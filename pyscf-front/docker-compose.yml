@@ -11,7 +11,7 @@ services:
       MYSQL_USER: pyscf_user
       MYSQL_PASSWORD: pyscf_password
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database/schema:/docker-entrypoint-initdb.d
@@ -44,26 +44,8 @@ services:
     networks:
       - pyscf_network
 
-  # Flutter Frontend (for development)
-  frontend:
-    build:
-      context: .
-      dockerfile: ./docker/frontend/Dockerfile.dev
-    restart: always
-    ports:
-      - "8080:8080"    # Flutter development server
-    volumes:
-      - ./frontend:/app
-    depends_on:
-      - backend
-    networks:
-      - pyscf_network
-    environment:
-      - DISPLAY=${DISPLAY:-:0}
-    # For GUI applications on Linux
-    volumes:
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-    privileged: true
+  # Note: Flutter frontend requires local development
+  # Use 'flutter run' locally instead of Docker for GUI apps
 
   # phpMyAdmin (for database management)
   phpmyadmin:

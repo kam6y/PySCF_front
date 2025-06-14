@@ -1,11 +1,33 @@
 version: '3.8'
 
 services:
-  # Development environment extends base compose
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: dev_root_password
+      MYSQL_DATABASE: pyscf_dev
+      MYSQL_USER: pyscf_user
+      MYSQL_PASSWORD: pyscf_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+      - ./database/schema:/docker-entrypoint-initdb.d
+    command: 
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    networks:
+      - pyscf_network
+
+  # Development Backend
   backend:
     build:
       context: .
-      dockerfile: ./docker/backend/Dockerfile.dev
+      dockerfile: ./docker/backend/Dockerfile
+    restart: always
     volumes:
       - ./backend:/app
       - ./protos:/protos
@@ -15,38 +37,33 @@ services:
       - DATABASE_URL=mysql+pymysql://pyscf_user:pyscf_password@mysql:3306/pyscf_dev
       - GRPC_PORT=50051
       - MCP_SERVER_ENABLED=false
-      - FLASK_ENV=development
       - DEBUG=true
-    command: >
-      sh -c "pip install -e . &&
-             python -m uvicorn src.main:app --reload --host 0.0.0.0 --port 8000"
-
-  # Flutter Frontend Development
-  frontend:
-    build:
-      context: .
-      dockerfile: ./docker/frontend/Dockerfile.dev
-    volumes:
-      - ./frontend:/app
-    environment:
-      - DISPLAY=${DISPLAY:-:0}
     ports:
-      - "8080:8080"
-      - "9200:9200"  # Flutter DevTools
+      - "50051:50051"  # gRPC
+      - "8000:8000"    # FastAPI
     depends_on:
-      - backend
-    
-  # MySQL with development-specific settings
-  mysql:
+      - mysql
+    networks:
+      - pyscf_network
+
+  # phpMyAdmin (for database management)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: dev_root_password
-      MYSQL_DATABASE: pyscf_dev
-      MYSQL_USER: pyscf_user
-      MYSQL_PASSWORD: pyscf_password
-    volumes:
-      - mysql_dev_data:/var/lib/mysql
-      - ./database/schema:/docker-entrypoint-initdb.d
-      - ./database/test_data:/docker-entrypoint-initdb.d/test_data
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: dev_root_password
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - pyscf_network
 
 volumes:
   mysql_dev_data:
+
+networks:
+  pyscf_network:
+    driver: bridge

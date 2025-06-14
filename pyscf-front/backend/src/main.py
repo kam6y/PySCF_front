@@ -2,12 +2,23 @@
 PySCF_Front Backend Main Application
 """
 import os
+import threading
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Import gRPC service
+from src.grpc_service import serve as serve_grpc
+from src.database.connection import init_database
+from src.core.pyscf_config import pyscf_config
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -55,6 +66,29 @@ async def info():
         "environment": os.getenv("ENVIRONMENT", "development"),
         "database_url": os.getenv("DATABASE_URL", "not_configured").split("@")[-1] if "@" in os.getenv("DATABASE_URL", "") else "not_configured"
     }
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize application on startup"""
+    logger.info("Starting PySCF_Front Backend...")
+    
+    # Initialize database
+    db_success = init_database()
+    if not db_success:
+        logger.error("Failed to initialize database")
+        raise RuntimeError("Database initialization failed")
+    
+    logger.info("Database initialized successfully")
+    
+    # Initialize PySCF
+    logger.info(f"PySCF initialized with {len(pyscf_config.get_available_methods())} methods and {len(pyscf_config.get_available_basis_sets())} basis sets")
+    
+    # Start gRPC server
+    grpc_thread = threading.Thread(target=serve_grpc, daemon=True)
+    grpc_thread.start()
+    logger.info("gRPC server started in background thread")
+    
+    logger.info("PySCF_Front Backend startup complete")
 
 if __name__ == "__main__":
     import uvicorn
