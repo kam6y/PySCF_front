@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: dev_root_password
+      MYSQL_DATABASE: pyscf_dev
+      MYSQL_USER: pyscf_user
+      MYSQL_PASSWORD: pyscf_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema:/docker-entrypoint-initdb.d
+    command: 
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    networks:
+      - pyscf_network
+
+  # Python Backend
+  backend:
+    build:
+      context: .
+      dockerfile: ./docker/backend/Dockerfile
+    restart: always
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - DATABASE_URL=mysql+pymysql://pyscf_user:pyscf_password@mysql:3306/pyscf_dev
+      - GRPC_PORT=50051
+      - MCP_SERVER_ENABLED=false
+    ports:
+      - "50051:50051"  # gRPC
+      - "8000:8000"    # FastAPI (for web interface)
+    volumes:
+      - ./protos:/protos
+    depends_on:
+      - mysql
+    networks:
+      - pyscf_network
+
+  # Flutter Frontend (for development)
+  frontend:
+    build:
+      context: .
+      dockerfile: ./docker/frontend/Dockerfile.dev
+    restart: always
+    ports:
+      - "8080:8080"    # Flutter development server
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+    networks:
+      - pyscf_network
+    environment:
+      - DISPLAY=${DISPLAY:-:0}
+    # For GUI applications on Linux
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+    privileged: true
+
+  # phpMyAdmin (for database management)
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: always
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: root
+      PMA_PASSWORD: dev_root_password
+    ports:
+      - "8080:80"
+    depends_on:
+      - mysql
+    networks:
+      - pyscf_network
+
+volumes:
+  mysql_data:
+
+networks:
+  pyscf_network:
+    driver: bridge
