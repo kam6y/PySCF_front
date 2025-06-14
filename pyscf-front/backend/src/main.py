@@ -1,95 +1,115 @@
-"""
-PySCF_Front Backend Main Application
-"""
-import os
-import threading
+"""PySCF_Front Backend Main Entry Point"""
+
+import asyncio
 import logging
+import os
+from concurrent import futures
+from contextlib import asynccontextmanager
+
+import grpc
+import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+from api.grpc_server import CalculationServicer
+from core.config import settings
+from core.database import DatabaseManager
+from core.pyscf_engine import PySCFEngine
 
-# Import gRPC service
-from src.grpc_service import serve as serve_grpc
-from src.database.connection import init_database
-from src.core.pyscf_config import pyscf_config
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    # Startup
+    logger.info("Starting PySCF_Front Backend...")
+    
+    # Initialize database
+    await DatabaseManager.initialize()
+    
+    # Start gRPC server
+    grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    servicer = CalculationServicer()
+    
+    # Import the generated gRPC service
+    from generated import calculation_pb2_grpc
+    calculation_pb2_grpc.add_CalculationServiceServicer_to_server(servicer, grpc_server)
+    
+    listen_addr = f'[::]:{settings.GRPC_PORT}'
+    grpc_server.add_insecure_port(listen_addr)
+    grpc_server.start()
+    
+    logger.info(f"gRPC server started on {listen_addr}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down PySCF_Front Backend...")
+    grpc_server.stop(grace=5)
+    await DatabaseManager.close()
+
+
+# FastAPI app for REST API and debugging
 app = FastAPI(
     title="PySCF_Front Backend",
-    description="Quantum chemistry calculation backend",
-    version="0.1.0"
+    description="Quantum chemistry calculation backend using PySCF",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 @app.get("/")
 async def root():
     """Root endpoint"""
-    return {
-        "message": "PySCF_Front Backend API",
-        "version": "0.1.0",
-        "status": "running"
-    }
+    return {"message": "PySCF_Front Backend is running", "version": "1.0.0"}
+
 
 @app.get("/health")
-async def health():
+async def health_check():
     """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "database": "connected",  # TODO: Add actual database check
-        "pyscf": "available"      # TODO: Add actual PySCF check
-    }
+    try:
+        # Check database connection
+        db_status = await DatabaseManager.health_check()
+        
+        # Check PySCF availability
+        pyscf_status = PySCFEngine.health_check()
+        
+        return {
+            "status": "healthy",
+            "database": db_status,
+            "pyscf": pyscf_status,
+            "grpc_port": settings.GRPC_PORT
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return {"status": "unhealthy", "error": str(e)}
 
-@app.get("/info")
-async def info():
+
+@app.get("/system-info")
+async def system_info():
     """System information endpoint"""
-    import sys
-    import platform
-    
-    return {
-        "python_version": sys.version,
-        "platform": platform.platform(),
-        "environment": os.getenv("ENVIRONMENT", "development"),
-        "database_url": os.getenv("DATABASE_URL", "not_configured").split("@")[-1] if "@" in os.getenv("DATABASE_URL", "") else "not_configured"
-    }
+    try:
+        info = PySCFEngine.get_system_info()
+        return {
+            "status": "success",
+            "system_info": info
+        }
+    except Exception as e:
+        logger.error(f"System info failed: {e}")
+        return {"status": "error", "error": str(e)}
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup"""
-    logger.info("Starting PySCF_Front Backend...")
-    
-    # Initialize database
-    db_success = init_database()
-    if not db_success:
-        logger.error("Failed to initialize database")
-        raise RuntimeError("Database initialization failed")
-    
-    logger.info("Database initialized successfully")
-    
-    # Initialize PySCF
-    logger.info(f"PySCF initialized with {len(pyscf_config.get_available_methods())} methods and {len(pyscf_config.get_available_basis_sets())} basis sets")
-    
-    # Start gRPC server
-    grpc_thread = threading.Thread(target=serve_grpc, daemon=True)
-    grpc_thread.start()
-    logger.info("gRPC server started in background thread")
-    
-    logger.info("PySCF_Front Backend startup complete")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=settings.API_PORT,
+        reload=settings.DEBUG,
+        log_level="info"
+    )

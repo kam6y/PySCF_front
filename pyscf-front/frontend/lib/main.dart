@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'widgets/grpc_test_widget.dart';
+import 'screens/home_screen.dart';
 
 void main() {
   runApp(const PySCFApp());
@@ -16,7 +16,8 @@ class PySCFApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const GrpcTestWidget(),
+      home: const HomeScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }

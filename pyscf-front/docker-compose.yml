@@ -21,12 +21,17 @@ services:
       - --default-authentication-plugin=mysql_native_password
     networks:
       - pyscf_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Python Backend
   backend:
     build:
-      context: .
-      dockerfile: ./docker/backend/Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile
     restart: always
     environment:
       - PYTHONDONTWRITEBYTECODE=1
@@ -38,11 +43,18 @@ services:
       - "50051:50051"  # gRPC
       - "8000:8000"    # FastAPI (for web interface)
     volumes:
-      - ./protos:/protos
+      - ./backend/src:/app/src:ro
+      - calculation_data:/app/data
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     networks:
       - pyscf_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Note: Flutter frontend requires local development
   # Use 'flutter run' locally instead of Docker for GUI apps
@@ -64,6 +76,7 @@ services:
 
 volumes:
   mysql_data:
+  calculation_data:
 
 networks:
   pyscf_network:

@@ -1,176 +1,106 @@
-import 'package:grpc/grpc.dart';
-import '../generated/calculation.pbgrpc.dart';
+import '../generated/calculation.pb.dart';
 
+// Simplified gRPC service for MVP
 class GrpcService {
-  late ClientChannel _channel;
-  late CalculationServiceClient _client;
+  bool _initialized = false;
   
-  static const String defaultHost = 'localhost';
-  static const int defaultPort = 50051;
-  
-  /// Initialize the gRPC connection
-  Future<void> initialize({
-    String host = defaultHost,
-    int port = defaultPort,
-  }) async {
-    _channel = ClientChannel(
-      host,
-      port: port,
-      options: const ChannelOptions(
-        credentials: ChannelCredentials.insecure(),
-      ),
-    );
-    
-    _client = CalculationServiceClient(_channel);
+  /// Initialize the gRPC connection (stub for MVP)
+  Future<void> initialize() async {
+    // Simulate connection
+    await Future.delayed(const Duration(milliseconds: 500));
+    _initialized = true;
   }
   
   /// Close the gRPC connection
   Future<void> close() async {
-    await _channel.shutdown();
+    _initialized = false;
   }
   
-  /// Get the calculation service client
-  CalculationServiceClient get client => _client;
+  bool get isInitialized => _initialized;
   
-  /// Health check
-  Future<HealthCheckResponse> healthCheck() async {
-    final request = HealthCheckRequest();
-    return await _client.healthCheck(request);
-  }
-  
-  /// Get system information
-  Future<SystemInfoResponse> getSystemInfo() async {
-    final request = GetSystemInfoRequest();
-    return await _client.getSystemInfo(request);
-  }
-  
-  /// Create a new molecule
+  /// Create a new molecule (stub implementation)
   Future<MoleculeResponse> createMolecule({
     required String name,
     required String formula,
     required List<Atom> atoms,
     int charge = 0,
     int multiplicity = 1,
-    String symmetry = '',
-    GeometryType geometryType = GeometryType.GEOMETRY_TYPE_XYZ,
   }) async {
-    final request = CreateMoleculeRequest()
+    await Future.delayed(const Duration(milliseconds: 200));
+    
+    final response = MoleculeResponse()
+      ..success = true
+      ..message = 'Molecule created successfully';
+    
+    final molecule = Molecule()
+      ..id = DateTime.now().millisecondsSinceEpoch.toString()
       ..name = name
       ..formula = formula
-      ..atoms.addAll(atoms)
       ..charge = charge
       ..multiplicity = multiplicity
-      ..symmetry = symmetry
-      ..geometryType = geometryType;
+      ..molecularWeight = atoms.length * 10.0; // Simple estimation
     
-    return await _client.createMolecule(request);
+    molecule.atoms.addAll(atoms);
+    response.molecule = molecule;
+    
+    return response;
   }
   
-  /// Get molecule by ID
-  Future<MoleculeResponse> getMolecule(String moleculeId) async {
-    final request = GetMoleculeRequest()..moleculeId = moleculeId;
-    return await _client.getMolecule(request);
-  }
-  
-  /// Create a new calculation instance
+  /// Create a calculation instance (stub implementation)
   Future<InstanceResponse> createInstance({
     required String name,
     required String description,
     required String moleculeId,
-    String? projectId,
   }) async {
-    final request = CreateInstanceRequest()
+    await Future.delayed(const Duration(milliseconds: 200));
+    
+    final response = InstanceResponse()
+      ..success = true
+      ..message = 'Instance created successfully';
+    
+    final instance = Instance()
+      ..id = DateTime.now().millisecondsSinceEpoch.toString()
       ..name = name
-      ..description = description
-      ..moleculeId = moleculeId;
+      ..description = description;
     
-    if (projectId != null) {
-      request.projectId = projectId;
-    }
+    response.instance = instance;
     
-    return await _client.createInstance(request);
+    return response;
   }
   
-  /// Get instance by ID
-  Future<InstanceResponse> getInstance(String instanceId) async {
-    final request = GetInstanceRequest()..instanceId = instanceId;
-    return await _client.getInstance(request);
-  }
-  
-  /// List instances with optional filtering
-  Future<ListInstancesResponse> listInstances({
-    String? projectId,
-    InstanceStatus? status,
-    int page = 1,
-    int pageSize = 10,
-  }) async {
-    final request = ListInstancesRequest()
-      ..page = page
-      ..pageSize = pageSize;
-    
-    if (projectId != null) {
-      request.projectId = projectId;
-    }
-    
-    if (status != null) {
-      request.status = status;
-    }
-    
-    return await _client.listInstances(request);
-  }
-  
-  /// Start a calculation and listen to progress updates
+  /// Start calculation with progress stream (stub implementation)
   Stream<CalculationProgress> startCalculation({
     required String instanceId,
     required String method,
     required String basisSet,
-    Map<String, String>? parameters,
-    ConvergenceCriteria? convergenceCriteria,
-    int? maxIterations,
-    int? priority,
-  }) {
-    final request = StartCalculationRequest()
-      ..instanceId = instanceId
-      ..method = method
-      ..basisSet = basisSet;
+    int priority = 1,
+  }) async* {
+    // Simulate calculation progress
+    final steps = [
+      'Initializing calculation',
+      'Setting up molecule',
+      'Building basis set',
+      'SCF iteration 1',
+      'SCF iteration 2',
+      'SCF iteration 3',
+      'Convergence achieved',
+      'Finalizing results',
+    ];
     
-    if (parameters != null) {
-      request.parameters.addAll(parameters);
+    for (int i = 0; i < steps.length; i++) {
+      await Future.delayed(const Duration(seconds: 1));
+      
+      final progress = CalculationProgress()
+        ..jobId = instanceId
+        ..currentStep = steps[i]
+        ..progressPercentage = ((i + 1) / steps.length * 100)
+        ..message = steps[i]
+        ..status = i == steps.length - 1 
+            ? CalculationStatus.CALCULATION_STATUS_COMPLETED
+            : CalculationStatus.CALCULATION_STATUS_RUNNING;
+      
+      yield progress;
     }
-    
-    if (convergenceCriteria != null) {
-      request.convergenceCriteria = convergenceCriteria;
-    }
-    
-    if (maxIterations != null) {
-      request.maxIterations = maxIterations;
-    }
-    
-    if (priority != null) {
-      request.priority = priority;
-    }
-    
-    return _client.startCalculation(request);
-  }
-  
-  /// Get calculation results
-  Future<ResultsResponse> getResults({
-    required String calculationId,
-    List<String>? resultTypes,
-  }) async {
-    final request = GetResultsRequest()..calculationId = calculationId;
-    
-    if (resultTypes != null) {
-      request.resultTypes.addAll(resultTypes);
-    }
-    
-    return await _client.getResults(request);
-  }
-  
-  /// Cancel a running calculation
-  Future<CancelCalculationResponse> cancelCalculation(String calculationId) async {
-    final request = CancelCalculationRequest()..calculationId = calculationId;
-    return await _client.cancelCalculation(request);
   }
 }
 
