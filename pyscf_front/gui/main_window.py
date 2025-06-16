@@ -28,12 +28,13 @@ class MainWindow(QMainWindow):
         # 分子管理システム
         self.molecule_manager = MoleculeManager()
         
-        # 計算エンジン（統合版・プラグインシステム対応）
-        self.calculation_engine = UnifiedCalculationEngine(use_database=True)
-        
-        # データベースモードが利用できない場合の警告
-        if not self.calculation_engine.use_database:
-            self.show_database_warning()
+        # 計算エンジン（統合版・SQLiteデータベース専用）
+        try:
+            self.calculation_engine = UnifiedCalculationEngine()
+        except RuntimeError as e:
+            logger.error(f"Failed to initialize calculation engine: {e}")
+            self.show_database_error(str(e))
+            return
         
         # ウィンドウ基本設定
         self.setWindowTitle("PySCF_Front v0.0.1")
@@ -270,24 +271,15 @@ class MainWindow(QMainWindow):
         molecule = self.molecule_widget.current_molecule
         
         try:
-            # データベースモードが利用可能な場合は永続化、そうでなければメモリモード
-            if self.calculation_engine.use_database:
-                job_id = self.calculation_engine.submit_calculation_with_persistence(
-                    molecule,
-                    method="B3LYP",
-                    basis_set="6-31G(d)",
-                    instance_name=f"QuickCalc_{molecule.name}"
-                )
-                self.status_bar.showMessage(f"クイック計算を開始（永続化）: {molecule.name} (Job: {job_id[:8]})", 5000)
-                logger.info(f"Started persistent quick calculation for {molecule.name}: {job_id}")
-            else:
-                job_id = self.calculation_engine.submit_calculation(
-                    molecule,
-                    method="B3LYP",
-                    basis_set="6-31G(d)"
-                )
-                self.status_bar.showMessage(f"クイック計算を開始（メモリ）: {molecule.name} (Job: {job_id[:8]})", 5000)
-                logger.info(f"Started memory-only quick calculation for {molecule.name}: {job_id}")
+            # SQLiteデータベースへの永続化計算
+            job_id = self.calculation_engine.submit_calculation(
+                molecule,
+                method="B3LYP",
+                basis_set="6-31G(d)",
+                instance_name=f"QuickCalc_{molecule.name}"
+            )
+            self.status_bar.showMessage(f"クイック計算を開始: {molecule.name} (Job: {job_id[:8]})", 5000)
+            logger.info(f"Started quick calculation for {molecule.name}: {job_id}")
             
         except Exception as e:
             self.status_bar.showMessage(f"計算開始エラー: {str(e)}", 5000)
@@ -663,13 +655,17 @@ ID: {instance_details['id']}
         msg.setIcon(QMessageBox.Icon.Information)
         msg.exec()
     
-    def show_database_warning(self):
-        """データベース接続失敗の警告を表示"""
-        self.status_bar.showMessage(
-            "⚠️ データベースに接続できません。メモリモードで動作中（計算履歴は保存されません）", 
-            10000
+    def show_database_error(self, error_message: str):
+        """データベースエラーの表示"""
+        from PySide6.QtWidgets import QMessageBox
+        
+        QMessageBox.critical(
+            self,
+            "データベースエラー",
+            f"SQLiteデータベースの初期化に失敗しました:\n\n{error_message}\n\n"
+            "アプリケーションを終了します。"
         )
-        logger.warning("Running in memory-only mode due to database connection failure")
+        self.close()
     
     def closeEvent(self, event):
         """アプリケーション終了時の処理"""

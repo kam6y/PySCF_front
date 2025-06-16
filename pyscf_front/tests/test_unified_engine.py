@@ -46,48 +46,43 @@ class TestUnifiedCalculationEngine:
                 'basis_plugin': mock_basis_plugin
             }
     
-    def test_engine_initialization_without_database(self, mock_plugins):
-        """データベースなしでのエンジン初期化テスト"""
-        with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
-            
-            engine = UnifiedCalculationEngine(use_database=False)
-            
-            assert engine.use_database is False
-            assert engine.calculation_service is None
-            assert engine.molecule_service is None
-            assert engine.instance_service is None
-            assert isinstance(engine.jobs, dict)
-            assert len(engine.jobs) == 0
-    
-    def test_engine_initialization_with_database(self, mock_plugins):
-        """データベースありでのエンジン初期化テスト"""
+    def test_engine_initialization_database_required(self, mock_plugins):
+        """データベース必須でのエンジン初期化テスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
              patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.CalculationService') as mock_calc_svc, \
-             patch('pyscf_front.core.calculation_engine_unified.MoleculeService') as mock_mol_svc, \
-             patch('pyscf_front.core.calculation_engine_unified.InstanceService') as mock_inst_svc:
+             patch('pyscf_front.services.calculation_service.CalculationService'), \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch('pyscf_front.services.instance_service.InstanceService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
-            engine = UnifiedCalculationEngine(use_database=True)
+            engine = UnifiedCalculationEngine()
             
-            assert engine.use_database is True
             assert engine.calculation_service is not None
             assert engine.molecule_service is not None
             assert engine.instance_service is not None
-            assert hasattr(engine, 'job_to_calculation_mapping')
-            assert hasattr(engine, 'job_to_instance_mapping')
+            assert isinstance(engine.jobs, dict)
+            assert len(engine.jobs) == 0
+    
+    def test_database_initialization_failure(self, mock_plugins):
+        """データベース初期化失敗テスト"""
+        with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.calculation_service.CalculationService', side_effect=Exception("DB Connection Failed")):
             
-            # サービスが初期化されたことを確認
-            mock_calc_svc.assert_called_once()
-            mock_mol_svc.assert_called_once()
-            mock_inst_svc.assert_called_once()
+            # データベース初期化の失敗で RuntimeError が発生することを確認
+            with pytest.raises(RuntimeError, match="Failed to initialize SQLite database"):
+                UnifiedCalculationEngine()
     
     def test_available_methods_and_basis_sets(self, mock_plugins):
         """利用可能な手法と基底関数の取得テスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.calculation_service.CalculationService'), \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch('pyscf_front.services.instance_service.InstanceService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
-            engine = UnifiedCalculationEngine(use_database=False)
+            engine = UnifiedCalculationEngine()
             
             methods = engine.get_available_methods()
             basis_sets = engine.get_available_basis_sets()
@@ -99,42 +94,14 @@ class TestUnifiedCalculationEngine:
             mock_plugins['manager'].get_available_methods.assert_called()
             mock_plugins['manager'].get_available_basis_sets.assert_called()
     
-    def test_simple_calculation_submission(self, mock_plugins, sample_molecule):
-        """シンプルな計算投入テスト"""
-        with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
-            
-            engine = UnifiedCalculationEngine(use_database=False)
-            
-            # 計算投入
-            job_id = engine.submit_calculation(
-                molecule=sample_molecule,
-                method="HF",
-                basis_set="STO-3G"
-            )
-            
-            # 検証
-            assert job_id is not None
-            assert isinstance(job_id, str)
-            assert job_id in engine.jobs
-            
-            job = engine.jobs[job_id]
-            assert job.molecule == sample_molecule
-            assert job.method == "HF"
-            assert job.basis_set == "STO-3G"
-            assert job.status == CalculationStatus.PENDING
-            
-            # プラグインが呼ばれたことを確認
-            mock_plugins['manager'].find_method_plugin.assert_called_with("HF")
-            mock_plugins['manager'].find_basis_plugin.assert_called_with("STO-3G")
-    
-    def test_persistent_calculation_submission(self, mock_plugins, sample_molecule):
+    def test_calculation_submission_with_persistence(self, mock_plugins, sample_molecule):
         """永続化計算投入テスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
              patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.InstanceService') as mock_inst_svc, \
-             patch('pyscf_front.core.calculation_engine_unified.CalculationService') as mock_calc_svc, \
-             patch('pyscf_front.core.calculation_engine_unified.MoleculeService'):
+             patch('pyscf_front.services.instance_service.InstanceService') as mock_inst_svc, \
+             patch('pyscf_front.services.calculation_service.CalculationService') as mock_calc_svc, \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
             # サービスのモック設定
             mock_inst_service = Mock()
@@ -147,35 +114,51 @@ class TestUnifiedCalculationEngine:
             ]
             mock_calc_svc.return_value = mock_calc_service
             
-            engine = UnifiedCalculationEngine(use_database=True)
+            engine = UnifiedCalculationEngine()
             
-            # 永続化計算投入
-            job_id = engine.submit_calculation_with_persistence(
+            # 計算投入
+            job_id = engine.submit_calculation(
                 molecule=sample_molecule,
-                method="B3LYP",
-                basis_set="6-31G",
+                method="HF",
+                basis_set="STO-3G",
                 instance_name="Test Calculation"
             )
             
             # 検証
             assert job_id is not None
+            assert isinstance(job_id, str)
             assert job_id in engine.jobs
             assert job_id in engine.job_to_calculation_mapping
             assert job_id in engine.job_to_instance_mapping
+            
+            job = engine.jobs[job_id]
+            assert job.molecule == sample_molecule
+            assert job.method == "HF"
+            assert job.basis_set == "STO-3G"
+            assert job.status == CalculationStatus.PENDING
+            
+            # プラグインが呼ばれたことを確認
+            mock_plugins['manager'].find_method_plugin.assert_called_with("HF")
+            mock_plugins['manager'].find_basis_plugin.assert_called_with("STO-3G")
             
             # サービスが呼ばれたことを確認
             mock_inst_service.create_complete_instance.assert_called_once()
             mock_calc_service.get_calculations_by_instance.assert_called_once()
     
+    
     def test_unsupported_method_handling(self, mock_plugins, sample_molecule):
         """サポートされていない手法のハンドリングテスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.calculation_service.CalculationService'), \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch('pyscf_front.services.instance_service.InstanceService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
             # 手法プラグインが見つからない場合
             mock_plugins['manager'].find_method_plugin.return_value = None
             
-            engine = UnifiedCalculationEngine(use_database=False)
+            engine = UnifiedCalculationEngine()
             
             with pytest.raises(ValueError, match="Method INVALID_METHOD is not supported"):
                 engine.submit_calculation(
@@ -187,12 +170,16 @@ class TestUnifiedCalculationEngine:
     def test_unsupported_basis_set_handling(self, mock_plugins, sample_molecule):
         """サポートされていない基底関数のハンドリングテスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.calculation_service.CalculationService'), \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch('pyscf_front.services.instance_service.InstanceService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
             # 基底関数プラグインが見つからない場合
             mock_plugins['manager'].find_basis_plugin.return_value = None
             
-            engine = UnifiedCalculationEngine(use_database=False)
+            engine = UnifiedCalculationEngine()
             
             with pytest.raises(ValueError, match="Basis set INVALID_BASIS is not supported"):
                 engine.submit_calculation(
@@ -204,9 +191,24 @@ class TestUnifiedCalculationEngine:
     def test_job_status_and_management(self, mock_plugins, sample_molecule):
         """ジョブステータスと管理のテスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.instance_service.InstanceService') as mock_inst_svc, \
+             patch('pyscf_front.services.calculation_service.CalculationService') as mock_calc_svc, \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
-            engine = UnifiedCalculationEngine(use_database=False)
+            # サービスのモック設定
+            mock_inst_service = Mock()
+            mock_inst_service.create_complete_instance.return_value = "test-instance-id"
+            mock_inst_svc.return_value = mock_inst_service
+            
+            mock_calc_service = Mock()
+            mock_calc_service.get_calculations_by_instance.return_value = [
+                {'id': 'test-calc-id', 'status': 'pending'}
+            ]
+            mock_calc_svc.return_value = mock_calc_service
+            
+            engine = UnifiedCalculationEngine()
             
             # 計算投入
             job_id = engine.submit_calculation(
@@ -234,9 +236,13 @@ class TestUnifiedCalculationEngine:
     def test_time_estimation(self, mock_plugins, sample_molecule):
         """計算時間推定のテスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.calculation_service.CalculationService'), \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch('pyscf_front.services.instance_service.InstanceService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
-            engine = UnifiedCalculationEngine(use_database=False)
+            engine = UnifiedCalculationEngine()
             
             time_str = engine.estimate_calculation_time(
                 molecule=sample_molecule,
@@ -254,9 +260,24 @@ class TestUnifiedCalculationEngine:
     def test_completed_jobs_cleanup(self, mock_plugins, sample_molecule):
         """完了ジョブのクリーンアップテスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.instance_service.InstanceService') as mock_inst_svc, \
+             patch('pyscf_front.services.calculation_service.CalculationService') as mock_calc_svc, \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
-            engine = UnifiedCalculationEngine(use_database=False)
+            # サービスのモック設定
+            mock_inst_service = Mock()
+            mock_inst_service.create_complete_instance.return_value = "test-instance-id"
+            mock_inst_svc.return_value = mock_inst_service
+            
+            mock_calc_service = Mock()
+            mock_calc_service.get_calculations_by_instance.return_value = [
+                {'id': 'test-calc-id', 'status': 'pending'}
+            ]
+            mock_calc_svc.return_value = mock_calc_service
+            
+            engine = UnifiedCalculationEngine()
             
             # 複数のジョブを作成
             job_ids = []
@@ -369,7 +390,11 @@ class TestUnifiedEngineIntegration:
     def test_end_to_end_calculation_workflow(self, sample_molecule, mock_pyscf):
         """エンドツーエンドの計算ワークフローテスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin') as mock_method_cls, \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin') as mock_basis_cls:
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin') as mock_basis_cls, \
+             patch('pyscf_front.services.calculation_service.CalculationService'), \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch('pyscf_front.services.instance_service.InstanceService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
             # プラグインのモック設定
             mock_method_plugin = Mock()
@@ -385,7 +410,7 @@ class TestUnifiedEngineIntegration:
             mock_basis_cls.return_value = mock_basis_plugin
             
             # エンジン作成
-            engine = UnifiedCalculationEngine(use_database=False)
+            engine = UnifiedCalculationEngine()
             
             # 利用可能な手法と基底関数の確認
             methods = engine.get_available_methods()
@@ -412,41 +437,34 @@ class TestUnifiedEngineIntegration:
             )
             assert "分" in time_estimate or "秒" in time_estimate
     
-    def test_database_and_memory_mode_compatibility(self, sample_molecule):
-        """データベースモードとメモリモードの互換性テスト"""
+    def test_database_only_mode(self, sample_molecule):
+        """データベース専用モードテスト"""
         with patch('pyscf_front.core.calculation_engine_unified.PySCFMethodPlugin'), \
-             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'):
+             patch('pyscf_front.core.calculation_engine_unified.PySCFBasisSetPlugin'), \
+             patch('pyscf_front.services.calculation_service.CalculationService'), \
+             patch('pyscf_front.services.molecule_service.MoleculeService'), \
+             patch('pyscf_front.services.instance_service.InstanceService'), \
+             patch.object(UnifiedCalculationEngine, '_test_database_connection'):
             
-            # メモリモードエンジン
-            memory_engine = UnifiedCalculationEngine(use_database=False)
+            # データベース専用エンジン
+            db_engine = UnifiedCalculationEngine()
             
-            # データベースモードエンジン（モック）
-            with patch('pyscf_front.core.calculation_engine_unified.CalculationService'), \
-                 patch('pyscf_front.core.calculation_engine_unified.MoleculeService'), \
-                 patch('pyscf_front.core.calculation_engine_unified.InstanceService'):
-                
-                db_engine = UnifiedCalculationEngine(use_database=True)
+            # APIが利用可能
+            methods = db_engine.get_available_methods()
+            basis_sets = db_engine.get_available_basis_sets()
             
-            # 両方で同じAPIが利用可能
-            for engine in [memory_engine, db_engine]:
-                methods = engine.get_available_methods()
-                basis_sets = engine.get_available_basis_sets()
-                
-                assert isinstance(methods, list)
-                assert isinstance(basis_sets, list)
-                
-                # 基本的な計算投入も同様
-                assert hasattr(engine, 'submit_calculation')
-                assert hasattr(engine, 'get_job_status')
-                assert hasattr(engine, 'list_jobs')
+            assert isinstance(methods, list)
+            assert isinstance(basis_sets, list)
             
-            # データベースモード固有の機能
-            assert hasattr(db_engine, 'submit_calculation_with_persistence')
+            # 基本的な計算投入機能
+            assert hasattr(db_engine, 'submit_calculation')
+            assert hasattr(db_engine, 'get_job_status')
+            assert hasattr(db_engine, 'list_jobs')
+            
+            # データベース機能
             assert hasattr(db_engine, 'get_calculation_history')
-            
-            # メモリモードでデータベース機能を呼ぶとエラー
-            with pytest.raises(RuntimeError, match="Database persistence is not enabled"):
-                memory_engine.submit_calculation_with_persistence(sample_molecule)
+            assert hasattr(db_engine, 'list_all_instances')
+            assert hasattr(db_engine, 'get_instance_details')
 
 
 if __name__ == "__main__":

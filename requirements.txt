@@ -19,7 +19,6 @@ pyqtgraph==0.13.7
 # Database
 sqlalchemy==2.0.30
 alembic==1.13.1
-mysql-connector-python==9.3.0
 
 # Utilities
 pyyaml==6.0.1

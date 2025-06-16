@@ -229,48 +229,38 @@ class UnifiedCalculationWorker(QRunnable):
 
 
 class UnifiedCalculationEngine:
-    """統合計算エンジン（プラグインシステム対応）"""
+    """統合計算エンジン（SQLiteデータベース専用）"""
     
-    def __init__(self, use_database: bool = True):
-        self.use_database = use_database
+    def __init__(self):
         self.jobs: Dict[str, CalculationJob] = {}
         self.signals = CalculationSignals()
         self.thread_pool = QThreadPool()
         
-        # サービス層（データベース使用時のみ）
-        if self.use_database:
-            try:
-                from pyscf_front.services import CalculationService, MoleculeService, InstanceService
-                self.calculation_service = CalculationService()
-                self.molecule_service = MoleculeService()
-                self.instance_service = InstanceService()
-                
-                # データベース接続テスト
-                self._test_database_connection()
-                
-                # マッピング辞書
-                self.job_to_calculation_mapping: Dict[str, str] = {}
-                self.job_to_instance_mapping: Dict[str, str] = {}
-                
-                logger.info("Database services initialized successfully")
-                
-            except Exception as e:
-                logger.warning(f"Database initialization failed: {e}")
-                logger.info("Falling back to memory-only mode")
-                self.use_database = False
-                self.calculation_service = None
-                self.molecule_service = None
-                self.instance_service = None
-        else:
-            self.calculation_service = None
-            self.molecule_service = None
-            self.instance_service = None
+        # サービス層（常にデータベース使用）
+        try:
+            from pyscf_front.services import CalculationService, MoleculeService, InstanceService
+            self.calculation_service = CalculationService()
+            self.molecule_service = MoleculeService()
+            self.instance_service = InstanceService()
+            
+            # データベース接続テスト
+            self._test_database_connection()
+            
+            # マッピング辞書
+            self.job_to_calculation_mapping: Dict[str, str] = {}
+            self.job_to_instance_mapping: Dict[str, str] = {}
+            
+            logger.info("Database services initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Database initialization failed: {e}")
+            raise RuntimeError(f"Failed to initialize SQLite database: {e}")
         
         # プラグインマネージャーの初期化
         self.plugin_manager = get_plugin_manager()
         self._initialize_plugins()
         
-        logger.info(f"UnifiedCalculationEngine initialized (database: {self.use_database})")
+        logger.info("UnifiedCalculationEngine initialized with SQLite database")
     
     def _test_database_connection(self):
         """データベース接続をテスト"""
@@ -309,61 +299,10 @@ class UnifiedCalculationEngine:
         charge: Optional[int] = None,
         multiplicity: Optional[int] = None,
         parameters: Optional[Dict[str, Any]] = None,
-        priority: int = 5
-    ) -> str:
-        """計算を投入（メモリのみ）"""
-        
-        # プラグインの可用性チェック
-        if not self.plugin_manager.find_method_plugin(method):
-            raise ValueError(f"Method {method} is not supported by any plugin")
-        
-        if not self.plugin_manager.find_basis_plugin(basis_set):
-            raise ValueError(f"Basis set {basis_set} is not supported by any plugin")
-        
-        # 電荷とスピン多重度の設定
-        if charge is None:
-            charge = molecule.charge
-        if multiplicity is None:
-            multiplicity = molecule.multiplicity
-        
-        # ジョブID生成
-        job_id = str(uuid.uuid4())
-        
-        # ジョブ作成
-        job = CalculationJob(
-            id=job_id,
-            molecule=molecule,
-            method=method,
-            basis_set=basis_set,
-            charge=charge,
-            multiplicity=multiplicity,
-            parameters=parameters or {}
-        )
-        
-        self.jobs[job_id] = job
-        
-        # ワーカー作成と投入
-        worker = UnifiedCalculationWorker(job, self.signals)
-        self.thread_pool.start(worker)
-        
-        logger.info(f"Submitted calculation job: {job_id}")
-        return job_id
-    
-    def submit_calculation_with_persistence(
-        self,
-        molecule: Molecule,
-        method: str = "B3LYP",
-        basis_set: str = "6-31G(d)",
-        charge: Optional[int] = None,
-        multiplicity: Optional[int] = None,
-        parameters: Optional[Dict[str, Any]] = None,
         instance_name: Optional[str] = None,
         priority: int = 5
     ) -> str:
-        """計算を投入（データベース永続化付き）"""
-        
-        if not self.use_database:
-            raise RuntimeError("Database persistence is not enabled")
+        """計算を投入（データベース永続化）"""
         
         # プラグインの可用性チェック
         if not self.plugin_manager.find_method_plugin(method):
@@ -395,7 +334,7 @@ class UnifiedCalculationEngine:
         
         calculation_id = calculations[0]['id']
         
-        # 従来のジョブIDを生成
+        # ジョブID生成
         job_id = str(uuid.uuid4())
         
         # 電荷とスピン多重度の設定
@@ -432,6 +371,7 @@ class UnifiedCalculationEngine:
             f"(instance: {instance_id}, calculation: {calculation_id})"
         )
         return job_id
+    
     
     def get_available_methods(self) -> List[str]:
         """利用可能な計算手法の一覧"""
@@ -485,9 +425,8 @@ class UnifiedCalculationEngine:
         for job_id in completed_jobs:
             del self.jobs[job_id]
             # マッピングもクリア
-            if self.use_database:
-                self.job_to_calculation_mapping.pop(job_id, None)
-                self.job_to_instance_mapping.pop(job_id, None)
+            self.job_to_calculation_mapping.pop(job_id, None)
+            self.job_to_instance_mapping.pop(job_id, None)
         
         logger.info(f"Cleared {len(completed_jobs)} completed jobs")
     
@@ -517,42 +456,29 @@ class UnifiedCalculationEngine:
             logger.error(f"Time estimation failed: {e}")
             return "推定不可"
     
-    # データベース関連メソッド（use_database=Trueの場合のみ有効）
+    # データベース関連メソッド
     def get_calculation_history(self, instance_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """計算履歴を取得"""
-        if not self.use_database:
-            return []
         return self.calculation_service.get_calculation_history(instance_id)
     
     def get_instance_calculations(self, instance_id: str) -> List[Dict[str, Any]]:
         """インスタンスの計算一覧を取得"""
-        if not self.use_database:
-            return []
         return self.calculation_service.get_calculations_by_instance(instance_id)
     
     def list_all_instances(self) -> List[Dict[str, Any]]:
         """全インスタンスの一覧を取得"""
-        if not self.use_database:
-            return []
         return self.instance_service.get_all_instances(include_details=False)
     
     def get_instance_details(self, instance_id: str) -> Optional[Dict[str, Any]]:
         """インスタンスの詳細情報を取得"""
-        if not self.use_database:
-            return None
         return self.instance_service.get_instance_details(instance_id)
     
     def delete_instance(self, instance_id: str) -> bool:
         """インスタンスを削除"""
-        if not self.use_database:
-            return False
         return self.instance_service.delete_instance(instance_id)
     
     def resume_interrupted_calculations(self) -> List[str]:
         """中断された計算を再開"""
-        if not self.use_database:
-            return []
-        
         # 実装は IntegratedCalculationEngine と同様
         # 詳細省略...
         return []
