@@ -2,7 +2,7 @@
 
 ## 概要
 
-PySCF_native_appは、PySide6 (Qt 6.7+) を使用してPythonで完全に構築された高度な量子化学計算デスクトップアプリケーションです。PySCFを計算エンジンとして使用し、分子の可視化、計算管理、結果分析を統合したネイティブGUIアプリケーションです。
+PySCF_native_appは、PySide6 (Qt 6.7+) を使用してPythonで完全に構築された高度な量子化学計算デスクトップアプリケーションです。PySCFを計算エンジンとして使用し、分子の可視化、計算管理、結果分析を統合したネイティブGUIアプリケーション、そして拡張可能なプラグインシステムを提供します。
 
 ## アーキテクチャ概要
 
@@ -11,15 +11,16 @@ PySCF_native_appは、PySide6 (Qt 6.7+) を使用してPythonで完全に構築�
 - **直接統合**: gRPC不要 - GUIと計算エンジン間の直接関数呼び出し
 - **ネイティブ性能**: Qt基盤のGUIでOpenGL/VTKアクセラレーション
 - **科学計算エコシステム**: NumPy、SciPy、Matplotlib、RDKitとの直接統合
+- **プラグインアーキテクチャ**: 拡張可能な計算手法、基底関数、解析ツールのプラグインシステム
 
 ### 技術スタック
-- **フロントエンド**: PySide6 6.7.0 (Qt基盤のネイティブGUI)
-- **計算エンジン**: PySCF 2.9.0 (量子化学計算)
-- **分子処理**: RDKit 2024.03.3 (SMILES処理、3D生成)
-- **データベース**: SQLAlchemy 2.0.30 (MySQL/SQLite対応)
-- **可視化**: VTK 9.3.0、Matplotlib 3.9.0
-- **設定管理**: YAML設定ファイル + 環境変数オーバーライド
-- **テスト**: Pytest + Qt GUIテスト対応
+- **フロントエンド**: PySide6 6.7.0+ (Qt基盤のネイティブGUI)
+- **計算エンジン**: PySCF 2.9.0+ (量子化学計算) + 統合プラグインシステム
+- **分子処理**: RDKit 2024.03.3+ (SMILES処理、3D生成)
+- **データベース**: SQLAlchemy 2.0.30+ (SQLite専用)
+- **可視化**: VTK 9.3.0+、Matplotlib 3.9.0+
+- **設定管理**: 環境変数ベース設定システム
+- **テスト**: Pytest + pytest-qt (GUI テスト対応)
 
 ## ディレクトリ構成
 
@@ -27,16 +28,23 @@ PySCF_native_appは、PySide6 (Qt 6.7+) を使用してPythonで完全に構築�
 PySCF_native_app/
 ├── README.md                    # プロジェクト基本説明
 ├── CLAUDE.md                    # Claude Code用プロジェクト指示書
-├── IMPLEMENTATION_STATUS.md     # 実装状況レポート (95%完成)
+├── IMPLEMENTATION_STATUS.md     # 実装状況レポート
 ├── SETUP_COMPLETE.md           # セットアップ完了ドキュメント
 ├── PROJECT_STRUCTURE.md        # 本ファイル - プロジェクト構成説明
+├── LICENSE                     # ライセンス情報
 ├── mcp-server-setup.md         # MCP サーバーセットアップガイド
 ├── setup.py                    # Python パッケージ配布設定
 ├── run_dev.py                  # 開発用起動スクリプト
 ├── test_environment.py         # 環境検証スクリプト
 ├── requirements.txt            # 本番依存関係
 ├── requirements-dev.txt        # 開発依存関係
-├── venv/                       # Python仮想環境
+├── .env                        # 環境変数設定ファイル
+├── .env.example               # 環境変数設定例
+├── .gitignore                 # Git除外設定
+├── venv/                      # Python仮想環境
+├── data/                      # データディレクトリ
+│   └── pyscf_front.db         # SQLiteデータベースファイル
+├── logs/                      # ログディレクトリ
 │
 └── pyscf_front/               # メインアプリケーション
     ├── __init__.py
@@ -45,8 +53,8 @@ PySCF_native_app/
     ├── core/                  # 計算エンジン・コアロジック
     │   ├── __init__.py
     │   ├── molecule.py        # 分子データ管理 (Atom, Molecule, MoleculeBuilder)
-    │   ├── calculation_engine.py        # PySCF統合、非同期ジョブ管理
-    │   └── calculation_engine_integrated.py  # 統合計算エンジン
+    │   ├── calculation_engine.py         # レガシー計算エンジン
+    │   └── calculation_engine_unified.py # 統合計算エンジン（プラグイン対応）
     │
     ├── gui/                   # PySide6 GUI コンポーネント
     │   ├── __init__.py
@@ -58,18 +66,14 @@ PySCF_native_app/
     │   ├── widgets/           # 再利用可能UIウィジェット
     │   │   ├── __init__.py
     │   │   └── molecule_viewer.py       # 分子管理ウィジェット
-    │   └── resources/         # UIリソース
-    │       ├── icons/         # アプリケーションアイコン
-    │       ├── styles/        # スタイルシート
-    │       │   └── dark_theme.qss       # ダークテーマ
-    │       └── ui_files/      # Qt Designer ファイル
+    │   └── resources/         # UIリソース (空のディレクトリ)
     │
-    ├── database/              # データ永続化層
+    ├── database/              # データ永続化層（SQLite専用）
     │   ├── __init__.py
     │   ├── models.py          # SQLAlchemy ORM モデル
     │   ├── repository.py      # データアクセス層 (DAO パターン)
-    │   ├── connection.py      # データベース接続管理
-    │   └── migrations/        # データベースマイグレーション
+    │   ├── connection.py      # SQLiteデータベース接続管理
+    │   └── migrations/        # データベースマイグレーション (空)
     │
     ├── services/              # ビジネスロジック サービス層
     │   ├── __init__.py
@@ -79,29 +83,42 @@ PySCF_native_app/
     │
     ├── plugins/               # プラグインシステム
     │   ├── __init__.py
+    │   ├── base.py            # プラグイン基底クラス・管理システム
     │   ├── methods/           # 計算手法プラグイン
+    │   │   ├── __init__.py
+    │   │   └── pyscf_methods.py        # PySCF手法プラグイン
     │   ├── basis_sets/        # 基底関数プラグイン
-    │   └── analysis/          # 解析ツールプラグイン
+    │   │   ├── __init__.py
+    │   │   └── pyscf_basis_sets.py     # PySCF基底関数プラグイン
+    │   └── analysis/          # 解析ツールプラグイン (空)
     │
     ├── utils/                 # ユーティリティ関数
     │   ├── __init__.py
-    │   ├── config.py          # 設定管理 (YAML + 環境変数)
+    │   ├── config.py          # 設定管理 (環境変数ベース)
     │   └── logger.py          # ログ設定・管理
     │
     ├── tests/                 # テストスイート
     │   ├── __init__.py
     │   ├── conftest.py        # Pytest設定・フィクスチャ
-    │   ├── test_calculation_engine_integration.py # 統合テスト
-    │   └── test_services.py   # サービス層テスト
+    │   ├── test_gui_components.py       # GUI コンポーネントテスト
+    │   ├── test_plugin_system.py       # プラグインシステムテスト
+    │   ├── test_services.py            # サービス層テスト
+    │   └── test_unified_engine.py      # 統合エンジンテスト
     │
-    ├── translations/          # 国際化対応
+    ├── translations/          # 国際化対応 (空)
     │   └── (翻訳ファイル)
     │
-    ├── mcp_server/            # MCP サーバー (オプション)
+    ├── mcp_server/            # MCP サーバー (オプション、空)
     │   └── (Claude Desktop統合用)
     │
-    └── resources/             # 追加リソース
-        └── (追加リソースファイル)
+    ├── docs/                  # ドキュメント (空)
+    │   └── (プロジェクト文書)
+    │
+    └── resources/             # アプリケーションリソース
+        ├── icons/             # アプリケーションアイコン (空)
+        ├── styles/            # スタイルシート
+        │   └── dark_theme.qss # ダークテーマ
+        └── ui_files/          # Qt Designer ファイル (空)
 ```
 
 ## 主要コンポーネント詳細
@@ -120,13 +137,20 @@ PySCF_native_app/
   - 水、メタン、ベンゼンなどのプリセット分子
 - **MoleculeManager**: 分子コレクション管理
 
-#### `calculation_engine.py`
+#### `calculation_engine.py` (レガシー)
 - **CalculationJob データクラス**: ジョブ追跡
-- **CalculationEngine**: PySCF 統合計算エンジン
+- **CalculationEngine**: 従来のPySCF 統合計算エンジン
   - スレッド化された計算実行
   - 進捗シグナル対応
   - HF、DFT (B3LYP、PBE)、post-HF 手法対応
-  - 非同期ジョブ管理
+
+#### `calculation_engine_unified.py` (現在の主要エンジン)
+- **UnifiedCalculationEngine**: プラグインシステム対応の統合計算エンジン
+  - SQLite専用データベース永続化
+  - プラグインベースの計算手法・基底関数管理
+  - 非同期ジョブ管理と進捗追跡
+  - 自動的な計算時間推定
+  - 結果の詳細解析（HOMO/LUMO、双極子モーメント、Mulliken電荷など）
 
 ### 2. GUI コンポーネント (`gui/`)
 
@@ -145,7 +169,7 @@ PySCF_native_app/
 - **molecule_viewer.py**: 分子管理ウィジェット
 - 再利用可能な GUI コンポーネント
 
-### 3. データ管理層 (`database/`)
+### 3. データ管理層 (`database/`) - SQLite専用
 
 #### `models.py`
 - SQLAlchemy ORM モデル定義
@@ -167,8 +191,10 @@ PySCF_native_app/
   - JobQueueRepository: ジョブキュー操作
 
 #### `connection.py`
-- データベース接続管理
-- MySQL/SQLite 対応
+- **DatabaseConfig**: SQLite専用設定クラス
+- **DatabaseManager**: SQLiteデータベース接続管理
+- ローカルファイルベースのデータベース (`data/pyscf_front.db`)
+- 自動テーブル作成とスキーマ管理
 
 ### 4. サービス層 (`services/`)
 
@@ -186,19 +212,36 @@ PySCF_native_app/
 - データベース統合
 - SMILES/XYZ からの分子作成
 
-### 5. 設定管理 (`utils/`)
+### 5. プラグインシステム (`plugins/`)
+
+#### `base.py`
+- **PluginInterface**: 全プラグインの基底クラス
+- **CalculationMethodPlugin**: 計算手法プラグインの基底クラス
+- **BasisSetPlugin**: 基底関数プラグインの基底クラス
+- **AnalysisPlugin**: 解析プラグインの基底クラス
+- **PluginManager**: プラグインの登録・管理・実行制御
+
+#### `methods/pyscf_methods.py`
+- **PySCFMethodPlugin**: PySCF対応計算手法プラグイン
+- サポート手法: HF、B3LYP、PBE、M06、wB97X-D など
+- 計算時間推定とパラメータ検証機能
+
+#### `basis_sets/pyscf_basis_sets.py`
+- **PySCFBasisSetPlugin**: PySCF対応基底関数プラグイン
+- サポート基底関数: STO-3G、6-31G系、cc-pVDZ系、def2系 など
+- 原子種との互換性チェック機能
+
+### 6. 設定管理 (`utils/`)
 
 #### `config.py`
-- YAML 設定ファイル管理
-- 環境変数オーバーライド対応
-- **設定セクション**:
-  - データベース設定
-  - アプリケーション設定
-  - 計算エンジン設定
-  - GUI 設定
-  - MCP サーバー設定
+- 環境変数ベース設定管理
+- **主要設定項目**:
+  - データベース設定 (`DB_PATH`)
+  - アプリケーション設定 (`PYSCF_FRONT_DEBUG`)
+  - ログレベル設定 (`PYSCF_FRONT_LOG_LEVEL`)
+  - GUI設定 (`PYSCF_FRONT_THEME`, `PYSCF_FRONT_LANGUAGE`)
 
-### 6. テスト (`tests/`)
+### 7. テスト (`tests/`)
 
 #### `conftest.py`
 - Pytest 設定・フィクスチャ
@@ -207,33 +250,38 @@ PySCF_native_app/
 - サンプル分子 (水、メタン)
 - Qt アプリケーションテスト対応
 
-#### テストクラス
-- **統合テスト**: 計算エンジンとデータベース統合
-- **サービス層テスト**: ビジネスロジックテスト
-- **GUI テスト**: pytest-qt 使用
+#### テストモジュール
+- **test_gui_components.py**: GUI コンポーネントテスト（pytest-qt使用）
+- **test_plugin_system.py**: プラグインシステムの登録・実行テスト
+- **test_services.py**: サービス層のビジネスロジックテスト
+- **test_unified_engine.py**: 統合計算エンジンの機能テスト
 
-## データフロー
+## データフロー（現在のアーキテクチャ）
 
-1. **ユーザー入力** → PySide6 GUI ダイアログ
-2. **GUI** → **サービス層** (直接 Python 関数呼び出し)
-3. **サービス層** → **コア計算エンジン** (PySCF)
-4. **計算実行** → QThreadPool でバックグラウンド処理
-5. **結果** → SQLAlchemy 経由でデータベース保存
-6. **可視化** → VTK/OpenGL で 3D 分子構造レンダリング
+1. **ユーザー入力** → PySide6 GUI ダイアログ・ウィジェット
+2. **GUI層** → **サービス層** (直接 Python 関数呼び出し)
+3. **サービス層** → **統合計算エンジン** (プラグインシステム経由)
+4. **プラグイン選択** → 手法・基底関数プラグインの動的ロード
+5. **計算実行** → QThreadPool でバックグラウンド処理 + PySCF計算
+6. **進捗更新** → Qt シグナル/スロットによる GUI 更新
+7. **結果処理** → SQLAlchemy 経由で SQLite データベース保存
+8. **可視化** → VTK/OpenGL で 3D 分子構造レンダリング（予定）
 
-## 実装状況 (95% 完成)
+## 実装状況
 
 ### ✅ 完了済み
-- 完全な分子入力系統 (SMILES、XYZ、プリセット)
-- 完全な PySCF 計算エンジン統合
-- 包括的な GUI とジョブ管理
-- 非同期計算実行と進捗追跡
-- 基本的な 3D 分子表示
-- データベース永続化とサービス層統合
+- **コアシステム**: 分子入力・管理システム (SMILES、XYZ、プリセット)
+- **計算エンジン**: 統合計算エンジンとプラグインシステム
+- **データベース**: SQLite専用データ永続化システム
+- **GUI基盤**: PySide6ベースのメインウィンドウとダイアログ
+- **サービス層**: 完全なビジネスロジック実装
+- **テスト**: 包括的なユニット・統合テストスイート
 
-### 🔄 進行中
-- 高度な 3D 可視化 (60% 完成)
-- 追加の解析ツール
+### 🔄 進行中・予定
+- **3D可視化**: VTK統合による高度な分子表示
+- **解析ツール**: 追加の結果解析プラグイン
+- **MCP サーバー**: Claude Desktop統合機能
+- **国際化**: 多言語対応システム
 
 ## 外部統合
 
@@ -246,23 +294,43 @@ PySCF_native_app/
 ## 開発環境
 
 ### 依存関係管理
-- **requirements.txt**: 本番環境依存関係
-- **requirements-dev.txt**: 開発環境依存関係
-- **venv/**: Python 仮想環境
+- **requirements.txt**: 本番環境依存関係 (PySCF、PySide6、SQLAlchemy等)
+- **requirements-dev.txt**: 開発環境依存関係 (pytest、Black、MyPy等)
+- **venv/**: Python 3.13 仮想環境
 
-### 開発ツール
+### 開発ツール設定
 - **Black**: コードフォーマッター (88文字、Python 3.13対応)
-- **MyPy**: 型チェック
+- **MyPy**: 静的型チェック
 - **Flake8**: PEP 8 コンプライアンス
-- **Pytest**: テストフレームワーク
+- **Pytest**: テストフレームワーク + pytest-qt (GUI テスト)
+
+### 環境設定
+- **.env**: 環境変数設定ファイル (SQLiteパスなど)
+- **.env.example**: 環境変数設定テンプレート
+- **data/**: SQLiteデータベースファイル格納ディレクトリ
+- **logs/**: アプリケーションログ格納ディレクトリ
 
 ### IDE サポート
-- VS Code 設定完備
-- Python インタープリター自動設定
+- VS Code 設定完備 (推奨)
+- Python インタープリター自動設定 (venv/bin/python)
 - Qt ツール統合 (Designer、UIC、RCC)
 - デバッグ・実行設定
 
 ## 使用方法
+
+### 初期セットアップ
+```bash
+# 仮想環境作成・有効化
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# 依存関係インストール
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# 環境設定
+cp .env.example .env  # 必要に応じて編集
+```
 
 ### 開発モード起動
 ```bash
@@ -276,7 +344,35 @@ python test_environment.py
 
 ### テスト実行
 ```bash
+# 全テスト実行
 pytest pyscf_front/tests/ -v
+
+# GUI テスト実行
+pytest pyscf_front/tests/test_gui_components.py --qt-test-timeout=5000
+
+# カバレッジ付きテスト
+pytest pyscf_front/tests/ --cov=pyscf_front
 ```
 
-このプロジェクトは、量子化学計算のための成熟した、よく設計されたデスクトップアプリケーションであり、プロフェッショナルな開発環境と包括的なテスト、設定管理、外部統合機能を提供します。
+### コード品質チェック
+```bash
+# フォーマット
+black pyscf_front/ --line-length=88
+
+# 型チェック
+mypy pyscf_front/
+
+# リント
+flake8 pyscf_front/
+```
+
+## プロジェクトの特徴
+
+PySCF_native_appは、以下の特徴を持つ成熟した量子化学計算デスクトップアプリケーションです：
+
+- **統合アーキテクチャ**: 単一Python言語による seamless な統合
+- **モジュラー設計**: プラグインシステムによる高い拡張性
+- **データ永続化**: SQLite による軽量で高速なローカルデータベース
+- **プロフェッショナル品質**: 包括的なテスト、型注釈、コード品質管理
+- **ユーザーフレンドリー**: 直感的なQt/PySide6 GUI
+- **科学計算特化**: PySCF統合による高精度量子化学計算
