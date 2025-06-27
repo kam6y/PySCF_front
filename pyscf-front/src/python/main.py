@@ -105,14 +105,17 @@ class PySCFBackend:
         try:
             mol = self.molecule_builder.build_from_data(data)
             
+            # Return molecule data in the same format expected by calculations
+            # Preserve original coordinate format for seamless workflow
             return {
                 'status': 'success',
                 'molecule': {
-                    'natoms': mol.natm,
+                    'type': 'coordinates',  # Maintain input type
+                    'coordinates': self.molecule_builder.get_coordinates_in_angstrom(mol),  # [element, x, y, z] format
                     'charge': mol.charge,
                     'spin': mol.spin,
-                    'coordinates': mol.atom_coords().tolist(),
-                    'elements': [mol.atom_symbol(i) for i in range(mol.natm)]
+                    'natoms': mol.natm,
+                    'unit': 'Angstrom'  # Always return in Angstrom for consistency
                 }
             }
             

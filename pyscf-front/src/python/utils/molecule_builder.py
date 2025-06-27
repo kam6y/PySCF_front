@@ -55,9 +55,12 @@ class MoleculeBuilder:
         if not coordinates:
             raise ValueError("No coordinates provided")
         
+        # Auto-detect coordinate format and normalize to [element, x, y, z] format
+        normalized_coordinates = self._normalize_coordinate_format(data, coordinates)
+        
         # Convert coordinates to PySCF format
         atom_string = ""
-        for coord in coordinates:
+        for coord in normalized_coordinates:
             if len(coord) != 4:
                 raise ValueError("Each coordinate must be [element, x, y, z]")
             element, x, y, z = coord
@@ -73,7 +76,7 @@ class MoleculeBuilder:
         mol.unit = unit  # Use specified unit
         mol.build()
         
-        logger.info(f"Built molecule from coordinates: {len(coordinates)} atoms")
+        logger.info(f"Built molecule from coordinates: {len(normalized_coordinates)} atoms")
         logger.info(f"PySCF molecule unit: {mol.unit}")
         return mol
     
@@ -98,6 +101,47 @@ class MoleculeBuilder:
             result.append([element, float(x), float(y), float(z)])
         
         return result
+    
+    def _normalize_coordinate_format(self, data: Dict[str, Any], coordinates: List) -> List[List]:
+        """
+        Normalize different coordinate formats to standard [element, x, y, z] format.
+        
+        Supports:
+        1. Standard format: [[element, x, y, z], ...]
+        2. Separated format: {coordinates: [[x, y, z], ...], elements: [element, ...]}
+        """
+        if not coordinates:
+            return []
+        
+        # Check if this is standard format [element, x, y, z]
+        first_coord = coordinates[0]
+        if (len(first_coord) == 4 and isinstance(first_coord[0], str)):
+            # Standard format - already correct
+            logger.info("Detected standard coordinate format [element, x, y, z]")
+            return coordinates
+        
+        # Check if this is separated format [[x, y, z], ...] with separate elements
+        elif (len(first_coord) == 3 and 'elements' in data):
+            # Separated format - need to combine
+            elements = data.get('elements', [])
+            
+            if len(coordinates) != len(elements):
+                raise ValueError(f"Coordinate count ({len(coordinates)}) does not match element count ({len(elements)})")
+            
+            logger.info("Detected separated coordinate format, combining with elements")
+            normalized = []
+            for i, (x, y, z) in enumerate(coordinates):
+                element = elements[i]
+                normalized.append([element, x, y, z])
+            
+            return normalized
+        
+        else:
+            # Unknown format
+            if len(first_coord) == 3:
+                raise ValueError("Coordinates appear to be missing elements. Use format [[element, x, y, z], ...] or provide 'elements' array.")
+            else:
+                raise ValueError(f"Invalid coordinate format. Expected [element, x, y, z] or [[x, y, z], ...] with elements array, got {len(first_coord)} values per coordinate.")
     
     def _build_from_smiles(self, data: Dict[str, Any]) -> gto.Mole:
         """Build molecule from SMILES string."""
