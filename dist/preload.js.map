@@ -1,0 +1,1 @@
+{"version":3,"file":"preload.js","mappings":";;;;;AAAa;AACb","sources":["webpack://pyscf_native_app/./src/preload.ts"],"sourcesContent":["\"use strict\";\nconsole.log(\"preloaded!\");\n"],"names":[],"sourceRoot":""}

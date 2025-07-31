@@ -1,0 +1,1 @@
+{"version":3,"file":"app.css","mappings":";;;AAAA;EACE,uBAAuB;EACvB,kBAAkB;AACpB,C","sources":["webpack://pyscf_native_app/./src/web/App.css"],"sourcesContent":[".container {\n  font-family: sans-serif;\n  text-align: center;\n}"],"names":[],"sourceRoot":""}
