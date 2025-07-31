@@ -5,8 +5,13 @@
     "esModuleInterop": true,
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
-    "strict": true
+    "strict": true,
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "types": []
   },
+  "include": [
+    "src/**/*"
+  ],
   "ts-node": {
     "compilerOptions": {
       "module": "CommonJS"

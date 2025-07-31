@@ -27581,12 +27581,616 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   App: () => (/* binding */ App)
 /* harmony export */ });
 /* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
-/* harmony import */ var _App_css__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./App.css */ "./src/web/App.css");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _App_css__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./App.css */ "./src/web/App.css");
+/* harmony import */ var _components_MoleculeViewer__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./components/MoleculeViewer */ "./src/web/components/MoleculeViewer.tsx");
+/* harmony import */ var _components_XYZInput__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./components/XYZInput */ "./src/web/components/XYZInput.tsx");
+/* harmony import */ var _components_StyleControls__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./components/StyleControls */ "./src/web/components/StyleControls.tsx");
+
+
+
+
 
 
 const App = () => {
-    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "container", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { children: "Hello." }) }));
+    const moleculeViewerRef = (0,react__WEBPACK_IMPORTED_MODULE_1__.useRef)(null);
+    const [hasValidMolecule, setHasValidMolecule] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
+    const [currentXYZ, setCurrentXYZ] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)("");
+    const handleXYZChange = (xyzData, isValid) => {
+        setCurrentXYZ(xyzData);
+        setHasValidMolecule(isValid);
+        if (isValid && xyzData.trim()) {
+            moleculeViewerRef.current?.loadXYZ(xyzData);
+        }
+        else {
+            moleculeViewerRef.current?.clearModels();
+        }
+    };
+    const handleStyleChange = (style) => {
+        if (hasValidMolecule) {
+            moleculeViewerRef.current?.setStyle(style);
+        }
+    };
+    const handleZoomToFit = () => {
+        if (hasValidMolecule) {
+            moleculeViewerRef.current?.zoomToFit();
+        }
+    };
+    const handleTakeScreenshot = () => {
+        if (hasValidMolecule) {
+            const screenshot = moleculeViewerRef.current?.takeScreenshot();
+            if (screenshot) {
+                // Create a download link for the screenshot
+                const link = document.createElement('a');
+                link.download = 'molecule-screenshot.png';
+                link.href = screenshot;
+                link.click();
+            }
+        }
+    };
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "app-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("header", { className: "app-header", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { children: "PySCF Molecular Visualizer" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Enter XYZ coordinates to visualize molecular structures in 3D" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("main", { className: "app-main", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "left-panel", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "input-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_XYZInput__WEBPACK_IMPORTED_MODULE_4__.XYZInput, { onXYZChange: handleXYZChange }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "controls-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_StyleControls__WEBPACK_IMPORTED_MODULE_5__.StyleControls, { onStyleChange: handleStyleChange }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "actions-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "action-buttons", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: handleZoomToFit, disabled: !hasValidMolecule, className: "action-button", children: "\uD83D\uDD0D Zoom to Fit" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: handleTakeScreenshot, disabled: !hasValidMolecule, className: "action-button", children: "\uD83D\uDCF7 Screenshot" })] }) })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "right-panel", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("section", { className: "viewer-section", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "viewer-header", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h2", { children: "3D Molecular Structure" }), hasValidMolecule && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "viewer-status", children: "\u2705 Molecule loaded successfully" }))] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "viewer-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_MoleculeViewer__WEBPACK_IMPORTED_MODULE_3__.MoleculeViewer, { ref: moleculeViewerRef, width: 600, height: 500, backgroundColor: "white", className: "main-viewer" }), !hasValidMolecule && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "viewer-placeholder", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "placeholder-content", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h3", { children: "No molecule loaded" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Enter valid XYZ coordinates in the left panel to see the 3D structure" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Try loading a sample molecule to get started!" })] }) }))] })] }) })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("footer", { className: "app-footer", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Powered by 3Dmol.js \u2022 Built with React and TypeScript" }) })] }));
 };
+
+
+/***/ }),
+
+/***/ "./src/web/components/MoleculeViewer.tsx":
+/*!***********************************************!*\
+  !*** ./src/web/components/MoleculeViewer.tsx ***!
+  \***********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   MoleculeViewer: () => (/* binding */ MoleculeViewer)
+/* harmony export */ });
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+
+
+const MoleculeViewer = (0,react__WEBPACK_IMPORTED_MODULE_1__.forwardRef)(({ width = 600, height = 400, backgroundColor = "white", className = "" }, ref) => {
+    const containerRef = (0,react__WEBPACK_IMPORTED_MODULE_1__.useRef)(null);
+    const viewerRef = (0,react__WEBPACK_IMPORTED_MODULE_1__.useRef)(null);
+    const currentModelRef = (0,react__WEBPACK_IMPORTED_MODULE_1__.useRef)(null);
+    (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(() => {
+        const initViewer = async () => {
+            if (!containerRef.current)
+                return;
+            try {
+                // Dynamic import to ensure 3Dmol.js is loaded properly
+                const $3Dmol = await __webpack_require__.e(/*! import() */ "vendors-node_modules_3dmol_build_3Dmol_js").then(__webpack_require__.t.bind(__webpack_require__, /*! 3dmol/build/3Dmol.js */ "./node_modules/3dmol/build/3Dmol.js", 23));
+                const viewer = $3Dmol.createViewer(containerRef.current, {
+                    backgroundColor,
+                });
+                viewer.setWidth(width);
+                viewer.setHeight(height);
+                viewerRef.current = viewer;
+            }
+            catch (error) {
+                console.error("Failed to initialize 3Dmol viewer:", error);
+            }
+        };
+        initViewer();
+        return () => {
+            if (viewerRef.current) {
+                viewerRef.current.clear();
+            }
+        };
+    }, [backgroundColor, width, height]);
+    (0,react__WEBPACK_IMPORTED_MODULE_1__.useImperativeHandle)(ref, () => ({
+        loadXYZ: (xyzData) => {
+            if (!viewerRef.current) {
+                console.error("Viewer not initialized");
+                return;
+            }
+            try {
+                // Clear existing models
+                viewerRef.current.removeAllModels();
+                // Add new model
+                const model = viewerRef.current.addModel(xyzData, "xyz");
+                currentModelRef.current = model;
+                // Set default style
+                viewerRef.current.setStyle({}, {
+                    stick: { radius: 0.2 },
+                    sphere: { radius: 0.3 }
+                });
+                // Zoom to fit and render
+                viewerRef.current.zoomTo();
+                viewerRef.current.render();
+            }
+            catch (error) {
+                console.error("Failed to load XYZ data:", error);
+            }
+        },
+        setStyle: (style) => {
+            if (!viewerRef.current) {
+                console.error("Viewer not initialized");
+                return;
+            }
+            try {
+                viewerRef.current.setStyle({}, style);
+                viewerRef.current.render();
+            }
+            catch (error) {
+                console.error("Failed to set style:", error);
+            }
+        },
+        clearModels: () => {
+            if (!viewerRef.current)
+                return;
+            viewerRef.current.removeAllModels();
+            viewerRef.current.render();
+            currentModelRef.current = null;
+        },
+        zoomToFit: () => {
+            if (!viewerRef.current)
+                return;
+            viewerRef.current.zoomTo();
+            viewerRef.current.render();
+        },
+        takeScreenshot: () => {
+            if (!viewerRef.current)
+                return "";
+            return viewerRef.current.screenshot(width, height);
+        }
+    }));
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: `molecule-viewer ${className}`, style: {
+            width: width,
+            height: height,
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            overflow: "hidden"
+        }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { ref: containerRef, style: {
+                width: "100%",
+                height: "100%",
+                position: "relative"
+            } }) }));
+});
+
+
+/***/ }),
+
+/***/ "./src/web/components/StyleControls.tsx":
+/*!**********************************************!*\
+  !*** ./src/web/components/StyleControls.tsx ***!
+  \**********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   StyleControls: () => (/* binding */ StyleControls)
+/* harmony export */ });
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+
+
+const styleOptions = [
+    {
+        id: "stick",
+        label: "Stick",
+        description: "Show bonds as sticks"
+    },
+    {
+        id: "sphere",
+        label: "Space-filling",
+        description: "Show atoms as spheres"
+    },
+    {
+        id: "ball-and-stick",
+        label: "Ball & Stick",
+        description: "Combination of spheres and sticks"
+    },
+    {
+        id: "line",
+        label: "Wireframe",
+        description: "Show bonds as thin lines"
+    },
+    {
+        id: "cartoon",
+        label: "Cartoon",
+        description: "Simplified representation"
+    }
+];
+const StyleControls = ({ onStyleChange, className = "" }) => {
+    const [selectedStyle, setSelectedStyle] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)("ball-and-stick");
+    const [atomRadius, setAtomRadius] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(0.3);
+    const [bondRadius, setBondRadius] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(0.2);
+    const generateStyleSpec = (style) => {
+        switch (style) {
+            case "stick":
+                return {
+                    stick: {
+                        radius: bondRadius,
+                        colorscheme: "element"
+                    }
+                };
+            case "sphere":
+                return {
+                    sphere: {
+                        radius: atomRadius,
+                        colorscheme: "element"
+                    }
+                };
+            case "ball-and-stick":
+                return {
+                    stick: {
+                        radius: bondRadius * 0.8,
+                        colorscheme: "element"
+                    },
+                    sphere: {
+                        radius: atomRadius * 0.8,
+                        colorscheme: "element"
+                    }
+                };
+            case "line":
+                return {
+                    line: {
+                        linewidth: 2,
+                        color: "black"
+                    }
+                };
+            case "cartoon":
+                return {
+                    cartoon: {
+                        colorscheme: "element"
+                    }
+                };
+            default:
+                return {
+                    stick: { radius: bondRadius },
+                    sphere: { radius: atomRadius }
+                };
+        }
+    };
+    const handleStyleChange = (style) => {
+        setSelectedStyle(style);
+        const styleSpec = generateStyleSpec(style);
+        onStyleChange(styleSpec);
+    };
+    const handleRadiusChange = () => {
+        const styleSpec = generateStyleSpec(selectedStyle);
+        onStyleChange(styleSpec);
+    };
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: `style-controls ${className}`, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "style-controls-header", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h3", { style: { margin: "0 0 10px 0", fontSize: "16px", fontWeight: "bold" }, children: "Visualization Style" }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "style-options", style: { marginBottom: "15px" }, children: styleOptions.map((option) => ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: {
+                        display: "flex",
+                        alignItems: "center",
+                        marginBottom: "8px",
+                        cursor: "pointer",
+                        padding: "8px",
+                        backgroundColor: selectedStyle === option.id ? "#e3f2fd" : "transparent",
+                        borderRadius: "4px",
+                        border: selectedStyle === option.id ? "1px solid #2196f3" : "1px solid transparent"
+                    }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "radio", name: "visualization-style", value: option.id, checked: selectedStyle === option.id, onChange: () => handleStyleChange(option.id), style: { marginRight: "8px" } }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { fontWeight: "bold", fontSize: "14px" }, children: option.label }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { fontSize: "12px", color: "#666" }, children: option.description })] })] }, option.id))) }), (selectedStyle === "sphere" || selectedStyle === "ball-and-stick") && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "size-controls", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { marginBottom: "10px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: { display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }, children: ["Atom Size: ", atomRadius.toFixed(2)] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "range", min: "0.1", max: "1.0", step: "0.1", value: atomRadius, onChange: (e) => {
+                                setAtomRadius(parseFloat(e.target.value));
+                                handleRadiusChange();
+                            }, style: { width: "100%" } })] }) })), (selectedStyle === "stick" || selectedStyle === "ball-and-stick") && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "size-controls", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { marginBottom: "10px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: { display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }, children: ["Bond Size: ", bondRadius.toFixed(2)] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "range", min: "0.05", max: "0.5", step: "0.05", value: bondRadius, onChange: (e) => {
+                                setBondRadius(parseFloat(e.target.value));
+                                handleRadiusChange();
+                            }, style: { width: "100%" } })] }) })), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "quick-actions", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h4", { style: { margin: "0 0 8px 0", fontSize: "14px", fontWeight: "bold" }, children: "Quick Actions" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: () => handleStyleChange("ball-and-stick"), style: {
+                                    padding: "6px 12px",
+                                    fontSize: "12px",
+                                    backgroundColor: "#f8f9fa",
+                                    border: "1px solid #ccc",
+                                    borderRadius: "4px",
+                                    cursor: "pointer"
+                                }, children: "Default" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: () => {
+                                    setAtomRadius(0.6);
+                                    setBondRadius(0.3);
+                                    handleRadiusChange();
+                                }, style: {
+                                    padding: "6px 12px",
+                                    fontSize: "12px",
+                                    backgroundColor: "#f8f9fa",
+                                    border: "1px solid #ccc",
+                                    borderRadius: "4px",
+                                    cursor: "pointer"
+                                }, children: "Large" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: () => {
+                                    setAtomRadius(0.2);
+                                    setBondRadius(0.1);
+                                    handleRadiusChange();
+                                }, style: {
+                                    padding: "6px 12px",
+                                    fontSize: "12px",
+                                    backgroundColor: "#f8f9fa",
+                                    border: "1px solid #ccc",
+                                    borderRadius: "4px",
+                                    cursor: "pointer"
+                                }, children: "Small" })] })] })] }));
+};
+
+
+/***/ }),
+
+/***/ "./src/web/components/XYZInput.tsx":
+/*!*****************************************!*\
+  !*** ./src/web/components/XYZInput.tsx ***!
+  \*****************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   XYZInput: () => (/* binding */ XYZInput)
+/* harmony export */ });
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _utils_xyzParser__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../utils/xyzParser */ "./src/web/utils/xyzParser.ts");
+
+
+
+const XYZInput = ({ onXYZChange, className = "" }) => {
+    const [xyzInput, setXyzInput] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)("");
+    const [validationResult, setValidationResult] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(null);
+    const [isValidating, setIsValidating] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
+    const sampleData = (0,_utils_xyzParser__WEBPACK_IMPORTED_MODULE_2__.getSampleXYZData)();
+    const validateXYZ = (0,react__WEBPACK_IMPORTED_MODULE_1__.useCallback)((input) => {
+        if (!input.trim()) {
+            setValidationResult(null);
+            onXYZChange("", false);
+            return;
+        }
+        setIsValidating(true);
+        // Add a small delay to avoid excessive validation during typing
+        const timeoutId = setTimeout(() => {
+            const result = (0,_utils_xyzParser__WEBPACK_IMPORTED_MODULE_2__.parseXYZData)(input);
+            setValidationResult(result);
+            onXYZChange(input, result.isValid);
+            setIsValidating(false);
+        }, 300);
+        return () => clearTimeout(timeoutId);
+    }, [onXYZChange]);
+    const handleInputChange = (event) => {
+        const value = event.target.value;
+        setXyzInput(value);
+        validateXYZ(value);
+    };
+    const handleSampleSelect = (event) => {
+        const sampleKey = event.target.value;
+        if (sampleKey && sampleData[sampleKey]) {
+            const sampleXYZ = sampleData[sampleKey];
+            setXyzInput(sampleXYZ);
+            validateXYZ(sampleXYZ);
+        }
+    };
+    const handleClear = () => {
+        setXyzInput("");
+        setValidationResult(null);
+        onXYZChange("", false);
+    };
+    const getValidationStatusStyle = () => {
+        if (!validationResult && !isValidating)
+            return {};
+        if (isValidating) {
+            return { borderColor: "#ffa500", backgroundColor: "#fff9e6" };
+        }
+        return validationResult?.isValid
+            ? { borderColor: "#28a745", backgroundColor: "#f8fff8" }
+            : { borderColor: "#dc3545", backgroundColor: "#fff8f8" };
+    };
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: `xyz-input-container ${className}`, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "xyz-input-header", style: { marginBottom: "10px", display: "flex", alignItems: "center", gap: "10px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("label", { htmlFor: "xyz-textarea", style: { fontWeight: "bold", fontSize: "14px" }, children: "XYZ Coordinates:" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("select", { onChange: handleSampleSelect, style: {
+                            padding: "4px 8px",
+                            fontSize: "12px",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px"
+                        }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("option", { value: "", children: "Load Sample..." }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("option", { value: "water", children: "Water (H\u2082O)" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("option", { value: "methane", children: "Methane (CH\u2084)" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("option", { value: "benzene", children: "Benzene (C\u2086H\u2086)" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: handleClear, style: {
+                            padding: "4px 8px",
+                            fontSize: "12px",
+                            backgroundColor: "#f8f9fa",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px",
+                            cursor: "pointer"
+                        }, children: "Clear" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("textarea", { id: "xyz-textarea", value: xyzInput, onChange: handleInputChange, placeholder: `Enter XYZ coordinates in the format:
+<number of atoms>
+<comment line (optional)>
+<element> <x> <y> <z>
+<element> <x> <y> <z>
+...
+
+Example:
+3
+Water molecule
+O   0.000000   0.000000   0.119262
+H   0.000000   0.763239  -0.477047
+H   0.000000  -0.763239  -0.477047`, style: {
+                    width: "100%",
+                    height: "200px",
+                    padding: "10px",
+                    fontSize: "12px",
+                    fontFamily: "monospace",
+                    border: "1px solid #ccc",
+                    borderRadius: "4px",
+                    resize: "vertical",
+                    ...getValidationStatusStyle()
+                } }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "validation-status", style: { marginTop: "8px" }, children: [isValidating && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { color: "#ffa500", fontSize: "12px" }, children: "\u23F3 Validating..." })), validationResult && !isValidating && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { fontSize: "12px" }, children: validationResult.isValid ? ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { color: "#28a745" }, children: ["\u2705 Valid XYZ data - ", validationResult.data?.numAtoms, " atoms detected"] })) : ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { color: "#dc3545" }, children: ["\u274C ", validationResult.error] })) }))] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("details", { style: { marginTop: "10px", fontSize: "12px", color: "#666" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("summary", { style: { cursor: "pointer", fontWeight: "bold" }, children: "XYZ Format Help" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { marginTop: "8px", padding: "8px", backgroundColor: "#f8f9fa", borderRadius: "4px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("strong", { children: "XYZ format structure:" }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("ol", { style: { paddingLeft: "20px", margin: "8px 0" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("li", { children: "First line: Number of atoms (integer)" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("li", { children: "Second line: Comment or description (optional)" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("li", { children: "Following lines: Element symbol followed by X, Y, Z coordinates" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("strong", { children: "Example:" }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("pre", { style: { backgroundColor: "#fff", padding: "8px", borderRadius: "4px", fontSize: "11px" }, children: `3
+Water molecule
+O   0.000000   0.000000   0.119262
+H   0.000000   0.763239  -0.477047
+H   0.000000  -0.763239  -0.477047` })] })] })] }));
+};
+
+
+/***/ }),
+
+/***/ "./src/web/utils/xyzParser.ts":
+/*!************************************!*\
+  !*** ./src/web/utils/xyzParser.ts ***!
+  \************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   formatXYZData: () => (/* binding */ formatXYZData),
+/* harmony export */   getSampleXYZData: () => (/* binding */ getSampleXYZData),
+/* harmony export */   parseXYZData: () => (/* binding */ parseXYZData)
+/* harmony export */ });
+/**
+ * Parse XYZ coordinate data from string
+ * XYZ format:
+ * Line 1: Number of atoms
+ * Line 2: Comment (optional)
+ * Lines 3+: Element X Y Z
+ */
+function parseXYZData(xyzString) {
+    try {
+        const lines = xyzString.trim().split('\n').filter(line => line.trim() !== '');
+        if (lines.length < 2) {
+            return {
+                isValid: false,
+                error: "XYZ data must have at least 2 lines (atom count and at least one atom)"
+            };
+        }
+        // Parse number of atoms
+        const numAtomsLine = lines[0].trim();
+        const numAtoms = parseInt(numAtomsLine, 10);
+        if (isNaN(numAtoms) || numAtoms <= 0) {
+            return {
+                isValid: false,
+                error: "First line must be a positive integer (number of atoms)"
+            };
+        }
+        // Parse comment line (optional)
+        let comment = "";
+        let atomStartIndex = 1;
+        // Check if second line looks like atom data or comment
+        if (lines.length > 1) {
+            const secondLineParts = lines[1].trim().split(/\s+/);
+            // If second line has exactly 4 parts and parts 1-3 are numbers, it's atom data
+            if (secondLineParts.length === 4 &&
+                !isNaN(parseFloat(secondLineParts[1])) &&
+                !isNaN(parseFloat(secondLineParts[2])) &&
+                !isNaN(parseFloat(secondLineParts[3]))) {
+                comment = "";
+                atomStartIndex = 1;
+            }
+            else {
+                comment = lines[1].trim();
+                atomStartIndex = 2;
+            }
+        }
+        // Parse atoms
+        const atoms = [];
+        const atomLines = lines.slice(atomStartIndex);
+        if (atomLines.length !== numAtoms) {
+            return {
+                isValid: false,
+                error: `Expected ${numAtoms} atoms, but found ${atomLines.length} atom lines`
+            };
+        }
+        for (let i = 0; i < atomLines.length; i++) {
+            const line = atomLines[i].trim();
+            const parts = line.split(/\s+/);
+            if (parts.length < 4) {
+                return {
+                    isValid: false,
+                    error: `Line ${atomStartIndex + i + 1}: Expected format "Element X Y Z", got "${line}"`
+                };
+            }
+            const element = parts[0];
+            const x = parseFloat(parts[1]);
+            const y = parseFloat(parts[2]);
+            const z = parseFloat(parts[3]);
+            if (isNaN(x) || isNaN(y) || isNaN(z)) {
+                return {
+                    isValid: false,
+                    error: `Line ${atomStartIndex + i + 1}: X, Y, Z coordinates must be numbers`
+                };
+            }
+            // Validate element symbol
+            if (!isValidElement(element)) {
+                return {
+                    isValid: false,
+                    error: `Line ${atomStartIndex + i + 1}: "${element}" is not a valid element symbol`
+                };
+            }
+            atoms.push({ element, x, y, z });
+        }
+        return {
+            isValid: true,
+            data: {
+                numAtoms,
+                comment,
+                atoms
+            }
+        };
+    }
+    catch (error) {
+        return {
+            isValid: false,
+            error: `Parse error: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+}
+/**
+ * Convert parsed XYZ data back to XYZ format string
+ */
+function formatXYZData(data) {
+    const lines = [];
+    // Add atom count
+    lines.push(data.numAtoms.toString());
+    // Add comment line
+    lines.push(data.comment || "Generated by PySCF Native App");
+    // Add atom lines
+    data.atoms.forEach(atom => {
+        lines.push(`${atom.element.padEnd(2)} ${atom.x.toFixed(6)} ${atom.y.toFixed(6)} ${atom.z.toFixed(6)}`);
+    });
+    return lines.join('\n');
+}
+/**
+ * Validate if a string is a valid chemical element symbol
+ */
+function isValidElement(element) {
+    const validElements = [
+        'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+        'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar', 'K', 'Ca',
+        'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+        'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr', 'Rb', 'Sr', 'Y', 'Zr',
+        'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd', 'In', 'Sn',
+        'Sb', 'Te', 'I', 'Xe', 'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd',
+        'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy', 'Ho', 'Er', 'Tm', 'Yb',
+        'Lu', 'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg',
+        'Tl', 'Pb', 'Bi', 'Po', 'At', 'Rn', 'Fr', 'Ra', 'Ac', 'Th',
+        'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk', 'Cf', 'Es', 'Fm',
+        'Md', 'No', 'Lr', 'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds',
+        'Rg', 'Cn', 'Nh', 'Fl', 'Mc', 'Lv', 'Ts', 'Og'
+    ];
+    return validElements.includes(element);
+}
+/**
+ * Generate sample XYZ data for testing
+ */
+function getSampleXYZData() {
+    return {
+        water: `3
+Water molecule
+O   0.000000   0.000000   0.119262
+H   0.000000   0.763239  -0.477047
+H   0.000000  -0.763239  -0.477047`,
+        methane: `5
+Methane molecule
+C   0.000000   0.000000   0.000000
+H   0.629118   0.629118   0.629118
+H  -0.629118  -0.629118   0.629118
+H  -0.629118   0.629118  -0.629118
+H   0.629118  -0.629118  -0.629118`,
+        benzene: `12
+Benzene ring
+C   1.396263   0.000000   0.000000
+C   0.698132   1.209153   0.000000
+C  -0.698132   1.209153   0.000000
+C  -1.396263   0.000000   0.000000
+C  -0.698132  -1.209153   0.000000
+C   0.698132  -1.209153   0.000000
+H   2.485018   0.000000   0.000000
+H   1.242509   2.152032   0.000000
+H  -1.242509   2.152032   0.000000
+H  -2.485018   0.000000   0.000000
+H  -1.242509  -2.152032   0.000000
+H   1.242509  -2.152032   0.000000`
+    };
+}
 
 
 /***/ })
@@ -27611,7 +28215,7 @@ const App = () => {
 /******/ 		};
 /******/ 	
 /******/ 		// Execute the module function
-/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/ 		__webpack_modules__[moduleId].call(module.exports, module, module.exports, __webpack_require__);
 /******/ 	
 /******/ 		// Flag the module as loaded
 /******/ 		module.loaded = true;
@@ -27619,6 +28223,9 @@ const App = () => {
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
+/******/ 	
+/******/ 	// expose the modules object (__webpack_modules__)
+/******/ 	__webpack_require__.m = __webpack_modules__;
 /******/ 	
 /************************************************************************/
 /******/ 	/* webpack/runtime/compat get default export */
@@ -27630,6 +28237,36 @@ const App = () => {
 /******/ 				() => (module);
 /******/ 			__webpack_require__.d(getter, { a: getter });
 /******/ 			return getter;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/create fake namespace object */
+/******/ 	(() => {
+/******/ 		var getProto = Object.getPrototypeOf ? (obj) => (Object.getPrototypeOf(obj)) : (obj) => (obj.__proto__);
+/******/ 		var leafPrototypes;
+/******/ 		// create a fake namespace object
+/******/ 		// mode & 1: value is a module id, require it
+/******/ 		// mode & 2: merge all properties of value into the ns
+/******/ 		// mode & 4: return value when already ns object
+/******/ 		// mode & 16: return value when it's Promise-like
+/******/ 		// mode & 8|1: behave like require
+/******/ 		__webpack_require__.t = function(value, mode) {
+/******/ 			if(mode & 1) value = this(value);
+/******/ 			if(mode & 8) return value;
+/******/ 			if(typeof value === 'object' && value) {
+/******/ 				if((mode & 4) && value.__esModule) return value;
+/******/ 				if((mode & 16) && typeof value.then === 'function') return value;
+/******/ 			}
+/******/ 			var ns = Object.create(null);
+/******/ 			__webpack_require__.r(ns);
+/******/ 			var def = {};
+/******/ 			leafPrototypes = leafPrototypes || [null, getProto({}), getProto([]), getProto(getProto)];
+/******/ 			for(var current = mode & 2 && value; (typeof current == 'object' || typeof current == 'function') && !~leafPrototypes.indexOf(current); current = getProto(current)) {
+/******/ 				Object.getOwnPropertyNames(current).forEach((key) => (def[key] = () => (value[key])));
+/******/ 			}
+/******/ 			def['default'] = () => (value);
+/******/ 			__webpack_require__.d(ns, def);
+/******/ 			return ns;
 /******/ 		};
 /******/ 	})();
 /******/ 	
@@ -27645,9 +28282,98 @@ const App = () => {
 /******/ 		};
 /******/ 	})();
 /******/ 	
+/******/ 	/* webpack/runtime/ensure chunk */
+/******/ 	(() => {
+/******/ 		__webpack_require__.f = {};
+/******/ 		// This file contains only the entry chunk.
+/******/ 		// The chunk loading function for additional chunks
+/******/ 		__webpack_require__.e = (chunkId) => {
+/******/ 			return Promise.all(Object.keys(__webpack_require__.f).reduce((promises, key) => {
+/******/ 				__webpack_require__.f[key](chunkId, promises);
+/******/ 				return promises;
+/******/ 			}, []));
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/get javascript chunk filename */
+/******/ 	(() => {
+/******/ 		// This function allow to reference async chunks
+/******/ 		__webpack_require__.u = (chunkId) => {
+/******/ 			// return url for filenames based on template
+/******/ 			return "" + chunkId + ".js";
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/get mini-css chunk filename */
+/******/ 	(() => {
+/******/ 		// This function allow to reference async chunks
+/******/ 		__webpack_require__.miniCssF = (chunkId) => {
+/******/ 			// return url for filenames based on template
+/******/ 			return undefined;
+/******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/global */
+/******/ 	(() => {
+/******/ 		__webpack_require__.g = (function() {
+/******/ 			if (typeof globalThis === 'object') return globalThis;
+/******/ 			try {
+/******/ 				return this || new Function('return this')();
+/******/ 			} catch (e) {
+/******/ 				if (typeof window === 'object') return window;
+/******/ 			}
+/******/ 		})();
+/******/ 	})();
+/******/ 	
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */
 /******/ 	(() => {
 /******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/load script */
+/******/ 	(() => {
+/******/ 		var inProgress = {};
+/******/ 		var dataWebpackPrefix = "pyscf_native_app:";
+/******/ 		// loadScript function to load a script via script tag
+/******/ 		__webpack_require__.l = (url, done, key, chunkId) => {
+/******/ 			if(inProgress[url]) { inProgress[url].push(done); return; }
+/******/ 			var script, needAttach;
+/******/ 			if(key !== undefined) {
+/******/ 				var scripts = document.getElementsByTagName("script");
+/******/ 				for(var i = 0; i < scripts.length; i++) {
+/******/ 					var s = scripts[i];
+/******/ 					if(s.getAttribute("src") == url || s.getAttribute("data-webpack") == dataWebpackPrefix + key) { script = s; break; }
+/******/ 				}
+/******/ 			}
+/******/ 			if(!script) {
+/******/ 				needAttach = true;
+/******/ 				script = document.createElement('script');
+/******/ 		
+/******/ 				script.charset = 'utf-8';
+/******/ 				script.timeout = 120;
+/******/ 				if (__webpack_require__.nc) {
+/******/ 					script.setAttribute("nonce", __webpack_require__.nc);
+/******/ 				}
+/******/ 				script.setAttribute("data-webpack", dataWebpackPrefix + key);
+/******/ 		
+/******/ 				script.src = url;
+/******/ 			}
+/******/ 			inProgress[url] = [done];
+/******/ 			var onScriptComplete = (prev, event) => {
+/******/ 				// avoid mem leaks in IE.
+/******/ 				script.onerror = script.onload = null;
+/******/ 				clearTimeout(timeout);
+/******/ 				var doneFns = inProgress[url];
+/******/ 				delete inProgress[url];
+/******/ 				script.parentNode && script.parentNode.removeChild(script);
+/******/ 				doneFns && doneFns.forEach((fn) => (fn(event)));
+/******/ 				if(prev) return prev(event);
+/******/ 			}
+/******/ 			var timeout = setTimeout(onScriptComplete.bind(null, undefined, { type: 'timeout', target: script }), 120000);
+/******/ 			script.onerror = onScriptComplete.bind(null, script.onerror);
+/******/ 			script.onload = onScriptComplete.bind(null, script.onload);
+/******/ 			needAttach && document.head.appendChild(script);
+/******/ 		};
 /******/ 	})();
 /******/ 	
 /******/ 	/* webpack/runtime/make namespace object */
@@ -27668,6 +28394,119 @@ const App = () => {
 /******/ 			if (!module.children) module.children = [];
 /******/ 			return module;
 /******/ 		};
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/publicPath */
+/******/ 	(() => {
+/******/ 		var scriptUrl;
+/******/ 		if (__webpack_require__.g.importScripts) scriptUrl = __webpack_require__.g.location + "";
+/******/ 		var document = __webpack_require__.g.document;
+/******/ 		if (!scriptUrl && document) {
+/******/ 			if (document.currentScript && document.currentScript.tagName.toUpperCase() === 'SCRIPT')
+/******/ 				scriptUrl = document.currentScript.src;
+/******/ 			if (!scriptUrl) {
+/******/ 				var scripts = document.getElementsByTagName("script");
+/******/ 				if(scripts.length) {
+/******/ 					var i = scripts.length - 1;
+/******/ 					while (i > -1 && (!scriptUrl || !/^http(s?):/.test(scriptUrl))) scriptUrl = scripts[i--].src;
+/******/ 				}
+/******/ 			}
+/******/ 		}
+/******/ 		// When supporting browsers where an automatic publicPath is not supported you must specify an output.publicPath manually via configuration
+/******/ 		// or pass an empty string ("") and set the __webpack_public_path__ variable from your code to use your own logic.
+/******/ 		if (!scriptUrl) throw new Error("Automatic publicPath is not supported in this browser");
+/******/ 		scriptUrl = scriptUrl.replace(/^blob:/, "").replace(/#.*$/, "").replace(/\?.*$/, "").replace(/\/[^\/]+$/, "/");
+/******/ 		__webpack_require__.p = scriptUrl;
+/******/ 	})();
+/******/ 	
+/******/ 	/* webpack/runtime/jsonp chunk loading */
+/******/ 	(() => {
+/******/ 		// no baseURI
+/******/ 		
+/******/ 		// object to store loaded and loading chunks
+/******/ 		// undefined = chunk not loaded, null = chunk preloaded/prefetched
+/******/ 		// [resolve, reject, Promise] = chunk loading, 0 = chunk loaded
+/******/ 		var installedChunks = {
+/******/ 			"app": 0
+/******/ 		};
+/******/ 		
+/******/ 		__webpack_require__.f.j = (chunkId, promises) => {
+/******/ 				// JSONP chunk loading for javascript
+/******/ 				var installedChunkData = __webpack_require__.o(installedChunks, chunkId) ? installedChunks[chunkId] : undefined;
+/******/ 				if(installedChunkData !== 0) { // 0 means "already installed".
+/******/ 		
+/******/ 					// a Promise means "currently loading".
+/******/ 					if(installedChunkData) {
+/******/ 						promises.push(installedChunkData[2]);
+/******/ 					} else {
+/******/ 						if(true) { // all chunks have JS
+/******/ 							// setup Promise in chunk cache
+/******/ 							var promise = new Promise((resolve, reject) => (installedChunkData = installedChunks[chunkId] = [resolve, reject]));
+/******/ 							promises.push(installedChunkData[2] = promise);
+/******/ 		
+/******/ 							// start chunk loading
+/******/ 							var url = __webpack_require__.p + __webpack_require__.u(chunkId);
+/******/ 							// create error before stack unwound to get useful stacktrace later
+/******/ 							var error = new Error();
+/******/ 							var loadingEnded = (event) => {
+/******/ 								if(__webpack_require__.o(installedChunks, chunkId)) {
+/******/ 									installedChunkData = installedChunks[chunkId];
+/******/ 									if(installedChunkData !== 0) installedChunks[chunkId] = undefined;
+/******/ 									if(installedChunkData) {
+/******/ 										var errorType = event && (event.type === 'load' ? 'missing' : event.type);
+/******/ 										var realSrc = event && event.target && event.target.src;
+/******/ 										error.message = 'Loading chunk ' + chunkId + ' failed.\n(' + errorType + ': ' + realSrc + ')';
+/******/ 										error.name = 'ChunkLoadError';
+/******/ 										error.type = errorType;
+/******/ 										error.request = realSrc;
+/******/ 										installedChunkData[1](error);
+/******/ 									}
+/******/ 								}
+/******/ 							};
+/******/ 							__webpack_require__.l(url, loadingEnded, "chunk-" + chunkId, chunkId);
+/******/ 						}
+/******/ 					}
+/******/ 				}
+/******/ 		};
+/******/ 		
+/******/ 		// no prefetching
+/******/ 		
+/******/ 		// no preloaded
+/******/ 		
+/******/ 		// no HMR
+/******/ 		
+/******/ 		// no HMR manifest
+/******/ 		
+/******/ 		// no on chunks loaded
+/******/ 		
+/******/ 		// install a JSONP callback for chunk loading
+/******/ 		var webpackJsonpCallback = (parentChunkLoadingFunction, data) => {
+/******/ 			var [chunkIds, moreModules, runtime] = data;
+/******/ 			// add "moreModules" to the modules object,
+/******/ 			// then flag all "chunkIds" as loaded and fire callback
+/******/ 			var moduleId, chunkId, i = 0;
+/******/ 			if(chunkIds.some((id) => (installedChunks[id] !== 0))) {
+/******/ 				for(moduleId in moreModules) {
+/******/ 					if(__webpack_require__.o(moreModules, moduleId)) {
+/******/ 						__webpack_require__.m[moduleId] = moreModules[moduleId];
+/******/ 					}
+/******/ 				}
+/******/ 				if(runtime) var result = runtime(__webpack_require__);
+/******/ 			}
+/******/ 			if(parentChunkLoadingFunction) parentChunkLoadingFunction(data);
+/******/ 			for(;i < chunkIds.length; i++) {
+/******/ 				chunkId = chunkIds[i];
+/******/ 				if(__webpack_require__.o(installedChunks, chunkId) && installedChunks[chunkId]) {
+/******/ 					installedChunks[chunkId][0]();
+/******/ 				}
+/******/ 				installedChunks[chunkId] = 0;
+/******/ 			}
+/******/ 		
+/******/ 		}
+/******/ 		
+/******/ 		var chunkLoadingGlobal = self["webpackChunkpyscf_native_app"] = self["webpackChunkpyscf_native_app"] || [];
+/******/ 		chunkLoadingGlobal.forEach(webpackJsonpCallback.bind(null, 0));
+/******/ 		chunkLoadingGlobal.push = webpackJsonpCallback.bind(null, chunkLoadingGlobal.push.bind(chunkLoadingGlobal));
 /******/ 	})();
 /******/ 	
 /************************************************************************/
