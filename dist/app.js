@@ -27791,7 +27791,7 @@ const styleOptions = [
     {
         id: "cartoon",
         label: "Cartoon",
-        description: "Simplified representation"
+        description: "Simplified representation for biomolecules"
     }
 ];
 const StyleControls = ({ onStyleChange, className = "" }) => {
@@ -27817,19 +27817,18 @@ const StyleControls = ({ onStyleChange, className = "" }) => {
             case "ball-and-stick":
                 return {
                     stick: {
-                        radius: bondRadius * 0.8,
+                        radius: bondRadius,
                         colorscheme: "element"
                     },
                     sphere: {
-                        radius: atomRadius * 0.8,
+                        radius: atomRadius,
                         colorscheme: "element"
                     }
                 };
             case "line":
                 return {
                     line: {
-                        linewidth: 2,
-                        color: "black"
+                        linewidth: 2
                     }
                 };
             case "cartoon":
@@ -27840,20 +27839,16 @@ const StyleControls = ({ onStyleChange, className = "" }) => {
                 };
             default:
                 return {
-                    stick: { radius: bondRadius },
-                    sphere: { radius: atomRadius }
+                    stick: { radius: 0.2 },
+                    sphere: { radius: 0.3 }
                 };
         }
     };
-    const handleStyleChange = (style) => {
-        setSelectedStyle(style);
-        const styleSpec = generateStyleSpec(style);
-        onStyleChange(styleSpec);
-    };
-    const handleRadiusChange = () => {
+    // ✨ stateが更新された後に副作用として3Dビューワを更新する
+    (0,react__WEBPACK_IMPORTED_MODULE_1__.useEffect)(() => {
         const styleSpec = generateStyleSpec(selectedStyle);
         onStyleChange(styleSpec);
-    };
+    }, [selectedStyle, atomRadius, bondRadius, onStyleChange]); // 依存配列
     return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: `style-controls ${className}`, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "style-controls-header", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h3", { style: { margin: "0 0 10px 0", fontSize: "16px", fontWeight: "bold" }, children: "Visualization Style" }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "style-options", style: { marginBottom: "15px" }, children: styleOptions.map((option) => ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: {
                         display: "flex",
                         alignItems: "center",
@@ -27863,13 +27858,11 @@ const StyleControls = ({ onStyleChange, className = "" }) => {
                         backgroundColor: selectedStyle === option.id ? "#e3f2fd" : "transparent",
                         borderRadius: "4px",
                         border: selectedStyle === option.id ? "1px solid #2196f3" : "1px solid transparent"
-                    }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "radio", name: "visualization-style", value: option.id, checked: selectedStyle === option.id, onChange: () => handleStyleChange(option.id), style: { marginRight: "8px" } }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { fontWeight: "bold", fontSize: "14px" }, children: option.label }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { fontSize: "12px", color: "#666" }, children: option.description })] })] }, option.id))) }), (selectedStyle === "sphere" || selectedStyle === "ball-and-stick") && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "size-controls", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { marginBottom: "10px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: { display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }, children: ["Atom Size: ", atomRadius.toFixed(2)] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "range", min: "0.1", max: "1.0", step: "0.1", value: atomRadius, onChange: (e) => {
-                                setAtomRadius(parseFloat(e.target.value));
-                                handleRadiusChange();
-                            }, style: { width: "100%" } })] }) })), (selectedStyle === "stick" || selectedStyle === "ball-and-stick") && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "size-controls", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { marginBottom: "10px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: { display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }, children: ["Bond Size: ", bondRadius.toFixed(2)] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "range", min: "0.05", max: "0.5", step: "0.05", value: bondRadius, onChange: (e) => {
-                                setBondRadius(parseFloat(e.target.value));
-                                handleRadiusChange();
-                            }, style: { width: "100%" } })] }) })), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "quick-actions", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h4", { style: { margin: "0 0 8px 0", fontSize: "14px", fontWeight: "bold" }, children: "Quick Actions" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: () => handleStyleChange("ball-and-stick"), style: {
+                    }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "radio", name: "visualization-style", value: option.id, checked: selectedStyle === option.id, onChange: () => setSelectedStyle(option.id), style: { marginRight: "8px" } }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { fontWeight: "bold", fontSize: "14px" }, children: option.label }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { style: { fontSize: "12px", color: "#666" }, children: option.description })] })] }, option.id))) }), (selectedStyle === "sphere" || selectedStyle === "ball-and-stick") && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "size-controls", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { marginBottom: "10px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: { display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }, children: ["Atom Size: ", atomRadius.toFixed(2)] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "range", min: "0.1", max: "1.0", step: "0.05", value: atomRadius, onChange: (e) => setAtomRadius(parseFloat(e.target.value)), style: { width: "100%" } })] }) })), (selectedStyle === "stick" || selectedStyle === "ball-and-stick") && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "size-controls", style: { marginBottom: "15px" }, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { marginBottom: "10px" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("label", { style: { display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }, children: ["Bond Size: ", bondRadius.toFixed(2)] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("input", { type: "range", min: "0.05", max: "0.5", step: "0.05", value: bondRadius, onChange: (e) => setBondRadius(parseFloat(e.target.value)), style: { width: "100%" } })] }) })), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "quick-actions", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h4", { style: { margin: "0 0 8px 0", fontSize: "14px", fontWeight: "bold" }, children: "Quick Actions" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { style: { display: "flex", gap: "8px", flexWrap: "wrap" }, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: () => {
+                                    setSelectedStyle("ball-and-stick");
+                                    setAtomRadius(0.3);
+                                    setBondRadius(0.2);
+                                }, style: {
                                     padding: "6px 12px",
                                     fontSize: "12px",
                                     backgroundColor: "#f8f9fa",
@@ -27878,8 +27871,7 @@ const StyleControls = ({ onStyleChange, className = "" }) => {
                                     cursor: "pointer"
                                 }, children: "Default" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: () => {
                                     setAtomRadius(0.6);
-                                    setBondRadius(0.3);
-                                    handleRadiusChange();
+                                    setBondRadius(0.4);
                                 }, style: {
                                     padding: "6px 12px",
                                     fontSize: "12px",
@@ -27890,7 +27882,6 @@ const StyleControls = ({ onStyleChange, className = "" }) => {
                                 }, children: "Large" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: () => {
                                     setAtomRadius(0.2);
                                     setBondRadius(0.1);
-                                    handleRadiusChange();
                                 }, style: {
                                     padding: "6px 12px",
                                     fontSize: "12px",

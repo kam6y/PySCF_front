@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StyleSpec } from "../../types/3dmol";
 
 export interface StyleControlsProps {
@@ -43,7 +43,7 @@ const styleOptions: StyleOption[] = [
   {
     id: "cartoon",
     label: "Cartoon",
-    description: "Simplified representation"
+    description: "Simplified representation for biomolecules"
   }
 ];
 
@@ -73,11 +73,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
       case "ball-and-stick":
         return {
           stick: {
-            radius: bondRadius * 0.8,
+            radius: bondRadius,
             colorscheme: "element"
           },
           sphere: {
-            radius: atomRadius * 0.8,
+            radius: atomRadius,
             colorscheme: "element"
           }
         };
@@ -85,8 +85,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
       case "line":
         return {
           line: {
-            linewidth: 2,
-            color: "black"
+            linewidth: 2
           }
         };
       
@@ -99,22 +98,17 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
       
       default:
         return {
-          stick: { radius: bondRadius },
-          sphere: { radius: atomRadius }
+          stick: { radius: 0.2 },
+          sphere: { radius: 0.3 }
         };
     }
   };
 
-  const handleStyleChange = (style: VisualizationStyle) => {
-    setSelectedStyle(style);
-    const styleSpec = generateStyleSpec(style);
-    onStyleChange(styleSpec);
-  };
-
-  const handleRadiusChange = () => {
+  // ✨ stateが更新された後に副作用として3Dビューワを更新する
+  useEffect(() => {
     const styleSpec = generateStyleSpec(selectedStyle);
     onStyleChange(styleSpec);
-  };
+  }, [selectedStyle, atomRadius, bondRadius, onStyleChange]); // 依存配列
 
   return (
     <div className={`style-controls ${className}`}>
@@ -145,7 +139,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
               name="visualization-style"
               value={option.id}
               checked={selectedStyle === option.id}
-              onChange={() => handleStyleChange(option.id)}
+              onChange={() => setSelectedStyle(option.id)} // state更新のみを行う
               style={{ marginRight: "8px" }}
             />
             <div>
@@ -171,12 +165,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
               type="range"
               min="0.1"
               max="1.0"
-              step="0.1"
+              step="0.05"
               value={atomRadius}
-              onChange={(e) => {
-                setAtomRadius(parseFloat(e.target.value));
-                handleRadiusChange();
-              }}
+              onChange={(e) => setAtomRadius(parseFloat(e.target.value))} // state更新のみ
               style={{ width: "100%" }}
             />
           </div>
@@ -195,10 +186,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
               max="0.5"
               step="0.05"
               value={bondRadius}
-              onChange={(e) => {
-                setBondRadius(parseFloat(e.target.value));
-                handleRadiusChange();
-              }}
+              onChange={(e) => setBondRadius(parseFloat(e.target.value))} // state更新のみ
               style={{ width: "100%" }}
             />
           </div>
@@ -212,7 +200,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
         </h4>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <button
-            onClick={() => handleStyleChange("ball-and-stick")}
+            onClick={() => {
+              setSelectedStyle("ball-and-stick");
+              setAtomRadius(0.3);
+              setBondRadius(0.2);
+            }}
             style={{
               padding: "6px 12px",
               fontSize: "12px",
@@ -227,8 +219,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
           <button
             onClick={() => {
               setAtomRadius(0.6);
-              setBondRadius(0.3);
-              handleRadiusChange();
+              setBondRadius(0.4);
             }}
             style={{
               padding: "6px 12px",
@@ -245,7 +236,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
             onClick={() => {
               setAtomRadius(0.2);
               setBondRadius(0.1);
-              handleRadiusChange();
             }}
             style={{
               padding: "6px 12px",
