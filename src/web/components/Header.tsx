@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 interface HeaderProps {
   onSidebarToggle: () => void;
@@ -15,25 +15,7 @@ export const Header: React.FC<HeaderProps> = ({
   isDropdownOpen,
   isSidebarOpen,
 }) => {
-  const [isMaximized, setIsMaximized] = useState(false);
 
-  useEffect(() => {
-    // Check if electronAPI is available (we're in Electron)
-    if (typeof window !== 'undefined' && window.electronAPI) {
-      // Get initial window state
-      window.electronAPI.isWindowMaximized().then(setIsMaximized);
-
-      // Listen for window state changes
-      window.electronAPI.onWindowStateChange(setIsMaximized);
-
-      // Cleanup
-      return () => {
-        window.electronAPI.removeAllListeners('window-state-changed');
-      };
-    }
-  }, []);
-
-  const handleCloseWindow = () => {};
   return (
     <header className="app-header-new">
       {/* Left Section */}

@@ -1,6 +1,3 @@
-/*!*******************************************************************!*\
-  !*** css ./node_modules/css-loader/dist/cjs.js!./src/web/App.css ***!
-  \*******************************************************************/
 /* Global Styles */
 * {
   box-sizing: border-box;
@@ -23,71 +20,29 @@ body {
 
 /* Old header styles removed - using new macOS-style header */
 
-/* New macOS-style Header */
+/* New Header with titlebar overlay support */
 .app-header-new {
   display: flex;
   align-items: center;
   justify-content: space-between;
   height: 52px;
-  background: linear-gradient(180deg, #74b9ff 0%, #55a3ff 100%);
+  background: #50D4F5;
   color: #333;
   padding: 0 16px;
+  padding-left: env(titlebar-area-x, 16px);
+  width: env(titlebar-area-width, 100%);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   position: relative;
   z-index: 1000;
   -webkit-app-region: drag;
 }
 
-/* macOS Window Controls */
-.macos-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 10;
-  -webkit-app-region: no-drag;
-}
-
-.control-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 0.5px solid rgba(0,0,0,0.1);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  -webkit-app-region: no-drag;
-}
-
-.control-dot:hover {
-  transform: scale(1.1);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-
-.control-dot:active {
-  transform: scale(0.95);
-}
-
-.control-dot.red {
-  background: #ff5f57;
-}
-
-.control-dot.yellow {
-  background: #ffbd2e;
-}
-
-.control-dot.green {
-  background: #28ca42;
-}
 
 /* Header Left Section */
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-left: 80px; /* Increased space for macOS controls */
   -webkit-app-region: no-drag;
 }
 
@@ -468,10 +423,7 @@ body {
     max-width: 320px;
   }
 
-  /* Adjust header layout for tablets */
-  .header-left {
-    margin-left: 60px; /* Reduced margin for tablet */
-  }
+  /* Header remains consistent on tablets */
 
   /* Adjust dropdown position */
   .dropdown-menu {
@@ -488,13 +440,7 @@ body {
     padding: 0 12px;
   }
 
-  /* Hide macOS controls on mobile */
-  .macos-controls {
-    display: none;
-  }
-
   .header-left {
-    margin-left: 0; /* Remove margin when controls are hidden */
     gap: 8px;
   }
 
@@ -556,5 +502,3 @@ body {
 .loading {
   animation: pulse 1.5s ease-in-out infinite;
 }
-
-/*# sourceMappingURL=app.css.map*/
