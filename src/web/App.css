@@ -1,4 +1,9 @@
 /* Global Styles */
+@font-face {
+  font-family: 'ADLaM';
+  src: url('../assets/fonts/ADLaMDisplay-Regular.ttf') format('truetype');
+}
+
 * {
   box-sizing: border-box;
 }
@@ -21,16 +26,21 @@ body {
 /* Old header styles removed - using new macOS-style header */
 
 /* New Header with titlebar overlay support */
-.app-header-new {
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 52px;
-  background: linear-gradient(180deg, #74b9ff 0%, #55a3ff 100%);
+  height: 48px;
+  background: #50D4F5;
   color: #333;
   padding: 0 16px;
   padding-left: env(titlebar-area-x, 16px);
-  width: env(titlebar-area-width, 100%);
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   position: relative;
   z-index: 1000;
@@ -42,7 +52,8 @@ body {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  margin-left: 12px;
+  gap: 8px;
   -webkit-app-region: no-drag;
 }
 
@@ -52,10 +63,10 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: rgba(255,255,255,0.2);
+  background: white;
   border: none;
-  border-radius: 6px;
-  color: #333;
+  border-radius: 16px;
+  color: #50D4F5;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
@@ -63,15 +74,15 @@ body {
 }
 
 .sidebar-toggle:hover {
-  background: rgba(255,255,255,0.3);
   transform: scale(1.05);
 }
 
 .app-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 24px;
+  font-family: 'ADLaM', sans-serif;
   font-weight: 600;
-  color: #333;
+  color: white;
 }
 
 /* Header Right Section */
@@ -88,11 +99,11 @@ body {
   gap: 8px;
   height: 32px;
   padding: 0 12px;
-  background: rgba(255,255,255,0.2);
+  background: white;
   border: none;
   border-radius: 6px;
   color: #333;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -101,7 +112,8 @@ body {
 
 .dropdown-button:hover,
 .dropdown-button.active {
-  background: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.9);
+  transform: scale(1.02);
 }
 
 .dropdown-arrow {
@@ -118,7 +130,7 @@ body {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: rgba(255,255,255,0.2);
+  background: white;
   border: none;
   border-radius: 6px;
   color: #333;
@@ -127,7 +139,7 @@ body {
 }
 
 .plus-button:hover {
-  background: rgba(255,255,255,0.3);
+  background: rgba(255,255,255,0.9);
   transform: scale(1.05);
 }
 
@@ -210,7 +222,7 @@ body {
 
 .sidebar {
   position: fixed;
-  top: 52px; /* Header height */
+  top: 48px; /* Header height */
   left: 0;
   bottom: 0;
   width: 280px;
@@ -436,7 +448,7 @@ body {
 
 @media (max-width: 768px) {
   /* New header mobile styles */
-  .app-header-new {
+  .header-container {
     padding: 0 12px;
   }
 

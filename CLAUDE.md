@@ -4,106 +4,80 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a PySCF molecular visualization desktop application built with React + TypeScript + Electron. It provides a 3D molecular structure viewer using 3Dmol.js, allowing users to input XYZ coordinates and visualize molecular structures with various styling options.
-
-## Architecture
-
-### Multi-Process Structure
-- **Main Process** (`src/main.ts`): Electron's main process that manages application lifecycle and creates browser windows
-- **Preload Script** (`src/preload.ts`): Security bridge between main and renderer processes  
-- **Renderer Process** (`src/web/`): React application that runs in the browser window
-
-### Build System
-The project uses webpack with three separate configurations defined in `webpack.config.ts`:
-1. **Main Process Bundle**: `electron-main` target for Node.js environment
-2. **Preload Bundle**: `electron-preload` target with restricted APIs
-3. **Renderer Bundle**: `web` target for browser environment with React
-
-### Key Technologies
-- **Electron 37+**: Desktop app framework
-- **React 19+**: UI library with modern JSX transform
-- **TypeScript**: Strict type checking enabled
-- **Webpack 5**: Module bundler with hot reloading
-- **3Dmol.js**: 3D molecular visualization library
-- **CSS Modules**: Extracted CSS files (not inlined for security)
+This is a PySCF Native App - an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates and visualizing 3D molecular structures using 3Dmol.js.
 
 ## Development Commands
 
 ```bash
-# Start development with hot reload for both main and renderer processes
+# Development mode (builds and runs Electron with hot reload)
 npm run dev
 
-# Build for production
+# Production build
 npm run build
 
-# Individual webpack processes (used internally by npm run dev)
-npm run dev:webpack  # Webpack watch mode
-npm run dev:electron # Electron with file watching
+# Clean build directory
+rimraf dist
 ```
 
-## Development Workflow
+The development command runs webpack in watch mode and launches Electron with automatic restart on changes using electronmon.
 
-The `npm run dev` command:
-1. Clears the `dist/` directory with `rimraf`
-2. Runs webpack in watch mode for all three bundles in parallel
-3. Waits for initial build completion with `wait-on`
-4. Starts Electron with `electronmon` for automatic restarts
+## Architecture Overview
 
-Hot reloading behavior:
-- **Main process changes**: Full Electron app restart
-- **Renderer process changes**: Browser window reload  
-- **Preload script changes**: Full Electron app restart
+### Electron Structure
+- **Main Process** (`src/main.ts`): Creates BrowserWindow with custom titlebar styling, loads the React app
+- **Preload Script** (`src/preload.ts`): Currently minimal, handles secure communication between main and renderer
+- **Renderer Process** (`src/web/`): React application for the UI
 
-## Application Structure
+### Build System
+- Uses Webpack with TypeScript compilation
+- Three separate build targets: main process, preload script, and renderer (React app)
+- Development mode includes source maps and file watching
+- Security-focused configuration (no style-loader, electron-renderer target avoided)
 
 ### Core Components
-- **App.tsx** (`src/web/App.tsx`): Main application container managing state and component coordination
-- **MoleculeViewer** (`src/web/components/MoleculeViewer.tsx`): 3D molecular visualization component using 3Dmol.js
-- **XYZInput** (`src/web/components/XYZInput.tsx`): Input component for XYZ coordinate data
-- **StyleControls** (`src/web/components/StyleControls.tsx`): UI controls for molecular styling options
+- **App.tsx**: Main application component managing UI state and molecular viewer interactions
+- **MoleculeViewer**: React component wrapping 3Dmol.js for 3D molecular visualization
+- **XYZInput**: Component for inputting and validating XYZ coordinate data
+- **StyleControls**: Controls for adjusting molecular visualization styles
+- **Header/Sidebar/DropdownMenu**: Navigation and UI components (navigation not fully implemented)
 
-### State Management
-The application uses React's built-in state management:
-- `hasValidMolecule`: Boolean tracking if valid XYZ data is loaded
-- `currentXYZ`: String storing current XYZ coordinate data
-- Component refs for imperative API calls to MoleculeViewer
+### Key Libraries
+- **3Dmol.js**: For 3D molecular visualization and rendering
+- **React 19**: UI framework
+- **TypeScript**: Type safety throughout the codebase
 
-### 3Dmol.js Integration
-- Dynamic imports used for proper library loading
-- Custom TypeScript definitions in `src/types/3dmol.d.ts` and `src/types/3dmol-build.d.ts`
-- Viewer lifecycle managed through React refs and useEffect hooks
-- Support for molecular styling, zoom-to-fit, and screenshot functionality
+### Data Flow
+1. User inputs XYZ coordinates via XYZInput component
+2. Data is validated using `xyzParser.ts` utilities
+3. Valid coordinates are passed to MoleculeViewer component
+4. MoleculeViewer loads the molecular structure into 3Dmol.js viewer
+5. User can adjust visualization styles and take screenshots
 
-## Security Considerations
+### File Structure
+```
+src/
+├── main.ts              # Electron main process
+├── preload.ts           # Electron preload script  
+├── types/               # TypeScript definitions for 3Dmol.js and Electron
+├── web/
+│   ├── App.tsx          # Main React application
+│   ├── components/      # React components
+│   └── utils/           # Utility functions (XYZ parsing)
+```
 
-- Uses `target: "web"` instead of `electron-renderer` for the renderer process
-- CSS is extracted to separate files rather than inlined via `style-loader`
-- Content Security Policy is set in the HTML template
-- Preload script provides controlled API bridge between processes
-- `fsevents` external dependency for macOS compatibility
+### Type Definitions
+Custom TypeScript definitions are provided for:
+- 3Dmol.js library (`3dmol.d.ts`, `3dmol-build.d.ts`)
+- Electron APIs (`electron.d.ts`)
 
-## File Structure Notes
+## Development Notes
 
-- All build output goes to `dist/` (gitignored)
-- Main process entry expects `dist/index.html` to exist
-- Preload script is referenced as `preload.js` in the main process
-- React app mounts to `#root` element in the HTML template
-- Assets are placed in `dist/assets/` with original names
-- Type definitions stored in `src/types/` directory
+- The app uses a custom titlebar with `titleBarStyle: 'hidden'` and `titleBarOverlay`
+- Security best practices are followed (nodeIntegration disabled, contextIsolation enabled)
+- XYZ parser supports standard XYZ format with comprehensive validation
+- Sample molecules (water, methane, benzene) are available for testing
+- Navigation between different app sections is planned but not fully implemented (see TODOs in App.tsx)
 
-## TypeScript Configuration
+## Common Tasks
 
-- Uses modern ES modules with bundler resolution
-- React JSX transform (no need to import React in JSX files)
-- Strict mode enabled for all TypeScript checking
-- Special CommonJS config for `ts-node` to handle webpack config execution
-- Custom type roots include both `node_modules/@types` and `src/types`
-
-## Molecular Visualization Features
-
-- XYZ coordinate parsing and validation (`src/web/utils/xyzParser.ts`)
-- Real-time 3D molecular structure rendering
-- Interactive styling controls (stick, ball-and-stick, sphere representations)
-- Zoom-to-fit functionality
-- Screenshot export capability
-- Error handling for invalid molecular data
+When adding new molecular visualization features, work with the MoleculeViewer component and 3Dmol.js APIs. For new input formats, extend the parsing utilities in `src/web/utils/`. For UI changes, follow the existing component patterns in `src/web/components/`.

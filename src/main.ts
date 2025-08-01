@@ -14,7 +14,7 @@ app.whenReady().then(() => {
     titleBarOverlay: {
       color: 'rgba(0, 0, 0, 0)', // Transparent overlay
       symbolColor: '#000000',
-      height: 52
+      height: 48
     },
     webPreferences: {
       // webpack が出力したプリロードスクリプトを読み込み
