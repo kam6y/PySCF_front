@@ -1,17 +1,23 @@
-import React, { useRef, useState } from "react";
+import { useRef, useState } from "react";
 import "./App.css";
 import { MoleculeViewer, MoleculeViewerRef } from "./components/MoleculeViewer";
 import { XYZInput } from "./components/XYZInput";
 import { StyleControls } from "./components/StyleControls";
+import { Header } from "./components/Header";
+import { Sidebar } from "./components/Sidebar";
+import { DropdownMenu, DropdownOption } from "./components/DropdownMenu";
 import { StyleSpec } from "../types/3dmol";
 
 export const App = () => {
   const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const [hasValidMolecule, setHasValidMolecule] = useState(false);
-  const [currentXYZ, setCurrentXYZ] = useState("");
+  
+  // New state for UI components
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedDropdownOption, setSelectedDropdownOption] = useState<DropdownOption>('calculation-settings');
 
   const handleXYZChange = (xyzData: string, isValid: boolean) => {
-    setCurrentXYZ(xyzData);
     setHasValidMolecule(isValid);
     
     if (isValid && xyzData.trim()) {
@@ -46,16 +52,74 @@ export const App = () => {
     }
   };
 
+  // New event handlers for UI components
+  const handleSidebarToggle = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
+  const handleSidebarClose = () => {
+    setIsSidebarOpen(false);
+  };
+
+  const handleDropdownToggle = () => {
+    setIsDropdownOpen(!isDropdownOpen);
+  };
+
+  const handleDropdownClose = () => {
+    setIsDropdownOpen(false);
+  };
+
+  const handleDropdownOptionSelect = (option: DropdownOption) => {
+    setSelectedDropdownOption(option);
+    // Handle navigation based on selected option
+    switch (option) {
+      case 'calculation-settings':
+        // Currently the main view - no navigation needed
+        break;
+      case 'calculation-results':
+        // TODO: Navigate to calculation results view
+        console.log('Navigate to calculation results');
+        break;
+      case 'draw-molecule':
+        // TODO: Navigate to draw molecule view
+        console.log('Navigate to draw molecule');
+        break;
+    }
+  };
+
+  const handlePlusClick = () => {
+    // Navigate to Calculation page
+    console.log('Navigate to Calculation page');
+    // TODO: Implement navigation to calculation page
+  };
+
   return (
     <div className="app-container">
-      {/* Header */}
-      <header className="app-header">
-        <h1>PySCF Molecular Visualizer</h1>
-        <p>Enter XYZ coordinates to visualize molecular structures in 3D</p>
-      </header>
+      {/* New Header */}
+      <Header
+        onSidebarToggle={handleSidebarToggle}
+        onDropdownToggle={handleDropdownToggle}
+        onPlusClick={handlePlusClick}
+        isDropdownOpen={isDropdownOpen}
+        isSidebarOpen={isSidebarOpen}
+      />
+
+      {/* Dropdown Menu */}
+      <DropdownMenu
+        isOpen={isDropdownOpen}
+        selectedOption={selectedDropdownOption}
+        onOptionSelect={handleDropdownOptionSelect}
+        onClose={handleDropdownClose}
+      />
+
+      {/* Sidebar */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={handleSidebarClose}
+      />
 
       {/* Main Content */}
-      <main className="app-main">
+      <main className={`app-main ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         {/* Left Panel - Input and Controls */}
         <div className="left-panel">
           <section className="input-section">

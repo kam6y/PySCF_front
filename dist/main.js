@@ -103,16 +103,55 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var electron__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(electron__WEBPACK_IMPORTED_MODULE_1__);
 
 
+let mainWindow;
 electron__WEBPACK_IMPORTED_MODULE_1__.app.whenReady().then(() => {
     // アプリの起動イベント発火で BrowserWindow インスタンスを作成
-    const mainWindow = new electron__WEBPACK_IMPORTED_MODULE_1__.BrowserWindow({
+    mainWindow = new electron__WEBPACK_IMPORTED_MODULE_1__.BrowserWindow({
+        width: 1200,
+        height: 800,
+        minWidth: 800,
+        minHeight: 600,
+        titleBarStyle: 'hiddenInset', // macOS style with hidden title bar
         webPreferences: {
             // webpack が出力したプリロードスクリプトを読み込み
             preload: node_path__WEBPACK_IMPORTED_MODULE_0___default().join(__dirname, "preload.js"),
+            nodeIntegration: false,
+            contextIsolation: true,
         },
     });
     // レンダラープロセスをロード
     mainWindow.loadFile("dist/index.html");
+    // Window state change events
+    mainWindow.on('maximize', () => {
+        mainWindow.webContents.send('window-state-changed', true);
+    });
+    mainWindow.on('unmaximize', () => {
+        mainWindow.webContents.send('window-state-changed', false);
+    });
+});
+// IPC handlers for window controls
+electron__WEBPACK_IMPORTED_MODULE_1__.ipcMain.handle('window-close', () => {
+    if (mainWindow) {
+        mainWindow.close();
+    }
+});
+electron__WEBPACK_IMPORTED_MODULE_1__.ipcMain.handle('window-minimize', () => {
+    if (mainWindow) {
+        mainWindow.minimize();
+    }
+});
+electron__WEBPACK_IMPORTED_MODULE_1__.ipcMain.handle('window-maximize', () => {
+    if (mainWindow) {
+        if (mainWindow.isMaximized()) {
+            mainWindow.unmaximize();
+        }
+        else {
+            mainWindow.maximize();
+        }
+    }
+});
+electron__WEBPACK_IMPORTED_MODULE_1__.ipcMain.handle('window-is-maximized', () => {
+    return mainWindow ? mainWindow.isMaximized() : false;
 });
 // すべてのウィンドウが閉じられたらアプリを終了する
 electron__WEBPACK_IMPORTED_MODULE_1__.app.once("window-all-closed", () => electron__WEBPACK_IMPORTED_MODULE_1__.app.quit());

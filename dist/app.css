@@ -21,28 +21,271 @@ body {
   background-color: #ffffff;
 }
 
-/* Header */
-.app-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 20px;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* Old header styles removed - using new macOS-style header */
+
+/* New macOS-style Header */
+.app-header-new {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  background: linear-gradient(180deg, #74b9ff 0%, #55a3ff 100%);
+  color: #333;
+  padding: 0 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 1000;
+  -webkit-app-region: drag;
 }
 
-.app-header h1 {
-  margin: 0 0 8px 0;
-  font-size: 28px;
-  font-weight: 600;
+/* macOS Window Controls */
+.macos-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  -webkit-app-region: no-drag;
 }
 
-.app-header p {
+.control-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 0.5px solid rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  -webkit-app-region: no-drag;
+}
+
+.control-dot:hover {
+  transform: scale(1.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.control-dot:active {
+  transform: scale(0.95);
+}
+
+.control-dot.red {
+  background: #ff5f57;
+}
+
+.control-dot.yellow {
+  background: #ffbd2e;
+}
+
+.control-dot.green {
+  background: #28ca42;
+}
+
+/* Header Left Section */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 80px; /* Increased space for macOS controls */
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 6px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  z-index: 5;
+}
+
+.sidebar-toggle:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+
+.app-title {
   margin: 0;
   font-size: 16px;
-  opacity: 0.9;
+  font-weight: 600;
+  color: #333;
 }
 
-/* Main Content */
+/* Header Right Section */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.dropdown-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 6px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.dropdown-button:hover,
+.dropdown-button.active {
+  background: rgba(255,255,255,0.3);
+}
+
+.dropdown-arrow {
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.plus-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  border-radius: 6px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.plus-button:hover {
+  background: rgba(255,255,255,0.3);
+  transform: scale(1.05);
+}
+
+/* Dropdown Menu */
+.dropdown-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 50px;
+  width: 200px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  padding: 8px 0;
+  z-index: 1001;
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  font-size: 14px;
+  color: #333;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.dropdown-item.selected {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.dropdown-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Sidebar */
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 998;
+  animation: backdropFadeIn 0.3s ease-out;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sidebar {
+  position: fixed;
+  top: 52px; /* Header height */
+  left: 0;
+  bottom: 0;
+  width: 280px;
+  background: white;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease-out;
+  z-index: 999;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+}
+
+.sidebar-content {
+  padding: 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.sidebar-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Main Content with Sidebar */
 .app-main {
   display: flex;
   flex: 1;
@@ -51,6 +294,11 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  transition: margin-left 0.3s ease-out;
+}
+
+.app-main.sidebar-open {
+  margin-left: 280px; /* Sidebar width */
 }
 
 /* Left Panel */
@@ -197,6 +445,7 @@ body {
   .app-main {
     flex-direction: column;
     padding: 15px;
+    margin-left: 0 !important; /* Reset sidebar margin on mobile */
   }
   
   .left-panel {
@@ -212,19 +461,53 @@ body {
     width: 100% !important;
     max-width: 600px;
   }
+
+  /* Mobile sidebar - full width overlay */
+  .sidebar {
+    width: 100%;
+    max-width: 320px;
+  }
+
+  /* Adjust header layout for tablets */
+  .header-left {
+    margin-left: 60px; /* Reduced margin for tablet */
+  }
+
+  /* Adjust dropdown position */
+  .dropdown-menu {
+    right: 16px;
+    left: auto;
+    width: calc(100vw - 32px);
+    max-width: 280px;
+  }
 }
 
 @media (max-width: 768px) {
-  .app-header {
-    padding: 15px;
+  /* New header mobile styles */
+  .app-header-new {
+    padding: 0 12px;
   }
-  
-  .app-header h1 {
-    font-size: 24px;
+
+  /* Hide macOS controls on mobile */
+  .macos-controls {
+    display: none;
   }
-  
-  .app-header p {
+
+  .header-left {
+    margin-left: 0; /* Remove margin when controls are hidden */
+    gap: 8px;
+  }
+
+  .app-title {
     font-size: 14px;
+  }
+
+  .dropdown-button span {
+    display: none; /* Hide text on very small screens */
+  }
+
+  .header-right {
+    gap: 6px;
   }
   
   .app-main {
@@ -245,6 +528,12 @@ body {
   
   .action-button {
     min-width: auto;
+  }
+
+  /* Mobile sidebar adjustments */
+  .sidebar {
+    width: 100%;
+    max-width: 280px;
   }
 }
 
