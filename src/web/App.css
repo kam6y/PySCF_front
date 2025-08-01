@@ -272,6 +272,7 @@ body {
 
 .app-content.sidebar-open {
   margin-left: 280px; /* Sidebar width */
+  width: calc(100% - 280px);
 }
 
 /* Left Panel */
