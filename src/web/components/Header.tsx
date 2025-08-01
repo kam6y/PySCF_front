@@ -1,4 +1,5 @@
 import React from "react";
+import { DropdownMenu, DropdownOption } from "./DropdownMenu";
 
 interface HeaderProps {
   onSidebarToggle: () => void;
@@ -6,6 +7,10 @@ interface HeaderProps {
   onPlusClick: () => void;
   isDropdownOpen: boolean;
   isSidebarOpen: boolean;
+  currentPageTitle: string;
+  currentPage: DropdownOption;
+  onDropdownOptionSelect: (option: DropdownOption) => void;
+  onDropdownClose: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,6 +19,10 @@ export const Header: React.FC<HeaderProps> = ({
   onPlusClick,
   isDropdownOpen,
   isSidebarOpen,
+  currentPageTitle,
+  currentPage,
+  onDropdownOptionSelect,
+  onDropdownClose,
 }) => {
 
   return (
@@ -102,7 +111,7 @@ export const Header: React.FC<HeaderProps> = ({
                 fill="currentColor"
               />
             </svg>
-            <span>Calculation settings</span>
+            <span>{currentPageTitle}</span>
             <svg
               width="12"
               height="12"
@@ -143,6 +152,14 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
       </div>
+      
+      {/* Dropdown Menu */}
+      <DropdownMenu
+        isOpen={isDropdownOpen}
+        selectedOption={currentPage}
+        onOptionSelect={onDropdownOptionSelect}
+        onClose={onDropdownClose}
+      />
     </header>
   );
 };

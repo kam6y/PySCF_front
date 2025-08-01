@@ -27584,13 +27584,11 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
 /* harmony import */ var _App_css__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./App.css */ "./src/web/App.css");
-/* harmony import */ var _components_MoleculeViewer__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./components/MoleculeViewer */ "./src/web/components/MoleculeViewer.tsx");
-/* harmony import */ var _components_XYZInput__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./components/XYZInput */ "./src/web/components/XYZInput.tsx");
-/* harmony import */ var _components_StyleControls__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./components/StyleControls */ "./src/web/components/StyleControls.tsx");
-/* harmony import */ var _components_Header__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./components/Header */ "./src/web/components/Header.tsx");
-/* harmony import */ var _components_Sidebar__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./components/Sidebar */ "./src/web/components/Sidebar.tsx");
-/* harmony import */ var _components_DropdownMenu__WEBPACK_IMPORTED_MODULE_8__ = __webpack_require__(/*! ./components/DropdownMenu */ "./src/web/components/DropdownMenu.tsx");
-
+/* harmony import */ var _components_Header__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./components/Header */ "./src/web/components/Header.tsx");
+/* harmony import */ var _components_Sidebar__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ./components/Sidebar */ "./src/web/components/Sidebar.tsx");
+/* harmony import */ var _pages_CalculationSettingsPage__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(/*! ./pages/CalculationSettingsPage */ "./src/web/pages/CalculationSettingsPage.tsx");
+/* harmony import */ var _pages_CalculationResultsPage__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(/*! ./pages/CalculationResultsPage */ "./src/web/pages/CalculationResultsPage.tsx");
+/* harmony import */ var _pages_DrawMoleculePage__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(/*! ./pages/DrawMoleculePage */ "./src/web/pages/DrawMoleculePage.tsx");
 
 
 
@@ -27600,44 +27598,24 @@ __webpack_require__.r(__webpack_exports__);
 
 
 const App = () => {
-    const moleculeViewerRef = (0,react__WEBPACK_IMPORTED_MODULE_1__.useRef)(null);
-    const [hasValidMolecule, setHasValidMolecule] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
-    // New state for UI components
+    // UI state
     const [isSidebarOpen, setIsSidebarOpen] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
     const [isDropdownOpen, setIsDropdownOpen] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
-    const [selectedDropdownOption, setSelectedDropdownOption] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)('calculation-settings');
-    const handleXYZChange = (xyzData, isValid) => {
-        setHasValidMolecule(isValid);
-        if (isValid && xyzData.trim()) {
-            moleculeViewerRef.current?.loadXYZ(xyzData);
-        }
-        else {
-            moleculeViewerRef.current?.clearModels();
-        }
-    };
-    const handleStyleChange = (style) => {
-        if (hasValidMolecule) {
-            moleculeViewerRef.current?.setStyle(style);
-        }
-    };
-    const handleZoomToFit = () => {
-        if (hasValidMolecule) {
-            moleculeViewerRef.current?.zoomToFit();
+    const [currentPage, setCurrentPage] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)('calculation-settings');
+    // Get page title based on current page
+    const getPageTitle = (page) => {
+        switch (page) {
+            case 'calculation-settings':
+                return 'Calculation settings';
+            case 'calculation-results':
+                return 'Calculation results';
+            case 'draw-molecule':
+                return 'Draw molecule';
+            default:
+                return 'Calculation settings';
         }
     };
-    const handleTakeScreenshot = () => {
-        if (hasValidMolecule) {
-            const screenshot = moleculeViewerRef.current?.takeScreenshot();
-            if (screenshot) {
-                // Create a download link for the screenshot
-                const link = document.createElement('a');
-                link.download = 'molecule-screenshot.png';
-                link.href = screenshot;
-                link.click();
-            }
-        }
-    };
-    // New event handlers for UI components
+    // Event handlers for UI components
     const handleSidebarToggle = () => {
         setIsSidebarOpen(!isSidebarOpen);
     };
@@ -27651,28 +27629,26 @@ const App = () => {
         setIsDropdownOpen(false);
     };
     const handleDropdownOptionSelect = (option) => {
-        setSelectedDropdownOption(option);
-        // Handle navigation based on selected option
-        switch (option) {
-            case 'calculation-settings':
-                // Currently the main view - no navigation needed
-                break;
-            case 'calculation-results':
-                // TODO: Navigate to calculation results view
-                console.log('Navigate to calculation results');
-                break;
-            case 'draw-molecule':
-                // TODO: Navigate to draw molecule view
-                console.log('Navigate to draw molecule');
-                break;
-        }
+        setCurrentPage(option);
     };
     const handlePlusClick = () => {
-        // Navigate to Calculation page
-        console.log('Navigate to Calculation page');
-        // TODO: Implement navigation to calculation page
+        // TODO: Implement add new calculation functionality
+        console.log('Add new calculation');
     };
-    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "app-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_Header__WEBPACK_IMPORTED_MODULE_6__.Header, { onSidebarToggle: handleSidebarToggle, onDropdownToggle: handleDropdownToggle, onPlusClick: handlePlusClick, isDropdownOpen: isDropdownOpen, isSidebarOpen: isSidebarOpen }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_DropdownMenu__WEBPACK_IMPORTED_MODULE_8__.DropdownMenu, { isOpen: isDropdownOpen, selectedOption: selectedDropdownOption, onOptionSelect: handleDropdownOptionSelect, onClose: handleDropdownClose }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_Sidebar__WEBPACK_IMPORTED_MODULE_7__.Sidebar, { isOpen: isSidebarOpen, onClose: handleSidebarClose }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("main", { className: `app-main ${isSidebarOpen ? 'sidebar-open' : ''}`, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "left-panel", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "input-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_XYZInput__WEBPACK_IMPORTED_MODULE_4__.XYZInput, { onXYZChange: handleXYZChange }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "controls-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_StyleControls__WEBPACK_IMPORTED_MODULE_5__.StyleControls, { onStyleChange: handleStyleChange }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "actions-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "action-buttons", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: handleZoomToFit, disabled: !hasValidMolecule, className: "action-button", children: "\uD83D\uDD0D Zoom to Fit" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: handleTakeScreenshot, disabled: !hasValidMolecule, className: "action-button", children: "\uD83D\uDCF7 Screenshot" })] }) })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "right-panel", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("section", { className: "viewer-section", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "viewer-header", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h2", { children: "3D Molecular Structure" }), hasValidMolecule && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "viewer-status", children: "\u2705 Molecule loaded successfully" }))] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "viewer-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_MoleculeViewer__WEBPACK_IMPORTED_MODULE_3__.MoleculeViewer, { ref: moleculeViewerRef, width: 600, height: 500, backgroundColor: "white", className: "main-viewer" }), !hasValidMolecule && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "viewer-placeholder", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "placeholder-content", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h3", { children: "No molecule loaded" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Enter valid XYZ coordinates in the left panel to see the 3D structure" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Try loading a sample molecule to get started!" })] }) }))] })] }) })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("footer", { className: "app-footer", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Powered by 3Dmol.js \u2022 Built with React and TypeScript" }) })] }));
+    // Render current page component
+    const renderCurrentPage = () => {
+        switch (currentPage) {
+            case 'calculation-settings':
+                return (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_pages_CalculationSettingsPage__WEBPACK_IMPORTED_MODULE_5__.CalculationSettingsPage, {});
+            case 'calculation-results':
+                return (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_pages_CalculationResultsPage__WEBPACK_IMPORTED_MODULE_6__.CalculationResultsPage, {});
+            case 'draw-molecule':
+                return (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_pages_DrawMoleculePage__WEBPACK_IMPORTED_MODULE_7__.DrawMoleculePage, {});
+            default:
+                return (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_pages_CalculationSettingsPage__WEBPACK_IMPORTED_MODULE_5__.CalculationSettingsPage, {});
+        }
+    };
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "app-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_Header__WEBPACK_IMPORTED_MODULE_3__.Header, { onSidebarToggle: handleSidebarToggle, onDropdownToggle: handleDropdownToggle, onPlusClick: handlePlusClick, isDropdownOpen: isDropdownOpen, isSidebarOpen: isSidebarOpen, currentPageTitle: getPageTitle(currentPage), currentPage: currentPage, onDropdownOptionSelect: handleDropdownOptionSelect, onDropdownClose: handleDropdownClose }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_Sidebar__WEBPACK_IMPORTED_MODULE_4__.Sidebar, { isOpen: isSidebarOpen, onClose: handleSidebarClose }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: `app-content ${isSidebarOpen ? 'sidebar-open' : ''}`, children: renderCurrentPage() }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("footer", { className: "app-footer", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Powered by 3Dmol.js \u2022 Built with React and TypeScript" }) })] }));
 };
 
 
@@ -27714,13 +27690,15 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   Header: () => (/* binding */ Header)
 /* harmony export */ });
 /* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var _DropdownMenu__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./DropdownMenu */ "./src/web/components/DropdownMenu.tsx");
 
-const Header = ({ onSidebarToggle, onDropdownToggle, onPlusClick, isDropdownOpen, isSidebarOpen, }) => {
-    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("header", { className: "app-header", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "header-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "header-left", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { className: "sidebar-toggle", onClick: onSidebarToggle, "aria-label": "Toggle sidebar", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: isSidebarOpen ? (
-                                // Arrow pointing left (close sidebar)
-                                (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M10 4L6 8L10 12", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round" })) : (
-                                // Arrow pointing right (open sidebar)
-                                (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M6 4L10 8L6 12", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round" })) }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { className: "app-title", children: "PySCF_front" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "header-right", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("button", { className: `dropdown-button ${isDropdownOpen ? 'active' : ''}`, onClick: onDropdownToggle, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M8 1.5C8 1.22386 7.77614 1 7.5 1H6.5C6.22386 1 6 1.22386 6 1.5V2.5C6 2.77614 6.22386 3 6.5 3H7.5C7.77614 3 8 2.77614 8 2.5V1.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M10.5 6C10.7761 6 11 6.22386 11 6.5V7.5C11 7.77614 10.7761 8 10.5 8H9.5C9.22386 8 9 7.77614 9 7.5V6.5C9 6.22386 9.22386 6 9.5 6H10.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M6 9.5C6 9.22386 6.22386 9 6.5 9H7.5C7.77614 9 8 9.22386 8 9.5V10.5C8 10.77614 7.77614 11 7.5 11H6.5C6.22386 11 6 10.77614 6 10.5V9.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M14.5 8C14.7761 8 15 8.22386 15 8.5V9.5C15 9.77614 14.7761 10 14.5 10H13.5C13.22386 10 13 9.77614 13 9.5V8.5C13 8.22386 13.22386 8 13.5 8H14.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M2 6.5C2 6.22386 2.22386 6 2.5 6H3.5C3.77614 6 4 6.22386 4 6.5V7.5C4 7.77614 3.77614 8 3.5 8H2.5C2.22386 8 2 7.77614 2 7.5V6.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M10.5 2C10.7761 2 11 2.22386 11 2.5V3.5C11 3.77614 10.7761 4 10.5 4H9.5C9.22386 4 9 3.77614 9 3.5V2.5C9 2.22386 9.22386 2 9.5 2H10.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M14 4.5C14 4.22386 13.7761 4 13.5 4H12.5C12.22386 4 12 4.22386 12 4.5V5.5C12 5.77614 12.22386 6 12.5 6H13.5C13.7761 6 14 5.77614 14 5.5V4.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M2.5 10C2.77614 10 3 10.2239 3 10.5V11.5C3 11.7761 2.77614 12 2.5 12H1.5C1.22386 12 1 11.7761 1 11.5V10.5C1 10.2239 1.22386 10 1.5 10H2.5Z", fill: "currentColor" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("span", { children: "Calculation settings" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("svg", { width: "12", height: "12", viewBox: "0 0 12 12", fill: "none", xmlns: "http://www.w3.org/2000/svg", className: `dropdown-arrow ${isDropdownOpen ? 'open' : ''}`, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M3 4.5L6 7.5L9 4.5", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { className: "plus-button", onClick: onPlusClick, "aria-label": "Add new calculation", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M8 3V13M3 8H13", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }) }) })] })] }) }));
+
+const Header = ({ onSidebarToggle, onDropdownToggle, onPlusClick, isDropdownOpen, isSidebarOpen, currentPageTitle, currentPage, onDropdownOptionSelect, onDropdownClose, }) => {
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("header", { className: "app-header", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "header-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "header-left", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { className: "sidebar-toggle", onClick: onSidebarToggle, "aria-label": "Toggle sidebar", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: isSidebarOpen ? (
+                                    // Arrow pointing left (close sidebar)
+                                    (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M10 4L6 8L10 12", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round" })) : (
+                                    // Arrow pointing right (open sidebar)
+                                    (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M6 4L10 8L6 12", stroke: "currentColor", strokeWidth: "3", strokeLinecap: "round", strokeLinejoin: "round" })) }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { className: "app-title", children: "PySCF_front" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "header-right", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("button", { className: `dropdown-button ${isDropdownOpen ? 'active' : ''}`, onClick: onDropdownToggle, children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M8 1.5C8 1.22386 7.77614 1 7.5 1H6.5C6.22386 1 6 1.22386 6 1.5V2.5C6 2.77614 6.22386 3 6.5 3H7.5C7.77614 3 8 2.77614 8 2.5V1.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M10.5 6C10.7761 6 11 6.22386 11 6.5V7.5C11 7.77614 10.7761 8 10.5 8H9.5C9.22386 8 9 7.77614 9 7.5V6.5C9 6.22386 9.22386 6 9.5 6H10.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M6 9.5C6 9.22386 6.22386 9 6.5 9H7.5C7.77614 9 8 9.22386 8 9.5V10.5C8 10.77614 7.77614 11 7.5 11H6.5C6.22386 11 6 10.77614 6 10.5V9.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M14.5 8C14.7761 8 15 8.22386 15 8.5V9.5C15 9.77614 14.7761 10 14.5 10H13.5C13.22386 10 13 9.77614 13 9.5V8.5C13 8.22386 13.22386 8 13.5 8H14.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M2 6.5C2 6.22386 2.22386 6 2.5 6H3.5C3.77614 6 4 6.22386 4 6.5V7.5C4 7.77614 3.77614 8 3.5 8H2.5C2.22386 8 2 7.77614 2 7.5V6.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M10.5 2C10.7761 2 11 2.22386 11 2.5V3.5C11 3.77614 10.7761 4 10.5 4H9.5C9.22386 4 9 3.77614 9 3.5V2.5C9 2.22386 9.22386 2 9.5 2H10.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M14 4.5C14 4.22386 13.7761 4 13.5 4H12.5C12.22386 4 12 4.22386 12 4.5V5.5C12 5.77614 12.22386 6 12.5 6H13.5C13.7761 6 14 5.77614 14 5.5V4.5Z", fill: "currentColor" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M2.5 10C2.77614 10 3 10.2239 3 10.5V11.5C3 11.7761 2.77614 12 2.5 12H1.5C1.22386 12 1 11.7761 1 11.5V10.5C1 10.2239 1.22386 10 1.5 10H2.5Z", fill: "currentColor" })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("span", { children: currentPageTitle }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("svg", { width: "12", height: "12", viewBox: "0 0 12 12", fill: "none", xmlns: "http://www.w3.org/2000/svg", className: `dropdown-arrow ${isDropdownOpen ? 'open' : ''}`, children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M3 4.5L6 7.5L9 4.5", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round" }) })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { className: "plus-button", onClick: onPlusClick, "aria-label": "Add new calculation", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("svg", { width: "16", height: "16", viewBox: "0 0 16 16", fill: "none", xmlns: "http://www.w3.org/2000/svg", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("path", { d: "M8 3V13M3 8H13", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }) }) })] })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_DropdownMenu__WEBPACK_IMPORTED_MODULE_1__.DropdownMenu, { isOpen: isDropdownOpen, selectedOption: currentPage, onOptionSelect: onDropdownOptionSelect, onClose: onDropdownClose })] }));
 };
 
 
@@ -28110,6 +28088,104 @@ Water molecule
 O   0.000000   0.000000   0.119262
 H   0.000000   0.763239  -0.477047
 H   0.000000  -0.763239  -0.477047` })] })] })] }));
+};
+
+
+/***/ }),
+
+/***/ "./src/web/pages/CalculationResultsPage.tsx":
+/*!**************************************************!*\
+  !*** ./src/web/pages/CalculationResultsPage.tsx ***!
+  \**************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   CalculationResultsPage: () => (/* binding */ CalculationResultsPage)
+/* harmony export */ });
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+const CalculationResultsPage = () => {
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "page-container", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "page-content", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { children: "Calculation Results" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Results will be displayed here..." })] }) }));
+};
+
+
+/***/ }),
+
+/***/ "./src/web/pages/CalculationSettingsPage.tsx":
+/*!***************************************************!*\
+  !*** ./src/web/pages/CalculationSettingsPage.tsx ***!
+  \***************************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   CalculationSettingsPage: () => (/* binding */ CalculationSettingsPage)
+/* harmony export */ });
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+/* harmony import */ var react__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(react__WEBPACK_IMPORTED_MODULE_1__);
+/* harmony import */ var _components_MoleculeViewer__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../components/MoleculeViewer */ "./src/web/components/MoleculeViewer.tsx");
+/* harmony import */ var _components_XYZInput__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../components/XYZInput */ "./src/web/components/XYZInput.tsx");
+/* harmony import */ var _components_StyleControls__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../components/StyleControls */ "./src/web/components/StyleControls.tsx");
+
+
+
+
+
+const CalculationSettingsPage = () => {
+    const moleculeViewerRef = (0,react__WEBPACK_IMPORTED_MODULE_1__.useRef)(null);
+    const [hasValidMolecule, setHasValidMolecule] = (0,react__WEBPACK_IMPORTED_MODULE_1__.useState)(false);
+    const handleXYZChange = (xyzData, isValid) => {
+        setHasValidMolecule(isValid);
+        if (isValid && xyzData.trim()) {
+            moleculeViewerRef.current?.loadXYZ(xyzData);
+        }
+        else {
+            moleculeViewerRef.current?.clearModels();
+        }
+    };
+    const handleStyleChange = (style) => {
+        if (hasValidMolecule) {
+            moleculeViewerRef.current?.setStyle(style);
+        }
+    };
+    const handleZoomToFit = () => {
+        if (hasValidMolecule) {
+            moleculeViewerRef.current?.zoomToFit();
+        }
+    };
+    const handleTakeScreenshot = () => {
+        if (hasValidMolecule) {
+            const screenshot = moleculeViewerRef.current?.takeScreenshot();
+            if (screenshot) {
+                const link = document.createElement('a');
+                link.download = 'molecule-screenshot.png';
+                link.href = screenshot;
+                link.click();
+            }
+        }
+    };
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)(react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.Fragment, { children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "left-panel", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "input-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_XYZInput__WEBPACK_IMPORTED_MODULE_3__.XYZInput, { onXYZChange: handleXYZChange }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "controls-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_StyleControls__WEBPACK_IMPORTED_MODULE_4__.StyleControls, { onStyleChange: handleStyleChange }) }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("section", { className: "actions-section", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "action-buttons", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: handleZoomToFit, disabled: !hasValidMolecule, className: "action-button", children: "\uD83D\uDD0D Zoom to Fit" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("button", { onClick: handleTakeScreenshot, disabled: !hasValidMolecule, className: "action-button", children: "\uD83D\uDCF7 Screenshot" })] }) })] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "right-panel", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("section", { className: "viewer-section", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "viewer-header", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h2", { children: "3D Molecular Structure" }), hasValidMolecule && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "viewer-status", children: "\u2705 Molecule loaded successfully" }))] }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "viewer-container", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)(_components_MoleculeViewer__WEBPACK_IMPORTED_MODULE_2__.MoleculeViewer, { ref: moleculeViewerRef, width: 600, height: 500, backgroundColor: "white", className: "main-viewer" }), !hasValidMolecule && ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "viewer-placeholder", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "placeholder-content", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h3", { children: "No molecule loaded" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Enter valid XYZ coordinates in the left panel to see the 3D structure" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Try loading a sample molecule to get started!" })] }) }))] })] }) })] }));
+};
+
+
+/***/ }),
+
+/***/ "./src/web/pages/DrawMoleculePage.tsx":
+/*!********************************************!*\
+  !*** ./src/web/pages/DrawMoleculePage.tsx ***!
+  \********************************************/
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+__webpack_require__.r(__webpack_exports__);
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   DrawMoleculePage: () => (/* binding */ DrawMoleculePage)
+/* harmony export */ });
+/* harmony import */ var react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react/jsx-runtime */ "./node_modules/react/jsx-runtime.js");
+
+const DrawMoleculePage = () => {
+    return ((0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("div", { className: "page-container", children: (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsxs)("div", { className: "page-content", children: [(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("h1", { children: "Draw Molecule" }), (0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_0__.jsx)("p", { children: "Molecular drawing tools will be available here..." })] }) }));
 };
 
 
