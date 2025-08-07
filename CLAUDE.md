@@ -35,23 +35,26 @@ The development command runs webpack in watch mode and launches Electron with au
 - Security-focused configuration (no style-loader, electron-renderer target avoided)
 
 ### Core Components
-- **App.tsx**: Main application component managing UI state and molecular viewer interactions
-- **MoleculeViewer**: React component wrapping 3Dmol.js for 3D molecular visualization
+- **App.tsx**: Main application component with page routing, sidebar/dropdown state management
+- **Pages**: Three main app sections (CalculationSettingsPage, CalculationResultsPage, DrawMoleculePage)
+- **MoleculeViewer**: React component wrapping 3Dmol.js for 3D molecular visualization (in DrawMoleculePage)
 - **XYZInput**: Component for inputting and validating XYZ coordinate data
 - **StyleControls**: Controls for adjusting molecular visualization styles
-- **Header/Sidebar/DropdownMenu**: Navigation and UI components (navigation not fully implemented)
+- **Header/Sidebar/DropdownMenu**: Navigation components with page switching functionality
 
 ### Key Libraries
 - **3Dmol.js**: For 3D molecular visualization and rendering
 - **React 19**: UI framework
 - **TypeScript**: Type safety throughout the codebase
 
-### Data Flow
-1. User inputs XYZ coordinates via XYZInput component
-2. Data is validated using `xyzParser.ts` utilities
-3. Valid coordinates are passed to MoleculeViewer component
-4. MoleculeViewer loads the molecular structure into 3Dmol.js viewer
-5. User can adjust visualization styles and take screenshots
+### Application Flow
+1. App.tsx manages page routing between three main sections via dropdown navigation
+2. DrawMoleculePage contains the molecular visualization workflow:
+   - User inputs XYZ coordinates via XYZInput component
+   - Data is validated using `xyzParser.ts` utilities
+   - Valid coordinates are passed to MoleculeViewer component
+   - MoleculeViewer loads the molecular structure into 3Dmol.js viewer
+   - User can adjust visualization styles and take screenshots
 
 ### File Structure
 ```
@@ -60,8 +63,9 @@ src/
 ├── preload.ts           # Electron preload script  
 ├── types/               # TypeScript definitions for 3Dmol.js and Electron
 ├── web/
-│   ├── App.tsx          # Main React application
-│   ├── components/      # React components
+│   ├── App.tsx          # Main React application with page routing
+│   ├── components/      # React components (Header, Sidebar, MoleculeViewer, etc.)
+│   ├── pages/           # Page components (CalculationSettings, Results, DrawMolecule)
 │   └── utils/           # Utility functions (XYZ parsing)
 ```
 
@@ -76,7 +80,7 @@ Custom TypeScript definitions are provided for:
 - Security best practices are followed (nodeIntegration disabled, contextIsolation enabled)
 - XYZ parser supports standard XYZ format with comprehensive validation
 - Sample molecules (water, methane, benzene) are available for testing
-- Navigation between different app sections is planned but not fully implemented (see TODOs in App.tsx)
+- Navigation between app sections is implemented via dropdown menu (CalculationSettings, Results, DrawMolecule pages)
 
 ## Common Tasks
 

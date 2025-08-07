@@ -41,13 +41,11 @@ body {
   color: #50D4F5;
   cursor: pointer;
   transition: all 0.3s ease-out;
-  z-index: 1001;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 1002;
 }
 
 .independent-sidebar-toggle:hover {
   transform: scale(1.05);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .independent-sidebar-toggle.sidebar-open {
@@ -85,8 +83,9 @@ body {
 }
 
 .header-container.sidebar-open {
-  width: calc(100% - 280px);
-  margin-left: 280px;
+  width: calc(100% - 25dvw);
+  margin-left: 25dvw;
+  padding: 16px;
 }
 
 
@@ -104,6 +103,12 @@ body {
   font-family: 'ADLaM', sans-serif;
   font-weight: 600;
   color: white;
+  transition: margin-left 0.3s ease-out;
+}
+
+/* Reduce title margin when sidebar is open */
+.header-container.sidebar-open .app-title {
+  margin-left: 0px;
 }
 
 /* Header Right Section */
@@ -249,23 +254,24 @@ body {
 
 .sidebar {
   position: fixed;
-  top: 48px; /* Header height */
+  top: 0;
   left: 0;
   bottom: 0;
-  width: 280px;
+  width: 25dvw;
   background: white;
-  box-shadow: 2px 0 8px rgba(0,0,0,0.1);
   transform: translateX(-100%);
   transition: transform 0.3s ease-out;
-  z-index: 999;
+  z-index: 1001;
 }
 
 .sidebar.open {
   transform: translateX(0);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.4);
 }
 
 .sidebar-content {
   padding: 20px;
+  padding-top: 68px; /* Account for header height (48px) + extra spacing */
   height: 100%;
   overflow-y: auto;
 }
@@ -292,8 +298,8 @@ body {
 }
 
 .app-content.sidebar-open {
-  margin-left: 280px; /* Sidebar width */
-  width: calc(100% - 280px);
+  margin-left: 25dvw; /* Sidebar width */
+  width: calc(100% - 25dvw);
 }
 
 /* Left Panel */
@@ -433,49 +439,4 @@ body {
   border-top: 1px solid #dee2e6;
   color: #6c757d;
   font-size: 14px;
-}
-
-/* Responsive Design */
-@media (max-width: 1200px) {
-  .app-content {
-    flex-direction: column;
-    padding: 15px;
-    margin-left: 0 !important; /* Reset sidebar margin on mobile */
-  }
-  
-  .left-panel {
-    flex: none;
-    order: 2;
-  }
-  
-  .right-panel {
-    order: 1;
-  }
-  
-  .main-viewer {
-    width: 100% !important;
-    max-width: 600px;
-  }
-
-  /* Header compression disabled on tablets/mobile */
-  .header-container.sidebar-open {
-    width: 100%;
-    margin-left: 0;
-  }
-
-  /* Mobile sidebar - full width overlay */
-  .sidebar {
-    width: 100%;
-    max-width: 320px;
-  }
-
-  /* Header remains consistent on tablets */
-
-  /* Adjust dropdown position */
-  .dropdown-menu {
-    right: 16px;
-    left: auto;
-    width: calc(100vw - 32px);
-    max-width: 280px;
-  }
 }
