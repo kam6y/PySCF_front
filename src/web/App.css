@@ -28,13 +28,13 @@ body {
 /* Independent Sidebar Toggle */
 .independent-sidebar-toggle {
   position: fixed;
-  top: 8px;
+  top: 6px;
   left: 72px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   background: white;
   border: none;
   border-radius: 16px;
@@ -70,7 +70,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
+  height: 40px;
   background: #50D4F5;
   color: #333;
   padding: 0 16px;
@@ -83,7 +83,6 @@ body {
 }
 
 .header-container.sidebar-open {
-  width: calc(100% - 25dvw);
   margin-left: 25dvw;
   padding: 16px;
 }
@@ -271,7 +270,7 @@ body {
 
 .sidebar-content {
   padding: 20px;
-  padding-top: 68px; /* Account for header height (48px) + extra spacing */
+  padding-top: 60px; /* Account for header height (40px) + extra spacing */
   height: 100%;
   overflow-y: auto;
 }

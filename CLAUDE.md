@@ -15,8 +15,12 @@ npm run dev
 # Production build
 npm run build
 
-# Clean build directory
+# Clean build directory (automatically done before dev)
 rimraf dist
+
+# Individual build commands
+npm run dev:webpack    # Build with webpack in development mode
+npm run dev:electron   # Start Electron (requires dist files to exist)
 ```
 
 The development command runs webpack in watch mode and launches Electron with automatic restart on changes using electronmon.
@@ -33,6 +37,9 @@ The development command runs webpack in watch mode and launches Electron with au
 - Three separate build targets: main process, preload script, and renderer (React app)
 - Development mode includes source maps and file watching
 - Security-focused configuration (no style-loader, electron-renderer target avoided)
+- Uses `electronmon` for automatic Electron restart during development
+- CSS is extracted to separate files using `MiniCssExtractPlugin` for security
+- Assets (fonts, images) are processed as resources and placed in `dist/assets/`
 
 ### Core Components
 - **App.tsx**: Main application component with page routing, sidebar/dropdown state management
@@ -81,6 +88,15 @@ Custom TypeScript definitions are provided for:
 - XYZ parser supports standard XYZ format with comprehensive validation
 - Sample molecules (water, methane, benzene) are available for testing
 - Navigation between app sections is implemented via dropdown menu (CalculationSettings, Results, DrawMolecule pages)
+- TypeScript strict mode is enabled with custom type definitions in `src/types/`
+- Webpack configuration includes Japanese comments and is security-focused
+- The development server uses `wait-on` to ensure build artifacts exist before starting Electron
+
+## Troubleshooting
+
+- If build fails on macOS, the `fsevents` external in webpack config provides a workaround
+- Electron requires both `dist/index.html` and `dist/main.js` to exist before starting
+- Source maps are essential for development mode to avoid "Uncaught EvalError" in DevTools
 
 ## Common Tasks
 
