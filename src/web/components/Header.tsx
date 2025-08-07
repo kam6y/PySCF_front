@@ -2,7 +2,6 @@ import React from "react";
 import { DropdownMenu, DropdownOption } from "./DropdownMenu";
 
 interface HeaderProps {
-  onSidebarToggle: () => void;
   onDropdownToggle: () => void;
   onPlusClick: () => void;
   isDropdownOpen: boolean;
@@ -14,7 +13,6 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onSidebarToggle,
   onDropdownToggle,
   onPlusClick,
   isDropdownOpen,
@@ -97,42 +95,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="app-header">
-      <div className="header-container">
+      <div className={`header-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         {/* Left Section */}
         <div className="header-left">
-          <button
-            className="sidebar-toggle"
-            onClick={onSidebarToggle}
-            aria-label="Toggle sidebar"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {isSidebarOpen ? (
-                // Arrow pointing left (close sidebar)
-                <path
-                  d="M10 4L6 8L10 12"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              ) : (
-                // Arrow pointing right (open sidebar)
-                <path
-                  d="M6 4L10 8L6 12"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              )}
-            </svg>
-          </button>
           <h1 className="app-title">PySCF_front</h1>
         </div>
         {/* Right Section */}

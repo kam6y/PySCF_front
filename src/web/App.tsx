@@ -69,9 +69,43 @@ export const App = () => {
 
   return (
     <div className="app-container">
+      {/* Independent Sidebar Toggle */}
+      <button
+        className={`independent-sidebar-toggle ${isSidebarOpen ? 'sidebar-open' : ''}`}
+        onClick={handleSidebarToggle}
+        aria-label="Toggle sidebar"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {isSidebarOpen ? (
+            // Arrow pointing left (close sidebar)
+            <path
+              d="M10 4L6 8L10 12"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : (
+            // Arrow pointing right (open sidebar)
+            <path
+              d="M6 4L10 8L6 12"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+        </svg>
+      </button>
+
       {/* Header */}
       <Header
-        onSidebarToggle={handleSidebarToggle}
         onDropdownToggle={handleDropdownToggle}
         onPlusClick={handlePlusClick}
         isDropdownOpen={isDropdownOpen}

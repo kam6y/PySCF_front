@@ -25,6 +25,42 @@ body {
 
 /* Old header styles removed - using new macOS-style header */
 
+/* Independent Sidebar Toggle */
+.independent-sidebar-toggle {
+  position: fixed;
+  top: 8px;
+  left: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: none;
+  border-radius: 16px;
+  color: #50D4F5;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+  z-index: 1001;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.independent-sidebar-toggle:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.independent-sidebar-toggle.sidebar-open {
+  background: #50D4F5;
+  color: white;
+}
+
+.independent-sidebar-toggle.sidebar-open:hover {
+  background: #45c1e8;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.4);
+}
+
 /* New Header with titlebar overlay support */
 .app-header {
   position: sticky;
@@ -45,6 +81,12 @@ body {
   position: relative;
   z-index: 1000;
   -webkit-app-region: drag;
+  transition: all 0.3s ease-out;
+}
+
+.header-container.sidebar-open {
+  width: calc(100% - 280px);
+  margin-left: 280px;
 }
 
 
@@ -52,33 +94,12 @@ body {
 .header-left {
   display: flex;
   align-items: center;
-  margin-left: 12px;
-  gap: 8px;
   -webkit-app-region: no-drag;
 }
 
-.sidebar-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: white;
-  border: none;
-  border-radius: 16px;
-  color: #50D4F5;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  z-index: 5;
-}
-
-.sidebar-toggle:hover {
-  transform: scale(1.05);
-}
 
 .app-title {
-  margin: 0;
+  margin-left: 56px;
   font-size: 24px;
   font-family: 'ADLaM', sans-serif;
   font-weight: 600;
@@ -436,6 +457,12 @@ body {
     max-width: 600px;
   }
 
+  /* Header compression disabled on tablets/mobile */
+  .header-container.sidebar-open {
+    width: 100%;
+    margin-left: 0;
+  }
+
   /* Mobile sidebar - full width overlay */
   .sidebar {
     width: 100%;
@@ -451,102 +478,4 @@ body {
     width: calc(100vw - 32px);
     max-width: 280px;
   }
-}
-
-@media (max-width: 768px) {
-  /* New header mobile styles */
-  .header-container {
-    padding: 0 12px;
-  }
-
-  .header-left {
-    gap: 8px;
-  }
-
-  .app-title {
-    font-size: 14px;
-  }
-
-  .dropdown-button span {
-    display: none; /* Hide text on very small screens */
-  }
-
-  .header-right {
-    gap: 6px;
-  }
-  
-  .app-content {
-    padding: 10px;
-    gap: 15px;
-  }
-  
-  .input-section,
-  .controls-section,
-  .actions-section,
-  .viewer-section {
-    padding: 15px;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-  }
-  
-  .action-button {
-    min-width: auto;
-  }
-
-  /* Mobile sidebar adjustments */
-  .sidebar {
-    width: 100%;
-    max-width: 280px;
-  }
-}
-
-/* Molecule Viewer Specific Styles */
-.molecule-viewer {
-  transition: border-color 0.3s ease;
-}
-
-.molecule-viewer:hover {
-  border-color: #667eea !important;
-}
-
-/* Page Components */
-.page-container {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  padding: 24px;
-  background-color: #f8f9fa;
-}
-
-.page-content {
-  background: white;
-  border-radius: 8px;
-  padding: 32px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.page-content h1 {
-  color: #2d3748;
-  font-size: 2rem;
-  margin-bottom: 16px;
-  font-weight: 600;
-}
-
-.page-content p {
-  color: #4a5568;
-  font-size: 1rem;
-  line-height: 1.5;
-}
-
-/* Loading Animation */
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
-}
-
-.loading {
-  animation: pulse 1.5s ease-in-out infinite;
 }

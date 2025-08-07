@@ -24,6 +24,7 @@ app.whenReady().then(() => {
     },
   });
 
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
   // レンダラープロセスをロード
   mainWindow.loadFile("dist/index.html");
 });
