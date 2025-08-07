@@ -29,7 +29,7 @@ body {
 .independent-sidebar-toggle {
   position: fixed;
   top: 6px;
-  left: 72px;
+  left: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
