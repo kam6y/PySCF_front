@@ -68,116 +68,75 @@ export const XYZInput: React.FC<XYZInputProps> = ({ onXYZChange, className = "" 
 
   return (
     <div className={`xyz-input-container ${className}`}>
-      <div className="xyz-input-header" style={{ marginBottom: "10px", display: "flex", alignItems: "center", gap: "10px" }}>
-        <label htmlFor="xyz-textarea" style={{ fontWeight: "bold", fontSize: "14px" }}>
-          XYZ Coordinates:
-        </label>
-        
-        <select 
-          onChange={handleSampleSelect}
-          style={{
-            padding: "4px 8px",
-            fontSize: "12px",
-            border: "1px solid #ccc",
-            borderRadius: "4px"
-          }}
-        >
-          <option value="">Load Sample...</option>
-          <option value="water">Water (H₂O)</option>
-          <option value="methane">Methane (CH₄)</option>
-          <option value="benzene">Benzene (C₆H₆)</option>
-        </select>
-
-        <button 
-          onClick={handleClear}
-          style={{
-            padding: "4px 8px",
-            fontSize: "12px",
-            backgroundColor: "#f8f9fa",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            cursor: "pointer"
-          }}
-        >
-          Clear
-        </button>
-      </div>
-
       <textarea
         id="xyz-textarea"
         value={xyzInput}
         onChange={handleInputChange}
-        placeholder={`Enter XYZ coordinates in the format:
-<number of atoms>
-<comment line (optional)>
-<element> <x> <y> <z>
-<element> <x> <y> <z>
-...
-
-Example:
-3
-Water molecule
-O   0.000000   0.000000   0.119262
-H   0.000000   0.763239  -0.477047
-H   0.000000  -0.763239  -0.477047`}
-        style={{
-          width: "100%",
-          height: "200px",
-          padding: "10px",
-          fontSize: "12px",
-          fontFamily: "monospace",
-          border: "1px solid #ccc",
-          borderRadius: "4px",
-          resize: "vertical",
-          ...getValidationStatusStyle()
-        }}
+        placeholder={`C -1.151228 0.497765 -1.393083
+N -2.046769 -0.227518 -1.197056
+C -3.273621 0.358425 -0.274278
+C -3.383621 1.488582 -0.274278
+C -2.238126 0.144473 -1.132090
+C -2.317317 -0.752840 -0.250109
+...`}
+        className="xyz-textarea"
       />
 
       {/* Validation Status */}
-      <div className="validation-status" style={{ marginTop: "8px" }}>
+      <div className="xyz-validation-status">
         {isValidating && (
-          <div style={{ color: "#ffa500", fontSize: "12px" }}>
+          <div className="validation-message validating">
             ⏳ Validating...
           </div>
         )}
         
         {validationResult && !isValidating && (
-          <div style={{ fontSize: "12px" }}>
+          <>
             {validationResult.isValid ? (
-              <div style={{ color: "#28a745" }}>
+              <div className="validation-message valid">
                 ✅ Valid XYZ data - {validationResult.data?.numAtoms} atoms detected
               </div>
             ) : (
-              <div style={{ color: "#dc3545" }}>
+              <div className="validation-message invalid">
                 ❌ {validationResult.error}
               </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
-      {/* Format Help */}
-      <details style={{ marginTop: "10px", fontSize: "12px", color: "#666" }}>
-        <summary style={{ cursor: "pointer", fontWeight: "bold" }}>
-          XYZ Format Help
-        </summary>
-        <div style={{ marginTop: "8px", padding: "8px", backgroundColor: "#f8f9fa", borderRadius: "4px" }}>
-          <p><strong>XYZ format structure:</strong></p>
-          <ol style={{ paddingLeft: "20px", margin: "8px 0" }}>
-            <li>First line: Number of atoms (integer)</li>
-            <li>Second line: Comment or description (optional)</li>
-            <li>Following lines: Element symbol followed by X, Y, Z coordinates</li>
-          </ol>
-          <p><strong>Example:</strong></p>
-          <pre style={{ backgroundColor: "#fff", padding: "8px", borderRadius: "4px", fontSize: "11px" }}>
+      {/* Format Help Link */}
+      <div className="xyz-format-help">
+        <a href="#" className="format-help-link" onClick={(e) => {
+          e.preventDefault();
+          const details = e.currentTarget.parentElement?.querySelector('details');
+          if (details) {
+            details.open = !details.open;
+          }
+        }}>
+          ▶ XYZ Format Help
+        </a>
+        
+        <details className="format-help-details">
+          <summary className="format-help-summary"></summary>
+          <div className="format-help-content">
+            <p><strong>XYZ format structure:</strong></p>
+            <ol>
+              <li>First line: Number of atoms (integer)</li>
+              <li>Second line: Comment or description (optional)</li>
+              <li>Following lines: Element symbol followed by X, Y, Z coordinates</li>
+            </ol>
+            <p><strong>Example:</strong></p>
+            <pre className="format-example">
 {`3
 Water molecule
 O   0.000000   0.000000   0.119262
 H   0.000000   0.763239  -0.477047
 H   0.000000  -0.763239  -0.477047`}
-          </pre>
-        </div>
-      </details>
+            </pre>
+          </div>
+        </details>
+      </div>
     </div>
   );
 };

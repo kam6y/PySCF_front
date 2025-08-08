@@ -23,7 +23,12 @@ npm run dev:webpack    # Build with webpack in development mode
 npm run dev:electron   # Start Electron (requires dist files to exist)
 ```
 
-The development command runs webpack in watch mode and launches Electron with automatic restart on changes using electronmon.
+**Development Workflow:**
+- `npm run dev` automatically cleans dist/, builds with webpack in watch mode, and starts Electron
+- Webpack compiles 3 separate bundles: main process, preload script, and renderer (React app)
+- `electronmon` watches `dist/**/*` and restarts Electron automatically on changes
+- `wait-on` ensures build artifacts exist before starting Electron to prevent startup errors
+- Development mode includes source maps and opens DevTools in detached mode
 
 ## Architecture Overview
 
@@ -55,13 +60,16 @@ The development command runs webpack in watch mode and launches Electron with au
 - **TypeScript**: Type safety throughout the codebase
 
 ### Application Flow
-1. App.tsx manages page routing between three main sections via dropdown navigation
-2. DrawMoleculePage contains the molecular visualization workflow:
-   - User inputs XYZ coordinates via XYZInput component
-   - Data is validated using `xyzParser.ts` utilities
+1. **Page Management**: App.tsx manages state for sidebar, dropdown navigation, and current page routing
+2. **Navigation**: Independent sidebar toggle button and header dropdown provide access to three main pages
+3. **Molecular Visualization Workflow** (DrawMoleculePage):
+   - User inputs XYZ coordinates via XYZInput component with validation
+   - Data is parsed and validated using `xyzParser.ts` utilities
    - Valid coordinates are passed to MoleculeViewer component
-   - MoleculeViewer loads the molecular structure into 3Dmol.js viewer
-   - User can adjust visualization styles and take screenshots
+   - MoleculeViewer creates a 3Dmol.js viewer instance and loads molecular structure
+   - StyleControls allow real-time adjustment of visualization appearance (atoms, bonds, surfaces)
+   - Screenshots can be taken directly from the 3D viewer
+4. **State Management**: All UI state (sidebar, dropdown, current page) managed in App.tsx with React hooks
 
 ### File Structure
 ```
@@ -83,14 +91,29 @@ Custom TypeScript definitions are provided for:
 
 ## Development Notes
 
-- The app uses a custom titlebar with `titleBarStyle: 'hidden'` and `titleBarOverlay`
-- Security best practices are followed (nodeIntegration disabled, contextIsolation enabled)
-- XYZ parser supports standard XYZ format with comprehensive validation
-- Sample molecules (water, methane, benzene) are available for testing
-- Navigation between app sections is implemented via dropdown menu (CalculationSettings, Results, DrawMolecule pages)
-- TypeScript strict mode is enabled with custom type definitions in `src/types/`
-- Webpack configuration includes Japanese comments and is security-focused
-- The development server uses `wait-on` to ensure build artifacts exist before starting Electron
+### Electron Security & Configuration
+- Custom titlebar with `titleBarStyle: 'hidden'` and transparent `titleBarOverlay` (40px height)
+- Security best practices: `nodeIntegration: false`, `contextIsolation: true`
+- DevTools automatically opens in detached mode during development
+
+### Code Organization & Standards
+- TypeScript strict mode enabled with comprehensive type definitions in `src/types/`
+- Custom TypeScript definitions for 3Dmol.js library and Electron APIs
+- XYZ parser supports standard molecular coordinate format with validation
+- Sample molecules available for testing: water, methane, benzene
+
+### Build System Details
+- Webpack configuration includes Japanese comments and prioritizes security
+- Three separate build targets prevent security vulnerabilities
+- CSS extracted to separate files (no style-loader for security)
+- Assets processed as resources and placed in `dist/assets/`
+- `fsevents` externalized for macOS compatibility
+
+### UI Architecture
+- Independent sidebar toggle button with custom SVG icons
+- Dropdown navigation between three main app sections
+- Responsive layout that adapts when sidebar is open/closed
+- Footer displays technology credits (3Dmol.js, React, TypeScript)
 
 ## Troubleshooting
 

@@ -50,7 +50,7 @@ const styleOptions: StyleOption[] = [
 export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, className = "" }) => {
   const [selectedStyle, setSelectedStyle] = useState<VisualizationStyle>("ball-and-stick");
   const [atomRadius, setAtomRadius] = useState(0.3);
-  const [bondRadius, setBondRadius] = useState(0.2);
+  const [bondRadius, setBondRadius] = useState(0.15);
 
   const generateStyleSpec = (style: VisualizationStyle): StyleSpec => {
     switch (style) {
@@ -104,51 +104,36 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
     }
   };
 
-  // ✨ stateが更新された後に副作用として3Dビューワを更新する
+  // Update 3D viewer as a side effect after state is updated
   useEffect(() => {
     const styleSpec = generateStyleSpec(selectedStyle);
     onStyleChange(styleSpec);
-  }, [selectedStyle, atomRadius, bondRadius, onStyleChange]); // 依存配列
+  }, [selectedStyle, atomRadius, bondRadius, onStyleChange]); // dependency array
 
   return (
     <div className={`style-controls ${className}`}>
-      <div className="style-controls-header" style={{ marginBottom: "15px" }}>
-        <h3 style={{ margin: "0 0 10px 0", fontSize: "16px", fontWeight: "bold" }}>
-          Visualization Style
-        </h3>
+      <div className="style-controls-header">
+        <h3 className="section-title">Visualization Style</h3>
       </div>
 
       {/* Style Selection */}
-      <div className="style-options" style={{ marginBottom: "15px" }}>
+      <div className="style-options">
         {styleOptions.map((option) => (
           <label 
             key={option.id}
-            style={{ 
-              display: "flex", 
-              alignItems: "center", 
-              marginBottom: "8px",
-              cursor: "pointer",
-              padding: "8px",
-              backgroundColor: selectedStyle === option.id ? "#e3f2fd" : "transparent",
-              borderRadius: "4px",
-              border: selectedStyle === option.id ? "1px solid #2196f3" : "1px solid transparent"
-            }}
+            className={`style-option ${selectedStyle === option.id ? 'selected' : ''}`}
           >
             <input
               type="radio"
               name="visualization-style"
               value={option.id}
               checked={selectedStyle === option.id}
-              onChange={() => setSelectedStyle(option.id)} // state更新のみを行う
-              style={{ marginRight: "8px" }}
+              onChange={() => setSelectedStyle(option.id)}
+              className="style-radio"
             />
-            <div>
-              <div style={{ fontWeight: "bold", fontSize: "14px" }}>
-                {option.label}
-              </div>
-              <div style={{ fontSize: "12px", color: "#666" }}>
-                {option.description}
-              </div>
+            <div className="option-content">
+              <div className="option-label">{option.label}</div>
+              <div className="option-description">{option.description}</div>
             </div>
           </label>
         ))}
@@ -156,9 +141,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
 
       {/* Size Controls */}
       {(selectedStyle === "sphere" || selectedStyle === "ball-and-stick") && (
-        <div className="size-controls" style={{ marginBottom: "15px" }}>
-          <div style={{ marginBottom: "10px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }}>
+        <div className="size-control-section">
+          <div className="slider-control">
+            <label className="slider-label">
               Atom Size: {atomRadius.toFixed(2)}
             </label>
             <input
@@ -167,17 +152,17 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
               max="1.0"
               step="0.05"
               value={atomRadius}
-              onChange={(e) => setAtomRadius(parseFloat(e.target.value))} // state更新のみ
-              style={{ width: "100%" }}
+              onChange={(e) => setAtomRadius(parseFloat(e.target.value))}
+              className="size-slider"
             />
           </div>
         </div>
       )}
 
       {(selectedStyle === "stick" || selectedStyle === "ball-and-stick") && (
-        <div className="size-controls" style={{ marginBottom: "15px" }}>
-          <div style={{ marginBottom: "10px" }}>
-            <label style={{ display: "block", fontSize: "14px", fontWeight: "bold", marginBottom: "5px" }}>
+        <div className="size-control-section">
+          <div className="slider-control">
+            <label className="slider-label">
               Bond Size: {bondRadius.toFixed(2)}
             </label>
             <input
@@ -186,8 +171,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
               max="0.5"
               step="0.05"
               value={bondRadius}
-              onChange={(e) => setBondRadius(parseFloat(e.target.value))} // state更新のみ
-              style={{ width: "100%" }}
+              onChange={(e) => setBondRadius(parseFloat(e.target.value))}
+              className="size-slider"
             />
           </div>
         </div>
@@ -195,24 +180,15 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
 
       {/* Quick Actions */}
       <div className="quick-actions">
-        <h4 style={{ margin: "0 0 8px 0", fontSize: "14px", fontWeight: "bold" }}>
-          Quick Actions
-        </h4>
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <h4 className="quick-actions-title">Quick Actions</h4>
+        <div className="quick-action-buttons">
           <button
             onClick={() => {
               setSelectedStyle("ball-and-stick");
               setAtomRadius(0.3);
-              setBondRadius(0.2);
+              setBondRadius(0.15);
             }}
-            style={{
-              padding: "6px 12px",
-              fontSize: "12px",
-              backgroundColor: "#f8f9fa",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
+            className="quick-action-btn"
           >
             Default
           </button>
@@ -221,14 +197,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
               setAtomRadius(0.6);
               setBondRadius(0.4);
             }}
-            style={{
-              padding: "6px 12px",
-              fontSize: "12px",
-              backgroundColor: "#f8f9fa",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
+            className="quick-action-btn"
           >
             Large
           </button>
@@ -237,14 +206,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
               setAtomRadius(0.2);
               setBondRadius(0.1);
             }}
-            style={{
-              padding: "6px 12px",
-              fontSize: "12px",
-              backgroundColor: "#f8f9fa",
-              border: "1px solid #ccc",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
+            className="quick-action-btn"
           >
             Small
           </button>

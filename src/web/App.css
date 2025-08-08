@@ -439,3 +439,703 @@ body {
   color: #6c757d;
   font-size: 14px;
 }
+
+/* Calculation Settings Page Styles */
+
+.calculation-settings-containers {
+  display: flex;
+  width: 100%;
+  height: 80dvh;
+}
+
+.calculation-settings-container {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  height: calc(100vh - 40px);
+  padding: 0 16px;
+  gap: 16px;
+}
+
+/* Header Section */
+.calculation-header {
+  background: white;
+  margin-bottom: 12px;
+}
+
+.header-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.molecule-name-section {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.molecule-name-input {
+  width: 340px;
+  padding: 12px 40px 12px 20px;
+  border: 2px solid #50D4F5;
+  border-radius: 28px;
+  font-size: 15px;
+  outline: none;
+  background: white;
+  color: #333;
+}
+
+.molecule-name-input::placeholder {
+  color: #999;
+  font-style: normal;
+}
+
+.molecule-name-input:focus {
+  border-color: #45c1e8;
+  box-shadow: 0 0 0 3px rgba(80, 212, 245, 0.15);
+}
+
+.clear-molecule-name {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-molecule-name:hover {
+  background: rgba(0,0,0,0.05);
+  color: #666;
+}
+
+.computation-settings {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-group label {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  text-align: center;
+  font-weight: 500;
+}
+
+.setting-group select {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+  min-width: 80px;
+  color: #333;
+}
+
+.setting-group select:focus {
+  border-color: #50D4F5;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.1);
+}
+
+.memory-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+}
+
+.memory-value {
+  width: 80px;
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  text-align: right;
+  font-size: 14px;
+  color: #333;
+}
+
+.memory-value:focus {
+  border-color: #50D4F5;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.1);
+}
+
+.memory-unit {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.start-calculation-btn {
+  background: #50D4F5;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.start-calculation-btn:hover {
+  background: #45c1e8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
+}
+
+/* Main Content Three Column Layout */
+.main-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* calculation Column - Calculation Settings */
+.calculation-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.calculation-settings-section,
+.solvent-settings-section {
+  display: flex;
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #e0e0e0;
+}
+
+.setting-row:last-child {
+  margin-bottom: 0;
+}
+
+.setting-row label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #444;
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.setting-row select,
+.setting-row .number-input {
+  width: 100px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+  background: white;
+  color: #333;
+}
+
+.setting-row select:focus,
+.setting-row .number-input:focus {
+  border-color: #50D4F5;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.1);
+}
+
+.setting-row select:disabled {
+  background-color: #f5f5f5;
+  color: #999;
+}
+
+.number-input {
+  text-align: center;
+}
+
+/* Chrome, Safari, Edge のスピンボタンを表示 */
+.number-input.with-spinner::-webkit-outer-spin-button,
+.number-input.with-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: auto;
+  margin: 0;
+}
+
+/* Firefox のスピンボタンを表示 */
+.number-input.with-spinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Left Column - 3D Viewer */
+.left-column {
+  display: flex;
+  background: white;
+  height: fit-content;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #e0e0e0;
+}
+
+.left-column .viewer-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex: 1;
+  position: relative;
+  min-height: 500px;
+}
+
+/* Right Column - Visualization Controls and Input */
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.visualization-section,
+.molecular-input-section {
+  background: white;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #e0e0e0;
+}
+
+/* Molecular Input Section */
+.molecular-input-section .section-title {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.subsection-title {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.input-method-selection {
+  margin-bottom: 20px;
+}
+
+.radio-options {
+  margin-top: 8px;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.radio-option input[type="radio"] {
+  margin-right: 8px;
+  accent-color: #ff4444;
+  transform: scale(1.1);
+}
+
+.radio-text {
+  color: #333;
+  font-weight: 500;
+}
+
+.pubchem-input-section {
+  margin-bottom: 24px;
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.pubchem-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #333;
+}
+
+.pubchem-input::placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.pubchem-input:focus {
+  border-color: #50D4F5;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.1);
+}
+
+.convert-button {
+  background: #50D4F5;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.convert-button:hover {
+  background: #45c1e8;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(80, 212, 245, 0.3);
+}
+
+.xyz-direct-input {
+  border-top: 1px solid #eee;
+  padding-top: 20px;
+}
+
+.xyz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.xyz-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.xyz-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+}
+
+.atom-count {
+  background: #f8f9fa;
+  color: #333;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #e0e0e0;
+}
+
+.molecule-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  font-style: italic;
+}
+
+/* StyleControls Component Styles */
+.style-controls-header {
+  margin-bottom: 16px;
+}
+
+.section-title {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.style-options {
+  margin-bottom: 20px;
+}
+
+.style-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.style-option:hover {
+  background-color: #f8f9fa;
+}
+
+.style-option.selected {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+  box-shadow: 0 1px 3px rgba(33, 150, 243, 0.2);
+}
+
+.style-radio {
+  margin-right: 12px;
+  accent-color: #2196f3;
+  transform: scale(1.1);
+}
+
+.option-content {
+  flex: 1;
+}
+
+.option-label {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.option-description {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.3;
+}
+
+.size-control-section {
+  margin-bottom: 20px;
+}
+
+.slider-control {
+  margin-bottom: 16px;
+}
+
+.slider-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+}
+
+.size-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e0e0e0;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.size-slider::-webkit-slider-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e0e0e0;
+}
+
+.size-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2196f3;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  margin-top: -6px;
+}
+
+.size-slider::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: #e0e0e0;
+  border: none;
+}
+
+.size-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #2196f3;
+  cursor: pointer;
+  border: 2px solid white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.quick-actions {
+  border-top: 1px solid #eee;
+  padding-top: 16px;
+}
+
+.quick-actions-title {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.quick-action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.quick-action-btn {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-action-btn:hover {
+  background: #e9ecef;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* XYZ Input Component Styles */
+.xyz-input-container {
+  margin-top: 8px;
+}
+
+.xyz-textarea {
+  width: 100%;
+  height: 180px;
+  padding: 12px;
+  font-size: 11px;
+  font-family: 'Courier New', monospace;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  background: white;
+  color: #333;
+  line-height: 1.4;
+}
+
+.xyz-textarea:focus {
+  border-color: #50D4F5;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.1);
+}
+
+.xyz-textarea::placeholder {
+  color: #999;
+  font-style: normal;
+}
+
+.xyz-validation-status {
+  margin-top: 12px;
+  margin-bottom: 8px;
+}
+
+.validation-message {
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.validation-message.valid {
+  color: #28a745;
+}
+
+.validation-message.invalid {
+  color: #dc3545;
+}
+
+.validation-message.validating {
+  color: #ffa500;
+}
+
+.xyz-format-help {
+  margin-top: 8px;
+}
+
+.format-help-link {
+  color: #50D4F5;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.format-help-link:hover {
+  color: #45c1e8;
+  text-decoration: underline;
+}
+
+.format-help-details {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #666;
+}
+
+.format-help-summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 8px;
+  list-style: none;
+}
+
+.format-help-content {
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #50D4F5;
+}
+
+.format-help-content p {
+  margin: 0 0 8px 0;
+}
+
+.format-help-content ol {
+  padding-left: 20px;
+  margin: 8px 0;
+}
+
+.format-help-content li {
+  margin-bottom: 4px;
+}
+
+.format-example {
+  background: white;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 1.3;
+  margin: 8px 0 0 0;
+  border: 1px solid #e0e0e0;
+}
