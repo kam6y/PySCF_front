@@ -128,10 +128,6 @@ export const App = () => {
         {renderCurrentPage()}
       </div>
 
-      {/* Footer */}
-      <footer className="app-footer">
-        <p>Powered by 3Dmol.js • Built with React and TypeScript</p>
-      </footer>
     </div>
   );
 };

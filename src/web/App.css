@@ -12,14 +12,14 @@ body {
   margin: 0;
   padding: 0;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #f5f5f5;
+  background-color: #ffffff;
 }
 
 /* App Container */
 .app-container {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: fit-content;
   background-color: #ffffff;
 }
 
@@ -286,19 +286,10 @@ body {
 
 /* Main Content with Sidebar */
 .app-content {
-  display: flex;
-  flex: 1;
-  gap: 20px;
-  padding: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
+  max-width: calc(100vw - 104px);
+  margin: auto;
   width: 100%;
   transition: margin-left 0.3s ease-out;
-}
-
-.app-content.sidebar-open {
-  margin-left: 25dvw; /* Sidebar width */
-  width: calc(100% - 25dvw);
 }
 
 /* Left Panel */
@@ -352,18 +343,6 @@ body {
   font-size: 14px;
   color: #28a745;
   font-weight: 500;
-}
-
-.viewer-container {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.main-viewer {
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
 }
 
 .viewer-placeholder {
@@ -445,14 +424,14 @@ body {
 .calculation-settings-containers {
   display: flex;
   width: 100%;
-  height: 80dvh;
+  padding: 12px 0;
+  height: calc(100vh - 40px);
 }
 
 .calculation-settings-container {
   display: flex;
   width: 100%;
   flex-direction: column;
-  height: calc(100vh - 40px);
   padding: 0 16px;
   gap: 16px;
 }
@@ -460,7 +439,6 @@ body {
 /* Header Section */
 .calculation-header {
   background: white;
-  margin-bottom: 12px;
 }
 
 .header-title-bar {
@@ -480,7 +458,7 @@ body {
   width: 340px;
   padding: 12px 40px 12px 20px;
   border: 2px solid #50D4F5;
-  border-radius: 28px;
+  border-radius: 8px;
   font-size: 15px;
   outline: none;
   background: white;
@@ -587,12 +565,13 @@ body {
 }
 
 .start-calculation-btn {
-  background: #50D4F5;
+  background: #45c1e8;
   color: white;
   border: none;
-  padding: 12px 24px;
+  padding: 12px 16px;
   border-radius: 6px;
-  font-size: 15px;
+  font-size: 20px;
+  font-family: 'ADLaM', sans-serif;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -600,7 +579,7 @@ body {
 }
 
 .start-calculation-btn:hover {
-  background: #45c1e8;
+  background: #22b9e7;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
 }
@@ -618,21 +597,23 @@ body {
 .calculation-column {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #e0e0e0;
+  background-color:#f8f9fa;
 }
 
 .calculation-settings-section,
 .solvent-settings-section {
   display: flex;
-  background: white;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  border: 1px solid #e0e0e0;
+  padding: 8px;
+  gap: 16px;
 }
 
-.setting-row:last-child {
-  margin-bottom: 0;
+.setting-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
 }
 
 .setting-row label {
@@ -640,7 +621,7 @@ body {
   font-weight: 500;
   color: #444;
   text-align: left;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .setting-row select,
@@ -650,6 +631,7 @@ body {
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 13px;
+  text-align: start;
   background: white;
   color: #333;
 }
@@ -717,11 +699,17 @@ body {
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   border: 1px solid #e0e0e0;
+  height: fit-content;
 }
 
 /* Molecular Input Section */
+
+.molecular-input-section h3 {
+  margin: 0 0 12px 0;
+  color: #333;
+}
+
 .molecular-input-section .section-title {
-  margin: 0 0 16px 0;
   font-size: 16px;
   font-weight: 600;
   color: #333;
@@ -729,7 +717,7 @@ body {
 
 .subsection-title {
   margin: 0 0 12px 0;
-  font-size: 13px;
+  font-size: 8px;
   font-weight: 600;
   color: #333;
 }
@@ -764,6 +752,11 @@ body {
 
 .pubchem-input-section {
   margin-bottom: 24px;
+}
+
+.pubchem-input-container {
+  display: flex;
+  gap: 16px;
 }
 
 .input-label {
@@ -822,7 +815,6 @@ body {
 
 .xyz-direct-input {
   border-top: 1px solid #eee;
-  padding-top: 20px;
 }
 
 .xyz-header {

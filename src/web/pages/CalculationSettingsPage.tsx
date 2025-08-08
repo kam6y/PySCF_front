@@ -242,15 +242,17 @@ export const CalculationSettingsPage = () => {
 
         <div className="pubchem-input-section">
           <label>Compound name or CID</label>
-          <input
-            type="text"
-            value={pubchemInput}
-            onChange={(e) => setPubchemInput(e.target.value)}
-            className="pubchem-input"
-          />
-          <button onClick={handleXYZConvert} className="convert-button">
-            Convert to XYZ
-          </button>
+          <div className="pubchem-input-container">
+            <input
+              type="text"
+              value={pubchemInput}
+              onChange={(e) => setPubchemInput(e.target.value)}
+              className="pubchem-input"
+            />
+            <button onClick={handleXYZConvert} className="convert-button">
+              Convert to XYZ
+            </button>
+          </div>
         </div>
 
         <div className="xyz-direct-input">

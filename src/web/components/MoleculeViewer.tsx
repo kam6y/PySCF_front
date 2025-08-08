@@ -17,7 +17,7 @@ export interface MoleculeViewerRef {
 }
 
 export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>(
-  ({ width = 600, height = 400, backgroundColor = "white", className = "" }, ref) => {
+  ({ width = 600, height = 600, backgroundColor = "white", className = "" }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<GLViewer | null>(null);
     const currentModelRef = useRef<GLModel | null>(null);

@@ -133,7 +133,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
             />
             <div className="option-content">
               <div className="option-label">{option.label}</div>
-              <div className="option-description">{option.description}</div>
             </div>
           </label>
         ))}

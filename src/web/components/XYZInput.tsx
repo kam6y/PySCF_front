@@ -72,13 +72,12 @@ export const XYZInput: React.FC<XYZInputProps> = ({ onXYZChange, className = "" 
         id="xyz-textarea"
         value={xyzInput}
         onChange={handleInputChange}
-        placeholder={`C -1.151228 0.497765 -1.393083
-N -2.046769 -0.227518 -1.197056
-C -3.273621 0.358425 -0.274278
-C -3.383621 1.488582 -0.274278
-C -2.238126 0.144473 -1.132090
-C -2.317317 -0.752840 -0.250109
-...`}
+        placeholder={`3
+Water molecule
+O   0.000000   0.000000   0.119262
+H   0.000000   0.763239  -0.477047
+H   0.000000  -0.763239  -0.477047
+`}
         className="xyz-textarea"
       />
 
