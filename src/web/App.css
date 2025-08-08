@@ -626,6 +626,7 @@ body {
   grid-template-columns: 2fr 1fr;
   gap: 16px;
   flex: 1;
+  align-items: start;
 }
 
 /* calculation Column - Calculation Settings */
@@ -718,7 +719,7 @@ body {
   align-items: center;
   flex: 1;
   position: relative;
-  min-height: 500px;
+  min-height: 506px;
 }
 
 /* Right Column - Visualization Controls and Input */
@@ -726,7 +727,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: 100%;
+  height: fit-content;
 }
 
 .visualization-section,
