@@ -80,23 +80,44 @@ export const CalculationSettingsPage = () => {
               <button className="clear-molecule-name">×</button>
             </div>
             <div className="computation-settings">
-              <div className="setting-group">
+              <div className="setting-group cpu-setting">
                 <label>CPU cores</label>
-                <select value={cpuCores} onChange={(e) => setCpuCores(Number(e.target.value))}>
-                  <option value={1}>1</option>
-                  <option value={2}>2</option>
-                  <option value={4}>4</option>
-                  <option value={8}>8</option>
-                </select>
+                <div className="cpu-input-container">
+                  <input
+                    type="number"
+                    value={cpuCores}
+                    onChange={(e) => setCpuCores(Math.max(1, Number(e.target.value)))}
+                    min="1"
+                    max="32"
+                    className="cpu-cores-input"
+                  />
+                  <div className="spinner-arrows">
+                    <button 
+                      type="button" 
+                      className="spinner-btn up" 
+                      onClick={() => setCpuCores(prev => Math.min(32, prev + 1))}
+                    >
+                      ▲
+                    </button>
+                    <button 
+                      type="button" 
+                      className="spinner-btn down" 
+                      onClick={() => setCpuCores(prev => Math.max(1, prev - 1))}
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="setting-group">
+              <div className="setting-group memory-setting">
                 <label>Memory usage</label>
-                <div className="memory-input">
+                <div className="memory-input-container">
                   <input
                     type="number"
                     value={memoryMB}
-                    onChange={(e) => setMemoryMB(Number(e.target.value))}
-                    className="memory-value"
+                    onChange={(e) => setMemoryMB(Math.max(128, Number(e.target.value)))}
+                    min="128"
+                    className="memory-value-input"
                   />
                   <span className="memory-unit">MB</span>
                 </div>
