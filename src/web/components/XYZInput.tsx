@@ -1,15 +1,37 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { parseXYZData, getSampleXYZData, XYZValidationResult } from "../utils/xyzParser";
 
 export interface XYZInputProps {
   onXYZChange: (xyzData: string, isValid: boolean) => void;
   className?: string;
+  value?: string; // Allow external control of the input value
 }
 
-export const XYZInput: React.FC<XYZInputProps> = ({ onXYZChange, className = "" }) => {
+export const XYZInput: React.FC<XYZInputProps> = ({ onXYZChange, className = "", value }) => {
   const [xyzInput, setXyzInput] = useState("");
   const [validationResult, setValidationResult] = useState<XYZValidationResult | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+
+  // Update internal state when external value changes
+  useEffect(() => {
+    if (value !== undefined && value !== xyzInput) {
+      setXyzInput(value);
+      // Validate the external value without triggering onChange
+      if (!value.trim()) {
+        setValidationResult(null);
+        return;
+      }
+      
+      setIsValidating(true);
+      const timeoutId = setTimeout(() => {
+        const result = parseXYZData(value);
+        setValidationResult(result);
+        setIsValidating(false);
+      }, 100); // Shorter delay for external updates
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [value]);
 
   const sampleData = getSampleXYZData();
 
@@ -39,32 +61,6 @@ export const XYZInput: React.FC<XYZInputProps> = ({ onXYZChange, className = "" 
     validateXYZ(value);
   };
 
-  const handleSampleSelect = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const sampleKey = event.target.value;
-    if (sampleKey && sampleData[sampleKey]) {
-      const sampleXYZ = sampleData[sampleKey];
-      setXyzInput(sampleXYZ);
-      validateXYZ(sampleXYZ);
-    }
-  };
-
-  const handleClear = () => {
-    setXyzInput("");
-    setValidationResult(null);
-    onXYZChange("", false);
-  };
-
-  const getValidationStatusStyle = () => {
-    if (!validationResult && !isValidating) return {};
-    
-    if (isValidating) {
-      return { borderColor: "#ffa500", backgroundColor: "#fff9e6" };
-    }
-    
-    return validationResult?.isValid 
-      ? { borderColor: "#28a745", backgroundColor: "#f8fff8" }
-      : { borderColor: "#dc3545", backgroundColor: "#fff8f8" };
-  };
 
   return (
     <div className={`xyz-input-container ${className}`}>

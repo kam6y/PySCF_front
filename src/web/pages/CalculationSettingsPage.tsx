@@ -27,9 +27,13 @@ export const CalculationSettingsPage = () => {
   // Molecular input state
   const [inputMethod, setInputMethod] = useState("pubchem");
   const [pubchemInput, setPubchemInput] = useState("");
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertError, setConvertError] = useState<string | null>(null);
+  const [xyzInputValue, setXyzInputValue] = useState<string>(""); // Control XYZ input externally
 
   const handleXYZChange = (xyzData: string, isValid: boolean) => {
     setHasValidMolecule(isValid);
+    setXyzInputValue(xyzData); // Update the controlled XYZ input value
 
     if (isValid && xyzData.trim()) {
       moleculeViewerRef.current?.loadXYZ(xyzData);
@@ -59,8 +63,51 @@ export const CalculationSettingsPage = () => {
     });
   };
 
-  const handleXYZConvert = () => {
-    console.log("Converting from PubChem/SMILES:", pubchemInput);
+  const handleXYZConvert = async () => {
+    if (!pubchemInput.trim()) {
+      setConvertError("Please enter a compound name or CID");
+      return;
+    }
+
+    setIsConverting(true);
+    setConvertError(null);
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/pubchem/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: pubchemInput.trim(),
+          search_type: inputMethod === 'pubchem' ? 'name' : 'name'  // Future: support more types
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Set the molecule name from compound info
+        if (data.data.compound_info?.iupac_name) {
+          setMoleculeName(data.data.compound_info.iupac_name);
+        }
+
+        // Update the XYZ input with the retrieved data
+        setXyzInputValue(data.data.xyz);
+        handleXYZChange(data.data.xyz, true);
+
+        console.log(`Successfully converted ${pubchemInput} to XYZ format`);
+        console.log(`Found compound: ${data.data.compound_info?.iupac_name} (CID: ${data.data.compound_info?.cid})`);
+        console.log(`Atoms: ${data.data.atom_count}`);
+      } else {
+        setConvertError(data.error || 'Failed to convert compound');
+      }
+    } catch (error) {
+      console.error('Error converting PubChem data:', error);
+      setConvertError('Network error or server is not available');
+    } finally {
+      setIsConverting(false);
+    }
   };
 
   return (
@@ -262,23 +309,43 @@ export const CalculationSettingsPage = () => {
         </div>
 
         <div className="pubchem-input-section">
-          <label>Compound name or CID</label>
+          <label></label>
           <div className="pubchem-input-container">
             <input
               type="text"
               value={pubchemInput}
-              onChange={(e) => setPubchemInput(e.target.value)}
+              onChange={(e) => {
+                setPubchemInput(e.target.value);
+                if (convertError) setConvertError(null); // Clear error when user types
+              }}
               className="pubchem-input"
             />
-            <button onClick={handleXYZConvert} className="convert-button">
-              Convert to XYZ
+            <button 
+              onClick={handleXYZConvert} 
+              className="convert-button"
+              disabled={isConverting || !pubchemInput.trim()}
+            >
+              {isConverting ? 'Converting...' : 'Convert to XYZ'}
             </button>
           </div>
+          
+          {/* Status Messages */}
+          {convertError && (
+            <div className="convert-error">
+              ❌ {convertError}
+            </div>
+          )}
+          
+          {isConverting && (
+            <div className="convert-loading">
+              ⏳ Searching PubChem database...
+            </div>
+          )}
         </div>
 
         <div className="xyz-direct-input">
           <h4>Direct XYZ Input/Edit</h4>
-          <XYZInput onXYZChange={handleXYZChange} />
+          <XYZInput onXYZChange={handleXYZChange} value={xyzInputValue} />
         </div>
       </section>
     </div>

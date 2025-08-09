@@ -58,7 +58,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
         return {
           stick: {
             radius: bondRadius,
-            colorscheme: "element"
+            colorscheme: "default"
           }
         };
       
@@ -66,7 +66,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
         return {
           sphere: {
             radius: atomRadius,
-            colorscheme: "element"
+            colorscheme: "default"
           }
         };
       
@@ -74,11 +74,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
         return {
           stick: {
             radius: bondRadius,
-            colorscheme: "element"
+            colorscheme: "default"
           },
           sphere: {
             radius: atomRadius,
-            colorscheme: "element"
+            colorscheme: "default"
           }
         };
       
@@ -92,7 +92,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
       case "cartoon":
         return {
           cartoon: {
-            colorscheme: "element"
+            colorscheme: "default"
           }
         };
       
