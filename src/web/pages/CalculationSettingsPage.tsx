@@ -325,7 +325,7 @@ export const CalculationSettingsPage = () => {
                 checked={inputMethod === "pubchem"}
                 onChange={(e) => setInputMethod(e.target.value)}
               />
-              <span className="radio-text">Get from PubChem name/ID</span>
+              <span className="radio-text">Get from PubChem name/CID</span>
             </label>
             <label className="radio-option">
               <input type="radio" name="inputMethod" value="smiles" disabled />
@@ -338,7 +338,7 @@ export const CalculationSettingsPage = () => {
             <input
               type="text"
               value={pubchemInput}
-              placeholder="e.g., water, caffeine, or CID"
+              placeholder=""
               onChange={(e) => {
                 setPubchemInput(e.target.value);
                 if (convertError) setConvertError(null);
