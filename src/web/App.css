@@ -740,6 +740,10 @@ body {
   height: fit-content;
 }
 
+.molecular-input-section {
+  background-color: #f8f9fa;
+}
+
 /* Molecular Input Section */
 
 .molecular-input-section h3 {
