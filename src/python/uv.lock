@@ -209,12 +209,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pubchempy"
-version = "1.0.4"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/aa/fb/8de3aa9804b614dbc8dc5c16ed061d819cc360e0ddecda3dcd01c1552339/PubChemPy-1.0.4.tar.gz", hash = "sha256:24e9dc2fc90ab153b2764bf805e510b1410700884faf0510a9e7cf0d61d8ed0e", size = 29767, upload-time = "2017-04-11T18:36:23.649Z" }
-
-[[package]]
 name = "pygments"
 version = "2.19.2"
 source = { registry = "https://pypi.org/simple" }
@@ -231,7 +225,6 @@ dependencies = [
     { name = "certifi" },
     { name = "flask" },
     { name = "flask-cors" },
-    { name = "pubchempy" },
     { name = "requests" },
 ]
 
@@ -246,7 +239,6 @@ requires-dist = [
     { name = "certifi", specifier = ">=2024.7.4" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=4.0.0" },
-    { name = "pubchempy", specifier = ">=1.0.4" },
     { name = "requests", specifier = ">=2.31.0" },
 ]
 

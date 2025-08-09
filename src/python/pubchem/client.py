@@ -145,6 +145,9 @@ class PubChemClient:
             logger.info(f"No 3D SDF record found for CID {cid}.")
             return None
 
+    #
+    # 変更点: SDFファイルのパース処理の堅牢化
+    #
     def _parse_sdf_atoms(self, sdf_data: str) -> List[Dict[str, Any]]:
         """Parses atom coordinates from SDF data."""
         atoms = []
@@ -159,10 +162,14 @@ class PubChemClient:
             
             atom_block = lines[4 : 4 + num_atoms]
             for line in atom_block:
-                x = float(line[0:10].strip())
-                y = float(line[10:20].strip())
-                z = float(line[20:30].strip())
-                element = line[31:34].strip()
+                parts = line.split()
+                if len(parts) < 4:
+                    continue # Skip malformed lines
+
+                x = float(parts[0])
+                y = float(parts[1])
+                z = float(parts[2])
+                element = parts[3]
                 atoms.append({'element': element, 'x': x, 'y': y, 'z': z})
         except (ValueError, IndexError) as e:
             logger.error(f"Failed to parse SDF data: {e}")

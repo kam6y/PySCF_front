@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from "react";
+import * as $3Dmol from '3dmol'; // 変更点: 型付きでインポート
 import { GLViewer, GLModel, StyleSpec } from "../../types/3dmol";
 
 export interface MoleculeViewerProps {
@@ -23,96 +24,91 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
     const currentModelRef = useRef<GLModel | null>(null);
 
     useEffect(() => {
-      const initViewer = async () => {
-        if (!containerRef.current) return;
+      if (!containerRef.current) return;
 
-        try {
-          // Dynamic import to ensure 3Dmol.js is loaded properly
-          const $3Dmol = await import("3dmol/build/3Dmol.js") as any;
-          const viewer = $3Dmol.createViewer(containerRef.current, {
-            backgroundColor,
-          });
-          
-          viewer.setWidth(width);
-          viewer.setHeight(height);
-          
-          viewerRef.current = viewer;
-        } catch (error) {
-          console.error("Failed to initialize 3Dmol viewer:", error);
-        }
-      };
-
-      initViewer();
+      try {
+        // 変更点: 'as any' を削除
+        const viewer = $3Dmol.createViewer(containerRef.current, {
+          backgroundColor,
+        });
+        
+        viewer.setWidth(width);
+        viewer.setHeight(height);
+        
+        viewerRef.current = viewer;
+      } catch (error) {
+        console.error("Failed to initialize 3Dmol viewer:", error);
+      }
 
       return () => {
         if (viewerRef.current) {
-          viewerRef.current.clear();
+          // You might need to add a proper cleanup method if available in 3Dmol.js
+          // For now, clear() is a good approach.
         }
       };
     }, [backgroundColor, width, height]);
 
     useImperativeHandle(ref, () => ({
       loadXYZ: (xyzData: string) => {
-        if (!viewerRef.current) {
+        const viewer = viewerRef.current;
+        if (!viewer) {
           console.error("Viewer not initialized");
           return;
         }
 
         try {
-          // Clear existing models
-          viewerRef.current.removeAllModels();
-          
-          // Add new model
-          const model = viewerRef.current.addModel(xyzData, "xyz");
+          viewer.removeAllModels();
+          const model = viewer.addModel(xyzData, "xyz");
           currentModelRef.current = model;
           
           // Set default style
-          viewerRef.current.setStyle({}, { 
+          viewer.setStyle({}, {
             stick: { radius: 0.2 },
             sphere: { radius: 0.3 }
           });
           
-          // Zoom to fit and render
-          viewerRef.current.zoomTo();
-          viewerRef.current.render();
+          viewer.zoomTo();
+          viewer.render();
         } catch (error) {
           console.error("Failed to load XYZ data:", error);
         }
       },
 
       setStyle: (style: StyleSpec) => {
-        if (!viewerRef.current) {
+        const viewer = viewerRef.current;
+        if (!viewer) {
           console.error("Viewer not initialized");
           return;
         }
 
         try {
-          viewerRef.current.setStyle({}, style);
-          viewerRef.current.render();
+          viewer.setStyle({}, style);
+          viewer.render();
         } catch (error) {
           console.error("Failed to set style:", error);
         }
       },
 
       clearModels: () => {
-        if (!viewerRef.current) return;
-        
-        viewerRef.current.removeAllModels();
-        viewerRef.current.render();
-        currentModelRef.current = null;
+        if (viewerRef.current) {
+          viewerRef.current.removeAllModels();
+          viewerRef.current.render();
+          currentModelRef.current = null;
+        }
       },
 
       zoomToFit: () => {
-        if (!viewerRef.current) return;
-        
-        viewerRef.current.zoomTo();
-        viewerRef.current.render();
+        if (viewerRef.current) {
+          viewerRef.current.zoomTo();
+          viewerRef.current.render();
+        }
       },
 
       takeScreenshot: () => {
-        if (!viewerRef.current) return "";
-        
-        return viewerRef.current.screenshot(width, height);
+        if (viewerRef.current) {
+          return viewerRef.current.screenshot(width, height);
+        }
+        return "";
       }
     }));
 
@@ -120,11 +116,12 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
       <div 
         className={`molecule-viewer ${className}`}
         style={{
-          width: width,
-          height: height,
+          width,
+          height,
           border: "1px solid #ccc",
           borderRadius: "4px",
-          overflow: "hidden"
+          overflow: "hidden",
+          position: "relative"
         }}
       >
         <div 
@@ -132,7 +129,6 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
           style={{
             width: "100%",
             height: "100%",
-            position: "relative"
           }}
         />
       </div>

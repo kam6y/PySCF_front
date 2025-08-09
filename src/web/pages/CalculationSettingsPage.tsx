@@ -4,6 +4,34 @@ import { XYZInput } from "../components/XYZInput";
 import { StyleControls } from "../components/StyleControls";
 import { StyleSpec } from "../../types/3dmol";
 
+// --- API通信と定数 ---
+
+// APIサーバーのURLを定数として定義
+const API_BASE_URL = 'http://127.0.0.1:5000';
+
+/**
+ * PubChem APIを介して分子情報を非同期で取得する関数
+ * @param query 化合物名またはCID
+ * @param searchType 検索タイプ（'name'など）
+ * @returns 成功した場合は分子データ、失敗した場合はエラーをスロー
+ */
+const fetchMoleculeFromPubChem = async (query: string, searchType: string) => {
+  const response = await fetch(`${API_BASE_URL}/api/pubchem/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, search_type: searchType }),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || 'Failed to fetch data from the server.');
+  }
+  return data.data;
+};
+
+// --- メインコンポーネント ---
+
 export const CalculationSettingsPage = () => {
   const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const [hasValidMolecule, setHasValidMolecule] = useState(false);
@@ -29,11 +57,14 @@ export const CalculationSettingsPage = () => {
   const [pubchemInput, setPubchemInput] = useState("");
   const [isConverting, setIsConverting] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
-  const [xyzInputValue, setXyzInputValue] = useState<string>(""); // Control XYZ input externally
+  const [xyzInputValue, setXyzInputValue] = useState<string>("");
 
+  /**
+   * XYZデータが変更されたときのハンドラ。分子ビューアを更新する。
+   */
   const handleXYZChange = (xyzData: string, isValid: boolean) => {
     setHasValidMolecule(isValid);
-    setXyzInputValue(xyzData); // Update the controlled XYZ input value
+    setXyzInputValue(xyzData);
 
     if (isValid && xyzData.trim()) {
       moleculeViewerRef.current?.loadXYZ(xyzData);
@@ -42,12 +73,18 @@ export const CalculationSettingsPage = () => {
     }
   };
 
+  /**
+   * 分子表示スタイルが変更されたときのハンドラ。
+   */
   const handleStyleChange = (style: StyleSpec) => {
     if (hasValidMolecule) {
       moleculeViewerRef.current?.setStyle(style);
     }
   };
 
+  /**
+   * 計算開始ボタンが押されたときのハンドラ。
+   */
   const handleStartCalculation = () => {
     console.log("Starting calculation with settings:", {
       moleculeName,
@@ -59,10 +96,15 @@ export const CalculationSettingsPage = () => {
       charges,
       spinMultiplicity,
       solventMethod,
-      solvent
+      solvent,
+      xyz: xyzInputValue,
     });
+    // NOTE: ここで実際の計算プロセスを呼び出す処理を実装します
   };
 
+  /**
+   * PubChemから分子構造を取得し、XYZ形式に変換するハンドラ。
+   */
   const handleXYZConvert = async () => {
     if (!pubchemInput.trim()) {
       setConvertError("Please enter a compound name or CID");
@@ -73,38 +115,19 @@ export const CalculationSettingsPage = () => {
     setConvertError(null);
 
     try {
-      const response = await fetch('http://127.0.0.1:5000/api/pubchem/search', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: pubchemInput.trim(),
-          search_type: inputMethod === 'pubchem' ? 'name' : 'name'  // Future: support more types
-        }),
-      });
+      const searchType = inputMethod === 'pubchem' ? 'name' : 'name'; // 将来的にSMILESなども考慮
+      const data = await fetchMoleculeFromPubChem(pubchemInput.trim(), searchType);
 
-      const data = await response.json();
-
-      if (data.success) {
-        // Set the molecule name from compound info
-        if (data.data.compound_info?.iupac_name) {
-          setMoleculeName(data.data.compound_info.iupac_name);
-        }
-
-        // Update the XYZ input with the retrieved data
-        setXyzInputValue(data.data.xyz);
-        handleXYZChange(data.data.xyz, true);
-
-        console.log(`Successfully converted ${pubchemInput} to XYZ format`);
-        console.log(`Found compound: ${data.data.compound_info?.iupac_name} (CID: ${data.data.compound_info?.cid})`);
-        console.log(`Atoms: ${data.data.atom_count}`);
-      } else {
-        setConvertError(data.error || 'Failed to convert compound');
+      if (data.compound_info?.iupac_name) {
+        setMoleculeName(data.compound_info.iupac_name);
       }
+
+      // handleXYZChange を呼び出してUI全体を更新
+      handleXYZChange(data.xyz, true);
+
     } catch (error) {
       console.error('Error converting PubChem data:', error);
-      setConvertError('Network error or server is not available');
+      setConvertError(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsConverting(false);
     }
@@ -124,7 +147,15 @@ export const CalculationSettingsPage = () => {
                 onChange={(e) => setMoleculeName(e.target.value)}
                 className="molecule-name-input"
               />
-              <button className="clear-molecule-name">×</button>
+              {moleculeName && (
+                <button
+                  onClick={() => setMoleculeName('')}
+                  className="clear-molecule-name"
+                  aria-label="Clear molecule name"
+                >
+                  ×
+                </button>
+              )}
             </div>
             <div className="computation-settings">
               <div className="setting-group cpu-setting">
@@ -139,16 +170,16 @@ export const CalculationSettingsPage = () => {
                     className="cpu-cores-input"
                   />
                   <div className="spinner-arrows">
-                    <button 
-                      type="button" 
-                      className="spinner-btn up" 
+                    <button
+                      type="button"
+                      className="spinner-btn up"
                       onClick={() => setCpuCores(prev => Math.min(32, prev + 1))}
                     >
                       ▲
                     </button>
-                    <button 
-                      type="button" 
-                      className="spinner-btn down" 
+                    <button
+                      type="button"
+                      className="spinner-btn down"
                       onClick={() => setCpuCores(prev => Math.max(1, prev - 1))}
                     >
                       ▼
@@ -169,7 +200,11 @@ export const CalculationSettingsPage = () => {
                   <span className="memory-unit">MB</span>
                 </div>
               </div>
-              <button className="start-calculation-btn" onClick={handleStartCalculation}>
+              <button
+                className="start-calculation-btn"
+                onClick={handleStartCalculation}
+                disabled={!hasValidMolecule}
+              >
                 + Start calculation
               </button>
             </div>
@@ -197,7 +232,7 @@ export const CalculationSettingsPage = () => {
               </div>
               <div className="setting-row">
                 <label>Exchange-correlation function</label>
-                <select value={exchangeCorrelation} onChange={(e) => setExchangeCorrelation(e.target.value)}>
+                <select value={exchangeCorrelation} onChange={(e) => setExchangeCorrelation(e.target.value)} disabled={calculationMethod !== 'DFT'}>
                   <option value="B3LYP">B3LYP</option>
                   <option value="PBE">PBE</option>
                   <option value="BP86">BP86</option>
@@ -210,7 +245,7 @@ export const CalculationSettingsPage = () => {
                   type="number"
                   value={charges}
                   onChange={(e) => setCharges(Number(e.target.value))}
-                  className="number-input"
+                  className="number-input with-spinner"
                 />
               </div>
               <div className="setting-row">
@@ -220,7 +255,8 @@ export const CalculationSettingsPage = () => {
                   value={spinMultiplicity}
                   onChange={(e) => setSpinMultiplicity(Number(e.target.value))}
                   min={1}
-                  className="number-input"
+                  step={1}
+                  className="number-input with-spinner"
                 />
               </div>
             </section>
@@ -247,7 +283,7 @@ export const CalculationSettingsPage = () => {
           </div>
         </div>
 
-        {/* Main Content - Three Column Layout */}
+        {/* Main Content - Two Column Layout */}
         <div className="main-content">
           {/* Left Column - 3D Molecular Viewer */}
           <div className="left-column">
@@ -259,7 +295,6 @@ export const CalculationSettingsPage = () => {
                 backgroundColor="white"
                 className="main-viewer"
               />
-
               {!hasValidMolecule && (
                 <div className="viewer-placeholder">
                   <div className="placeholder-content">
@@ -272,79 +307,57 @@ export const CalculationSettingsPage = () => {
           </div>
           {/* Right Column - Visualization Controls and Molecular Input */}
           <div className="right-column">
-            {/* Visualization Style Controls */}
             <section className="visualization-section">
               <StyleControls onStyleChange={handleStyleChange} />
             </section>
           </div>
         </div>
       </div>
-      {/* Molecular Structure Input */}
       <section className="molecular-input-section">
         <h3>Molecular Structure Input</h3>
-
         <div className="input-method-selection">
-          <h4>Input Method</h4>
-          <label className="radio-option">
-            <input
-              type="radio"
-              name="inputMethod"
-              value="pubchem"
-              checked={inputMethod === "pubchem"}
-              onChange={(e) => setInputMethod(e.target.value)}
-            />
-            Get from PubChem name/ID
-          </label>
-
-          <label className="radio-option">
-            <input
-              type="radio"
-              name="inputMethod"
-              value="smiles"
-              checked={inputMethod === "smiles"}
-              onChange={(e) => setInputMethod(e.target.value)}
-            />
-            Get from SMILES
-          </label>
+          <div className="radio-options">
+            <label className="radio-option">
+              <input
+                type="radio"
+                name="inputMethod"
+                value="pubchem"
+                checked={inputMethod === "pubchem"}
+                onChange={(e) => setInputMethod(e.target.value)}
+              />
+              <span className="radio-text">Get from PubChem name/ID</span>
+            </label>
+            <label className="radio-option">
+              <input type="radio" name="inputMethod" value="smiles" disabled />
+              Get from SMILES
+            </label>
+          </div>
         </div>
-
         <div className="pubchem-input-section">
-          <label></label>
-          <div className="pubchem-input-container">
+          <div className="input-with-button">
             <input
               type="text"
               value={pubchemInput}
+              placeholder="e.g., water, caffeine, or CID"
               onChange={(e) => {
                 setPubchemInput(e.target.value);
-                if (convertError) setConvertError(null); // Clear error when user types
+                if (convertError) setConvertError(null);
               }}
               className="pubchem-input"
             />
-            <button 
-              onClick={handleXYZConvert} 
+            <button
+              onClick={handleXYZConvert}
               className="convert-button"
               disabled={isConverting || !pubchemInput.trim()}
             >
               {isConverting ? 'Converting...' : 'Convert to XYZ'}
             </button>
           </div>
-          
-          {/* Status Messages */}
-          {convertError && (
-            <div className="convert-error">
-              ❌ {convertError}
-            </div>
-          )}
-          
-          {isConverting && (
-            <div className="convert-loading">
-              Searching PubChem database...
-            </div>
-          )}
+          {isConverting && <div className="validation-message validating" style={{ marginTop: '8px' }}>Searching PubChem...</div>}
+          {convertError && <div className="validation-message invalid" style={{ marginTop: '8px' }}>❌ {convertError}</div>}
         </div>
-
         <div className="xyz-direct-input">
-          <h4>Direct XYZ Input/Edit</h4>
+          <h4 className="subsection-title">Direct XYZ Input/Edit</h4>
           <XYZInput onXYZChange={handleXYZChange} value={xyzInputValue} />
         </div>
       </section>
