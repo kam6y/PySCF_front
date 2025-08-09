@@ -1,6 +1,6 @@
 version = 1
 revision = 3
-requires-python = ">=3.12.8"
+requires-python = ">=3.12"
 
 [[package]]
 name = "blinker"
@@ -243,7 +243,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "certifi", specifier = ">=2025.8.3" },
+    { name = "certifi", specifier = ">=2024.7.4" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=4.0.0" },
     { name = "pubchempy", specifier = ">=1.0.4" },

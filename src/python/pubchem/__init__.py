@@ -1,7 +1,17 @@
-"""PubChem API client module for molecular structure retrieval."""
+"""PubChem APIから分子構造を取得するためのクライアントモジュールです。"""
 
-from .client import PubChemClient
-from .parser import XYZParser
+# メインのクライアントとデータクラスをパッケージから直接公開します
+from .client import PubChemClient, PubChemError, CompoundData
 
-__version__ = "0.1.0"
-__all__ = ["PubChemClient", "XYZParser"]
+# parserモジュールをインポートしてアクセスできるようにします
+from . import parser
+
+__version__ = "0.2.0"
+
+# __all__ を更新して、新しい正しいエクスポートを反映させます
+__all__ = [
+    "PubChemClient",
+    "PubChemError",
+    "CompoundData",
+    "parser"
+]

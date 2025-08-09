@@ -338,7 +338,7 @@ export const CalculationSettingsPage = () => {
           
           {isConverting && (
             <div className="convert-loading">
-              ⏳ Searching PubChem database...
+              Searching PubChem database...
             </div>
           )}
         </div>
