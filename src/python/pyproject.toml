@@ -9,6 +9,7 @@ dependencies = [
     "requests>=2.31.0",
     "flask-cors>=4.0.0",
     "certifi>=2024.7.4",
+    "rdkit>=2025.3.5",
 ]
 
 [tool.uv]

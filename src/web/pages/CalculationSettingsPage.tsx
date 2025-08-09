@@ -10,16 +10,16 @@ import { StyleSpec } from "../../types/3dmol";
 const API_BASE_URL = 'http://127.0.0.1:5000';
 
 /**
- * PubChem APIを介して分子情報を非同期で取得する関数
- * @param query 化合物名またはCID
- * @param searchType 検索タイプ（'name'など）
- * @returns 成功した場合は分子データ、失敗した場合はエラーをスロー
+ * サーバーのエンドポイントに対して非同期でPOSTリクエストを送信する汎用関数
+ * @param endpoint APIエンドポイント (例: '/api/pubchem/search')
+ * @param body リクエストボディに含めるオブジェクト
+ * @returns 成功した場合はレスポンスのdata部、失敗した場合はエラーをスロー
  */
-const fetchMoleculeFromPubChem = async (query: string, searchType: string) => {
-  const response = await fetch(`${API_BASE_URL}/api/pubchem/search`, {
+const fetchAPI = async (endpoint: string, body: object) => {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, search_type: searchType }),
+    body: JSON.stringify(body),
   });
 
   const data = await response.json();
@@ -29,6 +29,7 @@ const fetchMoleculeFromPubChem = async (query: string, searchType: string) => {
   }
   return data.data;
 };
+
 
 // --- メインコンポーネント ---
 
@@ -103,11 +104,11 @@ export const CalculationSettingsPage = () => {
   };
 
   /**
-   * PubChemから分子構造を取得し、XYZ形式に変換するハンドラ。
+   * PubChemまたはSMILESから分子構造を取得し、XYZ形式に変換するハンドラ。
    */
   const handleXYZConvert = async () => {
     if (!pubchemInput.trim()) {
-      setConvertError("Please enter a compound name or CID");
+      setConvertError("Please enter a value.");
       return;
     }
 
@@ -115,23 +116,37 @@ export const CalculationSettingsPage = () => {
     setConvertError(null);
 
     try {
-      const searchType = inputMethod === 'pubchem' ? 'name' : 'name'; // 将来的にSMILESなども考慮
-      const data = await fetchMoleculeFromPubChem(pubchemInput.trim(), searchType);
-
-      if (data.compound_info?.iupac_name) {
-        setMoleculeName(data.compound_info.iupac_name);
+      let data;
+      if (inputMethod === 'smiles') {
+        data = await fetchAPI('/api/smiles/convert', { smiles: pubchemInput.trim() });
+        setMoleculeName(`Molecule from SMILES`);
+      } else { // 'pubchem'
+        data = await fetchAPI('/api/pubchem/search', { query: pubchemInput.trim(), search_type: 'name' });
+        if (data.compound_info?.iupac_name) {
+          setMoleculeName(data.compound_info.iupac_name);
+        }
       }
 
-      // handleXYZChange を呼び出してUI全体を更新
       handleXYZChange(data.xyz, true);
 
     } catch (error) {
-      console.error('Error converting PubChem data:', error);
+      console.error(`Error converting from ${inputMethod}:`, error);
       setConvertError(error instanceof Error ? error.message : 'An unknown error occurred.');
     } finally {
       setIsConverting(false);
     }
   };
+
+  /**
+   * 選択された入力方法に応じて、入力欄のプレースホルダーテキストを返す。
+   */
+  const getInputPlaceholder = () => {
+    if (inputMethod === 'smiles') {
+      return "e.g., CCO for ethanol";
+    }
+    return "e.g., caffeine, or CID";
+  };
+
 
   return (
     <div className="calculation-settings-containers">
@@ -170,20 +185,8 @@ export const CalculationSettingsPage = () => {
                     className="cpu-cores-input"
                   />
                   <div className="spinner-arrows">
-                    <button
-                      type="button"
-                      className="spinner-btn up"
-                      onClick={() => setCpuCores(prev => Math.min(32, prev + 1))}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      className="spinner-btn down"
-                      onClick={() => setCpuCores(prev => Math.max(1, prev - 1))}
-                    >
-                      ▼
-                    </button>
+                    <button type="button" className="spinner-btn up" onClick={() => setCpuCores(prev => Math.min(32, prev + 1))}>▲</button>
+                    <button type="button" className="spinner-btn down" onClick={() => setCpuCores(prev => Math.max(1, prev - 1))}>▼</button>
                   </div>
                 </div>
               </div>
@@ -200,11 +203,7 @@ export const CalculationSettingsPage = () => {
                   <span className="memory-unit">MB</span>
                 </div>
               </div>
-              <button
-                className="start-calculation-btn"
-                onClick={handleStartCalculation}
-                disabled={!hasValidMolecule}
-              >
+              <button className="start-calculation-btn" onClick={handleStartCalculation} disabled={!hasValidMolecule}>
                 + Start calculation
               </button>
             </div>
@@ -328,8 +327,14 @@ export const CalculationSettingsPage = () => {
               <span className="radio-text">Get from PubChem name/CID</span>
             </label>
             <label className="radio-option">
-              <input type="radio" name="inputMethod" value="smiles" disabled />
-              Get from SMILES
+              <input
+                type="radio"
+                name="inputMethod"
+                value="smiles"
+                checked={inputMethod === "smiles"}
+                onChange={(e) => setInputMethod(e.target.value)}
+              />
+              <span className="radio-text">Get from SMILES</span>
             </label>
           </div>
         </div>
@@ -338,7 +343,7 @@ export const CalculationSettingsPage = () => {
             <input
               type="text"
               value={pubchemInput}
-              placeholder=""
+              placeholder={getInputPlaceholder()}
               onChange={(e) => {
                 setPubchemInput(e.target.value);
                 if (convertError) setConvertError(null);
@@ -353,7 +358,7 @@ export const CalculationSettingsPage = () => {
               {isConverting ? 'Converting...' : 'Convert to XYZ'}
             </button>
           </div>
-          {isConverting && <div className="validation-message validating" style={{ marginTop: '8px' }}>Searching PubChem...</div>}
+          {isConverting && <div className="validation-message validating" style={{ marginTop: '8px' }}>Converting...</div>}
           {convertError && <div className="validation-message invalid" style={{ marginTop: '8px' }}>❌ {convertError}</div>}
         </div>
         <div className="xyz-direct-input">

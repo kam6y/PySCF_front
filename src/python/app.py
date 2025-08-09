@@ -1,17 +1,13 @@
-"""Flask API server for PubChem integration."""
+"""Flask API server for PubChem and SMILES integration."""
 
 import logging
 import os
-import sys
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-# The following sys.path modification is removed as we assume the package
-# is installed in editable mode (`uv pip install -e .`)
-# sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from pubchem.client import PubChemClient, PubChemError, CompoundData
-from pubchem import parser as xyz_parser # Import the module directly
+from pubchem.client import PubChemClient, PubChemError
+from pubchem import parser as xyz_parser
+from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 
 # Configure logging
 logging.basicConfig(
@@ -33,8 +29,8 @@ def health_check():
     """Health check endpoint."""
     return jsonify({
         'status': 'ok',
-        'service': 'pyscf-pubchem-api',
-        'version': '0.2.0' # Version updated
+        'service': 'pyscf-native-api',
+        'version': '0.3.0'
     })
 
 
@@ -42,7 +38,6 @@ def health_check():
 def search_pubchem():
     """Search PubChem for a compound and return its 3D structure in XYZ format."""
     try:
-        # Using request.get_json() without force=True is safer
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided or incorrect Content-Type.'}), 400
@@ -63,15 +58,8 @@ def search_pubchem():
         
         logger.info(f"Found CID {compound_data.cid} with {len(compound_data.atoms)} atoms.")
         
-        # Generate XYZ string
         title = xyz_parser.format_compound_title(compound_data, query)
         xyz_string = xyz_parser.atoms_to_xyz(compound_data.atoms, title)
-        
-        # The parser now includes robust validation, but an extra check here is fine.
-        validation = xyz_parser.validate_xyz(xyz_string)
-        if not validation['valid']:
-            logger.error(f"Internal error: Generated invalid XYZ for CID {compound_data.cid}. Reason: {validation['error']}")
-            return jsonify({'success': False, 'error': 'Internal server error: Failed to generate valid XYZ format.'}), 500
         
         logger.info(f"Successfully generated XYZ for CID {compound_data.cid}")
         
@@ -89,13 +77,39 @@ def search_pubchem():
                 'atom_count': len(compound_data.atoms)
             }
         })
-        
+            
     except PubChemError as e:
         logger.error(f"A PubChem API error occurred: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
         
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/smiles/convert', methods=['POST'])
+def convert_smiles():
+    """Converts a SMILES string to XYZ format."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
+
+        smiles = data.get('smiles', '').strip()
+        if not smiles:
+            return jsonify({'success': False, 'error': 'SMILES string is required.'}), 400
+
+        logger.info(f"Converting SMILES: {smiles}")
+
+        xyz_string = smiles_to_xyz(smiles, title=f"Molecule from SMILES: {smiles}")
+
+        return jsonify({'success': True, 'data': {'xyz': xyz_string}})
+
+    except SMILESError as e:
+        logger.error(f"SMILES conversion failed: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"An unexpected error occurred during SMILES conversion: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
@@ -129,8 +143,6 @@ def method_not_allowed(error):
     return jsonify({'success': False, 'error': 'Method not allowed for this endpoint.'}), 405
 
 if __name__ == '__main__':
-    # For production, use a proper WSGI server like Gunicorn or uWSGI
-    # Configuration should be loaded from environment variables
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
     port = int(os.environ.get('FLASK_RUN_PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
