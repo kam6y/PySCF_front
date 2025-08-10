@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a PySCF Native App - an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem database, and visualizing 3D molecular structures using 3Dmol.js.
+This is a PySCF Native App - an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management.
 
 ## Development Commands
 
@@ -12,7 +12,7 @@ This is a PySCF Native App - an Electron-based desktop application for molecular
 # Development mode (builds and runs Electron with hot reload + Python backend)
 npm run dev
 
-# Production build
+# Production build (builds frontend and creates Python executable)
 npm run build
 
 # Package application for distribution (includes production build)
@@ -27,194 +27,105 @@ npm run dev:electron   # Start Electron (requires dist files to exist)
 
 # Python backend development (separate terminal)
 cd src/python
-uv run python app.py   # Start Flask API server for PubChem integration
+uv run python app.py   # Start Flask API server
 uv run pytest tests/   # Run Python backend tests
 uv sync                # Install/update Python dependencies
 
-# TypeScript compilation and type checking
-npx tsc --noEmit       # Type check without emitting files
+# Build Python executable only
+npm run build:python   # Uses PyInstaller to create standalone executable
 ```
 
-**Development Workflow:**
-- `npm run dev` automatically cleans dist/, builds with webpack in watch mode, starts Electron AND Python Flask server
-- Webpack compiles 3 separate bundles: main process, preload script, and renderer (React app)
-- `electronmon` watches `dist/**/*` and restarts Electron automatically on changes
-- `wait-on` ensures build artifacts exist before starting Electron to prevent startup errors
-- Development mode includes source maps and opens DevTools in detached mode
-- Python Flask server (port 5000) starts automatically via Electron main process subprocess management
-- Main process includes health check mechanism to ensure Python server is ready before UI loads
-- SSL verification is disabled in development for PubChem HTTPS requests
+## Development Workflow:
+
+npm run dev automatically cleans dist/, builds with webpack in watch mode, and starts both the Electron app and the Python Flask server.
+
+Webpack compiles 3 separate bundles: main process, preload script, and renderer (React app).
+
+electronmon watches dist/**/* and restarts Electron automatically on changes.
+
+The Python Flask server (defaults to port 5000, configurable via FLASK_RUN_PORT env var) starts automatically via the Electron main process.
+
+The Main process includes a health check mechanism that pings /health endpoint to ensure the Python server is ready before the UI loads.
 
 ## Architecture Overview
 
 ### Electron Structure
-- **Main Process** (`src/main.ts`): Creates BrowserWindow with custom titlebar styling, manages Python Flask subprocess, loads the React app
-- **Preload Script** (`src/preload.ts`): Currently minimal, handles secure communication between main and renderer
-- **Renderer Process** (`src/web/`): React application for the UI
-- **Python Backend** (`src/python/`): Flask API server providing PubChem integration, SMILES conversion, and molecular data processing
+**Main Process (src/main.ts):** Creates the BrowserWindow, manages the Python Flask subprocess (using spawn with 'uv run python' in dev, PyInstaller executable in production), and handles application lifecycle events. Includes health check mechanism that pings http://127.0.0.1:5000/health before loading UI.
+
+**Preload Script (src/preload.ts):** Securely exposes limited Node.js/Electron APIs to the renderer process (currently minimal).
+
+**Renderer Process (src/web/):** The React application providing the user interface.
+
+### Python Backend (src/python/)
+A Flask API server that provides endpoints for:
+
+- PubChem integration (searching compounds, converting to XYZ)
+- SMILES string conversion using RDKit  
+- Running quantum chemistry calculations via PySCF
+- Managing calculation files (listing, renaming, deleting)
+- Health check endpoint for startup coordination
+
+**API Port:** Defaults to 5000 (configurable via FLASK_RUN_PORT env var).
 
 ### Build System
-- Uses Webpack with TypeScript compilation
-- Three separate build targets: main process, preload script, and renderer (React app)
-- Development mode includes source maps and file watching
-- Security-focused configuration (no style-loader, electron-renderer target avoided)
-- Uses `electronmon` for automatic Electron restart during development
-- CSS is extracted to separate files using `MiniCssExtractPlugin` for security
-- Assets (fonts, images) are processed as resources and placed in `dist/assets/`
+**Frontend:** Uses Webpack with ts-loader to compile TypeScript and React code into 3 bundles: main process, preload script, and renderer.
 
-### Core Components
-- **App.tsx**: Main application component with page routing, sidebar/dropdown state management
-- **Pages**: Three main app sections (CalculationSettingsPage, CalculationResultsPage, DrawMoleculePage)
-- **MoleculeViewer**: React component wrapping 3Dmol.js for 3D molecular visualization (in DrawMoleculePage)
-- **XYZInput**: Component for inputting and validating XYZ coordinate data
-- **StyleControls**: Controls for adjusting molecular visualization styles
-- **Header/Sidebar/DropdownMenu**: Navigation components with page switching functionality
+**Backend:** Uses PyInstaller to bundle the Flask application and its dependencies into a single executable for production. This is handled by the npm run build:python script.
 
-### Key Libraries
-- **3Dmol.js**: For 3D molecular visualization and rendering
-- **React 19**: UI framework
-- **TypeScript**: Type safety throughout the codebase
-- **Flask**: Python web framework for backend API
-- **RDKit**: Chemistry toolkit for molecular data processing and SMILES handling
-- **uv**: Modern Python package manager for dependency management
+**Packaging:** electron-builder packages the Electron app and the Python executable (as an extraResource) into distributable formats (DMG for macOS, AppImage for Linux, NSIS for Windows).
 
-### Application Flow
-1. **Page Management**: App.tsx manages state for sidebar, dropdown navigation, and current page routing
-2. **Navigation**: Independent sidebar toggle button and header dropdown provide access to three main pages
-3. **Molecular Visualization Workflow** (CalculationSettingsPage):
-   - **PubChem Integration**: User searches molecular compounds by name or CID
-   - **Direct API Access**: Flask backend queries PubChem REST API directly (bypassing SSL issues)
-   - **Data Retrieval**: Obtains molecular properties (IUPAC name, formula, weight, synonyms) and 3D coordinates
-   - **XYZ Conversion**: Backend converts SDF data to compact XYZ format with proper chemical names
-   - **UI Display**: Retrieved XYZ data automatically populates Direct XYZ Input/Edit field
-   - **Manual Input**: User can directly input XYZ coordinates via XYZInput component with validation
-   - **Real-time Validation**: Data is parsed and validated using `xyzParser.ts` utilities
-   - **3D Visualization**: Valid coordinates are passed to MoleculeViewer component
-   - **Interactive Viewer**: MoleculeViewer creates a 3Dmol.js viewer instance and loads molecular structure
-   - **Style Controls**: StyleControls allow real-time adjustment of visualization appearance (atoms, bonds, surfaces)
-   - **Screenshots**: Screenshots can be taken directly from the 3D viewer
-4. **State Management**: All UI state (sidebar, dropdown, current page, XYZ data) managed in React hooks with centralized control
+### Core Components & State Management
+**App.tsx:** Root component managing UI state (sidebar, pages) and orchestrating data flow.
 
-### File Structure
-```
+**Custom Hooks (src/web/hooks/):**
+- `useCalculations`: Manages the list of all calculations by fetching from the backend API. Handles creation, renaming, and deletion.
+- `useActiveCalculation`: Manages which calculation is currently being viewed or edited.
+
+**API Client (src/web/api/apiClient.ts):** Centralized module for all fetch requests to the Python backend.
+
+**State Flow:**
+1. UI interaction (e.g., clicking "delete") triggers a function in a React component
+2. The function calls a method from the useCalculations hook (e.g., deleteCalculation)
+3. The hook's method calls the apiClient to send a request to the Flask backend (e.g., DELETE /api/quantum/calculations/...)
+4. The Flask backend performs the operation (e.g., deletes the directory)
+5. The API call returns, and the hook updates its local state (e.g., removes the calculation from the list), causing the UI to re-render
+
+## File Structure
 src/
-├── main.ts              # Electron main process with Python subprocess management
-├── preload.ts           # Electron preload script  
-├── types/               # TypeScript definitions for 3Dmol.js and Electron
+├── main.ts              # Electron main process
+├── preload.ts           # Electron preload script
+├── types/               # TypeScript definitions
 ├── web/
-│   ├── App.tsx          # Main React application with page routing
-│   ├── components/      # React components (Header, Sidebar, MoleculeViewer, XYZInput, etc.)
-│   ├── pages/           # Page components (CalculationSettings, Results, DrawMolecule)
-│   ├── utils/           # Utility functions (XYZ parsing)
-│   └── index.html       # HTML template with CSP allowing localhost:5000
-└── python/              # Python Flask backend
+│   ├── api/
+│   │   └── apiClient.ts # Centralized API client
+│   ├── App.tsx          # Main React application
+│   ├── components/      # Reusable React components
+│   ├── hooks/           # Custom hooks for state management
+│   ├── pages/           # Page components
+│   └── ...
+└── python/
     ├── app.py           # Flask API server main entry point
-    ├── pyproject.toml   # uv project configuration with dependencies
+    ├── pyproject.toml   # Python dependencies (uv)
     ├── pubchem/         # PubChem integration modules
-    │   ├── __init__.py
-    │   ├── client.py    # PubChem API client with SSL bypassing
-    │   └── parser.py    # XYZ format parsing and conversion utilities
-    ├── SMILES/          # SMILES format conversion and processing
-    │   ├── __init__.py
-    │   └── smiles_converter.py  # RDKit-based SMILES to 3D coordinate conversion
-    └── tests/           # Python unit tests and API tests
-        ├── __init__.py
-        ├── test_pubchem.py      # PubChem client tests
-        └── test_flask_api.py    # Flask API endpoint tests
-```
+    ├── quantum_calc/    # PySCF calculation modules
+    └── tests/           # Python unit tests
 
-### Type Definitions
-Custom TypeScript definitions are provided for:
-- 3Dmol.js library (`3dmol.d.ts`, `3dmol-build.d.ts`)
-- Electron APIs (`electron.d.ts`)
+## Key API Endpoints
 
-## Development Notes
-
-### Electron Security & Configuration
-- Custom titlebar with `titleBarStyle: 'hidden'` and transparent `titleBarOverlay` (40px height)
-- Security best practices: `nodeIntegration: false`, `contextIsolation: true`
-- DevTools automatically opens in detached mode during development
-- Content Security Policy (CSP) configured to allow connections to localhost:5000 for Flask API
-- Python Flask subprocess automatically managed by Electron main process
-
-### Code Organization & Standards
-- TypeScript strict mode enabled with comprehensive type definitions in `src/types/`
-- Custom TypeScript definitions for 3Dmol.js library and Electron APIs
-- TypeScript configured with ESNext target, React JSX transform, and bundler module resolution
-- XYZ parser supports standard molecular coordinate format with validation
-- Sample molecules available for testing: water, methane, benzene
-- Python backend follows modern practices with uv package management (Python >=3.12)
-- Flask API uses REST conventions with JSON responses and proper error handling
-- SSL certificate verification disabled in development for PubChem API access
-- Comprehensive test coverage for both Python backend and TypeScript frontend
-
-### Build System Details
-- Webpack configuration includes Japanese comments and prioritizes security
-- Three separate build targets prevent security vulnerabilities
-- CSS extracted to separate files (no style-loader for security)
-- Assets processed as resources and placed in `dist/assets/`
-- `fsevents` externalized for macOS compatibility
-- electron-builder configured for cross-platform packaging (Windows NSIS, macOS DMG, Linux AppImage)
-- Production builds include Python backend as extraResources in `python_dist/` directory
-
-### UI Architecture
-- Independent sidebar toggle button with custom SVG icons
-- Dropdown navigation between three main app sections
-- Responsive layout that adapts when sidebar is open/closed
-- Footer displays technology credits (3Dmol.js, React, TypeScript)
+- `GET /health` - Health check endpoint used by main process
+- `POST /api/pubchem/search` - Search PubChem by name, CID, or formula  
+- `POST /api/smiles/convert` - Convert SMILES to XYZ format
+- `POST /api/quantum/calculate` - Run DFT calculations using PySCF
+- `GET /api/quantum/calculations` - List all calculation directories
+- `GET /api/quantum/calculations/<id>` - Get calculation details
+- `DELETE /api/quantum/calculations/<id>` - Delete calculation files
 
 ## Troubleshooting
 
-- If build fails on macOS, the `fsevents` external in webpack config provides a workaround
-- Electron requires both `dist/index.html` and `dist/main.js` to exist before starting
-- Source maps are essential for development mode to avoid "Uncaught EvalError" in DevTools
-- If PubChem API fails with SSL errors, check that SSL verification is disabled in `pubchem/client.py`
-- If Flask server fails to start, ensure port 5000 is not occupied (disable AirPlay Receiver on macOS)
-- Python dependencies managed by uv - use `uv sync` in `src/python/` to install/update packages
-- If XYZ data doesn't display properly, check that the coordinate format uses compact spacing (8.4f format)
+**Port Conflict:** If the Flask server fails to start, the port (default 5000) might be in use. You can change it by setting the FLASK_RUN_PORT environment variable.
 
-## Common Tasks
+**Build Failures:** Ensure Python dependencies (uv sync) and Node dependencies (npm install) are up to date. PyInstaller builds can sometimes be tricky; check its logs for errors.
 
-### Frontend Development
-- **New molecular visualization features**: Work with the MoleculeViewer component and 3Dmol.js APIs
-- **New input formats**: Extend the parsing utilities in `src/web/utils/`
-- **UI changes**: Follow the existing component patterns in `src/web/components/`
-- **XYZ input modifications**: Update XYZInput component with external value control support
+**Python Dependencies:** This project requires PySCF, RDKit, and geometric for quantum chemistry calculations. These have significant dependencies that may need compilation.
 
-### Backend Development
-- **PubChem API enhancements**: Modify `src/python/pubchem/client.py` for new compound properties
-- **New data formats**: Extend `src/python/pubchem/parser.py` for different molecular formats
-- **API endpoints**: Add new routes to `src/python/app.py` following REST conventions
-- **Testing**: Add tests to `src/python/tests/` for new functionality
-
-### Full-Stack Integration
-- **New molecular databases**: Implement similar to PubChem integration pattern
-- **Data flow**: Ensure proper state management between React frontend and Flask backend
-- **Error handling**: Implement consistent error reporting across both frontend and backend
-- **Security**: Maintain CSP policies when adding new external API connections
-
-## PubChem Integration Usage
-
-### Basic Usage
-1. Start the application with `npm run dev` (automatically starts both Electron and Flask server)
-2. Navigate to Calculation Settings page
-3. Select "Get from PubChem name/ID" option
-4. Enter molecular name (e.g., "water", "caffeine", "aspirin") or CID number
-5. Click "Convert to XYZ" button
-6. Molecular structure appears in both XYZ text field and 3D viewer
-
-### API Endpoints
-- **POST** `/api/pubchem/search`: Search compounds and retrieve XYZ coordinates
-- **POST** `/api/pubchem/validate`: Validate XYZ format strings
-- **POST** `/api/smiles/convert`: Convert SMILES strings to 3D XYZ coordinates using RDKit
-- **GET** `/health`: Health check for Flask server
-
-### Data Format
-Retrieved XYZ data uses compact formatting:
-```
-3
-oxidane (H2O) - CID:962
-O  0.000   0.000   0.000
-H  0.277   0.893   0.254
-H  0.607  -0.238  -0.717
-```
+**SSL/HTTPS:** pubchem/client.py uses standard HTTPS requests with SSL verification enabled. No special configuration should be needed.
