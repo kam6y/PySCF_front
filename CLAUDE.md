@@ -5,8 +5,6 @@ Project Overview
 This is a PySCF Native App, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
 
 Development Commands
-Bash
-
 # Install Node.js and Python dependencies
 npm install
 cd src/python
@@ -25,7 +23,7 @@ npm run package
 # --- Individual Commands ---
 
 # Clean build directory
-rimraf dist
+npm run clean # (Assuming 'rimraf dist' is aliased or used directly)
 
 # Build frontend with webpack in development mode
 npm run dev:webpack
@@ -44,6 +42,7 @@ uv run pytest tests/
 
 # Build Python executable only (uses PyInstaller)
 npm run build:python
+
 Development Workflow
 The npm run dev script is the primary command for development. It automatically:
 
@@ -51,13 +50,11 @@ Cleans the dist/ directory.
 
 Builds the frontend code (main process, preload script, and renderer) using Webpack in watch mode.
 
-Starts the Python Flask server via the Electron main process.
+Starts the Python Flask server as a subprocess from within the Electron main process.
 
 Starts the Electron application using electronmon, which watches the dist/ directory for changes and automatically restarts the app.
 
-The Electron main process (src/main.ts) launches the Python Flask server as a subprocess. In development, it uses uv run python app.py. In a packaged application, it runs the PyInstaller executable.
-
-The Main process includes a health check mechanism. It continuously pings the /health endpoint of the Python server to ensure the backend is fully initialized before loading the renderer's UI. The Flask server dynamically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
+The Electron main process (src/main.ts) launches the Python Flask server. In development, it uses uv run python app.py. In a packaged application, it runs the PyInstaller executable. The main process includes a health check mechanism; it continuously pings the /health endpoint of the Python server to ensure the backend is fully initialized before loading the UI. The Flask server dynamically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
 
 Architecture Overview
 Electron Structure
@@ -74,18 +71,18 @@ PubChem Integration: Searching compounds by name, CID, or formula and converting
 
 SMILES Conversion: Converting SMILES strings to 3D XYZ format using RDKit.
 
-Quantum Chemistry Calculations: Running DFT calculations via PySCF. Calculations are executed in background threads to keep the UI responsive.
+Quantum Chemistry Calculations: Running DFT calculations via PySCF. Calculations are executed in background threads to keep the API responsive.
 
 File Management: Listing, renaming, and deleting calculation directories and files.
 
 Health Check: An endpoint (/health) for startup coordination with the Electron main process.
 
-API Port: The Flask server automatically finds and uses a free port on startup. This port is then communicated to the Electron main process.
+Dynamic Port: The Flask server automatically finds and uses a free port on startup, communicating it back to the Electron process.
 
 Build System
 Frontend: Uses Webpack with ts-loader to compile TypeScript and React code into three separate bundles: main.js, preload.js, and the renderer's app.js.
 
-Backend: Uses PyInstaller to bundle the Flask application and its Python dependencies into a single standalone executable for production. This is handled by the npm run build:python script.
+Backend: Uses PyInstaller to bundle the Flask application and its Python dependencies into a single standalone executable for production.
 
 Packaging: electron-builder packages the Electron app and the Python executable (included as an extraResource) into distributable formats (DMG for macOS, NSIS for Windows, AppImage for Linux).
 
@@ -94,23 +91,40 @@ App.tsx: The root React component. It manages the overall UI state, such as the 
 
 Custom Hooks (src/web/hooks/):
 
-useCalculations: Manages the list of all calculations. It fetches the list from the backend, handles creating new (temporary) calculations, and triggers API calls for renaming and deletion.
+useCalculations: Manages the list of all calculations. It fetches the list from the backend, handles creating new calculations, and triggers API calls for renaming and deletion.
 
 useActiveCalculation: Manages the currently selected calculation. It fetches detailed data for the active calculation and caches it.
 
+useCalculationPolling: Manages polling for the status of a running calculation. When a calculation is started, this hook periodically requests updates from the backend until the status is completed or error.
+
 API Client (src/web/apiClient.ts): A centralized module containing fetch functions for all communication with the Python backend.
 
-State Flow Example (Deleting a Calculation):
+State Flow Example (Starting a Calculation)
+This is an asynchronous process involving the frontend, backend, and background threads.
 
-User clicks the delete button in the Sidebar component.
+User clicks the "Start Calculation" button in CalculationSettingsPage.
 
-The Sidebar component calls the deleteCalculation function provided by the useCalculations hook.
+The handleStartCalculation function in App.tsx is called. It calls apiClient.startCalculation with the calculation parameters.
 
-The deleteCalculation hook function calls the apiClient.deleteCalculation method, which sends a DELETE request to the Flask backend.
+The Flask backend (POST /api/quantum/calculate) receives the request. It immediately:
 
-The Flask backend deletes the corresponding calculation directory.
+Creates a new directory for the calculation.
 
-The API call returns successfully, and the hook updates its local state by removing the calculation from the list, causing the UI (the sidebar) to re-render.
+Saves the initial parameters and sets the status to pending.
+
+Starts a new background thread to run the PySCF calculation.
+
+Returns a 202 Accepted response with the newly created (and now persistent) CalculationInstance data.
+
+The useCalculations hook updates the list of calculations, replacing the temporary client-side ID with the new persistent ID from the server. The useActiveCalculation hook updates the active ID.
+
+The CalculationResultsPage detects that the active calculation's status is running and triggers the useCalculationPolling hook.
+
+The useCalculationPolling hook starts making periodic calls to GET /api/quantum/calculations/<id>.
+
+The hook's onUpdate callback updates the central state in App.tsx each time it receives new status information. This causes the UI to reflect the current state (e.g., in the sidebar).
+
+When the backend thread finishes, it updates the status.json on the filesystem to completed or error. The next polling request retrieves this final status, and the hook stops polling.
 
 File Structure
 src/
@@ -131,6 +145,7 @@ src/
     ├── SMILES/          # SMILES conversion modules
     ├── quantum_calc/    # PySCF calculation logic and file management
     └── tests/           # Python unit tests
+
 Key API Endpoints
 GET /health: Health check endpoint used by the Electron main process during startup.
 
