@@ -7,15 +7,15 @@ import { StyleControls } from "../components/StyleControls";
 import { StyleSpec } from "../../types/3dmol";
 import {
     CalculationParameters,
-    CalculationStatus,
     CalculationInstance
 } from "../types/calculation";
-import { startCalculation, searchPubChem, convertSmilesToXyz } from "../apiClient";
+import { searchPubChem, convertSmilesToXyz, getCalculationDetails } from "../apiClient";
 import type { PubChemSearchResponse, SmilesConvertResponse } from "../apiClient";
 
 interface CalculationSettingsPageProps {
     activeCalculation?: CalculationInstance;
     onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
+    onStartCalculation: (params: CalculationParameters) => Promise<CalculationInstance>;
     onCalculationSuccess: (completedCalculation: CalculationInstance) => void;
     onCalculationRename: (id: string, newName: string) => Promise<void>;
     createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: CalculationParameters) => void;
@@ -24,18 +24,57 @@ interface CalculationSettingsPageProps {
 export const CalculationSettingsPage = ({
     activeCalculation,
     onCalculationUpdate,
+    onStartCalculation,
     onCalculationSuccess,
     onCalculationRename,
     createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
     const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
-    const [calculationStatus, setCalculationStatus] = useState<CalculationStatus>('idle');
     const [calculationError, setCalculationError] = useState<string | null>(null);
     const [inputMethod, setInputMethod] = useState("pubchem");
     const [pubchemInput, setPubchemInput] = useState("");
     const [isConverting, setIsConverting] = useState(false);
     const [convertError, setConvertError] = useState<string | null>(null);
     const [localName, setLocalName] = useState("");
+
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    const stopPolling = () => {
+        if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+        }
+    };
+
+    const startPolling = useCallback((calculationId: string) => {
+        stopPolling(); // To prevent multiple pollers from running
+
+        pollingIntervalRef.current = setInterval(async () => {
+            try {
+                const response = await getCalculationDetails(calculationId);
+                const updatedCalc = response.calculation;
+
+                if (updatedCalc.status === 'completed' || updatedCalc.status === 'error') {
+                    stopPolling();
+                    onCalculationSuccess(updatedCalc); // Use success handler to update global state
+                } else {
+                    onCalculationUpdate(updatedCalc); // Update status locally while running
+                }
+            } catch (error) {
+                console.error(`Polling failed for calculation ${calculationId}:`, error);
+                setCalculationError(`Failed to get calculation status. ${error instanceof Error ? error.message : ''}`);
+                stopPolling();
+            }
+        }, 3000); // Poll every 3 seconds
+    }, [onCalculationSuccess, onCalculationUpdate]);
+
+    useEffect(() => {
+        // Stop polling when the component unmounts or the active calculation changes
+        return () => {
+            stopPolling();
+        };
+    }, []);
+
 
     useEffect(() => {
         if (activeCalculation) {
@@ -46,11 +85,18 @@ export const CalculationSettingsPage = ({
             } else {
                 moleculeViewerRef.current?.clearModels();
             }
+            // If calculation is running, start polling for its status
+            if (activeCalculation.status === 'running') {
+                startPolling(activeCalculation.id);
+            } else {
+                stopPolling();
+            }
         } else {
             setLocalName("");
             moleculeViewerRef.current?.clearModels();
+            stopPolling();
         }
-    }, [activeCalculation]);
+    }, [activeCalculation, startPolling]);
 
     const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
         if (!activeCalculation || !onCalculationUpdate) return;
@@ -100,7 +146,7 @@ export const CalculationSettingsPage = ({
             return;
         }
 
-        if (window.confirm(`この計算の名前を「${newName}」に変更しますか？`)) {
+        if (window.confirm(`Are you sure you want to rename this calculation to "${newName}"?`)) {
             onCalculationRename(activeCalculation.id, newName);
         } else {
             setLocalName(activeCalculation.name);
@@ -113,59 +159,45 @@ export const CalculationSettingsPage = ({
         }
     };
     
-    if (!activeCalculation) {
+    const handleStartCalculation = async () => {
+        if (!activeCalculation || !activeCalculation.parameters?.xyz || !activeCalculation.parameters.xyz.trim()) {
+            setCalculationError("A valid molecular structure is required.");
+            return;
+        }
+
+        setCalculationError(null);
+        const finalParams = { ...activeCalculation.parameters, molecule_name: localName.trim() };
+
+        try {
+            const runningCalculation = await onStartCalculation(finalParams);
+            startPolling(runningCalculation.id);
+        } catch (error) {
+            setCalculationError(error instanceof Error ? error.message : 'An unknown error occurred.');
+            if (activeCalculation) {
+                onCalculationUpdate({ ...activeCalculation, status: 'error' });
+            }
+        }
+    };
+
+    // Add a defensive check for activeCalculation and its parameters
+    if (!activeCalculation || !activeCalculation.parameters) {
         return (
             <div className="calculation-settings-containers">
                 <div style={{ textAlign: 'center', padding: '40px', color: '#666', width: '100%' }}>
-                    <h2>No Calculation Selected</h2>
-                    <p>Please select a calculation from the sidebar, or create a new one using the '+' button.</p>
+                    <h2>Loading Calculation...</h2>
+                    <p>Please wait or select a calculation from the sidebar.</p>
                 </div>
             </div>
         );
     }
 
-    const { parameters: params } = activeCalculation;
+    const { parameters: params, status: calculationStatus } = activeCalculation;
     const xyzInputValue = params.xyz || "";
     const hasValidMolecule = !!(params.xyz && params.xyz.trim() !== "");
 
     const handleStyleChange = (style: StyleSpec) => {
         if (hasValidMolecule) {
             moleculeViewerRef.current?.setStyle(style);
-        }
-    };
-
-    const handleStartCalculation = async () => {
-        if (!hasValidMolecule || !params.xyz) {
-            setCalculationError("A valid molecular structure is required.");
-            return;
-        }
-
-        setCalculationStatus('running');
-        setCalculationError(null);
-
-        const finalParams = { ...params, molecule_name: localName.trim() };
-
-        try {
-            const responseData = await startCalculation(finalParams);
-            setCalculationStatus('completed');
-
-            if (onCalculationSuccess) {
-                const completedInstance: CalculationInstance = {
-                    ...activeCalculation,
-                    id: responseData.calculation_id,
-                    name: localName.trim(),
-                    status: 'completed',
-                    updatedAt: new Date().toISOString(),
-                    parameters: finalParams,
-                    results: responseData.calculation_results,
-                    workingDirectory: responseData.calculation_results.working_directory,
-                };
-                onCalculationSuccess(completedInstance);
-            }
-            alert(`Calculation successful! ID: ${responseData.calculation_id}`);
-        } catch (error) {
-            setCalculationStatus('error');
-            setCalculationError(error instanceof Error ? error.message : 'An unknown error occurred.');
         }
     };
 
@@ -198,7 +230,7 @@ export const CalculationSettingsPage = ({
             });
 
         } catch (error) {
-            setConvertError(error instanceof Error ? error.message : 'Unknown error during conversion.');
+            setConvertError(error instanceof Error ? error.message : 'An unknown error occurred during conversion.');
         } finally {
             setIsConverting(false);
         }
@@ -224,41 +256,44 @@ export const CalculationSettingsPage = ({
                                 onKeyDown={handleNameKeyDown}
                                 onChange={handleNameChange}
                                 className="molecule-name-input"
+                                disabled={calculationStatus === 'running'}
                             />
                             {localName && (
                                 <button onClick={() => setLocalName('')} className="clear-molecule-name" aria-label="Clear molecule name"> × </button>
                             )}
                         </div>
                         <div className="computation-settings">
-                            <div className="setting-group cpu-setting">
-                                <label>CPU cores</label>
-                                <div className="cpu-input-container">
-                                    <input
-                                        type="number"
-                                        value={params.cpu_cores || 1}
-                                        onChange={(e) => handleParamChange('cpu_cores', Math.max(1, Number(e.target.value)))}
-                                        min="1" max="32"
-                                        className="cpu-cores-input"
-                                    />
-                                    <div className="spinner-arrows">
-                                        <button type="button" className="spinner-btn up" onClick={() => handleParamChange('cpu_cores', Math.min(32, (params.cpu_cores || 1) + 1))}>▲</button>
-                                        <button type="button" className="spinner-btn down" onClick={() => handleParamChange('cpu_cores', Math.max(1, (params.cpu_cores || 1) - 1))}>▼</button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="setting-group memory-setting">
-                                <label>Memory usage</label>
-                                <div className="memory-input-container">
-                                    <input
-                                        type="number"
-                                        value={params.memory_mb || 2000}
-                                        onChange={(e) => handleParamChange('memory_mb', Math.max(128, Number(e.target.value)))}
-                                        min="128"
-                                        className="memory-value-input"
-                                    />
-                                    <span className="memory-unit">MB</span>
-                                </div>
-                            </div>
+                             <div className="setting-group cpu-setting">
+                                 <label>CPU Cores</label>
+                                 <div className="cpu-input-container">
+                                     <input
+                                         type="number"
+                                         value={params.cpu_cores || 1}
+                                         onChange={(e) => handleParamChange('cpu_cores', Math.max(1, Number(e.target.value)))}
+                                         min="1" max="32"
+                                         className="cpu-cores-input"
+                                         disabled={calculationStatus === 'running'}
+                                     />
+                                     <div className="spinner-arrows">
+                                         <button type="button" className="spinner-btn up" onClick={() => handleParamChange('cpu_cores', Math.min(32, (params.cpu_cores || 1) + 1))} disabled={calculationStatus === 'running'}>▲</button>
+                                         <button type="button" className="spinner-btn down" onClick={() => handleParamChange('cpu_cores', Math.max(1, (params.cpu_cores || 1) - 1))} disabled={calculationStatus === 'running'}>▼</button>
+                                     </div>
+                                 </div>
+                             </div>
+                             <div className="setting-group memory-setting">
+                                 <label>Memory Usage</label>
+                                 <div className="memory-input-container">
+                                     <input
+                                         type="number"
+                                         value={params.memory_mb || 2000}
+                                         onChange={(e) => handleParamChange('memory_mb', Math.max(128, Number(e.target.value)))}
+                                         min="128"
+                                         className="memory-value-input"
+                                         disabled={calculationStatus === 'running'}
+                                     />
+                                     <span className="memory-unit">MB</span>
+                                 </div>
+                             </div>
                             <button
                                 className={`start-calculation-btn ${calculationStatus === 'running' ? 'calculating' : ''}`}
                                 onClick={handleStartCalculation}
@@ -271,26 +306,21 @@ export const CalculationSettingsPage = ({
                                     ❌ {calculationError}
                                 </div>
                             )}
-                            {calculationStatus === 'running' && (
-                                <div className="calculation-status" style={{ marginTop: '10px', color: '#3498db', fontSize: '14px' }}>
-                                    ⚛️ Running quantum chemistry calculation... This may take several minutes.
-                                </div>
-                            )}
                         </div>
                     </div>
                     <div className="calculation-column">
                         <section className="calculation-settings-section">
                             <div className="setting-row">
-                                <label>Calculation method</label>
-                                <select value={params.calculation_method || 'DFT'} onChange={(e) => handleParamChange('calculation_method', e.target.value)}>
+                                <label>Calculation Method</label>
+                                <select value={params.calculation_method || 'DFT'} onChange={(e) => handleParamChange('calculation_method', e.target.value)} disabled={calculationStatus === 'running'}>
                                     <option value="DFT">DFT</option>
                                     <option value="HF">HF</option>
                                     <option value="MP2">MP2</option>
                                 </select>
                             </div>
                             <div className="setting-row">
-                                <label>Basis functions</label>
-                                <select value={params.basis_function || '6-31G(d)'} onChange={(e) => handleParamChange('basis_function', e.target.value)}>
+                                <label>Basis Function</label>
+                                <select value={params.basis_function || '6-31G(d)'} onChange={(e) => handleParamChange('basis_function', e.target.value)} disabled={calculationStatus === 'running'}>
                                     <option value="STO-3G">STO-3G</option>
                                     <option value="3-21G">3-21G</option>
                                     <option value="6-31G">6-31G</option>
@@ -299,8 +329,8 @@ export const CalculationSettingsPage = ({
                                 </select>
                             </div>
                             <div className="setting-row">
-                                <label>Exchange-correlation function</label>
-                                <select value={params.exchange_correlation || 'B3LYP'} onChange={(e) => handleParamChange('exchange_correlation', e.target.value)} disabled={params.calculation_method !== 'DFT'}>
+                                <label>Exchange-Correlation Functional</label>
+                                <select value={params.exchange_correlation || 'B3LYP'} onChange={(e) => handleParamChange('exchange_correlation', e.target.value)} disabled={params.calculation_method !== 'DFT' || calculationStatus === 'running'}>
                                     <option value="B3LYP">B3LYP</option>
                                     <option value="PBE">PBE</option>
                                     <option value="BP86">BP86</option>
@@ -308,37 +338,39 @@ export const CalculationSettingsPage = ({
                                 </select>
                             </div>
                             <div className="setting-row">
-                                <label>Charges</label>
+                                <label>Charge</label>
                                 <input
                                     type="number"
                                     value={params.charges || 0}
                                     onChange={(e) => handleParamChange('charges', Number(e.target.value))}
                                     className="number-input with-spinner"
+                                    disabled={calculationStatus === 'running'}
                                 />
                             </div>
                             <div className="setting-row">
-                                <label>Spin multiplicity (2S+1)</label>
+                                <label>Spin Multiplicity (2S+1)</label>
                                 <input
                                     type="number"
                                     value={params.spin_multiplicity || 1}
                                     onChange={(e) => handleParamChange('spin_multiplicity', Number(e.target.value))}
                                     min={1} step={1}
                                     className="number-input with-spinner"
+                                    disabled={calculationStatus === 'running'}
                                 />
                             </div>
                         </section>
                         <section className="solvent-settings-section">
                             <div className="setting-row">
-                                <label>Solvent effect method</label>
-                                <select value={params.solvent_method || 'none'} onChange={(e) => handleParamChange('solvent_method', e.target.value)}>
-                                    <option value="none">none</option>
+                                <label>Solvent Effect Method</label>
+                                <select value={params.solvent_method || 'none'} onChange={(e) => handleParamChange('solvent_method', e.target.value)} disabled={calculationStatus === 'running'}>
+                                    <option value="none">None</option>
                                     <option value="PCM">PCM</option>
                                     <option value="SMD">SMD</option>
                                 </select>
                             </div>
                             <div className="setting-row">
                                 <label>Solvent</label>
-                                <select value={params.solvent || '-'} onChange={(e) => handleParamChange('solvent', e.target.value)} disabled={params.solvent_method === "none"}>
+                                <select value={params.solvent || '-'} onChange={(e) => handleParamChange('solvent', e.target.value)} disabled={params.solvent_method === "none" || calculationStatus === 'running'}>
                                     <option value="-">-</option>
                                     <option value="water">Water</option>
                                     <option value="methanol">Methanol</option>
@@ -348,7 +380,6 @@ export const CalculationSettingsPage = ({
                         </section>
                     </div>
                 </div>
-
                 <div className="main-content">
                     <div className="left-column">
                         <div className="viewer-container">
@@ -356,8 +387,8 @@ export const CalculationSettingsPage = ({
                             {!hasValidMolecule && (
                                 <div className="viewer-placeholder">
                                     <div className="placeholder-content">
-                                        <h3>No molecule loaded</h3>
-                                        <p>Enter molecular structure in the right panel to see the 3D visualization</p>
+                                        <h3>No Molecule Loaded</h3>
+                                        <p>Enter a molecular structure in the right panel to see the 3D visualization</p>
                                     </div>
                                 </div>
                             )}
@@ -375,11 +406,11 @@ export const CalculationSettingsPage = ({
                 <div className="input-method-selection">
                     <div className="radio-options">
                         <label className="radio-option">
-                            <input type="radio" name="inputMethod" value="pubchem" checked={inputMethod === "pubchem"} onChange={(e) => setInputMethod(e.target.value)} />
-                            <span className="radio-text">Get from PubChem name/CID</span>
+                            <input type="radio" name="inputMethod" value="pubchem" checked={inputMethod === "pubchem"} onChange={(e) => setInputMethod(e.target.value)} disabled={calculationStatus === 'running'} />
+                            <span className="radio-text">Get from PubChem Name/CID</span>
                         </label>
                         <label className="radio-option">
-                            <input type="radio" name="inputMethod" value="smiles" checked={inputMethod === "smiles"} onChange={(e) => setInputMethod(e.target.value)} />
+                            <input type="radio" name="inputMethod" value="smiles" checked={inputMethod === "smiles"} onChange={(e) => setInputMethod(e.target.value)} disabled={calculationStatus === 'running'} />
                             <span className="radio-text">Get from SMILES</span>
                         </label>
                     </div>
@@ -395,8 +426,9 @@ export const CalculationSettingsPage = ({
                                 if (convertError) setConvertError(null);
                             }}
                             className="pubchem-input"
+                            disabled={calculationStatus === 'running'}
                         />
-                        <button onClick={handleXYZConvert} className="convert-button" disabled={isConverting || !pubchemInput.trim()}>
+                        <button onClick={handleXYZConvert} className="convert-button" disabled={isConverting || !pubchemInput.trim() || calculationStatus === 'running'}>
                             {isConverting ? 'Converting...' : 'Convert to XYZ'}
                         </button>
                     </div>

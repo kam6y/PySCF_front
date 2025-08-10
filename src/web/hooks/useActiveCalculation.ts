@@ -62,8 +62,8 @@ export const useActiveCalculation = (
     setDetailsError(null);
 
     try {
-      const data = await getCalculationDetails(id);
-      const detailedCalculation = data.data.calculation;
+      const responseData = await getCalculationDetails(id);
+      const detailedCalculation = responseData.calculation;
       
       setDetailedCalculations(prev => {
         const newMap = new Map(prev);
@@ -117,14 +117,15 @@ export const useActiveCalculation = (
 
   useEffect(() => {
     if (activeCalculationId && calculations.length > 0 && !calculations.some(calc => calc.id === activeCalculationId)) {
-      setActiveCalculationId(calculations[0].id);
-    } else if (activeCalculationId && calculations.length === 0) {
+      setActiveCalculationId(calculations[0]?.id || null);
+    } else if (calculations.length === 0) {
         setActiveCalculationId(null);
     }
   }, [activeCalculationId, calculations]);
 
   useEffect(() => {
-    if (activeCalculationId && !detailedCalculations.has(activeCalculationId)) {
+    // *** 修正点: 一時的なクライアント側のみの計算IDに対しては詳細を取得しない ***
+    if (activeCalculationId && !activeCalculationId.startsWith('new-calculation-') && !detailedCalculations.has(activeCalculationId)) {
       loadCalculationDetails(activeCalculationId);
     }
   }, [activeCalculationId, detailedCalculations, loadCalculationDetails]);

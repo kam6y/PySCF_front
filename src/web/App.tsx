@@ -10,6 +10,7 @@ import { CalculationResultsPage } from "./pages/CalculationResultsPage";
 import { DrawMoleculePage } from "./pages/DrawMoleculePage";
 import { useCalculations, useActiveCalculation } from "./hooks";
 import { CalculationInstance, CalculationParameters } from "./types/calculation";
+import { startCalculation } from "./apiClient"; // apiClientからstartCalculationを直接インポート
 
 export const App = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -85,6 +86,26 @@ export const App = () => {
     handleSidebarClose();
   };
   
+  const handleStartCalculation = async (params: CalculationParameters) => {
+    try {
+      // 1. APIを呼び出して計算を開始し、新しい永続的な計算インスタンスを取得
+      const response = await startCalculation(params);
+      const runningCalculation = response.calculation;
+
+      // 2. calculationsリストの状態を更新 (一時IDを永続IDに置き換え)
+      updateCalculation(runningCalculation);
+
+      // 3. アクティブな計算IDを新しい永続IDに直接設定
+      setActiveCalculationById(runningCalculation.id);
+
+      return runningCalculation; // ポーリング開始のために返す
+    } catch (error) {
+      console.error("Failed to start calculation:", error);
+      alert(`Error starting calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
+  };
+
   const handleCalculationSuccess = async (completedCalculation: CalculationInstance) => {
     updateCalculation(completedCalculation);
     await refreshCalculations(); 
@@ -135,6 +156,7 @@ export const App = () => {
           <CalculationSettingsPage
             activeCalculation={activeCalculation}
             onCalculationUpdate={handleActiveCalculationUpdate}
+            onStartCalculation={handleStartCalculation}
             onCalculationSuccess={handleCalculationSuccess}
             onCalculationRename={handleCalculationRename}
             createNewCalculationFromExisting={handleCreateNewFromExisting}
@@ -155,6 +177,7 @@ export const App = () => {
           <CalculationSettingsPage
             activeCalculation={activeCalculation}
             onCalculationUpdate={handleActiveCalculationUpdate}
+            onStartCalculation={handleStartCalculation}
             onCalculationSuccess={handleCalculationSuccess}
             onCalculationRename={handleCalculationRename}
             createNewCalculationFromExisting={handleCreateNewFromExisting}

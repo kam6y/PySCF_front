@@ -43,7 +43,6 @@ class PubChemClient:
         try:
             response = self.session.get(url, timeout=self.timeout)
             
-            # --- 変更点: ステータスコードに応じた詳細なエラーハンドリング ---
             if response.status_code == 404:
                 raise PubChemNotFoundError(f"Resource not found at {url}", status_code=404)
             
@@ -65,7 +64,6 @@ class PubChemClient:
             
             if not atoms:
                 logger.warning(f"No 3D structure found for CID {cid}")
-                # 3D構造がない場合は、明確にエラーとして扱う
                 raise PubChemNotFoundError(f"A 3D structure is not available for the compound with CID {cid}.")
 
             compound_info['atoms'] = atoms

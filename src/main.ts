@@ -1,29 +1,38 @@
+// src/main.ts
+
 import path from "node:path";
-import { BrowserWindow, app } from "electron";
+import { BrowserWindow, app, ipcMain, dialog } from "electron";
 import { spawn, ChildProcess } from "child_process";
 import http from "node:http";
 
 let mainWindow: BrowserWindow;
 let pythonProcess: ChildProcess | null = null;
+let flaskPort: number | null = null;
+let isQuitting = false;
 
 /**
  * Pythonサーバーのヘルスチェックを行い、起動完了を待つ関数
- * @param url チェック対象のURL
+ * @param port チェック対象のポート番号
  * @param retries リトライ回数
  * @param delay リトライ間隔（ミリ秒）
  * @returns サーバーが正常に応答すれば解決されるPromise
  */
-const checkServerHealth = (url: string, retries = 15, delay = 1000): Promise<void> => {
+const checkServerHealth = (port: number, retries = 20, delay = 500): Promise<void> => {
   return new Promise((resolve, reject) => {
     let attempts = 0;
+    const url = `http://127.0.0.1:${port}/health`;
     const interval = setInterval(() => {
       http.get(url, (res) => {
         if (res.statusCode === 200) {
           clearInterval(interval);
+          console.log("Python server is healthy.");
           resolve();
+        } else {
+          console.log(`Health check failed with status: ${res.statusCode}`);
         }
-      }).on('error', () => {
+      }).on('error', (err) => {
         attempts++;
+        console.log(`Health check attempt ${attempts} failed...`);
         if (attempts >= retries) {
           clearInterval(interval);
           reject(new Error('Python server health check failed after multiple retries.'));
@@ -37,53 +46,68 @@ const checkServerHealth = (url: string, retries = 15, delay = 1000): Promise<voi
  * Python/Flaskサーバーを起動する関数
  * app.isPackaged の値に応じて、開発モードとパッケージ後で起動方法を切り替える
  */
-const startPythonServer = async (): Promise<void> => {
-  console.log('Starting Python Flask server...');
-  
-  if (app.isPackaged) {
-    // パッケージ化後の場合：同梱した実行ファイルを起動
-    const executableName = process.platform === 'win32' ? 'pyscf_front_api.exe' : 'pyscf_front_api';
-    // extraResources は process.resourcesPath にコピーされる
-    const pythonExecutablePath = path.join(process.resourcesPath, 'python_dist', executableName);
+const startPythonServer = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    console.log('Starting Python Flask server...');
     
-    console.log(`Executing packaged Python server at: ${pythonExecutablePath}`);
-    pythonProcess = spawn(pythonExecutablePath, [], {
-      stdio: ['pipe', 'pipe', 'pipe']
+    if (app.isPackaged) {
+      const executableName = process.platform === 'win32' ? 'pyscf_front_api.exe' : 'pyscf_front_api';
+      const pythonExecutablePath = path.join(process.resourcesPath, 'python_dist', executableName);
+      
+      console.log(`Executing packaged Python server at: ${pythonExecutablePath}`);
+      pythonProcess = spawn(pythonExecutablePath, [], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+
+    } else {
+      const pythonPath = path.join(__dirname, '..', 'src', 'python');
+      const appPath = path.join(pythonPath, 'app.py');
+      
+      console.log('Executing Python server in development mode...');
+      pythonProcess = spawn('uv', ['run', 'python', appPath], {
+        cwd: pythonPath,
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+    }
+
+    // stdout/stderrのログ出力
+    pythonProcess.stdout?.on('data', (data) => {
+      const output = data.toString().trim();
+      console.log(`Python server: ${output}`);
+      // Pythonサーバーからポート番号を受け取る
+      const match = output.match(/FLASK_SERVER_PORT:(\d+)/);
+      if (match && match[1]) {
+        flaskPort = parseInt(match[1], 10);
+        console.log(`Detected Flask server port: ${flaskPort}`);
+        // ヘルスチェックを開始してサーバー起動を待つ
+        checkServerHealth(flaskPort)
+          .then(resolve)
+          .catch(reject);
+      }
     });
 
-  } else {
-    // 開発時の場合：uv を使って直接Pythonスクリプトを起動
-    const pythonPath = path.join(__dirname, '..', 'src', 'python');
-    const appPath = path.join(pythonPath, 'app.py');
-    
-    console.log('Executing Python server in development mode...');
-    pythonProcess = spawn('uv', ['run', 'python', appPath], {
-      cwd: pythonPath,
-      stdio: ['pipe', 'pipe', 'pipe']
+    pythonProcess.stderr?.on('data', (data) => {
+      console.error(`Python server error: ${data.toString().trim()}`);
     });
-  }
 
-  // stdout/stderrのログ出力
-  pythonProcess.stdout?.on('data', (data) => {
-    console.log(`Python server: ${data.toString().trim()}`);
+    pythonProcess.on('error', (error) => {
+      console.error(`Failed to start Python server process: ${error.message}`);
+      reject(error);
+    });
+
+    pythonProcess.on('close', (code) => {
+      console.log(`Python server exited with code ${code}`);
+      pythonProcess = null;
+      // ユーザーがアプリを終了しようとしている場合以外での終了は異常とみなす
+      if (!isQuitting) {
+        dialog.showErrorBox(
+          "Backend Process Error",
+          `The Python backend process has unexpectedly stopped (exit code: ${code}). Please restart the application.`
+        );
+        app.quit();
+      }
+    });
   });
-
-  pythonProcess.stderr?.on('data', (data) => {
-    console.error(`Python server error: ${data.toString().trim()}`);
-  });
-
-  // プロセス自体のエラーハンドリング
-  pythonProcess.on('error', (error) => {
-    console.error(`Failed to start Python server process: ${error.message}`);
-  });
-
-  pythonProcess.on('close', (code) => {
-    console.log(`Python server exited with code ${code}`);
-    pythonProcess = null;
-  });
-
-  // サーバーのヘルスチェックを行い、起動を待つ
-  await checkServerHealth('http://127.0.0.1:5000/health');
 };
 
 /**
@@ -92,10 +116,9 @@ const startPythonServer = async (): Promise<void> => {
 const stopPythonServer = (): void => {
   if (pythonProcess && !pythonProcess.killed) {
     console.log('Stopping Python Flask server...');
-    // まずは穏便に終了を試みる (SIGTERM)
+    isQuitting = true;
     pythonProcess.kill('SIGTERM'); 
     
-    // 5秒経っても終了しない場合は強制終了 (SIGKILL)
     setTimeout(() => {
       if (pythonProcess && !pythonProcess.killed) {
         console.log('Force killing Python server...');
@@ -105,21 +128,20 @@ const stopPythonServer = (): void => {
   }
 };
 
-
-// Electronアプリの準備が完了したら実行
-app.whenReady().then(async () => {
-  // 最初にPythonサーバーを起動
+const createWindow = async () => {
   try {
     await startPythonServer();
-    console.log('Python server started successfully and is healthy.');
+    if (!flaskPort) {
+        throw new Error("Could not determine Flask server port.");
+    }
+    console.log('Python server started successfully.');
   } catch (error) {
     console.error('Failed to start Python server:', error);
-    // サーバーが起動しない場合はアプリを終了
+    dialog.showErrorBox("Fatal Error", "Could not start the Python backend. The application will now close.");
     app.quit();
     return;
   }
   
-  // BrowserWindow インスタンスを作成
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -138,24 +160,37 @@ app.whenReady().then(async () => {
     },
   });
 
-  // 開発モードの場合はデベロッパーツールを開く
   if (!app.isPackaged) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
+  
+  // レンダラープロセスにFlaskサーバーのポートを通知
+  mainWindow.webContents.on('did-finish-load', () => {
+    mainWindow.webContents.send('set-flask-port', flaskPort);
+  });
 
-  // レンダラープロセスをロード
   mainWindow.loadFile("dist/index.html");
-});
+};
 
+app.whenReady().then(createWindow);
 
-// すべてのウィンドウが閉じられたらアプリを終了する
-app.once("window-all-closed", () => {
+app.on("window-all-closed", () => {
   stopPythonServer();
-  app.quit();
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
+});
 
-// アプリ終了前の処理
 app.on('before-quit', () => {
+  isQuitting = true;
   stopPythonServer();
 });
+
+// IPC handler for renderer to get port (fallback)
+ipcMain.handle('get-flask-port', () => flaskPort);

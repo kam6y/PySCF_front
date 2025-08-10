@@ -1,10 +1,15 @@
-"""Flask API server for PubChem and SMILES integration."""
+# src/python/app.py
 
 import logging
 import os
+import sys
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import threading
+import socket
+import shutil
+from typing import Dict
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
@@ -25,6 +30,68 @@ CORS(app)  # Enable CORS for cross-origin requests
 
 # Initialize PubChem client
 pubchem_client = PubChemClient(timeout=30)
+
+# In-memory storage for calculation tasks
+# In a real-world scenario, a more persistent solution like Redis might be used
+calculation_tasks: Dict[str, Dict] = {}
+
+
+def find_free_port():
+    """Finds an available TCP port on the system."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        return s.getsockname()[1]
+
+def run_calculation_in_background(calculation_id: str, parameters: dict):
+    """
+    Worker function to run the DFT calculation in a separate thread.
+    Updates the global `calculation_tasks` dictionary with status and results.
+    """
+    file_manager = CalculationFileManager()
+    calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+
+    try:
+        # Update status to running
+        calculation_tasks[calculation_id] = {'status': 'running', 'result': None}
+        file_manager.save_calculation_status(calc_dir, 'running')
+        
+        # Initialize calculator
+        calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['molecule_name'])
+        
+        # Parse XYZ and setup calculation
+        atoms = calculator.parse_xyz(parameters['xyz'])
+        calculator.setup_calculation(
+            atoms,
+            basis=parameters['basis_function'],
+            xc=parameters['exchange_correlation'],
+            charge=parameters['charges'],
+            spin=(parameters['spin_multiplicity'] - 1) // 2,
+            max_cycle=150
+        )
+        
+        # Run calculation
+        results = calculator.run_calculation()
+        
+        # Save results and update status
+        file_manager.save_calculation_results(calc_dir, results)
+        file_manager.save_calculation_status(calc_dir, 'completed')
+        
+        # Update task dictionary
+        calculation_tasks[calculation_id]['status'] = 'completed'
+        calculation_tasks[calculation_id]['result'] = results
+        
+        logger.info(f"Calculation {calculation_id} completed successfully.")
+
+    except (InputError, ConvergenceError, CalculationError) as e:
+        logger.error(f"Calculation {calculation_id} failed: {e}")
+        file_manager.save_calculation_status(calc_dir, 'error')
+        calculation_tasks[calculation_id]['status'] = 'error'
+        calculation_tasks[calculation_id]['result'] = {'error': str(e)}
+    except Exception as e:
+        logger.error(f"Unexpected error in calculation {calculation_id}: {e}", exc_info=True)
+        file_manager.save_calculation_status(calc_dir, 'error')
+        calculation_tasks[calculation_id]['status'] = 'error'
+        calculation_tasks[calculation_id]['result'] = {'error': 'An unexpected internal server error occurred.'}
 
 
 @app.route('/health', methods=['GET'])
@@ -141,125 +208,71 @@ def validate_xyz_endpoint():
 
 @app.route('/api/quantum/calculate', methods=['POST'])
 def quantum_calculate():
-    """Perform quantum chemistry calculation using PySCF."""
-    calculation_id = None
-    file_manager = None
-    calc_dir = None
-    
+    """
+    Starts a quantum chemistry calculation in the background.
+    Immediately returns a calculation ID to track the job.
+    """
     try:
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
         
-        # Extract calculation parameters
-        xyz_data = data.get('xyz', '').strip()
-        if not xyz_data:
+        # Extract and validate parameters
+        if not data.get('xyz', '').strip():
             return jsonify({'success': False, 'error': 'XYZ molecular structure is required.'}), 400
+        if data.get('calculation_method', 'DFT') != 'DFT':
+            return jsonify({'success': False, 'error': 'Only DFT method is supported.'}), 400
         
-        calc_method = data.get('calculation_method', 'DFT')
-        basis = data.get('basis_function', '6-31G(d)')
-        xc_functional = data.get('exchange_correlation', 'B3LYP')
-        charge = int(data.get('charges', 0))
-        spin_mult = int(data.get('spin_multiplicity', 1))
-        
-        # Convert spin multiplicity to spin (2S+1 -> S)
-        spin = (spin_mult - 1) // 2
-        
-        logger.info(f"Starting {calc_method} calculation with basis={basis}, xc={xc_functional}")
-        
-        # Validate calculation method
-        if calc_method != 'DFT':
-            return jsonify({'success': False, 'error': f'Calculation method "{calc_method}" not yet supported. Only DFT is available.'}), 400
-        
-        # Extract molecule name for file organization
-        molecule_name = data.get('molecule_name', '').strip() or "Unnamed Calculation"
-        
-        # Initialize file manager and create calculation directory
-        file_manager = CalculationFileManager()
-        calc_dir = file_manager.create_calculation_dir(molecule_name)
-        calculation_id = os.path.basename(calc_dir)
-        
-        # Save calculation parameters
+        # Prepare parameters
         parameters = {
-            'calculation_method': calc_method,
-            'basis_function': basis,
-            'exchange_correlation': xc_functional,
-            'charges': charge,
-            'spin_multiplicity': spin_mult,
+            'calculation_method': data.get('calculation_method', 'DFT'),
+            'basis_function': data.get('basis_function', '6-31G(d)'),
+            'exchange_correlation': data.get('exchange_correlation', 'B3LYP'),
+            'charges': int(data.get('charges', 0)),
+            'spin_multiplicity': int(data.get('spin_multiplicity', 1)),
             'solvent_method': data.get('solvent_method', 'none'),
             'solvent': data.get('solvent', '-'),
-            'xyz': xyz_data,
-            'molecule_name': molecule_name,
+            'xyz': data.get('xyz', '').strip(),
+            'molecule_name': data.get('molecule_name', '').strip() or "Unnamed Calculation",
             'cpu_cores': data.get('cpu_cores'),
             'memory_mb': data.get('memory_mb'),
             'created_at': datetime.now().isoformat()
         }
+        
+        # Initialize file manager and create directory
+        file_manager = CalculationFileManager()
+        calc_dir = file_manager.create_calculation_dir(parameters['molecule_name'])
+        calculation_id = os.path.basename(calc_dir)
+        
+        # Save initial parameters and status
         file_manager.save_calculation_parameters(calc_dir, parameters)
-        
-        # Set initial status to running
-        file_manager.save_calculation_status(calc_dir, 'running')
-        
-        # Initialize calculator with the pre-created directory
-        calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=molecule_name)
-        
-        # Parse XYZ and setup calculation
-        atoms = calculator.parse_xyz(xyz_data)
-        calculator.setup_calculation(
-            atoms,
-            basis=basis,
-            xc=xc_functional,
-            charge=charge,
-            spin=spin,
-            max_cycle=150
+        file_manager.save_calculation_status(calc_dir, 'pending')
+
+        # Start background thread for the calculation
+        thread = threading.Thread(
+            target=run_calculation_in_background,
+            args=(calculation_id, parameters)
         )
+        thread.daemon = True
+        thread.start()
         
-        # Run calculation
-        results = calculator.run_calculation()
-        
-        # Save results and update status
-        file_manager.save_calculation_results(calc_dir, results)
-        file_manager.save_calculation_status(calc_dir, 'completed')
-        
-        # Keep files for analysis (don't clean up immediately)
-        calculator.cleanup(keep_files=True)
-        
-        logger.info(f"Calculation completed successfully. HOMO: {results['homo_index']}, LUMO: {results['lumo_index']}")
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'calculation_id': calculation_id,
-                'calculation_results': results,
-                'calculation_parameters': {
-                    'method': calc_method,
-                    'basis': basis,
-                    'xc_functional': xc_functional,
-                    'charge': charge,
-                    'spin_multiplicity': spin_mult
-                }
-            }
-        })
-        
-    except InputError as e:
-        if file_manager and calc_dir:
-            file_manager.save_calculation_status(calc_dir, 'error')
-        logger.error(f"Input validation error: {e}")
-        return jsonify({'success': False, 'error': str(e), 'calculation_id': calculation_id}), 400
-    except ConvergenceError as e:
-        if file_manager and calc_dir:
-            file_manager.save_calculation_status(calc_dir, 'error')
-        logger.error(f"Calculation convergence error: {e}")
-        return jsonify({'success': False, 'error': f'Calculation failed to converge: {str(e)}', 'calculation_id': calculation_id}), 422
-    except CalculationError as e:
-        if file_manager and calc_dir:
-            file_manager.save_calculation_status(calc_dir, 'error')
-        logger.error(f"Calculation error: {e}")
-        return jsonify({'success': False, 'error': f'Calculation error: {str(e)}', 'calculation_id': calculation_id}), 500
+        logger.info(f"Queued calculation {calculation_id} for molecule '{parameters['molecule_name']}'")
+
+        # Return immediately with the new calculation instance
+        initial_instance = {
+            'id': calculation_id,
+            'name': parameters['molecule_name'],
+            'status': 'running',
+            'createdAt': parameters['created_at'],
+            'updatedAt': parameters['created_at'],
+            'parameters': parameters
+        }
+
+        return jsonify({'success': True, 'data': {'calculation': initial_instance}}), 202
+
     except Exception as e:
-        if file_manager and calc_dir:
-            file_manager.save_calculation_status(calc_dir, 'error')
-        logger.error(f"Unexpected error in quantum calculation: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred during calculation.', 'calculation_id': calculation_id}), 500
+        logger.error(f"Error queuing calculation: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to queue calculation.'}), 500
 
 
 @app.route('/api/quantum/calculations', methods=['GET'])
@@ -285,15 +298,24 @@ def list_calculations():
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['GET'])
 def get_calculation_details(calculation_id):
-    """Get detailed information about a specific calculation."""
+    """Get detailed information about a specific calculation, including status of running jobs."""
     try:
+        # Check if the task is currently running
+        if calculation_id in calculation_tasks:
+            task = calculation_tasks[calculation_id]
+            if task['status'] == 'running':
+                return jsonify({'success': True, 'data': {'calculation': {'id': calculation_id, 'status': 'running'}}})
+            elif task['status'] in ['completed', 'error']:
+                # Once finished, remove from memory and let it be read from disk
+                del calculation_tasks[calculation_id]
+
         file_manager = CalculationFileManager()
         calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
 
         if not os.path.isdir(calc_path):
              return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
 
-        # Read calculation data
+        # Read calculation data from disk
         parameters = file_manager.read_calculation_parameters(calc_path) or {}
         results = file_manager.read_calculation_results(calc_path)
         status = file_manager.read_calculation_status(calc_path)
@@ -301,7 +323,6 @@ def get_calculation_details(calculation_id):
         display_name = parameters.get('molecule_name', calculation_id.rsplit('_', 1)[0])
         creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
 
-        # Create CalculationInstance compatible structure
         calculation_instance = {
             'id': calculation_id,
             'name': display_name,
@@ -377,8 +398,6 @@ def update_calculation(calculation_id):
 def delete_calculation(calculation_id):
     """Delete a calculation and its files."""
     try:
-        import shutil
-        
         file_manager = CalculationFileManager()
         
         calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
@@ -390,6 +409,10 @@ def delete_calculation(calculation_id):
         shutil.rmtree(calc_path)
         logger.info(f"Deleted calculation directory: {calc_path}")
         
+        # Remove from tasks if it exists
+        if calculation_id in calculation_tasks:
+            del calculation_tasks[calculation_id]
+
         return jsonify({
             'success': True,
             'data': {
@@ -403,58 +426,6 @@ def delete_calculation(calculation_id):
         return jsonify({'success': False, 'error': 'Failed to delete calculation.'}), 500
 
 
-@app.route('/api/quantum/test-simple', methods=['POST'])
-def test_simple_calculation():
-    """Test calculation with a simple water molecule."""
-    try:
-        # Simple water molecule XYZ data
-        water_xyz = """3
-water molecule test
-O  0.0000   0.0000   0.0000
-H  0.7571   0.5861   0.0000  
-H -0.7571   0.5861   0.0000"""
-        
-        logger.info("Starting simple water molecule test calculation")
-        
-        # Initialize calculator
-        calculator = DFTCalculator(keep_files=True, molecule_name="water_test")
-        
-        # Parse XYZ and setup calculation
-        atoms = calculator.parse_xyz(water_xyz)
-        calculator.setup_calculation(
-            atoms,
-            basis='STO-3G',  # Smaller basis for faster calculation
-            xc='B3LYP',
-            charge=0,
-            spin=0,
-            max_cycle=50  # Fewer cycles for test
-        )
-        
-        # Run calculation
-        results = calculator.run_calculation()
-        
-        # Keep files for analysis
-        calculator.cleanup(keep_files=True)
-        
-        logger.info(f"Test calculation completed. Files saved to: {results['working_directory']}")
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'message': 'Simple test calculation completed successfully',
-                'working_directory': results['working_directory'],
-                'homo_index': results['homo_index'],
-                'lumo_index': results['lumo_index'],
-                'scf_energy': results['scf_energy'],
-                'converged': results['converged']
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Test calculation failed: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': f'Test calculation failed: {str(e)}'}), 500
-
-
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'success': False, 'error': 'Endpoint not found.'}), 404
@@ -465,8 +436,12 @@ def method_not_allowed(error):
 
 if __name__ == '__main__':
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
-    port = int(os.environ.get('FLASK_RUN_PORT', 5000))
+    # If a port is passed as a command-line argument, use it. Otherwise, find a free one.
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else find_free_port()
     debug = os.environ.get('FLASK_ENV') == 'development'
+    
+    # Print the port to stdout so the Electron process can capture it.
+    print(f"FLASK_SERVER_PORT:{port}", file=sys.stdout, flush=True)
     
     logger.info(f"Starting API server on http://{host}:{port} (Debug: {debug})")
     app.run(host=host, port=port, debug=debug)

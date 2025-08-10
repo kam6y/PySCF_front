@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     CalculationInstance,
     CalculationParameters,
-    CalculationListResponse, // <-- インポートを追加
-    RenameResponse,          // <-- インポートを追加
+    CalculationListResponse,
+    RenameResponse,
 } from '../types/calculation';
 import * as apiClient from '../apiClient';
 
@@ -44,7 +44,7 @@ export const useCalculations = (): UseCalculationsReturn => {
         setError(null);
         try {
             const data = await apiClient.getCalculations();
-            const convertedCalculations = data.data.calculations.map(convertToCalculationInstance);
+            const convertedCalculations = data.calculations.map(convertToCalculationInstance);
             setCalculations(convertedCalculations);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -128,17 +128,27 @@ export const useCalculations = (): UseCalculationsReturn => {
 
     const updateCalculation = useCallback((updatedCalculation: CalculationInstance) => {
         setCalculations(prevCalculations => {
-            const exists = prevCalculations.some(c => c.id === updatedCalculation.id);
-            if (exists) {
-                return prevCalculations.map(calc =>
-                    calc.id === updatedCalculation.id ? updatedCalculation : calc
-                );
+            // First, check if this is a server response meant to replace a temporary calculation.
+            // This happens when a calculation is started.
+            if (!updatedCalculation.id.startsWith('new-calculation-')) {
+                const tempIndex = prevCalculations.findIndex(c => c.id.startsWith('new-calculation-'));
+                if (tempIndex !== -1) {
+                    const newCalculations = [...prevCalculations];
+                    newCalculations[tempIndex] = updatedCalculation;
+                    return newCalculations.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                }
             }
-            
-            const tempId = prevCalculations.find(c => c.id.startsWith('new-calculation-'))?.id;
-            if (tempId) {
-                return [updatedCalculation, ...prevCalculations.filter(c => c.id !== tempId)];
+
+            // If not replacing a temp calc, check if it's an update to an existing one.
+            // This handles status updates during polling or parameter changes.
+            const existingIndex = prevCalculations.findIndex(c => c.id === updatedCalculation.id);
+            if (existingIndex !== -1) {
+                const newCalculations = [...prevCalculations];
+                newCalculations[existingIndex] = updatedCalculation;
+                return newCalculations;
             }
+
+            // If it's not an update and not a replacement, it must be a new (temporary) calculation.
             return [updatedCalculation, ...prevCalculations];
         });
     }, []);

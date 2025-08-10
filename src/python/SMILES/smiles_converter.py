@@ -48,8 +48,8 @@ def smiles_to_xyz(smiles_string: str, title: str = "Molecule from SMILES") -> st
         for atom in mol.GetAtoms():
             pos = conformer.GetAtomPosition(atom.GetIdx())
             element = atom.GetSymbol()
-            xyz_lines.append(f"{element:<3} {pos.x:>10.4f} {pos.y:>10.4f} {pos.z:>10.4f}")
-            
+            xyz_lines.append(f"{element:<3} {pos.x:>7.4f} {pos.y:>7.4f} {pos.z:>7.4f}")
+
         return "\n".join(xyz_lines)
 
     except SMILESError:
