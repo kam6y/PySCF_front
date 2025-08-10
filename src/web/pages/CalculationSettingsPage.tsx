@@ -3,6 +3,17 @@ import { MoleculeViewer, MoleculeViewerRef } from "../components/MoleculeViewer"
 import { XYZInput } from "../components/XYZInput";
 import { StyleControls } from "../components/StyleControls";
 import { StyleSpec } from "../../types/3dmol";
+import { 
+  CalculationParameters, 
+  CalculationStatus,
+  QuantumCalculationResponse,
+  CalculationInstance 
+} from "../types/calculation";
+
+interface CalculationSettingsPageProps {
+  activeCalculation?: CalculationInstance;
+  onCalculationUpdate?: (updatedCalculation: CalculationInstance) => void;
+}
 
 // --- API通信と定数 ---
 
@@ -33,7 +44,10 @@ const fetchAPI = async (endpoint: string, body: object) => {
 
 // --- メインコンポーネント ---
 
-export const CalculationSettingsPage = () => {
+export const CalculationSettingsPage = ({ 
+  activeCalculation, 
+  onCalculationUpdate 
+}: CalculationSettingsPageProps) => {
   const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const [hasValidMolecule, setHasValidMolecule] = useState(false);
 
@@ -61,6 +75,10 @@ export const CalculationSettingsPage = () => {
   const [currentSearchType, setCurrentSearchType] = useState<'name' | 'cid' | null>(null);
   const [xyzInputValue, setXyzInputValue] = useState<string>("");
 
+  // Calculation status state
+  const [calculationStatus, setCalculationStatus] = useState<CalculationStatus>('idle');
+  const [calculationError, setCalculationError] = useState<string | null>(null);
+
   /**
    * XYZデータが変更されたときのハンドラ。分子ビューアを更新する。
    */
@@ -87,21 +105,52 @@ export const CalculationSettingsPage = () => {
   /**
    * 計算開始ボタンが押されたときのハンドラ。
    */
-  const handleStartCalculation = () => {
-    console.log("Starting calculation with settings:", {
-      moleculeName,
-      cpuCores,
-      memoryMB,
-      calculationMethod,
-      basisFunction,
-      exchangeCorrelation,
+  const handleStartCalculation = async () => {
+    if (!hasValidMolecule || !xyzInputValue.trim()) {
+      setCalculationError("Valid molecular structure is required for calculation.");
+      return;
+    }
+
+    setCalculationStatus('running');
+    setCalculationError(null);
+
+    const calculationParams: CalculationParameters = {
+      calculation_method: calculationMethod as any,
+      basis_function: basisFunction as any,
+      exchange_correlation: exchangeCorrelation as any,
       charges,
-      spinMultiplicity,
-      solventMethod,
+      spin_multiplicity: spinMultiplicity,
+      solvent_method: solventMethod as any,
       solvent,
       xyz: xyzInputValue,
-    });
-    // NOTE: ここで実際の計算プロセスを呼び出す処理を実装します
+      molecule_name: moleculeName,
+      cpu_cores: cpuCores,
+      memory_mb: memoryMB
+    };
+
+    try {
+      console.log("Starting quantum calculation with parameters:", calculationParams);
+      
+      const response = await fetchAPI('/api/quantum/calculate', calculationParams);
+      
+      console.log("Calculation completed successfully:", response);
+      setCalculationStatus('completed');
+      
+      // Store results in localStorage for now (later will be passed via App state)
+      localStorage.setItem('calculationResults', JSON.stringify({
+        results: response.calculation_results,
+        parameters: calculationParams,
+        completedAt: new Date().toISOString()
+      }));
+      
+      // Navigate to results page would be handled by parent component
+      alert(`Calculation completed!\nHOMO Index: ${response.calculation_results.homo_index}\nLUMO Index: ${response.calculation_results.lumo_index}\nSCF Energy: ${response.calculation_results.scf_energy.toFixed(6)} hartree`);
+      
+    } catch (error) {
+      console.error("Calculation failed:", error);
+      setCalculationStatus('error');
+      setCalculationError(error instanceof Error ? error.message : 'Unknown error occurred during calculation');
+    }
   };
 
   /**
@@ -216,9 +265,23 @@ export const CalculationSettingsPage = () => {
                   <span className="memory-unit">MB</span>
                 </div>
               </div>
-              <button className="start-calculation-btn" onClick={handleStartCalculation} disabled={!hasValidMolecule}>
-                + Start calculation
+              <button 
+                className={`start-calculation-btn ${calculationStatus === 'running' ? 'calculating' : ''}`}
+                onClick={handleStartCalculation} 
+                disabled={!hasValidMolecule || calculationStatus === 'running'}
+              >
+                {calculationStatus === 'running' ? '⚛️ Calculating...' : '+ Start calculation'}
               </button>
+              {calculationError && (
+                <div className="calculation-error" style={{ marginTop: '10px', color: '#e74c3c', fontSize: '14px' }}>
+                  ❌ {calculationError}
+                </div>
+              )}
+              {calculationStatus === 'running' && (
+                <div className="calculation-status" style={{ marginTop: '10px', color: '#3498db', fontSize: '14px' }}>
+                  ⚛️ Running quantum chemistry calculation... This may take several minutes.
+                </div>
+              )}
             </div>
           </div>
           {/* Left Column - Calculation Settings */}

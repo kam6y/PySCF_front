@@ -10,6 +10,8 @@ dependencies = [
     "flask-cors>=4.0.0",
     "certifi>=2024.7.4",
     "rdkit>=2025.3.5",
+    "pyscf>=2.10.0",
+    "geometric>=1.1",
 ]
 
 [tool.uv]

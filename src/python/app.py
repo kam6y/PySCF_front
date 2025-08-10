@@ -8,6 +8,8 @@ from flask_cors import CORS
 from pubchem.client import PubChemClient, PubChemError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
+from quantum_calc import DFTCalculator, CalculationError, ConvergenceError, InputError
+from quantum_calc.file_manager import CalculationFileManager
 
 # Configure logging
 logging.basicConfig(
@@ -132,6 +134,272 @@ def validate_xyz_endpoint():
     except Exception as e:
         logger.error(f"Error during XYZ validation: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/quantum/calculate', methods=['POST'])
+def quantum_calculate():
+    """Perform quantum chemistry calculation using PySCF."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
+        
+        # Extract calculation parameters
+        xyz_data = data.get('xyz', '').strip()
+        if not xyz_data:
+            return jsonify({'success': False, 'error': 'XYZ molecular structure is required.'}), 400
+        
+        calc_method = data.get('calculation_method', 'DFT')
+        basis = data.get('basis_function', '6-31G(d)')
+        xc_functional = data.get('exchange_correlation', 'B3LYP')
+        charge = int(data.get('charges', 0))
+        spin_mult = int(data.get('spin_multiplicity', 1))
+        
+        # Convert spin multiplicity to spin (2S+1 -> S)
+        spin = (spin_mult - 1) // 2
+        
+        logger.info(f"Starting {calc_method} calculation with basis={basis}, xc={xc_functional}")
+        
+        # Validate calculation method
+        if calc_method != 'DFT':
+            return jsonify({'success': False, 'error': f'Calculation method "{calc_method}" not yet supported. Only DFT is available.'}), 400
+        
+        # Extract molecule name for file organization
+        molecule_name = data.get('molecule_name', '').strip() or None
+        
+        # Initialize calculator with persistent file storage
+        calculator = DFTCalculator(keep_files=True, molecule_name=molecule_name)
+        
+        # Parse XYZ and setup calculation
+        atoms = calculator.parse_xyz(xyz_data)
+        calculator.setup_calculation(
+            atoms,
+            basis=basis,
+            xc=xc_functional,
+            charge=charge,
+            spin=spin,
+            max_cycle=150
+        )
+        
+        # Run calculation
+        results = calculator.run_calculation()
+        
+        # Keep files for analysis (don't clean up immediately)
+        calculator.cleanup(keep_files=True)
+        
+        logger.info(f"Calculation completed successfully. HOMO: {results['homo_index']}, LUMO: {results['lumo_index']}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'calculation_results': results,
+                'calculation_parameters': {
+                    'method': calc_method,
+                    'basis': basis,
+                    'xc_functional': xc_functional,
+                    'charge': charge,
+                    'spin_multiplicity': spin_mult
+                }
+            }
+        })
+        
+    except InputError as e:
+        logger.error(f"Input validation error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 400
+    except ConvergenceError as e:
+        logger.error(f"Calculation convergence error: {e}")
+        return jsonify({'success': False, 'error': f'Calculation failed to converge: {str(e)}'}), 422
+    except CalculationError as e:
+        logger.error(f"Calculation error: {e}")
+        return jsonify({'success': False, 'error': f'Calculation error: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error in quantum calculation: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred during calculation.'}), 500
+
+
+@app.route('/api/quantum/calculations', methods=['GET'])
+def list_calculations():
+    """List all available calculation directories."""
+    try:
+        file_manager = CalculationFileManager()
+        calculations = file_manager.list_calculations()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'base_directory': file_manager.get_base_directory(),
+                'calculations': calculations,
+                'count': len(calculations)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error listing calculations: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to list calculations.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>', methods=['GET'])
+def get_calculation_details(calculation_id):
+    """Get detailed information about a specific calculation."""
+    try:
+        file_manager = CalculationFileManager()
+        
+        # Find the calculation directory
+        calculations = file_manager.list_calculations()
+        target_calc = None
+        for calc in calculations:
+            if calc['name'] == calculation_id:
+                target_calc = calc
+                break
+        
+        if not target_calc:
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Read calculation info if available
+        calc_info = file_manager.read_calculation_info(target_calc['path'])
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'calculation': {
+                    'id': calculation_id,
+                    'name': calculation_id.replace('_\\d{8}_\\d{6}$', ''),  # Remove timestamp suffix
+                    'path': target_calc['path'],
+                    'date': target_calc['date'],
+                    'has_checkpoint': target_calc['has_checkpoint'],
+                    'info': calc_info
+                },
+                'files': {
+                    'checkpoint_exists': target_calc['has_checkpoint'],
+                    'info_file_exists': calc_info is not None,
+                    'geometry_file_exists': file_manager.file_exists(target_calc['path'], 'optimized_geometry.xyz')
+                }
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting calculation details for {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to get calculation details.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>', methods=['PUT'])
+def update_calculation(calculation_id):
+    """Update calculation metadata (name, etc.)."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
+        
+        # For now, this is a placeholder since renaming directories is complex
+        # We'll return success but note that actual renaming isn't implemented
+        new_name = data.get('name', '')
+        if not new_name:
+            return jsonify({'success': False, 'error': 'New name is required.'}), 400
+        
+        logger.info(f"Update request for calculation {calculation_id} with new name: {new_name}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'message': f'Calculation name update noted (actual filesystem rename not implemented)',
+                'calculation_id': calculation_id,
+                'new_name': new_name
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to update calculation.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>', methods=['DELETE'])
+def delete_calculation(calculation_id):
+    """Delete a calculation and its files."""
+    try:
+        import shutil
+        
+        file_manager = CalculationFileManager()
+        
+        # Find the calculation directory
+        calculations = file_manager.list_calculations()
+        target_calc = None
+        for calc in calculations:
+            if calc['name'] == calculation_id:
+                target_calc = calc
+                break
+        
+        if not target_calc:
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Delete the calculation directory
+        calc_path = target_calc['path']
+        if os.path.exists(calc_path):
+            shutil.rmtree(calc_path)
+            logger.info(f"Deleted calculation directory: {calc_path}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'message': f'Calculation "{calculation_id}" has been deleted successfully',
+                'deleted_path': calc_path
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error deleting calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to delete calculation.'}), 500
+
+
+@app.route('/api/quantum/test-simple', methods=['POST'])
+def test_simple_calculation():
+    """Test calculation with a simple water molecule."""
+    try:
+        # Simple water molecule XYZ data
+        water_xyz = """3
+water molecule test
+O  0.0000   0.0000   0.0000
+H  0.7571   0.5861   0.0000  
+H -0.7571   0.5861   0.0000"""
+        
+        logger.info("Starting simple water molecule test calculation")
+        
+        # Initialize calculator
+        calculator = DFTCalculator(keep_files=True, molecule_name="water_test")
+        
+        # Parse XYZ and setup calculation
+        atoms = calculator.parse_xyz(water_xyz)
+        calculator.setup_calculation(
+            atoms,
+            basis='STO-3G',  # Smaller basis for faster calculation
+            xc='B3LYP',
+            charge=0,
+            spin=0,
+            max_cycle=50  # Fewer cycles for test
+        )
+        
+        # Run calculation
+        results = calculator.run_calculation()
+        
+        # Keep files for analysis
+        calculator.cleanup(keep_files=True)
+        
+        logger.info(f"Test calculation completed. Files saved to: {results['working_directory']}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'message': 'Simple test calculation completed successfully',
+                'working_directory': results['working_directory'],
+                'homo_index': results['homo_index'],
+                'lumo_index': results['lumo_index'],
+                'scf_energy': results['scf_energy'],
+                'converged': results['converged']
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Test calculation failed: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': f'Test calculation failed: {str(e)}'}), 500
 
 
 @app.errorhandler(404)
