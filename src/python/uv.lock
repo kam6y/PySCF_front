@@ -123,6 +123,19 @@ wheels = [
 ]
 
 [[package]]
+name = "flask-pydantic"
+version = "0.13.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flask" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c2/f6/522878655869cb2bf8cc6a34ebba6879995573c7ab48945f1224c0016c18/flask_pydantic-0.13.1.tar.gz", hash = "sha256:ca810015ab0bb39e04774144ee27c35b6581fec56d9a1ffb536443a7936fcf37", size = 11845, upload-time = "2025-04-23T16:38:22.067Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/d7/b5932cef4bfb030eec2f4e71d7a35e59a7dc6013a2f0dde3b4e04e41af61/flask_pydantic-0.13.1-py3-none-any.whl", hash = "sha256:b814c236d76e047e78e75e602463dec39d2aa72bebb3446d4cb6c9c5c970c5b1", size = 10628, upload-time = "2025-04-23T16:38:20.67Z" },
+]
+
+[[package]]
 name = "geometric"
 version = "1.1"
 source = { registry = "https://pypi.org/simple" }
@@ -480,6 +493,7 @@ dependencies = [
     { name = "certifi" },
     { name = "flask" },
     { name = "flask-cors" },
+    { name = "flask-pydantic" },
     { name = "geometric" },
     { name = "pydantic" },
     { name = "pyscf" },
@@ -498,6 +512,7 @@ requires-dist = [
     { name = "certifi", specifier = ">=2024.7.4" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=4.0.0" },
+    { name = "flask-pydantic", specifier = ">=0.13.1" },
     { name = "geometric", specifier = ">=1.1" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pyscf", specifier = ">=2.10.0" },

@@ -6,6 +6,8 @@ import sys
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_pydantic import validate
+from pydantic import ValidationError
 import threading
 import socket
 import shutil
@@ -16,6 +18,10 @@ from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, CalculationError, ConvergenceError, InputError
 from quantum_calc.file_manager import CalculationFileManager
+from validation_models import (
+    PubChemSearchModel, SMILESConvertModel, PubChemValidateModel,
+    QuantumCalculateModel, CalculationUpdateModel
+)
 
 # Configure logging
 logging.basicConfig(
@@ -96,20 +102,12 @@ def health_check():
 
 
 @app.route('/api/pubchem/search', methods=['POST'])
-def search_pubchem():
+@validate()
+def search_pubchem(body: PubChemSearchModel):
     """Search PubChem for a compound and return its 3D structure in XYZ format."""
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided or incorrect Content-Type.'}), 400
-        
-        query = data.get('query', '').strip()
-        if not query:
-            return jsonify({'success': False, 'error': 'Query parameter is required.'}), 400
-        
-        search_type = data.get('search_type', 'name').lower()
-        if search_type not in ['name', 'cid', 'formula']:
-            return jsonify({'success': False, 'error': 'Invalid search_type. Must be "name", "cid", or "formula".'}), 400
+        query = body.query
+        search_type = body.search_type.value
         
         logger.info(f"Searching PubChem for '{query}' (type: {search_type})")
         
@@ -151,17 +149,12 @@ def search_pubchem():
 
 
 @app.route('/api/smiles/convert', methods=['POST'])
-def convert_smiles():
+@validate()
+def convert_smiles(body: SMILESConvertModel):
     """Converts a SMILES string to XYZ format."""
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
-
-        smiles = data.get('smiles', '').strip()
-        if not smiles:
-            return jsonify({'success': False, 'error': 'SMILES string is required.'}), 400
-
+        smiles = body.smiles
+        
         logger.info(f"Converting SMILES: {smiles}")
 
         xyz_string = smiles_to_xyz(smiles, title=f"Molecule from SMILES: {smiles}")
@@ -177,16 +170,11 @@ def convert_smiles():
 
 
 @app.route('/api/pubchem/validate', methods=['POST'])
-def validate_xyz_endpoint():
+@validate()
+def validate_xyz_endpoint(body: PubChemValidateModel):
     """Validate an XYZ format string."""
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided or incorrect Content-Type.'}), 400
-        
-        xyz_string = data.get('xyz', '')
-        if not xyz_string:
-            return jsonify({'success': False, 'error': 'XYZ string is required.'}), 400
+        xyz_string = body.xyz
         
         validation_result = xyz_parser.validate_xyz(xyz_string)
         
@@ -198,35 +186,26 @@ def validate_xyz_endpoint():
 
 
 @app.route('/api/quantum/calculate', methods=['POST'])
-def quantum_calculate():
+@validate()
+def quantum_calculate(body: QuantumCalculateModel):
     """
     Starts a quantum chemistry calculation in the background.
     Immediately returns a calculation ID to track the job.
     """
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
-        
-        # Extract and validate parameters
-        if not data.get('xyz', '').strip():
-            return jsonify({'success': False, 'error': 'XYZ molecular structure is required.'}), 400
-        if data.get('calculation_method', 'DFT') != 'DFT':
-            return jsonify({'success': False, 'error': 'Only DFT method is supported.'}), 400
-        
-        # Prepare parameters
+        # Prepare parameters using validated data from Pydantic model
         parameters = {
-            'calculation_method': data.get('calculation_method', 'DFT'),
-            'basis_function': data.get('basis_function', '6-31G(d)'),
-            'exchange_correlation': data.get('exchange_correlation', 'B3LYP'),
-            'charges': int(data.get('charges', 0)),
-            'spin_multiplicity': int(data.get('spin_multiplicity', 1)),
-            'solvent_method': data.get('solvent_method', 'none'),
-            'solvent': data.get('solvent', '-'),
-            'xyz': data.get('xyz', '').strip(),
-            'molecule_name': data.get('molecule_name', '').strip() or "Unnamed Calculation",
-            'cpu_cores': data.get('cpu_cores'),
-            'memory_mb': data.get('memory_mb'),
+            'calculation_method': body.calculation_method,
+            'basis_function': body.basis_function,
+            'exchange_correlation': body.exchange_correlation,
+            'charges': body.charges,
+            'spin_multiplicity': body.spin_multiplicity,
+            'solvent_method': body.solvent_method.value,
+            'solvent': body.solvent,
+            'xyz': body.xyz,
+            'molecule_name': body.molecule_name,
+            'cpu_cores': body.cpu_cores,
+            'memory_mb': body.memory_mb,
             'created_at': datetime.now().isoformat()
         }
         
@@ -338,42 +317,34 @@ def get_calculation_details(calculation_id):
 
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['PUT'])
-def update_calculation(calculation_id):
+@validate()
+def update_calculation(calculation_id, body: CalculationUpdateModel):
     """Update calculation metadata (currently only name)."""
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
-        
         file_manager = CalculationFileManager()
         
-        if 'name' in data:
-            new_name = data['name'].strip()
-            if not new_name:
-                return jsonify({'success': False, 'error': 'New name cannot be empty.'}), 400
+        new_name = body.name
+        
+        try:
+            new_id = file_manager.rename_calculation(calculation_id, new_name)
+            if not new_id:
+                return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
             
-            try:
-                new_id = file_manager.rename_calculation(calculation_id, new_name)
-                if not new_id:
-                     return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
-                
-                logger.info(f"Renamed calculation {calculation_id} to {new_id}")
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'message': 'Calculation renamed successfully.',
-                        'old_id': calculation_id,
-                        'new_id': new_id,
-                        'new_name': new_name
-                    }
-                })
-            except FileExistsError as e:
-                return jsonify({'success': False, 'error': str(e)}), 409 # Conflict
-            except Exception as e:
-                logger.error(f"Error renaming calculation {calculation_id}: {e}", exc_info=True)
-                return jsonify({'success': False, 'error': 'Failed to rename calculation.'}), 500
-
-        return jsonify({'success': False, 'error': 'No valid update field provided (e.g., "name").'}), 400
+            logger.info(f"Renamed calculation {calculation_id} to {new_id}")
+            return jsonify({
+                'success': True,
+                'data': {
+                    'message': 'Calculation renamed successfully.',
+                    'old_id': calculation_id,
+                    'new_id': new_id,
+                    'new_name': new_name
+                }
+            })
+        except FileExistsError as e:
+            return jsonify({'success': False, 'error': str(e)}), 409 # Conflict
+        except Exception as e:
+            logger.error(f"Error renaming calculation {calculation_id}: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': 'Failed to rename calculation.'}), 500
 
     except Exception as e:
         logger.error(f"Error updating calculation {calculation_id}: {e}", exc_info=True)
@@ -408,6 +379,20 @@ def delete_calculation(calculation_id):
         logger.error(f"Error deleting calculation {calculation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'Failed to delete calculation.'}), 500
 
+
+@app.errorhandler(ValidationError)
+def validation_error_handler(error):
+    """Handle Pydantic validation errors with consistent error format."""
+    errors = error.errors()
+    error_messages = []
+    for err in errors:
+        field = '.'.join(str(x) for x in err['loc'])
+        message = err['msg']
+        error_messages.append(f"{field}: {message}")
+    
+    combined_message = "Validation failed: " + "; ".join(error_messages)
+    logger.warning(f"Validation error: {combined_message}")
+    return jsonify({'success': False, 'error': combined_message}), 400
 
 @app.errorhandler(404)
 def not_found(error):
