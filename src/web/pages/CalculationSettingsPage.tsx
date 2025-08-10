@@ -9,8 +9,9 @@ import {
     CalculationParameters,
     CalculationInstance
 } from "../types/calculation";
-import { searchPubChem, convertSmilesToXyz, getCalculationDetails } from "../apiClient";
+import { searchPubChem, convertSmilesToXyz } from "../apiClient";
 import type { PubChemSearchResponse, SmilesConvertResponse } from "../apiClient";
+import { useCalculationPolling } from "../hooks/useCalculationPolling";
 
 interface CalculationSettingsPageProps {
     activeCalculation?: CalculationInstance;
@@ -35,43 +36,11 @@ export const CalculationSettingsPage = ({
     const [convertError, setConvertError] = useState<string | null>(null);
     const [localName, setLocalName] = useState("");
 
-    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
-    const stopPolling = () => {
-        if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-        }
-    };
-
-    const startPolling = useCallback((calculationId: string) => {
-        stopPolling(); // To prevent multiple pollers from running
-
-        pollingIntervalRef.current = setInterval(async () => {
-            try {
-                const response = await getCalculationDetails(calculationId);
-                const updatedCalc = response.calculation;
-
-                if (updatedCalc.status === 'completed' || updatedCalc.status === 'error') {
-                    stopPolling();
-                    onCalculationUpdate(updatedCalc); // Update calculation state when completed
-                } else {
-                    onCalculationUpdate(updatedCalc); // Update status locally while running
-                }
-            } catch (error) {
-                console.error(`Polling failed for calculation ${calculationId}:`, error);
-                setCalculationError(`Failed to get calculation status. ${error instanceof Error ? error.message : ''}`);
-                stopPolling();
-            }
-        }, 3000); // Poll every 3 seconds
-    }, [onCalculationUpdate]);
-
-    useEffect(() => {
-        // Stop polling when the component unmounts or the active calculation changes
-        return () => {
-            stopPolling();
-        };
-    }, []);
+    const { startPolling, stopPolling } = useCalculationPolling({
+        calculationId: activeCalculation?.id || null,
+        onUpdate: onCalculationUpdate,
+        onError: (error: string) => setCalculationError(error)
+    });
 
 
     useEffect(() => {
@@ -85,7 +54,7 @@ export const CalculationSettingsPage = ({
             }
             // If calculation is running, start polling for its status
             if (activeCalculation.status === 'running') {
-                startPolling(activeCalculation.id);
+                startPolling();
             } else {
                 stopPolling();
             }
@@ -94,7 +63,7 @@ export const CalculationSettingsPage = ({
             moleculeViewerRef.current?.clearModels();
             stopPolling();
         }
-    }, [activeCalculation, startPolling]);
+    }, [activeCalculation, startPolling, stopPolling]);
 
     const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
         if (!activeCalculation || !onCalculationUpdate) return;
@@ -168,7 +137,7 @@ export const CalculationSettingsPage = ({
 
         try {
             const runningCalculation = await onStartCalculation(finalParams);
-            startPolling(runningCalculation.id);
+            onCalculationUpdate(runningCalculation);
         } catch (error) {
             setCalculationError(error instanceof Error ? error.message : 'An unknown error occurred.');
             if (activeCalculation) {
