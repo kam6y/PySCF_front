@@ -242,6 +242,23 @@ export const CalculationSettingsPage = ({
             : "e.g., aspirin, or 2244";
     };
 
+    const getCalculationButtonText = () => {
+        switch (calculationStatus) {
+            case 'running':
+                return '⚛️ Running...';
+            case 'completed':
+                return '✅ Completed';
+            case 'error':
+                return '❌ Error';
+            default:
+                return '+ Start Calculation';
+        }
+    };
+
+    const getCalculationButtonClass = () => {
+        return `start-calculation-btn ${calculationStatus || 'pending'}`;
+    };
+
     return (
         <div className="calculation-settings-containers">
             <div className="calculation-settings-container">
@@ -295,11 +312,11 @@ export const CalculationSettingsPage = ({
                                  </div>
                              </div>
                             <button
-                                className={`start-calculation-btn ${calculationStatus === 'running' ? 'calculating' : ''}`}
+                                className={getCalculationButtonClass()}
                                 onClick={handleStartCalculation}
-                                disabled={!hasValidMolecule || calculationStatus === 'running'}
+                                disabled={!hasValidMolecule || calculationStatus === 'running' || calculationStatus === 'completed'}
                             >
-                                {calculationStatus === 'running' ? '⚛️ Calculating...' : '+ Start Calculation'}
+                                {getCalculationButtonText()}
                             </button>
                             {calculationError && (
                                 <div className="calculation-error" style={{ marginTop: '10px', color: '#e74c3c', fontSize: '14px' }}>
