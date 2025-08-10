@@ -29,12 +29,14 @@ export const CalculationSettingsPage = ({
     createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
     const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
+    const previousCalculationIdRef = useRef<string | null>(null);
     const [calculationError, setCalculationError] = useState<string | null>(null);
     const [inputMethod, setInputMethod] = useState("pubchem");
     const [pubchemInput, setPubchemInput] = useState("");
     const [isConverting, setIsConverting] = useState(false);
     const [convertError, setConvertError] = useState<string | null>(null);
     const [localName, setLocalName] = useState("");
+    const [isEditingName, setIsEditingName] = useState(false);
 
     const { startPolling, stopPolling } = useCalculationPolling({
         calculationId: activeCalculation?.id || null,
@@ -44,8 +46,18 @@ export const CalculationSettingsPage = ({
 
 
     useEffect(() => {
+        const currentCalculationId = activeCalculation?.id || null;
+        const previousCalculationId = previousCalculationIdRef.current;
+        const isNewCalculation = currentCalculationId !== previousCalculationId;
+
         if (activeCalculation) {
-            setLocalName(activeCalculation.name || activeCalculation.parameters?.molecule_name || "");
+            // Update localName only if:
+            // 1. It's a new calculation (ID changed), OR
+            // 2. User is not currently editing the name
+            if (isNewCalculation || !isEditingName) {
+                setLocalName(activeCalculation.name || activeCalculation.parameters?.molecule_name || "");
+            }
+            
             const xyz = activeCalculation.parameters?.xyz;
             if (xyz && xyz.trim() !== "") {
                 moleculeViewerRef.current?.loadXYZ(xyz);
@@ -62,12 +74,31 @@ export const CalculationSettingsPage = ({
             setLocalName("");
             moleculeViewerRef.current?.clearModels();
             stopPolling();
+            setIsEditingName(false); // Reset editing state when no calculation
         }
-    }, [activeCalculation, startPolling, stopPolling]);
+
+        // Update the previous calculation ID reference
+        previousCalculationIdRef.current = currentCalculationId;
+    }, [activeCalculation, isEditingName, startPolling, stopPolling]);
 
     const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
         if (!activeCalculation || !onCalculationUpdate) return;
-        if (field === 'molecule_name') return;
+        
+        // For molecule_name, we handle it differently via the dedicated name input field
+        // This prevents conflicts between the main name input and parameter updates
+        if (field === 'molecule_name') {
+            // For new calculations, allow direct parameter updates
+            if (activeCalculation.id.startsWith('new-calculation-')) {
+                const stringValue = String(value);
+                const updatedParams = { ...activeCalculation.parameters, [field]: stringValue };
+                onCalculationUpdate({
+                    ...activeCalculation,
+                    name: stringValue,
+                    parameters: updatedParams,
+                });
+            }
+            return;
+        }
 
         const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
         const isParamChange = field !== 'xyz';
@@ -94,30 +125,48 @@ export const CalculationSettingsPage = ({
 
     const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setLocalName(e.target.value);
+        setIsEditingName(true);
     };
 
-    const handleNameBlur = () => {
+    const handleNameBlur = async () => {
         const newName = localName.trim();
 
         if (!activeCalculation || !newName || activeCalculation.name === newName) {
             if (activeCalculation) setLocalName(activeCalculation.name);
+            setIsEditingName(false);
             return;
         }
 
+        // Handle new calculations (temporary IDs)
         if (activeCalculation.id.startsWith('new-calculation-')) {
-            onCalculationUpdate({
-                ...activeCalculation,
-                name: newName,
-                parameters: { ...activeCalculation.parameters, molecule_name: newName },
-            });
+            try {
+                onCalculationUpdate({
+                    ...activeCalculation,
+                    name: newName,
+                    parameters: { ...activeCalculation.parameters, molecule_name: newName },
+                });
+            } catch (error) {
+                console.error('Error updating new calculation name:', error);
+                setLocalName(activeCalculation.name || ''); // Revert on error
+            }
+            setIsEditingName(false);
             return;
         }
 
+        // Handle existing calculations (require confirmation and API call)
         if (window.confirm(`Are you sure you want to rename this calculation to "${newName}"?`)) {
-            onCalculationRename(activeCalculation.id, newName);
+            try {
+                await onCalculationRename(activeCalculation.id, newName);
+                // onCalculationRename should handle the UI updates via the callback chain
+            } catch (error) {
+                console.error('Error renaming calculation:', error);
+                setLocalName(activeCalculation.name || ''); // Revert on error
+                alert(`Failed to rename calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
         } else {
-            setLocalName(activeCalculation.name);
+            setLocalName(activeCalculation.name || '');
         }
+        setIsEditingName(false);
     };
 
     const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -132,8 +181,15 @@ export const CalculationSettingsPage = ({
             return;
         }
 
+        // Ensure molecule name is provided
+        const moleculeName = localName.trim();
+        if (!moleculeName) {
+            setCalculationError("A molecule name is required.");
+            return;
+        }
+
         setCalculationError(null);
-        const finalParams = { ...activeCalculation.parameters, molecule_name: localName.trim() };
+        const finalParams = { ...activeCalculation.parameters, molecule_name: moleculeName };
 
         try {
             const runningCalculation = await onStartCalculation(finalParams);
@@ -188,6 +244,7 @@ export const CalculationSettingsPage = ({
                 }
             }
             
+            // Update local state and calculation parameters
             setLocalName(moleculeName);
             const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
             onCalculationUpdate({
