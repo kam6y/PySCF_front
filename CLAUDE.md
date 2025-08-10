@@ -26,6 +26,10 @@ npm run dev:electron   # Start Electron (requires dist files to exist)
 cd src/python
 uv run python app.py   # Start Flask API server for PubChem integration
 uv run pytest tests/   # Run Python backend tests
+uv sync                # Install/update Python dependencies
+
+# TypeScript compilation and type checking
+npx tsc --noEmit       # Type check without emitting files
 ```
 
 **Development Workflow:**
@@ -43,7 +47,7 @@ uv run pytest tests/   # Run Python backend tests
 - **Main Process** (`src/main.ts`): Creates BrowserWindow with custom titlebar styling, manages Python Flask subprocess, loads the React app
 - **Preload Script** (`src/preload.ts`): Currently minimal, handles secure communication between main and renderer
 - **Renderer Process** (`src/web/`): React application for the UI
-- **Python Backend** (`src/python/`): Flask API server providing PubChem integration and molecular data processing
+- **Python Backend** (`src/python/`): Flask API server providing PubChem integration, SMILES conversion, and molecular data processing
 
 ### Build System
 - Uses Webpack with TypeScript compilation
@@ -67,7 +71,7 @@ uv run pytest tests/   # Run Python backend tests
 - **React 19**: UI framework
 - **TypeScript**: Type safety throughout the codebase
 - **Flask**: Python web framework for backend API
-- **pubchempy**: Python library for PubChem database integration
+- **RDKit**: Chemistry toolkit for molecular data processing and SMILES handling
 - **uv**: Modern Python package manager for dependency management
 
 ### Application Flow
@@ -106,6 +110,9 @@ src/
     │   ├── __init__.py
     │   ├── client.py    # PubChem API client with SSL bypassing
     │   └── parser.py    # XYZ format parsing and conversion utilities
+    ├── SMILES/          # SMILES format conversion and processing
+    │   ├── __init__.py
+    │   └── smiles_converter.py  # RDKit-based SMILES to 3D coordinate conversion
     └── tests/           # Python unit tests and API tests
         ├── __init__.py
         ├── test_pubchem.py      # PubChem client tests
@@ -192,6 +199,7 @@ Custom TypeScript definitions are provided for:
 ### API Endpoints
 - **POST** `/api/pubchem/search`: Search compounds and retrieve XYZ coordinates
 - **POST** `/api/pubchem/validate`: Validate XYZ format strings
+- **POST** `/api/smiles/convert`: Convert SMILES strings to 3D XYZ coordinates using RDKit
 - **GET** `/health`: Health check for Flask server
 
 ### Data Format

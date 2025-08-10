@@ -58,6 +58,7 @@ export const CalculationSettingsPage = () => {
   const [pubchemInput, setPubchemInput] = useState("");
   const [isConverting, setIsConverting] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
+  const [currentSearchType, setCurrentSearchType] = useState<'name' | 'cid' | null>(null);
   const [xyzInputValue, setXyzInputValue] = useState<string>("");
 
   /**
@@ -114,6 +115,7 @@ export const CalculationSettingsPage = () => {
 
     setIsConverting(true);
     setConvertError(null);
+    setCurrentSearchType(null);
 
     try {
       let data;
@@ -121,7 +123,9 @@ export const CalculationSettingsPage = () => {
         data = await fetchAPI('/api/smiles/convert', { smiles: pubchemInput.trim() });
         setMoleculeName(`Molecule from SMILES`);
       } else { // 'pubchem'
-        data = await fetchAPI('/api/pubchem/search', { query: pubchemInput.trim(), search_type: 'name' });
+        const searchType = detectSearchType(pubchemInput.trim());
+        setCurrentSearchType(searchType);
+        data = await fetchAPI('/api/pubchem/search', { query: pubchemInput.trim(), search_type: searchType });
         if (data.compound_info?.iupac_name) {
           setMoleculeName(data.compound_info.iupac_name);
         }
@@ -138,13 +142,22 @@ export const CalculationSettingsPage = () => {
   };
 
   /**
+   * 入力されたクエリがCID（数値のみ）かどうかを判定する。
+   */
+  const detectSearchType = (query: string): 'name' | 'cid' => {
+    const trimmedQuery = query.trim();
+    // 純粋な数値（正の整数）の場合はCIDとして扱う
+    return /^\d+$/.test(trimmedQuery) ? 'cid' : 'name';
+  };
+
+  /**
    * 選択された入力方法に応じて、入力欄のプレースホルダーテキストを返す。
    */
   const getInputPlaceholder = () => {
     if (inputMethod === 'smiles') {
       return "e.g., CCO for ethanol";
     }
-    return "e.g., caffeine, or CID";
+    return "e.g., aspirin, or 2244";
   };
 
 
@@ -347,6 +360,7 @@ export const CalculationSettingsPage = () => {
               onChange={(e) => {
                 setPubchemInput(e.target.value);
                 if (convertError) setConvertError(null);
+                if (currentSearchType) setCurrentSearchType(null);
               }}
               className="pubchem-input"
             />
@@ -358,7 +372,14 @@ export const CalculationSettingsPage = () => {
               {isConverting ? 'Converting...' : 'Convert to XYZ'}
             </button>
           </div>
-          {isConverting && <div className="validation-message validating" style={{ marginTop: '8px' }}>Converting...</div>}
+          {isConverting && (
+            <div className="validation-message validating" style={{ marginTop: '8px' }}>
+              {inputMethod === 'smiles' ? 'Converting SMILES...' : 
+               currentSearchType === 'cid' ? `Searching by CID...` :
+               currentSearchType === 'name' ? `Searching by name...` :
+               'Converting...'}
+            </div>
+          )}
           {convertError && <div className="validation-message invalid" style={{ marginTop: '8px' }}>❌ {convertError}</div>}
         </div>
         <div className="xyz-direct-input">
