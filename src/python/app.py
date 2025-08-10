@@ -31,10 +31,6 @@ CORS(app)  # Enable CORS for cross-origin requests
 # Initialize PubChem client
 pubchem_client = PubChemClient(timeout=30)
 
-# In-memory storage for calculation tasks
-# In a real-world scenario, a more persistent solution like Redis might be used
-calculation_tasks: Dict[str, Dict] = {}
-
 
 def find_free_port():
     """Finds an available TCP port on the system."""
@@ -45,14 +41,13 @@ def find_free_port():
 def run_calculation_in_background(calculation_id: str, parameters: dict):
     """
     Worker function to run the DFT calculation in a separate thread.
-    Updates the global `calculation_tasks` dictionary with status and results.
+    Updates the calculation status and results directly on the file system.
     """
     file_manager = CalculationFileManager()
     calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
 
     try:
-        # Update status to running
-        calculation_tasks[calculation_id] = {'status': 'running', 'result': None}
+        # Update status to running on the file system
         file_manager.save_calculation_status(calc_dir, 'running')
         
         # Initialize calculator
@@ -72,26 +67,22 @@ def run_calculation_in_background(calculation_id: str, parameters: dict):
         # Run calculation
         results = calculator.run_calculation()
         
-        # Save results and update status
+        # Save results and update status to completed
         file_manager.save_calculation_results(calc_dir, results)
         file_manager.save_calculation_status(calc_dir, 'completed')
-        
-        # Update task dictionary
-        calculation_tasks[calculation_id]['status'] = 'completed'
-        calculation_tasks[calculation_id]['result'] = results
         
         logger.info(f"Calculation {calculation_id} completed successfully.")
 
     except (InputError, ConvergenceError, CalculationError) as e:
         logger.error(f"Calculation {calculation_id} failed: {e}")
         file_manager.save_calculation_status(calc_dir, 'error')
-        calculation_tasks[calculation_id]['status'] = 'error'
-        calculation_tasks[calculation_id]['result'] = {'error': str(e)}
+        # エラー情報をresults.jsonに保存することも検討できる
+        file_manager.save_calculation_results(calc_dir, {'error': str(e)})
+
     except Exception as e:
         logger.error(f"Unexpected error in calculation {calculation_id}: {e}", exc_info=True)
         file_manager.save_calculation_status(calc_dir, 'error')
-        calculation_tasks[calculation_id]['status'] = 'error'
-        calculation_tasks[calculation_id]['result'] = {'error': 'An unexpected internal server error occurred.'}
+        file_manager.save_calculation_results(calc_dir, {'error': 'An unexpected internal server error occurred.'})
 
 
 @app.route('/health', methods=['GET'])
@@ -262,7 +253,7 @@ def quantum_calculate():
         initial_instance = {
             'id': calculation_id,
             'name': parameters['molecule_name'],
-            'status': 'running',
+            'status': 'running', # Frontend polls for actual status, so this is fine
             'createdAt': parameters['created_at'],
             'updatedAt': parameters['created_at'],
             'parameters': parameters
@@ -298,24 +289,19 @@ def list_calculations():
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['GET'])
 def get_calculation_details(calculation_id):
-    """Get detailed information about a specific calculation, including status of running jobs."""
+    """
+    Get detailed information about a specific calculation.
+    This now exclusively reads from the file system, making it the single source of truth.
+    """
     try:
-        # Check if the task is currently running
-        if calculation_id in calculation_tasks:
-            task = calculation_tasks[calculation_id]
-            if task['status'] == 'running':
-                return jsonify({'success': True, 'data': {'calculation': {'id': calculation_id, 'status': 'running'}}})
-            elif task['status'] in ['completed', 'error']:
-                # Once finished, remove from memory and let it be read from disk
-                del calculation_tasks[calculation_id]
-
+        
         file_manager = CalculationFileManager()
         calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
 
         if not os.path.isdir(calc_path):
              return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
 
-        # Read calculation data from disk
+        # Read all calculation data from disk
         parameters = file_manager.read_calculation_parameters(calc_path) or {}
         results = file_manager.read_calculation_results(calc_path)
         status = file_manager.read_calculation_status(calc_path)
@@ -409,9 +395,6 @@ def delete_calculation(calculation_id):
         shutil.rmtree(calc_path)
         logger.info(f"Deleted calculation directory: {calc_path}")
         
-        # Remove from tasks if it exists
-        if calculation_id in calculation_tasks:
-            del calculation_tasks[calculation_id]
 
         return jsonify({
             'success': True,
