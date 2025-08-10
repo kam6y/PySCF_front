@@ -23,6 +23,7 @@ export const App = () => {
     deleteCalculation,
     createCalculation,
     updateCalculation,
+    createNewCalculationFromExisting,
   } = useCalculations();
 
   const {
@@ -72,7 +73,7 @@ export const App = () => {
       solvent_method: 'none',
       solvent: '-',
       xyz: '',
-      molecule_name: ''
+      molecule_name: '' // no default name
     };
     const newCalculation = createCalculation('', defaultParams);
     setActiveCalculationById(newCalculation.id);
@@ -89,7 +90,11 @@ export const App = () => {
 
   const handleCalculationRename = async (calculationId: string, newName: string) => {
     try {
-      await updateCalculationName(calculationId, newName);
+      const response = await updateCalculationName(calculationId, newName);
+      // If the active calculation was renamed, update its ID
+      if (activeCalculationId === response.old_id) {
+        setActiveCalculationById(response.new_id);
+      }
     } catch (error) {
       console.error('Failed to rename calculation:', error);
       alert(`Error: Could not rename calculation. ${error instanceof Error ? error.message : ''}`);
@@ -113,6 +118,12 @@ export const App = () => {
     updateCalculation(updatedCalculation);
   };
 
+  const handleCreateNewFromExisting = (originalCalc: CalculationInstance, newParams: CalculationParameters) => {
+    const newInstance = createNewCalculationFromExisting(originalCalc, newParams);
+    setActiveCalculationById(newInstance.id);
+  };
+
+
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'calculation-settings':
@@ -121,7 +132,8 @@ export const App = () => {
             activeCalculation={activeCalculation}
             onCalculationUpdate={handleActiveCalculationUpdate}
             onCalculationSuccess={handleCalculationSuccess}
-            refreshCalculations={refreshCalculations}
+            onCalculationRename={handleCalculationRename}
+            createNewCalculationFromExisting={handleCreateNewFromExisting}
           />
         );
       case 'calculation-results':
@@ -140,7 +152,8 @@ export const App = () => {
             activeCalculation={activeCalculation}
             onCalculationUpdate={handleActiveCalculationUpdate}
             onCalculationSuccess={handleCalculationSuccess}
-            refreshCalculations={refreshCalculations}
+            onCalculationRename={handleCalculationRename}
+            createNewCalculationFromExisting={handleCreateNewFromExisting}
           />
         );
     }
@@ -185,7 +198,6 @@ export const App = () => {
         calculationsLoading={calculationsLoading}
         calculationsError={calculationsError}
         onCalculationSelect={handleCalculationSelect}
-        onCalculationRename={handleCalculationRename}
         onCalculationDelete={handleCalculationDelete}
       />
 

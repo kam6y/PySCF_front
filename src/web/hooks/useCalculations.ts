@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import {
     CalculationInstance,
     CalculationParameters,
+    CalculationListResponse, // <-- インポートを追加
+    RenameResponse,          // <-- インポートを追加
 } from '../types/calculation';
-import { getCalculations } from '../apiClient'; // apiClientからインポート
+import * as apiClient from '../apiClient';
 
 export interface UseCalculationsReturn {
     calculations: CalculationInstance[];
@@ -13,11 +15,11 @@ export interface UseCalculationsReturn {
     error: string | null;
     refreshCalculations: () => Promise<void>;
     getCalculationById: (id: string) => CalculationInstance | undefined;
-    updateCalculationName: (id: string, newName: string) => Promise<void>;
-    updateCalculationStatus: (id: string, status: 'pending' | 'running' | 'completed' | 'error') => Promise<void>;
+    updateCalculationName: (id: string, newName: string) => Promise<RenameResponse>;
     deleteCalculation: (id: string) => Promise<void>;
     createCalculation: (name: string, parameters: CalculationParameters) => CalculationInstance;
     updateCalculation: (updatedCalculation: CalculationInstance) => void;
+    createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: CalculationParameters) => CalculationInstance;
 }
 
 export const useCalculations = (): UseCalculationsReturn => {
@@ -25,16 +27,14 @@ export const useCalculations = (): UseCalculationsReturn => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const convertToCalculationInstance = (backendCalc: any): CalculationInstance => {
-        const dirName = backendCalc.name;
-        
+    const convertToCalculationInstance = (backendCalc: CalculationListResponse['data']['calculations'][0]): CalculationInstance => {
         return {
-            id: dirName,
-            name: dirName.replace(/_\d{8}_\d{6}$/, ''),
-            status: backendCalc.status || (backendCalc.has_checkpoint ? 'completed' : 'pending'),
+            id: backendCalc.id,
+            name: backendCalc.name,
+            status: backendCalc.status,
             createdAt: new Date(backendCalc.date).toISOString(),
             updatedAt: new Date(backendCalc.date).toISOString(),
-            parameters: {} as CalculationParameters, // 詳細は別途読み込み
+            parameters: {} as CalculationParameters, // Details are loaded separately
             results: undefined
         };
     };
@@ -43,11 +43,11 @@ export const useCalculations = (): UseCalculationsReturn => {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await getCalculations();
+            const data = await apiClient.getCalculations();
             const convertedCalculations = data.data.calculations.map(convertToCalculationInstance);
             setCalculations(convertedCalculations);
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : '不明なエラーが発生しました。';
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
             setError(errorMessage);
         } finally {
             setIsLoading(false);
@@ -67,30 +67,26 @@ export const useCalculations = (): UseCalculationsReturn => {
     }, [calculations]);
 
     const updateCalculationName = useCallback(async (id: string, newName: string) => {
-        // TODO: バックエンドAPI呼び出しを実装
-        console.warn("updateCalculationNameはバックエンドと永続化されません。");
-        setCalculations(prev =>
-            prev.map(calc =>
-                calc.id === id ? { ...calc, name: newName, updatedAt: new Date().toISOString() } : calc
-            )
-        );
-    }, []);
-
-    const updateCalculationStatus = useCallback(async (id: string, status: 'pending' | 'running' | 'completed' | 'error') => {
-        // TODO: バックエンドAPI呼び出しを実装
-        console.warn("updateCalculationStatusはバックエンドと永続化されません。");
-        setCalculations(prev =>
-            prev.map(calc =>
-                calc.id === id ? { ...calc, status, updatedAt: new Date().toISOString() } : calc
-            )
-        );
-    }, []);
+        try {
+            const response = await apiClient.updateCalculationName(id, newName);
+            await refreshCalculations();
+            return response;
+        } catch (error) {
+            console.error("Failed to update calculation name:", error);
+            throw error;
+        }
+    }, [refreshCalculations]);
 
     const deleteCalculation = useCallback(async (id: string) => {
-        // TODO: バックエンドAPI呼び出しを実装
-        console.warn("deleteCalculationはバックエンドと永続化されません。");
-        setCalculations(prev => prev.filter(calc => calc.id !== id));
-    }, []);
+        try {
+            await apiClient.deleteCalculation(id);
+            setCalculations(prev => prev.filter(calc => calc.id !== id));
+        } catch (error) {
+            console.error("Failed to delete calculation:", error);
+            await refreshCalculations();
+            throw error;
+        }
+    }, [refreshCalculations]);
 
     const createCalculation = useCallback((name: string, parameters: CalculationParameters): CalculationInstance => {
         const now = new Date().toISOString();
@@ -98,7 +94,7 @@ export const useCalculations = (): UseCalculationsReturn => {
         
         const newCalculation: CalculationInstance = {
             id,
-            name,
+            name: name || "New Calculation",
             status: 'pending',
             createdAt: now,
             updatedAt: now,
@@ -106,6 +102,26 @@ export const useCalculations = (): UseCalculationsReturn => {
             results: undefined
         };
         
+        setCalculations(prev => [newCalculation, ...prev]);
+        return newCalculation;
+    }, []);
+
+    const createNewCalculationFromExisting = useCallback((originalCalc: CalculationInstance, newParams: CalculationParameters): CalculationInstance => {
+        const now = new Date().toISOString();
+        const id = `new-calculation-${Date.now()}`;
+
+        const newCalculation: CalculationInstance = {
+            ...originalCalc,
+            id,
+            status: 'pending',
+            createdAt: now,
+            updatedAt: now,
+            parameters: newParams,
+            results: undefined,
+            workingDirectory: undefined,
+            errorMessage: undefined,
+        };
+
         setCalculations(prev => [newCalculation, ...prev]);
         return newCalculation;
     }, []);
@@ -118,8 +134,12 @@ export const useCalculations = (): UseCalculationsReturn => {
                     calc.id === updatedCalculation.id ? updatedCalculation : calc
                 );
             }
-            // 新規計算（'pending'から'completed'になった場合など）の処理
-            return [updatedCalculation, ...prevCalculations.filter(c => !c.id.startsWith('new-calculation-'))];
+            
+            const tempId = prevCalculations.find(c => c.id.startsWith('new-calculation-'))?.id;
+            if (tempId) {
+                return [updatedCalculation, ...prevCalculations.filter(c => c.id !== tempId)];
+            }
+            return [updatedCalculation, ...prevCalculations];
         });
     }, []);
 
@@ -130,9 +150,9 @@ export const useCalculations = (): UseCalculationsReturn => {
         refreshCalculations,
         getCalculationById,
         updateCalculationName,
-        updateCalculationStatus,
         deleteCalculation,
         createCalculation,
         updateCalculation,
+        createNewCalculationFromExisting,
     };
 };

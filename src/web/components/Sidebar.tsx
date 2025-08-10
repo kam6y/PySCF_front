@@ -39,7 +39,6 @@ interface SidebarProps {
   calculationsLoading: boolean;
   calculationsError: string | null;
   onCalculationSelect: (calculationId: string) => void;
-  onCalculationRename: (calculationId: string, newName: string) => Promise<void>;
   onCalculationDelete: (calculationId: string) => Promise<void>;
 }
 
@@ -51,7 +50,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   calculationsLoading, 
   calculationsError, 
   onCalculationSelect, 
-  onCalculationRename, 
   onCalculationDelete 
 }) => {
   return (
@@ -120,18 +118,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </div>
                   </div>
                   <div className="calculation-actions">
-                    <button 
-                      className="rename-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const newName = prompt('Enter new name:', calculation.name);
-                        if (newName && newName !== calculation.name) {
-                          onCalculationRename(calculation.id, newName);
-                        }
-                      }}
-                    >
-                      ✏️
-                    </button>
                     <button 
                       className="delete-btn"
                       onClick={(e) => {

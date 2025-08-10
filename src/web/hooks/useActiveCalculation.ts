@@ -22,7 +22,12 @@ export const useActiveCalculation = (
 ): UseActiveCalculationReturn => {
   const [activeCalculationId, setActiveCalculationId] = useState<string | null>(() => {
     try {
-      return localStorage.getItem(ACTIVE_CALCULATION_KEY);
+      const storedId = localStorage.getItem(ACTIVE_CALCULATION_KEY);
+      // Guard against invalid strings from localStorage
+      if (storedId && storedId !== "undefined" && storedId !== "null") {
+        return storedId;
+      }
+      return null;
     } catch {
       return null;
     }
@@ -68,7 +73,7 @@ export const useActiveCalculation = (
       
       return detailedCalculation;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '不明なエラーが発生しました。';
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
       setDetailsError(errorMessage);
       console.error('Failed to load calculation details:', err);
       return null;
@@ -89,12 +94,16 @@ export const useActiveCalculation = (
     setActiveCalculationId(null);
   }, []);
 
+  // Sync active ID if it's no longer in the main list
   useEffect(() => {
-    if (activeCalculationId && !calculations.some(calc => calc.id === activeCalculationId)) {
-      setActiveCalculationId(calculations.length > 0 ? calculations[0].id : null);
+    if (activeCalculationId && calculations.length > 0 && !calculations.some(calc => calc.id === activeCalculationId)) {
+      setActiveCalculationId(calculations[0].id);
+    } else if (activeCalculationId && calculations.length === 0) {
+        setActiveCalculationId(null);
     }
   }, [activeCalculationId, calculations]);
 
+  // Fetch details when active ID changes
   useEffect(() => {
     if (activeCalculationId && !detailedCalculations.has(activeCalculationId)) {
       loadCalculationDetails(activeCalculationId);

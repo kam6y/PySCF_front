@@ -116,9 +116,11 @@ class DFTCalculator(BaseCalculator):
                 'optimized_geometry': self._geometry_to_xyz_string()
             })
             
-            # Save calculation files and information
+            # ▼▼▼ エラー修正箇所 ▼▼▼
+            # 'save_calculation_info' -> 'save_calculation_results' に修正
+            # 'save_geometry'の呼び出しは、対応する関数をfile_managerに追加するため、このままにします
             if self.keep_files:
-                self.file_manager.save_calculation_info(self.working_dir, self.results)
+                self.file_manager.save_calculation_results(self.working_dir, self.results)
                 self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
                 print(f"Calculation files saved to: {self.working_dir}")
             

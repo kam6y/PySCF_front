@@ -13,16 +13,18 @@ import type { PubChemSearchResponse, SmilesConvertResponse } from "../apiClient"
 
 interface CalculationSettingsPageProps {
     activeCalculation?: CalculationInstance;
-    onCalculationUpdate?: (updatedCalculation: CalculationInstance) => void;
-    onCalculationSuccess?: (completedCalculation: CalculationInstance) => void;
-    refreshCalculations?: () => void;
+    onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
+    onCalculationSuccess: (completedCalculation: CalculationInstance) => void;
+    onCalculationRename: (id: string, newName: string) => Promise<void>;
+    createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: CalculationParameters) => void;
 }
 
 export const CalculationSettingsPage = ({
     activeCalculation,
     onCalculationUpdate,
     onCalculationSuccess,
-    refreshCalculations
+    onCalculationRename,
+    createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
     const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
     const [calculationStatus, setCalculationStatus] = useState<CalculationStatus>('idle');
@@ -39,23 +41,41 @@ export const CalculationSettingsPage = ({
         } else {
             moleculeViewerRef.current?.clearModels();
         }
-    }, [activeCalculation?.parameters?.xyz]);
+    }, [activeCalculation?.id, activeCalculation?.parameters?.xyz]); // Depend on ID to reload viewer for new instances
 
     const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
-        if (activeCalculation && onCalculationUpdate) {
-            const updatedParams = { ...activeCalculation.parameters, [field]: value };
+        if (!activeCalculation || !onCalculationUpdate) return;
+
+        const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
+        const isParamChange = field !== 'molecule_name' && field !== 'xyz';
+        const currentParams = activeCalculation.parameters;
+        
+        // If calculation is completed and a parameter (not name/xyz) is changed, create a new derived calculation
+        if (isCompleted && isParamChange) {
+            const newParams = { ...currentParams, [field]: value };
+            createNewCalculationFromExisting(activeCalculation, newParams);
+        } else {
+            // Otherwise, just update the current active calculation's state
+            const updatedParams = { ...currentParams, [field]: value };
             onCalculationUpdate({
                 ...activeCalculation,
                 parameters: updatedParams,
             });
         }
-    }, [activeCalculation, onCalculationUpdate]);
+    }, [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]);
     
     const handleXYZChange = useCallback((xyzData: string, isValid: boolean) => {
-        if (isValid) {
-            handleParamChange('xyz', xyzData);
+        if (isValid && activeCalculation) {
+            const updatedParams = { ...activeCalculation.parameters, xyz: xyzData };
+            onCalculationUpdate({ ...activeCalculation, parameters: updatedParams });
         }
-    }, [handleParamChange]);
+    }, [activeCalculation, onCalculationUpdate]);
+
+    const handleNameBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        if (activeCalculation && activeCalculation.name !== e.target.value.trim() && e.target.value.trim()) {
+            onCalculationRename(activeCalculation.id, e.target.value.trim());
+        }
+    };
     
     if (!activeCalculation) {
         return (
@@ -107,9 +127,6 @@ export const CalculationSettingsPage = ({
         } catch (error) {
             setCalculationStatus('error');
             setCalculationError(error instanceof Error ? error.message : 'An unknown error occurred.');
-            if (refreshCalculations) {
-                refreshCalculations();
-            }
         }
     };
 
@@ -128,23 +145,19 @@ export const CalculationSettingsPage = ({
                 data = await searchPubChem(pubchemInput.trim(), searchType);
             }
 
-            if (onCalculationUpdate) {
-                let moleculeName = params.molecule_name;
-                
-                if ('compound_info' in data && data.compound_info?.iupac_name) {
-                    moleculeName = data.compound_info.iupac_name;
-                } else if (inputMethod === 'smiles') {
-                    moleculeName = 'From SMILES';
-                } else {
-                    moleculeName = pubchemInput.trim();
-                }
-                
-                const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
-                onCalculationUpdate({
-                    ...activeCalculation,
-                    parameters: updatedParams,
-                });
+            let moleculeName = params.molecule_name;
+            if ('compound_info' in data && data.compound_info?.iupac_name) {
+                moleculeName = data.compound_info.iupac_name;
+            } else {
+                moleculeName = pubchemInput.trim();
             }
+            
+            const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
+            onCalculationUpdate({
+                ...activeCalculation,
+                parameters: updatedParams,
+            });
+
         } catch (error) {
             setConvertError(error instanceof Error ? error.message : 'Unknown error during conversion.');
         } finally {

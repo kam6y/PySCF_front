@@ -37,7 +37,6 @@ class CalculationFileManager:
         
         return str(calc_dir)
 
-    # --- 新規追加: 計算の名前変更とJSON更新を行う関数 ---
     def rename_calculation(self, old_id: str, new_name: str) -> Optional[str]:
         """Renames a calculation directory and updates its metadata."""
         old_path = self.base_dir / old_id
@@ -45,10 +44,11 @@ class CalculationFileManager:
             return None
 
         # タイムスタンプ部分を維持しつつ、新しいディレクトリ名を生成
+        # ▼▼▼ エラー修正箇所 ▼▼▼
         timestamp_match = re.search(r'_(\d{8}_\d{6})$', old_id)
         timestamp = timestamp_match.group(1) if timestamp_match else datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        clean_new_name = "".join(c for c in new_name if c.isalnum() or c in "._-").strip()
+        clean_new_name = "".join(c for c in new_name if c.isalnum() or c in "._-").strip() or "unnamed"
         new_id = f"{clean_new_name}_{timestamp}"
         new_path = self.base_dir / new_id
 
@@ -77,15 +77,15 @@ class CalculationFileManager:
         calculations = []
         for item in self.base_dir.iterdir():
             if item.is_dir():
-                # --- 変更点: JSONから名前を取得し、なければディレクトリ名から推測 ---
                 params = self.read_calculation_parameters(str(item))
-                display_name = params.get('molecule_name', item.name.replace(r'_(\d{8}_\d{6})$', '')) if params else item.name.replace(r'_(\d{8}_\d{6})$', '')
-
+                # Use molecule_name from JSON if available, otherwise parse from directory name
+                # ▼▼▼ エラー修正箇所 ▼▼▼
+                display_name = params.get('molecule_name', re.sub(r'_(\d{8}_\d{6})$', '', item.name)) if params else re.sub(r'_(\d{8}_\d{6})$', '', item.name)
                 status = self.read_calculation_status(str(item))
                 
                 calculations.append({
-                    'name': item.name, # `id`としてディレクトリ名を使用
-                    'displayName': display_name, # UI表示用の名前
+                    'id': item.name, # Use directory name as the unique ID
+                    'name': display_name, # Use this for display purposes
                     'path': str(item),
                     'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
                     'has_checkpoint': (item / "calculation.chk").exists(),
@@ -94,7 +94,14 @@ class CalculationFileManager:
         
         return sorted(calculations, key=lambda x: x['date'], reverse=True)
 
-    # ... (以降の関数は変更なし) ...
+    def save_geometry(self, calc_dir: str, xyz_string: str, filename: str = "optimized_geometry.xyz"):
+        """Save geometry to an XYZ file."""
+        if not xyz_string:
+            return
+        geom_file = Path(calc_dir) / filename
+        with open(geom_file, 'w') as f:
+            f.write(xyz_string)
+
     def get_base_directory(self) -> str:
         """Get the base directory path."""
         return str(self.base_dir)
@@ -151,7 +158,11 @@ class CalculationFileManager:
         """Read calculation status from JSON file."""
         status_file = Path(calc_dir) / "status.json"
         if not status_file.exists():
-            return 'completed' if self.file_exists(calc_dir, 'calculation.chk') else 'pending'
+            if self.file_exists(calc_dir, 'results.json'):
+                return 'completed'
+            if self.file_exists(calc_dir, 'parameters.json'):
+                 return 'pending'
+            return 'error' 
         try:
             with open(status_file, 'r') as f:
                 return json.load(f).get('status', 'pending')

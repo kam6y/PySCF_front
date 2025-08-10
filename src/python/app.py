@@ -6,7 +6,7 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from pubchem.client import PubChemClient, PubChemError
+from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, CalculationError, ConvergenceError, InputError
@@ -172,7 +172,7 @@ def quantum_calculate():
             return jsonify({'success': False, 'error': f'Calculation method "{calc_method}" not yet supported. Only DFT is available.'}), 400
         
         # Extract molecule name for file organization
-        molecule_name = data.get('molecule_name', '').strip() or None
+        molecule_name = data.get('molecule_name', '').strip() or "Unnamed Calculation"
         
         # Initialize file manager and create calculation directory
         file_manager = CalculationFileManager()
@@ -241,25 +241,21 @@ def quantum_calculate():
         })
         
     except InputError as e:
-        # Update status to error if we have a calculation directory
         if file_manager and calc_dir:
             file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Input validation error: {e}")
         return jsonify({'success': False, 'error': str(e), 'calculation_id': calculation_id}), 400
     except ConvergenceError as e:
-        # Update status to error if we have a calculation directory
         if file_manager and calc_dir:
             file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Calculation convergence error: {e}")
         return jsonify({'success': False, 'error': f'Calculation failed to converge: {str(e)}', 'calculation_id': calculation_id}), 422
     except CalculationError as e:
-        # Update status to error if we have a calculation directory
         if file_manager and calc_dir:
             file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Calculation error: {e}")
         return jsonify({'success': False, 'error': f'Calculation error: {str(e)}', 'calculation_id': calculation_id}), 500
     except Exception as e:
-        # Update status to error if we have a calculation directory
         if file_manager and calc_dir:
             file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Unexpected error in quantum calculation: {e}", exc_info=True)
@@ -292,33 +288,28 @@ def get_calculation_details(calculation_id):
     """Get detailed information about a specific calculation."""
     try:
         file_manager = CalculationFileManager()
-        
-        # Find the calculation directory
-        calculations = file_manager.list_calculations()
-        target_calc = None
-        for calc in calculations:
-            if calc['name'] == calculation_id:
-                target_calc = calc
-                break
-        
-        if not target_calc:
-            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
-        
+        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+
+        if not os.path.isdir(calc_path):
+             return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+
         # Read calculation data
-        calc_info = file_manager.read_calculation_info(target_calc['path'])
-        parameters = file_manager.read_calculation_parameters(target_calc['path'])
-        results = file_manager.read_calculation_results(target_calc['path'])
-        status = file_manager.read_calculation_status(target_calc['path'])
+        parameters = file_manager.read_calculation_parameters(calc_path) or {}
+        results = file_manager.read_calculation_results(calc_path)
+        status = file_manager.read_calculation_status(calc_path)
         
+        display_name = parameters.get('molecule_name', calculation_id.rsplit('_', 1)[0])
+        creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
+
         # Create CalculationInstance compatible structure
         calculation_instance = {
             'id': calculation_id,
-            'name': calculation_id.replace(r'_\d{8}_\d{6}$', ''),  # Remove timestamp suffix for display
+            'name': display_name,
             'status': status,
-            'createdAt': target_calc['date'].isoformat() if hasattr(target_calc['date'], 'isoformat') else str(target_calc['date']),
-            'updatedAt': target_calc['date'].isoformat() if hasattr(target_calc['date'], 'isoformat') else str(target_calc['date']),
-            'workingDirectory': target_calc['path'],
-            'parameters': parameters or {},
+            'createdAt': creation_date,
+            'updatedAt': datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat(),
+            'workingDirectory': calc_path,
+            'parameters': parameters,
             'results': results
         }
         
@@ -327,11 +318,9 @@ def get_calculation_details(calculation_id):
             'data': {
                 'calculation': calculation_instance,
                 'files': {
-                    'checkpoint_exists': target_calc['has_checkpoint'],
-                    'info_file_exists': calc_info is not None,
+                    'checkpoint_exists': file_manager.file_exists(calc_path, 'calculation.chk'),
                     'parameters_file_exists': parameters is not None,
                     'results_file_exists': results is not None,
-                    'geometry_file_exists': file_manager.file_exists(target_calc['path'], 'optimized_geometry.xyz')
                 }
             }
         })
@@ -343,7 +332,7 @@ def get_calculation_details(calculation_id):
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['PUT'])
 def update_calculation(calculation_id):
-    """Update calculation metadata (name, status, etc.)."""
+    """Update calculation metadata (currently only name)."""
     try:
         data = request.get_json()
         if not data:
@@ -351,38 +340,34 @@ def update_calculation(calculation_id):
         
         file_manager = CalculationFileManager()
         
-        # Find the calculation directory
-        calculations = file_manager.list_calculations()
-        target_calc = None
-        for calc in calculations:
-            if calc['name'] == calculation_id:
-                target_calc = calc
-                break
-        
-        if not target_calc:
-            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
-        
-        # Handle status updates
-        if 'status' in data:
-            new_status = data['status']
-            if new_status in ['pending', 'running', 'completed', 'error']:
-                file_manager.save_calculation_status(target_calc['path'], new_status)
-                logger.info(f"Updated status for calculation {calculation_id} to {new_status}")
-        
-        # Handle name updates (placeholder for now)
         if 'name' in data:
-            new_name = data['name']
-            logger.info(f"Name update request for calculation {calculation_id} to {new_name} (directory rename not implemented)")
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'message': 'Calculation updated successfully',
-                'calculation_id': calculation_id,
-                'updated_fields': list(data.keys())
-            }
-        })
-        
+            new_name = data['name'].strip()
+            if not new_name:
+                return jsonify({'success': False, 'error': 'New name cannot be empty.'}), 400
+            
+            try:
+                new_id = file_manager.rename_calculation(calculation_id, new_name)
+                if not new_id:
+                     return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+                
+                logger.info(f"Renamed calculation {calculation_id} to {new_id}")
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'message': 'Calculation renamed successfully.',
+                        'old_id': calculation_id,
+                        'new_id': new_id,
+                        'new_name': new_name
+                    }
+                })
+            except FileExistsError as e:
+                return jsonify({'success': False, 'error': str(e)}), 409 # Conflict
+            except Exception as e:
+                logger.error(f"Error renaming calculation {calculation_id}: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': 'Failed to rename calculation.'}), 500
+
+        return jsonify({'success': False, 'error': 'No valid update field provided (e.g., "name").'}), 400
+
     except Exception as e:
         logger.error(f"Error updating calculation {calculation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'Failed to update calculation.'}), 500
@@ -396,28 +381,20 @@ def delete_calculation(calculation_id):
         
         file_manager = CalculationFileManager()
         
-        # Find the calculation directory
-        calculations = file_manager.list_calculations()
-        target_calc = None
-        for calc in calculations:
-            if calc['name'] == calculation_id:
-                target_calc = calc
-                break
-        
-        if not target_calc:
+        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+
+        if not os.path.isdir(calc_path):
             return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
-        
+
         # Delete the calculation directory
-        calc_path = target_calc['path']
-        if os.path.exists(calc_path):
-            shutil.rmtree(calc_path)
-            logger.info(f"Deleted calculation directory: {calc_path}")
+        shutil.rmtree(calc_path)
+        logger.info(f"Deleted calculation directory: {calc_path}")
         
         return jsonify({
             'success': True,
             'data': {
                 'message': f'Calculation "{calculation_id}" has been deleted successfully',
-                'deleted_path': calc_path
+                'deleted_id': calculation_id
             }
         })
         
