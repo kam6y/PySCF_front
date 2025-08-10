@@ -1,6 +1,36 @@
 import React from "react";
 import { CalculationInstance } from "../types/calculation";
 
+// Status display configuration
+const STATUS_CONFIG = {
+  pending: {
+    icon: '⏳',
+    label: 'Pending',
+    className: 'status-pending',
+    color: '#ffa500'
+  },
+  running: {
+    icon: '⚛️',
+    label: 'Running',
+    className: 'status-running',
+    color: '#2196f3'
+  },
+  completed: {
+    icon: '✅',
+    label: 'Completed',
+    className: 'status-completed',
+    color: '#4caf50'
+  },
+  error: {
+    icon: '❌',
+    label: 'Error',
+    className: 'status-error',
+    color: '#f44336'
+  }
+} as const;
+
+type StatusType = keyof typeof STATUS_CONFIG;
+
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -67,10 +97,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="calculation-info">
                     <div className="calculation-name">{calculation.name}</div>
-                    <div className="calculation-status">
-                      <span className={`status-badge ${calculation.status}`}>
-                        {calculation.status}
-                      </span>
+                    <div className="calculation-meta">
+                      <div className="calculation-date">
+                        {new Date(calculation.updatedAt).toLocaleDateString()}
+                      </div>
+                      <div className="calculation-status">
+                        <span 
+                          className={`status-badge ${STATUS_CONFIG[calculation.status as StatusType]?.className || 'status-unknown'}`}
+                          style={{
+                            color: STATUS_CONFIG[calculation.status as StatusType]?.color || '#666',
+                            animation: calculation.status === 'running' ? 'pulse 2s infinite' : 'none'
+                          }}
+                        >
+                          <span className="status-icon">
+                            {STATUS_CONFIG[calculation.status as StatusType]?.icon || '❓'}
+                          </span>
+                          <span className="status-label">
+                            {STATUS_CONFIG[calculation.status as StatusType]?.label || calculation.status}
+                          </span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <div className="calculation-actions">

@@ -2,6 +2,7 @@
 
 import logging
 import os
+from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
@@ -139,6 +140,10 @@ def validate_xyz_endpoint():
 @app.route('/api/quantum/calculate', methods=['POST'])
 def quantum_calculate():
     """Perform quantum chemistry calculation using PySCF."""
+    calculation_id = None
+    file_manager = None
+    calc_dir = None
+    
     try:
         data = request.get_json()
         if not data:
@@ -167,8 +172,33 @@ def quantum_calculate():
         # Extract molecule name for file organization
         molecule_name = data.get('molecule_name', '').strip() or None
         
-        # Initialize calculator with persistent file storage
-        calculator = DFTCalculator(keep_files=True, molecule_name=molecule_name)
+        # Initialize file manager and create calculation directory
+        file_manager = CalculationFileManager()
+        calc_dir = file_manager.create_calculation_dir(molecule_name)
+        calculation_id = os.path.basename(calc_dir)
+        
+        # Save calculation parameters
+        parameters = {
+            'calculation_method': calc_method,
+            'basis_function': basis,
+            'exchange_correlation': xc_functional,
+            'charges': charge,
+            'spin_multiplicity': spin_mult,
+            'solvent_method': data.get('solvent_method', 'none'),
+            'solvent': data.get('solvent', '-'),
+            'xyz': xyz_data,
+            'molecule_name': molecule_name,
+            'cpu_cores': data.get('cpu_cores'),
+            'memory_mb': data.get('memory_mb'),
+            'created_at': datetime.now().isoformat()
+        }
+        file_manager.save_calculation_parameters(calc_dir, parameters)
+        
+        # Set initial status to running
+        file_manager.save_calculation_status(calc_dir, 'running')
+        
+        # Initialize calculator with the pre-created directory
+        calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=molecule_name)
         
         # Parse XYZ and setup calculation
         atoms = calculator.parse_xyz(xyz_data)
@@ -184,6 +214,10 @@ def quantum_calculate():
         # Run calculation
         results = calculator.run_calculation()
         
+        # Save results and update status
+        file_manager.save_calculation_results(calc_dir, results)
+        file_manager.save_calculation_status(calc_dir, 'completed')
+        
         # Keep files for analysis (don't clean up immediately)
         calculator.cleanup(keep_files=True)
         
@@ -192,6 +226,7 @@ def quantum_calculate():
         return jsonify({
             'success': True,
             'data': {
+                'calculation_id': calculation_id,
                 'calculation_results': results,
                 'calculation_parameters': {
                     'method': calc_method,
@@ -204,17 +239,29 @@ def quantum_calculate():
         })
         
     except InputError as e:
+        # Update status to error if we have a calculation directory
+        if file_manager and calc_dir:
+            file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Input validation error: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 400
+        return jsonify({'success': False, 'error': str(e), 'calculation_id': calculation_id}), 400
     except ConvergenceError as e:
+        # Update status to error if we have a calculation directory
+        if file_manager and calc_dir:
+            file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Calculation convergence error: {e}")
-        return jsonify({'success': False, 'error': f'Calculation failed to converge: {str(e)}'}), 422
+        return jsonify({'success': False, 'error': f'Calculation failed to converge: {str(e)}', 'calculation_id': calculation_id}), 422
     except CalculationError as e:
+        # Update status to error if we have a calculation directory
+        if file_manager and calc_dir:
+            file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Calculation error: {e}")
-        return jsonify({'success': False, 'error': f'Calculation error: {str(e)}'}), 500
+        return jsonify({'success': False, 'error': f'Calculation error: {str(e)}', 'calculation_id': calculation_id}), 500
     except Exception as e:
+        # Update status to error if we have a calculation directory
+        if file_manager and calc_dir:
+            file_manager.save_calculation_status(calc_dir, 'error')
         logger.error(f"Unexpected error in quantum calculation: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred during calculation.'}), 500
+        return jsonify({'success': False, 'error': 'An internal server error occurred during calculation.', 'calculation_id': calculation_id}), 500
 
 
 @app.route('/api/quantum/calculations', methods=['GET'])
@@ -255,23 +302,33 @@ def get_calculation_details(calculation_id):
         if not target_calc:
             return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
         
-        # Read calculation info if available
+        # Read calculation data
         calc_info = file_manager.read_calculation_info(target_calc['path'])
+        parameters = file_manager.read_calculation_parameters(target_calc['path'])
+        results = file_manager.read_calculation_results(target_calc['path'])
+        status = file_manager.read_calculation_status(target_calc['path'])
+        
+        # Create CalculationInstance compatible structure
+        calculation_instance = {
+            'id': calculation_id,
+            'name': calculation_id.replace(r'_\d{8}_\d{6}$', ''),  # Remove timestamp suffix for display
+            'status': status,
+            'createdAt': target_calc['date'].isoformat() if hasattr(target_calc['date'], 'isoformat') else str(target_calc['date']),
+            'updatedAt': target_calc['date'].isoformat() if hasattr(target_calc['date'], 'isoformat') else str(target_calc['date']),
+            'workingDirectory': target_calc['path'],
+            'parameters': parameters or {},
+            'results': results
+        }
         
         return jsonify({
             'success': True,
             'data': {
-                'calculation': {
-                    'id': calculation_id,
-                    'name': calculation_id.replace('_\\d{8}_\\d{6}$', ''),  # Remove timestamp suffix
-                    'path': target_calc['path'],
-                    'date': target_calc['date'],
-                    'has_checkpoint': target_calc['has_checkpoint'],
-                    'info': calc_info
-                },
+                'calculation': calculation_instance,
                 'files': {
                     'checkpoint_exists': target_calc['has_checkpoint'],
                     'info_file_exists': calc_info is not None,
+                    'parameters_file_exists': parameters is not None,
+                    'results_file_exists': results is not None,
                     'geometry_file_exists': file_manager.file_exists(target_calc['path'], 'optimized_geometry.xyz')
                 }
             }
@@ -284,26 +341,43 @@ def get_calculation_details(calculation_id):
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['PUT'])
 def update_calculation(calculation_id):
-    """Update calculation metadata (name, etc.)."""
+    """Update calculation metadata (name, status, etc.)."""
     try:
         data = request.get_json()
         if not data:
             return jsonify({'success': False, 'error': 'Invalid request: No JSON data provided.'}), 400
         
-        # For now, this is a placeholder since renaming directories is complex
-        # We'll return success but note that actual renaming isn't implemented
-        new_name = data.get('name', '')
-        if not new_name:
-            return jsonify({'success': False, 'error': 'New name is required.'}), 400
+        file_manager = CalculationFileManager()
         
-        logger.info(f"Update request for calculation {calculation_id} with new name: {new_name}")
+        # Find the calculation directory
+        calculations = file_manager.list_calculations()
+        target_calc = None
+        for calc in calculations:
+            if calc['name'] == calculation_id:
+                target_calc = calc
+                break
+        
+        if not target_calc:
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Handle status updates
+        if 'status' in data:
+            new_status = data['status']
+            if new_status in ['pending', 'running', 'completed', 'error']:
+                file_manager.save_calculation_status(target_calc['path'], new_status)
+                logger.info(f"Updated status for calculation {calculation_id} to {new_status}")
+        
+        # Handle name updates (placeholder for now)
+        if 'name' in data:
+            new_name = data['name']
+            logger.info(f"Name update request for calculation {calculation_id} to {new_name} (directory rename not implemented)")
         
         return jsonify({
             'success': True,
             'data': {
-                'message': f'Calculation name update noted (actual filesystem rename not implemented)',
+                'message': 'Calculation updated successfully',
                 'calculation_id': calculation_id,
-                'new_name': new_name
+                'updated_fields': list(data.keys())
             }
         })
         

@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import json
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -83,13 +84,21 @@ class CalculationFileManager:
         calculations = []
         for item in self.base_dir.iterdir():
             if item.is_dir():
-                info_file = item / "calculation_info.txt"
-                if info_file.exists():
+                # Check if this looks like a calculation directory
+                has_info = (item / "calculation_info.txt").exists()
+                has_params = (item / "parameters.json").exists()
+                has_status = (item / "status.json").exists()
+                
+                if has_info or has_params or has_status:
+                    # Get calculation status
+                    status = self.read_calculation_status(str(item))
+                    
                     calculations.append({
                         'name': item.name,
                         'path': str(item),
                         'date': datetime.fromtimestamp(item.stat().st_mtime),
-                        'has_checkpoint': (item / "calculation.chk").exists()
+                        'has_checkpoint': (item / "calculation.chk").exists(),
+                        'status': status
                     })
         
         return sorted(calculations, key=lambda x: x['date'], reverse=True)
@@ -129,3 +138,66 @@ class CalculationFileManager:
         """Check if a specific file exists in the calculation directory."""
         file_path = Path(calc_dir) / filename
         return file_path.exists()
+    
+    def save_calculation_parameters(self, calc_dir: str, parameters: Dict[str, Any]) -> None:
+        """Save calculation parameters to JSON file."""
+        params_file = Path(calc_dir) / "parameters.json"
+        with open(params_file, 'w') as f:
+            json.dump(parameters, f, indent=2, default=str)
+    
+    def save_calculation_results(self, calc_dir: str, results: Dict[str, Any]) -> None:
+        """Save calculation results to JSON file."""
+        results_file = Path(calc_dir) / "results.json"
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=2, default=str)
+    
+    def save_calculation_status(self, calc_dir: str, status: str) -> None:
+        """Save calculation status to JSON file."""
+        status_file = Path(calc_dir) / "status.json"
+        status_data = {
+            'status': status,
+            'updated_at': datetime.now().isoformat()
+        }
+        with open(status_file, 'w') as f:
+            json.dump(status_data, f, indent=2)
+    
+    def read_calculation_parameters(self, calc_dir: str) -> Optional[Dict[str, Any]]:
+        """Read calculation parameters from JSON file."""
+        params_file = Path(calc_dir) / "parameters.json"
+        
+        if not params_file.exists():
+            return None
+        
+        try:
+            with open(params_file, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return None
+    
+    def read_calculation_results(self, calc_dir: str) -> Optional[Dict[str, Any]]:
+        """Read calculation results from JSON file."""
+        results_file = Path(calc_dir) / "results.json"
+        
+        if not results_file.exists():
+            return None
+        
+        try:
+            with open(results_file, 'r') as f:
+                return json.load(f)
+        except Exception:
+            return None
+    
+    def read_calculation_status(self, calc_dir: str) -> str:
+        """Read calculation status from JSON file."""
+        status_file = Path(calc_dir) / "status.json"
+        
+        if not status_file.exists():
+            # Fall back to checking checkpoint file for backward compatibility
+            return 'completed' if self.file_exists(calc_dir, 'calculation.chk') else 'pending'
+        
+        try:
+            with open(status_file, 'r') as f:
+                status_data = json.load(f)
+                return status_data.get('status', 'pending')
+        except Exception:
+            return 'pending'

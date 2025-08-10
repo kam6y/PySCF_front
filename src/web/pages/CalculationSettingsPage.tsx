@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { MoleculeViewer, MoleculeViewerRef } from "../components/MoleculeViewer";
 import { XYZInput } from "../components/XYZInput";
 import { StyleControls } from "../components/StyleControls";
@@ -13,6 +13,7 @@ import {
 interface CalculationSettingsPageProps {
   activeCalculation?: CalculationInstance;
   onCalculationUpdate?: (updatedCalculation: CalculationInstance) => void;
+  onCalculationStatusUpdate?: (calculationId: string, status: 'pending' | 'running' | 'completed' | 'error') => Promise<void>;
 }
 
 // --- API通信と定数 ---
@@ -46,7 +47,8 @@ const fetchAPI = async (endpoint: string, body: object) => {
 
 export const CalculationSettingsPage = ({ 
   activeCalculation, 
-  onCalculationUpdate 
+  onCalculationUpdate,
+  onCalculationStatusUpdate
 }: CalculationSettingsPageProps) => {
   const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const [hasValidMolecule, setHasValidMolecule] = useState(false);
@@ -66,6 +68,44 @@ export const CalculationSettingsPage = ({
   // Solvent settings state
   const [solventMethod, setSolventMethod] = useState("none");
   const [solvent, setSolvent] = useState("-");
+  
+  // Track if we're editing an existing calculation
+  const isEditingExisting = Boolean(activeCalculation && activeCalculation.parameters);
+  
+  // Load active calculation parameters into form state
+  useEffect(() => {
+    if (activeCalculation && activeCalculation.parameters) {
+      const params = activeCalculation.parameters;
+      setMoleculeName(params.molecule_name || '');
+      setCpuCores(params.cpu_cores || 1);
+      setMemoryMB(params.memory_mb || 2000);
+      setCalculationMethod(params.calculation_method || 'DFT');
+      setBasisFunction(params.basis_function || 'STO-3G');
+      setExchangeCorrelation(params.exchange_correlation || 'B3LYP');
+      setCharges(params.charges || 0);
+      setSpinMultiplicity(params.spin_multiplicity || 1);
+      setSolventMethod(params.solvent_method || 'none');
+      setSolvent(params.solvent || '-');
+      if (params.xyz) {
+        setXyzInputValue(params.xyz);
+        handleXYZChange(params.xyz, true);
+      }
+    } else {
+      // Reset form for new calculation
+      setMoleculeName('');
+      setCpuCores(1);
+      setMemoryMB(2000);
+      setCalculationMethod('DFT');
+      setBasisFunction('STO-3G');
+      setExchangeCorrelation('B3LYP');
+      setCharges(0);
+      setSpinMultiplicity(1);
+      setSolventMethod('none');
+      setSolvent('-');
+      setXyzInputValue('');
+      handleXYZChange('', false);
+    }
+  }, [activeCalculation]);
 
   // Molecular input state
   const [inputMethod, setInputMethod] = useState("pubchem");
@@ -78,6 +118,7 @@ export const CalculationSettingsPage = ({
   // Calculation status state
   const [calculationStatus, setCalculationStatus] = useState<CalculationStatus>('idle');
   const [calculationError, setCalculationError] = useState<string | null>(null);
+  const [currentCalculationId, setCurrentCalculationId] = useState<string | null>(null);
 
   /**
    * XYZデータが変更されたときのハンドラ。分子ビューアを更新する。
@@ -113,6 +154,7 @@ export const CalculationSettingsPage = ({
 
     setCalculationStatus('running');
     setCalculationError(null);
+    setCurrentCalculationId(null);
 
     const calculationParams: CalculationParameters = {
       calculation_method: calculationMethod as any,
@@ -135,21 +177,44 @@ export const CalculationSettingsPage = ({
       
       console.log("Calculation completed successfully:", response);
       setCalculationStatus('completed');
+      setCurrentCalculationId(response.calculation_id);
       
-      // Store results in localStorage for now (later will be passed via App state)
-      localStorage.setItem('calculationResults', JSON.stringify({
-        results: response.calculation_results,
-        parameters: calculationParams,
-        completedAt: new Date().toISOString()
-      }));
+      // Update parent component about the calculation status
+      if (response.calculation_id && onCalculationStatusUpdate) {
+        await onCalculationStatusUpdate(response.calculation_id, 'completed');
+      }
       
-      // Navigate to results page would be handled by parent component
-      alert(`Calculation completed!\nHOMO Index: ${response.calculation_results.homo_index}\nLUMO Index: ${response.calculation_results.lumo_index}\nSCF Energy: ${response.calculation_results.scf_energy.toFixed(6)} hartree`);
+      // Update calculation instance with results
+      if (onCalculationUpdate && response.calculation_id) {
+        const updatedCalculation: CalculationInstance = {
+          id: response.calculation_id,
+          name: moleculeName || 'Untitled Calculation',
+          status: 'completed',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          parameters: calculationParams,
+          results: response.calculation_results,
+          workingDirectory: response.calculation_results.working_directory
+        };
+        onCalculationUpdate(updatedCalculation);
+      }
+      
+      // Show success message
+      alert(`Calculation completed successfully!\nCalculation ID: ${response.calculation_id}\nHOMO Index: ${response.calculation_results.homo_index}\nLUMO Index: ${response.calculation_results.lumo_index}\nSCF Energy: ${response.calculation_results.scf_energy.toFixed(6)} hartree`);
       
     } catch (error) {
       console.error("Calculation failed:", error);
       setCalculationStatus('error');
       setCalculationError(error instanceof Error ? error.message : 'Unknown error occurred during calculation');
+      
+      // Update status if we have a calculation ID
+      if (currentCalculationId && onCalculationStatusUpdate) {
+        try {
+          await onCalculationStatusUpdate(currentCalculationId, 'error');
+        } catch (err) {
+          console.error('Failed to update calculation status to error:', err);
+        }
+      }
     }
   };
 
@@ -270,7 +335,12 @@ export const CalculationSettingsPage = ({
                 onClick={handleStartCalculation} 
                 disabled={!hasValidMolecule || calculationStatus === 'running'}
               >
-                {calculationStatus === 'running' ? '⚛️ Calculating...' : '+ Start calculation'}
+                {calculationStatus === 'running' 
+                  ? '⚛️ Calculating...' 
+                  : isEditingExisting 
+                    ? '🔄 Re-run calculation'
+                    : '+ Start calculation'
+                }
               </button>
               {calculationError && (
                 <div className="calculation-error" style={{ marginTop: '10px', color: '#e74c3c', fontSize: '14px' }}>

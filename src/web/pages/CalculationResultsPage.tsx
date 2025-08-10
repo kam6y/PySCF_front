@@ -1,36 +1,38 @@
 import { useEffect, useState } from "react";
 import { CalculationResults, CalculationParameters, CalculationInstance } from "../types/calculation";
 
-interface StoredCalculationData {
-  results: CalculationResults;
-  parameters: CalculationParameters;
-  completedAt: string;
-}
-
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
+  isLoadingDetails?: boolean;
+  detailsError?: string | null;
 }
 
-export const CalculationResultsPage = ({ activeCalculation }: CalculationResultsPageProps) => {
-  const [calculationData, setCalculationData] = useState<StoredCalculationData | null>(null);
+export const CalculationResultsPage = ({ 
+  activeCalculation, 
+  isLoadingDetails = false, 
+  detailsError = null 
+}: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load calculation results from localStorage (temporary solution)
-    try {
-      const stored = localStorage.getItem('calculationResults');
-      if (stored) {
-        const data = JSON.parse(stored) as StoredCalculationData;
-        setCalculationData(data);
-      } else {
-        setError('No calculation results found. Please run a calculation first.');
-      }
-    } catch (err) {
-      setError('Failed to load calculation results.');
-      console.error('Error loading results:', err);
-    }
-  }, []);
+    setError(detailsError);
+  }, [detailsError]);
 
+  // Show loading state
+  if (isLoadingDetails) {
+    return (
+      <div className="page-container">
+        <div className="page-content">
+          <h1>Calculation Results</h1>
+          <div style={{ textAlign: 'center', padding: '20px' }}>
+            ⚛️ Loading calculation details...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
   if (error) {
     return (
       <div className="page-container">
@@ -44,20 +46,50 @@ export const CalculationResultsPage = ({ activeCalculation }: CalculationResults
     );
   }
 
-  if (!calculationData) {
+  // Show message when no calculation is selected
+  if (!activeCalculation) {
     return (
       <div className="page-container">
         <div className="page-content">
           <h1>Calculation Results</h1>
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            Loading results...
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+            📊 No calculation selected. Please select a calculation from the sidebar to view its results.
           </div>
         </div>
       </div>
     );
   }
 
-  const { results, parameters, completedAt } = calculationData;
+  // Show message for incomplete calculations
+  if (activeCalculation.status !== 'completed' || !activeCalculation.results) {
+    const statusMessages = {
+      pending: '⏳ This calculation is pending. Please run the calculation first.',
+      running: '⚛️ This calculation is currently running. Please wait for completion.',
+      error: '❌ This calculation failed. Please check the settings and try again.'
+    };
+    
+    return (
+      <div className="page-container">
+        <div className="page-content">
+          <h1>Calculation Results</h1>
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+            {statusMessages[activeCalculation.status as keyof typeof statusMessages] || 
+             '❓ Calculation results are not available.'}
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+            <strong>Calculation:</strong> {activeCalculation.name}<br/>
+            <strong>Status:</strong> <span className={`status-badge ${activeCalculation.status}`}>
+              {activeCalculation.status}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const results = activeCalculation.results;
+  const parameters = activeCalculation.parameters;
+  const completedAt = activeCalculation.updatedAt;
 
   return (
     <div className="page-container">

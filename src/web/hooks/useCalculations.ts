@@ -16,6 +16,7 @@ export interface UseCalculationsReturn {
   refreshCalculations: () => Promise<void>;
   getCalculationById: (id: string) => CalculationInstance | undefined;
   updateCalculationName: (id: string, newName: string) => Promise<void>;
+  updateCalculationStatus: (id: string, status: 'pending' | 'running' | 'completed' | 'error') => Promise<void>;
   deleteCalculation: (id: string) => Promise<void>;
   createCalculation: (name: string, parameters: CalculationParameters) => CalculationInstance;
 }
@@ -34,7 +35,7 @@ export const useCalculations = (): UseCalculationsReturn => {
     return {
       id: dirName,
       name: dirName.replace(/_\d{8}_\d{6}$/, ''), // Remove timestamp suffix for display
-      status: backendCalc.has_checkpoint ? 'completed' : 'pending',
+      status: backendCalc.status || (backendCalc.has_checkpoint ? 'completed' : 'pending'),
       createdAt: new Date(backendCalc.date).toISOString(),
       updatedAt: new Date(backendCalc.date).toISOString(),
       workingDirectory: backendCalc.path,
@@ -81,7 +82,19 @@ export const useCalculations = (): UseCalculationsReturn => {
   // Update calculation name
   const updateCalculationName = useCallback(async (id: string, newName: string) => {
     try {
-      // For now, just update locally since backend doesn't support name updates yet
+      // Call backend API to update name
+      const response = await fetch(`${API_BASE_URL}/api/quantum/calculations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update calculation name');
+      }
+      
+      // Update local state
       setCalculations(prev => 
         prev.map(calc => 
           calc.id === id 
@@ -90,15 +103,38 @@ export const useCalculations = (): UseCalculationsReturn => {
         )
       );
       
-      // TODO: Implement backend API call when available
-      // const response = await fetch(`${API_BASE_URL}/api/quantum/calculations/${id}`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ name: newName })
-      // });
-      
     } catch (err) {
       console.error('Failed to update calculation name:', err);
+      throw err;
+    }
+  }, []);
+  
+  // Update calculation status
+  const updateCalculationStatus = useCallback(async (id: string, status: 'pending' | 'running' | 'completed' | 'error') => {
+    try {
+      // Call backend API to update status
+      const response = await fetch(`${API_BASE_URL}/api/quantum/calculations/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update calculation status');
+      }
+      
+      // Update local state
+      setCalculations(prev => 
+        prev.map(calc => 
+          calc.id === id 
+            ? { ...calc, status, updatedAt: new Date().toISOString() }
+            : calc
+        )
+      );
+      
+    } catch (err) {
+      console.error('Failed to update calculation status:', err);
       throw err;
     }
   }, []);
@@ -106,13 +142,18 @@ export const useCalculations = (): UseCalculationsReturn => {
   // Delete calculation
   const deleteCalculation = useCallback(async (id: string) => {
     try {
-      // For now, just remove locally since backend doesn't support deletion yet
-      setCalculations(prev => prev.filter(calc => calc.id !== id));
+      // Call backend API to delete calculation
+      const response = await fetch(`${API_BASE_URL}/api/quantum/calculations/${id}`, {
+        method: 'DELETE'
+      });
       
-      // TODO: Implement backend API call when available
-      // const response = await fetch(`${API_BASE_URL}/api/quantum/calculations/${id}`, {
-      //   method: 'DELETE'
-      // });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete calculation');
+      }
+      
+      // Remove from local state
+      setCalculations(prev => prev.filter(calc => calc.id !== id));
       
     } catch (err) {
       console.error('Failed to delete calculation:', err);
@@ -152,6 +193,7 @@ export const useCalculations = (): UseCalculationsReturn => {
     refreshCalculations,
     getCalculationById,
     updateCalculationName,
+    updateCalculationStatus,
     deleteCalculation,
     createCalculation
   };
