@@ -3,13 +3,12 @@ import { MoleculeViewer, MoleculeViewerRef } from "../components/MoleculeViewer"
 import { XYZInput } from "../components/XYZInput";
 import { StyleControls } from "../components/StyleControls";
 import { StyleSpec } from "../../types/3dmol";
-import { 
-    CalculationParameters, 
+import {
+    CalculationParameters,
     CalculationStatus,
-    CalculationInstance 
+    CalculationInstance
 } from "../types/calculation";
 
-// --- 変更点 1: Propsの定義を更新 ---
 interface CalculationSettingsPageProps {
     activeCalculation?: CalculationInstance;
     onCalculationUpdate?: (updatedCalculation: CalculationInstance) => void;
@@ -38,14 +37,8 @@ export const CalculationSettingsPage = ({
     onCalculationSuccess,
     refreshCalculations
 }: CalculationSettingsPageProps) => {
+    // --- 変更点: すべてのフックをコンポーネントのトップレベルに移動 ---
     const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
-
-    // --- 変更点 2: 状態管理を単一オブジェクトに統合 ---
-    const [params, setParams] = useState<Partial<CalculationParameters>>({});
-    
-    // UIとロジックに関わるその他のState
-    const [xyzInputValue, setXyzInputValue] = useState<string>("");
-    const [hasValidMolecule, setHasValidMolecule] = useState(false);
     const [calculationStatus, setCalculationStatus] = useState<CalculationStatus>('idle');
     const [calculationError, setCalculationError] = useState<string | null>(null);
     const [inputMethod, setInputMethod] = useState("pubchem");
@@ -53,68 +46,50 @@ export const CalculationSettingsPage = ({
     const [isConverting, setIsConverting] = useState(false);
     const [convertError, setConvertError] = useState<string | null>(null);
 
-    // activeCalculationが変更されたら、フォームの値を更新
+    // activeCalculationの変更を監視して3Dビューアを更新する
     useEffect(() => {
-        if (activeCalculation?.parameters) {
-            setParams(activeCalculation.parameters);
-            const xyz = activeCalculation.parameters.xyz || "";
-            setXyzInputValue(xyz);
-            if (moleculeViewerRef.current) {
-                if (xyz) {
-                    moleculeViewerRef.current.loadXYZ(xyz);
-                    setHasValidMolecule(true);
-                } else {
-                    moleculeViewerRef.current.clearModels();
-                    setHasValidMolecule(false);
-                }
-            }
+        const xyz = activeCalculation?.parameters?.xyz;
+        if (xyz) {
+            moleculeViewerRef.current?.loadXYZ(xyz);
         } else {
-            // 新規計算用のデフォルト値
-            setParams({
-                molecule_name: 'New Calculation',
-                cpu_cores: 1,
-                memory_mb: 2000,
-                calculation_method: 'DFT',
-                basis_function: '6-31G(d)',
-                exchange_correlation: 'B3LYP',
-                charges: 0,
-                spin_multiplicity: 1,
-                solvent_method: 'none',
-                solvent: '-',
-                xyz: ''
-            });
-            setXyzInputValue("");
-            setHasValidMolecule(false);
             moleculeViewerRef.current?.clearModels();
         }
-    }, [activeCalculation]);
+    }, [activeCalculation?.parameters?.xyz]);
 
-    // --- 変更点 3: State更新ロジックを共通化 ---
-    const handleParamChange = (field: keyof CalculationParameters, value: string | number) => {
-        setParams(prev => ({ ...prev, [field]: value }));
-    };
-    
-    // --- 変更点 4: 親コンポーネントへの状態同期 ---
-    useEffect(() => {
+    // パラメータ変更時に親コンポーネントの状態を更新するコールバック関数
+    const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
         if (activeCalculation && onCalculationUpdate) {
+            const updatedParams = { ...activeCalculation.parameters, [field]: value };
             onCalculationUpdate({
                 ...activeCalculation,
-                parameters: params as CalculationParameters,
+                parameters: updatedParams,
             });
         }
-    }, [params, activeCalculation, onCalculationUpdate]);
+    }, [activeCalculation, onCalculationUpdate]);
 
+    // XYZ入力コンポーネントからの変更を処理するコールバック関数
     const handleXYZChange = useCallback((xyzData: string, isValid: boolean) => {
-        setHasValidMolecule(isValid);
-        setXyzInputValue(xyzData);
-        if (isValid) {
-            handleParamChange('xyz', xyzData); // 統合されたStateを更新
-            moleculeViewerRef.current?.loadXYZ(xyzData);
-        } else {
-            moleculeViewerRef.current?.clearModels();
-        }
-    }, []);
+        handleParamChange('xyz', isValid ? xyzData : '');
+    }, [handleParamChange]);
 
+    // --- 変更点: 条件分岐 (早期リターン) はすべてのフック呼び出しの後に配置 ---
+    if (!activeCalculation) {
+        return (
+            <div className="page-container">
+                <div className="page-content" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                    <h2>No Calculation Selected</h2>
+                    <p>Please select a calculation from the sidebar, or create a new one using the '+' button.</p>
+                </div>
+            </div>
+        );
+    }
+    
+    // これ以降 `activeCalculation` は常に存在することが保証される
+    const { parameters: params } = activeCalculation;
+    const xyzInputValue = params.xyz || "";
+    const hasValidMolecule = !!(params.xyz && params.xyz.trim() !== "");
+
+    // --- 残りのハンドラ ---
     const handleStyleChange = (style: StyleSpec) => {
         if (hasValidMolecule) {
             moleculeViewerRef.current?.setStyle(style);
@@ -134,15 +109,13 @@ export const CalculationSettingsPage = ({
             const responseData = await fetchAPI('/api/quantum/calculate', params);
             setCalculationStatus('completed');
             
-            // --- 変更点 5: onCalculationSuccessを呼び出す ---
             if (onCalculationSuccess) {
                 const completedInstance: CalculationInstance = {
+                    ...activeCalculation,
                     id: responseData.calculation_id,
-                    name: params.molecule_name || "Completed Calculation",
                     status: 'completed',
-                    createdAt: activeCalculation?.createdAt || new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
-                    parameters: params as CalculationParameters,
+                    parameters: params,
                     results: responseData.calculation_results,
                     workingDirectory: responseData.calculation_results.working_directory,
                 };
@@ -171,12 +144,20 @@ export const CalculationSettingsPage = ({
             
             const data = await fetchAPI(endpoint, body);
             
-            handleXYZChange(data.xyz, true);
-            if (data.compound_info?.iupac_name) {
-                handleParamChange('molecule_name', data.compound_info.iupac_name);
-            } else if (inputMethod === 'smiles') {
-                handleParamChange('molecule_name', 'From SMILES');
+            if (onCalculationUpdate) {
+                let moleculeName = params.molecule_name;
+                if (data.compound_info?.iupac_name) {
+                    moleculeName = data.compound_info.iupac_name;
+                } else if (inputMethod === 'smiles') {
+                    moleculeName = 'From SMILES';
+                }
+                const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
+                onCalculationUpdate({
+                    ...activeCalculation,
+                    parameters: updatedParams,
+                });
             }
+
         } catch (error) {
             setConvertError(error instanceof Error ? error.message : 'Unknown error');
         } finally {
@@ -194,7 +175,6 @@ export const CalculationSettingsPage = ({
     return (
         <div className="calculation-settings-containers">
             <div className="calculation-settings-container">
-                {/* Header Section */}
                 <div className="calculation-header">
                     <div className="header-title-bar">
                         <div className="molecule-name-section">
@@ -221,8 +201,8 @@ export const CalculationSettingsPage = ({
                                         className="cpu-cores-input"
                                     />
                                     <div className="spinner-arrows">
-                                        <button type="button" className="spinner-btn up" onClick={() => handleParamChange('cpu_cores', Math.min(32, (params.cpu_cores || 0) + 1))}>▲</button>
-                                        <button type="button" className="spinner-btn down" onClick={() => handleParamChange('cpu_cores', Math.max(1, (params.cpu_cores || 0) - 1))}>▼</button>
+                                        <button type="button" className="spinner-btn up" onClick={() => handleParamChange('cpu_cores', Math.min(32, (params.cpu_cores || 1) + 1))}>▲</button>
+                                        <button type="button" className="spinner-btn down" onClick={() => handleParamChange('cpu_cores', Math.max(1, (params.cpu_cores || 1) - 1))}>▼</button>
                                     </div>
                                 </div>
                             </div>
@@ -258,7 +238,6 @@ export const CalculationSettingsPage = ({
                             )}
                         </div>
                     </div>
-                    {/* Left Column - Calculation Settings */}
                     <div className="calculation-column">
                         <section className="calculation-settings-section">
                             <div className="setting-row">
@@ -307,7 +286,6 @@ export const CalculationSettingsPage = ({
                                 />
                             </div>
                         </section>
-                        {/* Solvent Settings */}
                         <section className="solvent-settings-section">
                             <div className="setting-row">
                                 <label>Solvent effect method</label>
@@ -330,9 +308,7 @@ export const CalculationSettingsPage = ({
                     </div>
                 </div>
 
-                {/* Main Content - Two Column Layout */}
                 <div className="main-content">
-                    {/* Left Column - 3D Molecular Viewer */}
                     <div className="left-column">
                         <div className="viewer-container">
                             <MoleculeViewer ref={moleculeViewerRef} width={600} height={500} backgroundColor="white" className="main-viewer" />
@@ -346,7 +322,6 @@ export const CalculationSettingsPage = ({
                             )}
                         </div>
                     </div>
-                    {/* Right Column - Visualization Controls and Molecular Input */}
                     <div className="right-column">
                         <section className="visualization-section">
                             <StyleControls onStyleChange={handleStyleChange} />

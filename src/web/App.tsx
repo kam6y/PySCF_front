@@ -10,8 +10,7 @@ import { useCalculations, useActiveCalculation } from "./hooks";
 import { CalculationInstance, CalculationParameters } from "./types/calculation";
 
 export const App = () => {
-  // --- State Management ---
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<DropdownOption>('calculation-settings');
 
@@ -22,6 +21,8 @@ export const App = () => {
     refreshCalculations,
     updateCalculationName,
     deleteCalculation,
+    createCalculation,
+    updateCalculation,
   } = useCalculations();
 
   const {
@@ -29,21 +30,17 @@ export const App = () => {
     activeCalculation,
     isLoadingDetails,
     detailsError,
-    setActiveCalculation,
     setActiveCalculationById,
     loadCalculationDetails,
     clearActiveCalculation,
   } = useActiveCalculation(calculations);
 
-  // --- Effect Hooks ---
   useEffect(() => {
     if (!activeCalculationId && calculations.length > 0) {
-      const firstCalculation = calculations[0];
-      setActiveCalculationById(firstCalculation.id);
+      setActiveCalculationById(calculations[0].id);
     }
   }, [calculations, activeCalculationId, setActiveCalculationById]);
 
-  // --- Helper Functions ---
   const getPageTitle = (page: DropdownOption): string => {
     const titles: Record<DropdownOption, string> = {
       'calculation-settings': 'Calculation Settings',
@@ -53,53 +50,40 @@ export const App = () => {
     return titles[page] || 'PySCF Front';
   };
 
-  // --- Event Handlers ---
   const handleSidebarToggle = () => setIsSidebarOpen(!isSidebarOpen);
   const handleSidebarClose = () => setIsSidebarOpen(false);
   const handleDropdownToggle = () => setIsDropdownOpen(!isDropdownOpen);
   const handleDropdownClose = () => setIsDropdownOpen(false);
   const handleDropdownOptionSelect = (option: DropdownOption) => setCurrentPage(option);
 
-  /**
-   * Handles selecting a calculation from the sidebar.
-   * This function now ONLY sets the active calculation and loads its details.
-   * It no longer changes the current page.
-   */
   const handleCalculationSelect = (calculationId: string) => {
     setActiveCalculationById(calculationId);
-    loadCalculationDetails(calculationId, true); // Force refresh details
+    loadCalculationDetails(calculationId, true);
     handleSidebarClose();
   };
 
   const handleNewCalculation = () => {
-    const now = new Date().toISOString();
-    const tempId = `new-calculation-${Date.now()}`;
-    const newCalculation: CalculationInstance = {
-      id: tempId,
-      name: 'New Calculation',
-      status: 'pending',
-      createdAt: now,
-      updatedAt: now,
-      parameters: {
-        calculation_method: 'DFT',
-        basis_function: '6-31G(d)',
-        exchange_correlation: 'B3LYP',
-        charges: 0,
-        spin_multiplicity: 1,
-        solvent_method: 'none',
-        solvent: '-',
-        xyz: '',
-        molecule_name: 'New Calculation'
-      },
+    const defaultParams: CalculationParameters = {
+      calculation_method: 'DFT',
+      basis_function: '6-31G(d)',
+      exchange_correlation: 'B3LYP',
+      charges: 0,
+      spin_multiplicity: 1,
+      solvent_method: 'none',
+      solvent: '-',
+      xyz: '',
+      molecule_name: ''
     };
-    setActiveCalculation(newCalculation);
+    const newCalculation = createCalculation('', defaultParams);
+    setActiveCalculationById(newCalculation.id);
     setCurrentPage('calculation-settings');
     handleSidebarClose();
   };
   
   const handleCalculationSuccess = async (completedCalculation: CalculationInstance) => {
+    updateCalculation(completedCalculation);
     await refreshCalculations(); 
-    setActiveCalculation(completedCalculation);
+    setActiveCalculationById(completedCalculation.id);
     setCurrentPage('calculation-results');
   };
 
@@ -124,15 +108,18 @@ export const App = () => {
       alert(`Error: Could not delete calculation. ${error instanceof Error ? error.message : ''}`);
     }
   };
+  
+  const handleActiveCalculationUpdate = (updatedCalculation: CalculationInstance) => {
+    updateCalculation(updatedCalculation);
+  };
 
-  // --- Page Rendering Logic ---
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'calculation-settings':
         return (
           <CalculationSettingsPage
             activeCalculation={activeCalculation}
-            onCalculationUpdate={setActiveCalculation}
+            onCalculationUpdate={handleActiveCalculationUpdate}
             onCalculationSuccess={handleCalculationSuccess}
             refreshCalculations={refreshCalculations}
           />
@@ -151,7 +138,7 @@ export const App = () => {
         return (
           <CalculationSettingsPage
             activeCalculation={activeCalculation}
-            onCalculationUpdate={setActiveCalculation}
+            onCalculationUpdate={handleActiveCalculationUpdate}
             onCalculationSuccess={handleCalculationSuccess}
             refreshCalculations={refreshCalculations}
           />
@@ -159,7 +146,10 @@ export const App = () => {
     }
   };
 
-  // --- Main Component Render ---
+  const sidebarCalculations = calculations.filter(
+    (calc) => calc.status !== 'pending' || (calc.parameters && calc.parameters.xyz && calc.parameters.xyz.trim() !== '')
+  );
+
   return (
     <div className="app-container">
       <button
@@ -190,7 +180,7 @@ export const App = () => {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={handleSidebarClose}
-        calculations={calculations}
+        calculations={sidebarCalculations}
         activeCalculationId={activeCalculationId}
         calculationsLoading={calculationsLoading}
         calculationsError={calculationsError}
