@@ -1,8 +1,10 @@
+// src/web/hooks/useActiveCalculation.ts
+
 import { useState, useEffect, useCallback } from 'react';
-import { CalculationInstance, CalculationDetailsResponse } from '../types/calculation';
+import { CalculationInstance } from '../types/calculation';
+import { getCalculationDetails } from '../apiClient'; // apiClientからインポート
 
 const ACTIVE_CALCULATION_KEY = 'pyscf-active-calculation-id';
-const API_BASE_URL = 'http://127.0.0.1:5000';
 
 export interface UseActiveCalculationReturn {
   activeCalculationId: string | null;
@@ -19,24 +21,21 @@ export const useActiveCalculation = (
   calculations: CalculationInstance[]
 ): UseActiveCalculationReturn => {
   const [activeCalculationId, setActiveCalculationId] = useState<string | null>(() => {
-    // Restore active calculation ID from localStorage
     try {
       return localStorage.getItem(ACTIVE_CALCULATION_KEY);
     } catch {
       return null;
     }
   });
-  
+
   const [detailedCalculations, setDetailedCalculations] = useState<Map<string, CalculationInstance>>(new Map());
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [detailsError, setDetailsError] = useState<string | null>(null);
 
-  // Get active calculation from the calculations array or detailed cache
-  const activeCalculation = activeCalculationId 
+  const activeCalculation = activeCalculationId
     ? detailedCalculations.get(activeCalculationId) || calculations.find(calc => calc.id === activeCalculationId)
     : undefined;
 
-  // Persist active calculation ID to localStorage
   useEffect(() => {
     try {
       if (activeCalculationId) {
@@ -49,33 +48,18 @@ export const useActiveCalculation = (
     }
   }, [activeCalculationId]);
 
-  // Load detailed calculation data from backend
   const loadCalculationDetails = useCallback(async (id: string, forceRefresh = false): Promise<CalculationInstance | null> => {
-    // Check cache first unless forced refresh
     if (!forceRefresh && detailedCalculations.has(id)) {
       return detailedCalculations.get(id) || null;
     }
-    
+
     setIsLoadingDetails(true);
     setDetailsError(null);
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/quantum/calculations/${id}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to load calculation details');
-      }
-      
-      const data: CalculationDetailsResponse = await response.json();
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to load calculation details');
-      }
-      
+      const data = await getCalculationDetails(id);
       const detailedCalculation = data.data.calculation;
       
-      // Cache the detailed calculation
       setDetailedCalculations(prev => {
         const newMap = new Map(prev);
         newMap.set(id, detailedCalculation);
@@ -83,9 +67,8 @@ export const useActiveCalculation = (
       });
       
       return detailedCalculation;
-      
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      const errorMessage = err instanceof Error ? err.message : '不明なエラーが発生しました。';
       setDetailsError(errorMessage);
       console.error('Failed to load calculation details:', err);
       return null;
@@ -94,35 +77,30 @@ export const useActiveCalculation = (
     }
   }, [detailedCalculations]);
 
-  // Set active calculation directly
   const setActiveCalculation = useCallback((calculation: CalculationInstance | null) => {
     setActiveCalculationId(calculation?.id || null);
   }, []);
 
-  // Set active calculation by ID
   const setActiveCalculationById = useCallback((id: string | null) => {
     setActiveCalculationId(id);
   }, []);
 
-  // Clear active calculation
   const clearActiveCalculation = useCallback(() => {
     setActiveCalculationId(null);
   }, []);
 
-  // Auto-clear active calculation if it no longer exists in calculations list
   useEffect(() => {
-    if (activeCalculationId && !calculations.find(calc => calc.id === activeCalculationId)) {
-      setActiveCalculationId(null);
+    if (activeCalculationId && !calculations.some(calc => calc.id === activeCalculationId)) {
+      setActiveCalculationId(calculations.length > 0 ? calculations[0].id : null);
     }
   }, [activeCalculationId, calculations]);
-  
-  // Auto-load details when active calculation changes
+
   useEffect(() => {
     if (activeCalculationId && !detailedCalculations.has(activeCalculationId)) {
       loadCalculationDetails(activeCalculationId);
     }
   }, [activeCalculationId, detailedCalculations, loadCalculationDetails]);
-
+  
   return {
     activeCalculationId,
     activeCalculation,

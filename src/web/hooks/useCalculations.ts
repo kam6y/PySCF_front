@@ -1,11 +1,11 @@
+// src/web/hooks/useCalculations.ts
+
 import { useState, useEffect, useCallback } from 'react';
-import { 
-    CalculationInstance, 
-    CalculationListResponse,
+import {
+    CalculationInstance,
     CalculationParameters,
 } from '../types/calculation';
-
-const API_BASE_URL = 'http://127.0.0.1:5000';
+import { getCalculations } from '../apiClient'; // apiClientからインポート
 
 export interface UseCalculationsReturn {
     calculations: CalculationInstance[];
@@ -26,8 +26,7 @@ export const useCalculations = (): UseCalculationsReturn => {
     const [error, setError] = useState<string | null>(null);
 
     const convertToCalculationInstance = (backendCalc: any): CalculationInstance => {
-        const pathParts = backendCalc.path.split(/[\\/]/);
-        const dirName = pathParts[pathParts.length - 1];
+        const dirName = backendCalc.name;
         
         return {
             id: dirName,
@@ -35,7 +34,7 @@ export const useCalculations = (): UseCalculationsReturn => {
             status: backendCalc.status || (backendCalc.has_checkpoint ? 'completed' : 'pending'),
             createdAt: new Date(backendCalc.date).toISOString(),
             updatedAt: new Date(backendCalc.date).toISOString(),
-            parameters: {} as CalculationParameters,
+            parameters: {} as CalculationParameters, // 詳細は別途読み込み
             results: undefined
         };
     };
@@ -44,15 +43,11 @@ export const useCalculations = (): UseCalculationsReturn => {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/quantum/calculations`);
-            if (!response.ok) throw new Error('Network response was not ok');
-            const data: CalculationListResponse = await response.json();
-            if (!data.success) throw new Error(data.error || 'Failed to fetch calculations');
-            
+            const data = await getCalculations();
             const convertedCalculations = data.data.calculations.map(convertToCalculationInstance);
             setCalculations(convertedCalculations);
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+            const errorMessage = err instanceof Error ? err.message : '不明なエラーが発生しました。';
             setError(errorMessage);
         } finally {
             setIsLoading(false);
@@ -72,25 +67,28 @@ export const useCalculations = (): UseCalculationsReturn => {
     }, [calculations]);
 
     const updateCalculationName = useCallback(async (id: string, newName: string) => {
-        // (Backend API call logic here)
-        setCalculations(prev => 
-            prev.map(calc => 
+        // TODO: バックエンドAPI呼び出しを実装
+        console.warn("updateCalculationNameはバックエンドと永続化されません。");
+        setCalculations(prev =>
+            prev.map(calc =>
                 calc.id === id ? { ...calc, name: newName, updatedAt: new Date().toISOString() } : calc
             )
         );
     }, []);
 
     const updateCalculationStatus = useCallback(async (id: string, status: 'pending' | 'running' | 'completed' | 'error') => {
-        // (Backend API call logic here)
-        setCalculations(prev => 
-            prev.map(calc => 
+        // TODO: バックエンドAPI呼び出しを実装
+        console.warn("updateCalculationStatusはバックエンドと永続化されません。");
+        setCalculations(prev =>
+            prev.map(calc =>
                 calc.id === id ? { ...calc, status, updatedAt: new Date().toISOString() } : calc
             )
         );
     }, []);
 
     const deleteCalculation = useCallback(async (id: string) => {
-        // (Backend API call logic here)
+        // TODO: バックエンドAPI呼び出しを実装
+        console.warn("deleteCalculationはバックエンドと永続化されません。");
         setCalculations(prev => prev.filter(calc => calc.id !== id));
     }, []);
 
@@ -113,11 +111,16 @@ export const useCalculations = (): UseCalculationsReturn => {
     }, []);
 
     const updateCalculation = useCallback((updatedCalculation: CalculationInstance) => {
-        setCalculations(prevCalculations => 
-            prevCalculations.map(calc => 
-                calc.id === updatedCalculation.id ? updatedCalculation : calc
-            )
-        );
+        setCalculations(prevCalculations => {
+            const exists = prevCalculations.some(c => c.id === updatedCalculation.id);
+            if (exists) {
+                return prevCalculations.map(calc =>
+                    calc.id === updatedCalculation.id ? updatedCalculation : calc
+                );
+            }
+            // 新規計算（'pending'から'completed'になった場合など）の処理
+            return [updatedCalculation, ...prevCalculations.filter(c => !c.id.startsWith('new-calculation-'))];
+        });
     }, []);
 
     return {

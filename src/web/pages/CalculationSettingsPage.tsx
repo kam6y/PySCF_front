@@ -8,6 +8,8 @@ import {
     CalculationStatus,
     CalculationInstance
 } from "../types/calculation";
+import { startCalculation, searchPubChem, convertSmilesToXyz } from "../apiClient";
+import type { PubChemSearchResponse, SmilesConvertResponse } from "../apiClient";
 
 interface CalculationSettingsPageProps {
     activeCalculation?: CalculationInstance;
@@ -16,28 +18,12 @@ interface CalculationSettingsPageProps {
     refreshCalculations?: () => void;
 }
 
-const API_BASE_URL = 'http://127.0.0.1:5000';
-
-const fetchAPI = async (endpoint: string, body: object) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-    });
-    const data = await response.json();
-    if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to fetch data from the server.');
-    }
-    return data.data;
-};
-
 export const CalculationSettingsPage = ({
     activeCalculation,
     onCalculationUpdate,
     onCalculationSuccess,
     refreshCalculations
 }: CalculationSettingsPageProps) => {
-    // --- 変更点: すべてのフックをコンポーネントのトップレベルに移動 ---
     const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
     const [calculationStatus, setCalculationStatus] = useState<CalculationStatus>('idle');
     const [calculationError, setCalculationError] = useState<string | null>(null);
@@ -46,17 +32,15 @@ export const CalculationSettingsPage = ({
     const [isConverting, setIsConverting] = useState(false);
     const [convertError, setConvertError] = useState<string | null>(null);
 
-    // activeCalculationの変更を監視して3Dビューアを更新する
     useEffect(() => {
         const xyz = activeCalculation?.parameters?.xyz;
-        if (xyz) {
+        if (xyz && xyz.trim() !== "") {
             moleculeViewerRef.current?.loadXYZ(xyz);
         } else {
             moleculeViewerRef.current?.clearModels();
         }
     }, [activeCalculation?.parameters?.xyz]);
 
-    // パラメータ変更時に親コンポーネントの状態を更新するコールバック関数
     const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
         if (activeCalculation && onCalculationUpdate) {
             const updatedParams = { ...activeCalculation.parameters, [field]: value };
@@ -66,36 +50,34 @@ export const CalculationSettingsPage = ({
             });
         }
     }, [activeCalculation, onCalculationUpdate]);
-
-    // XYZ入力コンポーネントからの変更を処理するコールバック関数
+    
     const handleXYZChange = useCallback((xyzData: string, isValid: boolean) => {
-        handleParamChange('xyz', isValid ? xyzData : '');
+        if (isValid) {
+            handleParamChange('xyz', xyzData);
+        }
     }, [handleParamChange]);
-
-    // --- 変更点: 条件分岐 (早期リターン) はすべてのフック呼び出しの後に配置 ---
+    
     if (!activeCalculation) {
         return (
-            <div className="page-container">
-                <div className="page-content" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+            <div className="calculation-settings-containers">
+                <div style={{ textAlign: 'center', padding: '40px', color: '#666', width: '100%' }}>
                     <h2>No Calculation Selected</h2>
                     <p>Please select a calculation from the sidebar, or create a new one using the '+' button.</p>
                 </div>
             </div>
         );
     }
-    
-    // これ以降 `activeCalculation` は常に存在することが保証される
+
     const { parameters: params } = activeCalculation;
     const xyzInputValue = params.xyz || "";
     const hasValidMolecule = !!(params.xyz && params.xyz.trim() !== "");
 
-    // --- 残りのハンドラ ---
     const handleStyleChange = (style: StyleSpec) => {
         if (hasValidMolecule) {
             moleculeViewerRef.current?.setStyle(style);
         }
     };
-    
+
     const handleStartCalculation = async () => {
         if (!hasValidMolecule || !params.xyz) {
             setCalculationError("A valid molecular structure is required.");
@@ -106,9 +88,9 @@ export const CalculationSettingsPage = ({
         setCalculationError(null);
 
         try {
-            const responseData = await fetchAPI('/api/quantum/calculate', params);
+            const responseData = await startCalculation(params);
             setCalculationStatus('completed');
-            
+
             if (onCalculationSuccess) {
                 const completedInstance: CalculationInstance = {
                     ...activeCalculation,
@@ -122,7 +104,6 @@ export const CalculationSettingsPage = ({
                 onCalculationSuccess(completedInstance);
             }
             alert(`Calculation successful! ID: ${responseData.calculation_id}`);
-
         } catch (error) {
             setCalculationStatus('error');
             setCalculationError(error instanceof Error ? error.message : 'An unknown error occurred.');
@@ -136,40 +117,45 @@ export const CalculationSettingsPage = ({
         if (!pubchemInput.trim()) return;
         setIsConverting(true);
         setConvertError(null);
+
         try {
-            const endpoint = inputMethod === 'smiles' ? '/api/smiles/convert' : '/api/pubchem/search';
-            const body = inputMethod === 'smiles' 
-                ? { smiles: pubchemInput.trim() }
-                : { query: pubchemInput.trim(), search_type: /^\d+$/.test(pubchemInput.trim()) ? 'cid' : 'name' };
-            
-            const data = await fetchAPI(endpoint, body);
-            
+            let data: PubChemSearchResponse | SmilesConvertResponse;
+
+            if (inputMethod === 'smiles') {
+                data = await convertSmilesToXyz(pubchemInput.trim());
+            } else {
+                const searchType = /^\d+$/.test(pubchemInput.trim()) ? 'cid' : 'name';
+                data = await searchPubChem(pubchemInput.trim(), searchType);
+            }
+
             if (onCalculationUpdate) {
                 let moleculeName = params.molecule_name;
-                if (data.compound_info?.iupac_name) {
+                
+                if ('compound_info' in data && data.compound_info?.iupac_name) {
                     moleculeName = data.compound_info.iupac_name;
                 } else if (inputMethod === 'smiles') {
                     moleculeName = 'From SMILES';
+                } else {
+                    moleculeName = pubchemInput.trim();
                 }
+                
                 const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
                 onCalculationUpdate({
                     ...activeCalculation,
                     parameters: updatedParams,
                 });
             }
-
         } catch (error) {
-            setConvertError(error instanceof Error ? error.message : 'Unknown error');
+            setConvertError(error instanceof Error ? error.message : 'Unknown error during conversion.');
         } finally {
             setIsConverting(false);
         }
     };
     
     const getInputPlaceholder = () => {
-        if (inputMethod === 'smiles') {
-            return "e.g., CCO for ethanol";
-        }
-        return "e.g., aspirin, or 2244";
+        return inputMethod === 'smiles'
+            ? "e.g., CCO for ethanol"
+            : "e.g., aspirin, or 2244";
     };
 
     return (
