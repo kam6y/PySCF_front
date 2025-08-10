@@ -1,5 +1,5 @@
 {
-  "name": "pyscf_native_app",
+  "name": "pyscf_front",
   "version": "0.0.1",
   "description": "A quantum chemical calculation app using Electron, React, and Python.",
   "main": "dist/main.js",
@@ -9,12 +9,12 @@
     "dev:electron": "wait-on ./dist/index.html ./dist/main.js && electronmon .",
     "build": "npm run build:webpack && npm run build:python",
     "build:webpack": "cross-env NODE_ENV=\"production\" webpack --progress",
-    "build:python": "rimraf python_dist && pyinstaller --distpath python_dist --workpath build/pyinstaller --noconfirm src/python/app.py --name pyscf_api",
+    "build:python": "rimraf python_dist && pyinstaller --distpath python_dist --workpath build/pyinstaller --noconfirm src/python/app.py --name pyscf_front_api",
     "package": "npm run build && electron-builder"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/kam6y/PySCF_native_app.git"
+    "url": "git+https://github.com/kam6y/Pyscf_front.git"
   },
   "keywords": [
     "electron",
@@ -31,9 +31,9 @@
   },
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/kam6y/PySCF_native_app/issues"
+    "url": "https://github.com/kam6y/Pyscf_front/issues"
   },
-  "homepage": "https://github.com/kam6y/PySCF_native_app#readme",
+  "homepage": "https://github.com/kam6y/Pyscf_front#readme",
   "devDependencies": {
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.9",
@@ -60,8 +60,8 @@
     "react-dom": "^19.1.1"
   },
   "build": {
-    "appId": "com.example.pyscf-native-app",
-    "productName": "PySCFNativeApp",
+    "appId": "com.kam6y.pyscf_front",
+    "productName": "Pyscf_front",
     "files": [
       "dist/**/*"
     ],

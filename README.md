@@ -27,8 +27,8 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 
 1.  リポジトリをクローンします。
     ```bash
-    git clone [https://github.com/kam6y/PySCF_native_app.git](https://github.com/kam6y/PySCF_native_app.git)
-    cd PySCF_native_app
+    git clone [https://github.com/kam6y/Pyscf_front.git](https://github.com/kam6y/Pyscf_front.git)
+    cd Pyscf_front
     ```
 
 2.  Node.jsの依存関係をインストールします。

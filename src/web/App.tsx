@@ -52,7 +52,7 @@ export const App = () => {
       'calculation-results': 'Calculation Results',
       'draw-molecule': 'Draw Molecule',
     };
-    return titles[page] || 'PySCF Front';
+    return titles[page] || 'PySCF_front';
   };
 
   const handleSidebarToggle = () => setIsSidebarOpen(!isSidebarOpen);

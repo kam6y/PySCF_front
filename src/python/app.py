@@ -32,7 +32,7 @@ def health_check():
     """Health check endpoint."""
     return jsonify({
         'status': 'ok',
-        'service': 'pyscf-native-api',
+        'service': 'pyscf-front-api',
         'version': '0.3.0'
     })
 

@@ -407,7 +407,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pyscf-pubchem"
+name = "pyscf-front-backend"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

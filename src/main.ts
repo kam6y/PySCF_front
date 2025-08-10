@@ -42,7 +42,7 @@ const startPythonServer = async (): Promise<void> => {
   
   if (app.isPackaged) {
     // パッケージ化後の場合：同梱した実行ファイルを起動
-    const executableName = process.platform === 'win32' ? 'pyscf_api.exe' : 'pyscf_api';
+    const executableName = process.platform === 'win32' ? 'pyscf_front_api.exe' : 'pyscf_front_api';
     // extraResources は process.resourcesPath にコピーされる
     const pythonExecutablePath = path.join(process.resourcesPath, 'python_dist', executableName);
     

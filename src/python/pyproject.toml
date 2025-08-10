@@ -1,5 +1,5 @@
 [project]
-name = "pyscf-pubchem"
+name = "pyscf-front-backend"
 version = "0.1.0"
 description = "PubChem integration backend for PySCF Native App"
 readme = "README.md"
