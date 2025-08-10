@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CalculationInstance } from '../types/calculation';
-import { getCalculationDetails } from '../apiClient'; // apiClientからインポート
+import { getCalculationDetails } from '../apiClient';
 
 const ACTIVE_CALCULATION_KEY = 'pyscf-active-calculation-id';
 
@@ -11,10 +11,11 @@ export interface UseActiveCalculationReturn {
   activeCalculation: CalculationInstance | undefined;
   isLoadingDetails: boolean;
   detailsError: string | null;
-  setActiveCalculation: (calculation: CalculationInstance | null) => void;
   setActiveCalculationById: (id: string | null) => void;
   loadCalculationDetails: (id: string, forceRefresh?: boolean) => Promise<CalculationInstance | null>;
   clearActiveCalculation: () => void;
+  updateActiveCalculationInCache: (updatedCalculation: CalculationInstance) => void;
+  renameIdInCache: (oldId: string, newId: string, newName: string) => void;
 }
 
 export const useActiveCalculation = (
@@ -23,7 +24,6 @@ export const useActiveCalculation = (
   const [activeCalculationId, setActiveCalculationId] = useState<string | null>(() => {
     try {
       const storedId = localStorage.getItem(ACTIVE_CALCULATION_KEY);
-      // Guard against invalid strings from localStorage
       if (storedId && storedId !== "undefined" && storedId !== "null") {
         return storedId;
       }
@@ -81,11 +81,7 @@ export const useActiveCalculation = (
       setIsLoadingDetails(false);
     }
   }, [detailedCalculations]);
-
-  const setActiveCalculation = useCallback((calculation: CalculationInstance | null) => {
-    setActiveCalculationId(calculation?.id || null);
-  }, []);
-
+  
   const setActiveCalculationById = useCallback((id: string | null) => {
     setActiveCalculationId(id);
   }, []);
@@ -94,7 +90,31 @@ export const useActiveCalculation = (
     setActiveCalculationId(null);
   }, []);
 
-  // Sync active ID if it's no longer in the main list
+  const updateActiveCalculationInCache = useCallback((updatedCalculation: CalculationInstance) => {
+    setDetailedCalculations(prev => {
+        const newMap = new Map(prev);
+        newMap.set(updatedCalculation.id, updatedCalculation);
+        return newMap;
+    });
+  }, []);
+
+  const renameIdInCache = useCallback((oldId: string, newId: string, newName: string) => {
+    setDetailedCalculations(prev => {
+        const newMap = new Map(prev);
+        const data = newMap.get(oldId);
+        if (data) {
+            newMap.delete(oldId);
+            newMap.set(newId, { 
+                ...data, 
+                id: newId, 
+                name: newName,
+                parameters: { ...data.parameters, molecule_name: newName }
+            });
+        }
+        return newMap;
+    });
+  }, []);
+
   useEffect(() => {
     if (activeCalculationId && calculations.length > 0 && !calculations.some(calc => calc.id === activeCalculationId)) {
       setActiveCalculationId(calculations[0].id);
@@ -103,7 +123,6 @@ export const useActiveCalculation = (
     }
   }, [activeCalculationId, calculations]);
 
-  // Fetch details when active ID changes
   useEffect(() => {
     if (activeCalculationId && !detailedCalculations.has(activeCalculationId)) {
       loadCalculationDetails(activeCalculationId);
@@ -115,9 +134,10 @@ export const useActiveCalculation = (
     activeCalculation,
     isLoadingDetails,
     detailsError,
-    setActiveCalculation,
     setActiveCalculationById,
     loadCalculationDetails,
-    clearActiveCalculation
+    clearActiveCalculation,
+    updateActiveCalculationInCache,
+    renameIdInCache
   };
 };

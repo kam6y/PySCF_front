@@ -94,7 +94,7 @@ export const useCalculations = (): UseCalculationsReturn => {
         
         const newCalculation: CalculationInstance = {
             id,
-            name: name || "New Calculation",
+            name: name || "", // no default name (must be set by user)
             status: 'pending',
             createdAt: now,
             updatedAt: now,

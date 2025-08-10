@@ -1,3 +1,5 @@
+// src/web/App.tsx
+
 import { useState, useEffect } from "react";
 import "./App.css";
 import { Header } from "./components/Header";
@@ -34,6 +36,8 @@ export const App = () => {
     setActiveCalculationById,
     loadCalculationDetails,
     clearActiveCalculation,
+    updateActiveCalculationInCache,
+    renameIdInCache,
   } = useActiveCalculation(calculations);
 
   useEffect(() => {
@@ -73,9 +77,9 @@ export const App = () => {
       solvent_method: 'none',
       solvent: '-',
       xyz: '',
-      molecule_name: '' // no default name
+      molecule_name: '' // no default name (must be set by user)
     };
-    const newCalculation = createCalculation('', defaultParams);
+    const newCalculation = createCalculation('', defaultParams); // no default name (must be set by user)
     setActiveCalculationById(newCalculation.id);
     setCurrentPage('calculation-settings');
     handleSidebarClose();
@@ -91,7 +95,7 @@ export const App = () => {
   const handleCalculationRename = async (calculationId: string, newName: string) => {
     try {
       const response = await updateCalculationName(calculationId, newName);
-      // If the active calculation was renamed, update its ID
+      renameIdInCache(response.old_id, response.new_id, response.new_name);
       if (activeCalculationId === response.old_id) {
         setActiveCalculationById(response.new_id);
       }
@@ -116,13 +120,13 @@ export const App = () => {
   
   const handleActiveCalculationUpdate = (updatedCalculation: CalculationInstance) => {
     updateCalculation(updatedCalculation);
+    updateActiveCalculationInCache(updatedCalculation);
   };
 
   const handleCreateNewFromExisting = (originalCalc: CalculationInstance, newParams: CalculationParameters) => {
     const newInstance = createNewCalculationFromExisting(originalCalc, newParams);
     setActiveCalculationById(newInstance.id);
   };
-
 
   const renderCurrentPage = () => {
     switch (currentPage) {

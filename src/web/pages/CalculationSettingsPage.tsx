@@ -1,3 +1,5 @@
+// src/web/pages/CalculationSettingsPage.tsx
+
 import { useRef, useState, useEffect, useCallback } from "react";
 import { MoleculeViewer, MoleculeViewerRef } from "../components/MoleculeViewer";
 import { XYZInput } from "../components/XYZInput";
@@ -33,21 +35,29 @@ export const CalculationSettingsPage = ({
     const [pubchemInput, setPubchemInput] = useState("");
     const [isConverting, setIsConverting] = useState(false);
     const [convertError, setConvertError] = useState<string | null>(null);
+    const [localName, setLocalName] = useState("");
 
     useEffect(() => {
-        const xyz = activeCalculation?.parameters?.xyz;
-        if (xyz && xyz.trim() !== "") {
-            moleculeViewerRef.current?.loadXYZ(xyz);
+        if (activeCalculation) {
+            setLocalName(activeCalculation.name || activeCalculation.parameters?.molecule_name || "");
+            const xyz = activeCalculation.parameters?.xyz;
+            if (xyz && xyz.trim() !== "") {
+                moleculeViewerRef.current?.loadXYZ(xyz);
+            } else {
+                moleculeViewerRef.current?.clearModels();
+            }
         } else {
+            setLocalName("");
             moleculeViewerRef.current?.clearModels();
         }
-    }, [activeCalculation?.id, activeCalculation?.parameters?.xyz]);
+    }, [activeCalculation]);
 
     const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
         if (!activeCalculation || !onCalculationUpdate) return;
+        if (field === 'molecule_name') return;
 
         const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
-        const isParamChange = field !== 'molecule_name' && field !== 'xyz';
+        const isParamChange = field !== 'xyz';
         const currentParams = activeCalculation.parameters;
         
         if (isCompleted && isParamChange) {
@@ -69,23 +79,32 @@ export const CalculationSettingsPage = ({
         }
     }, [activeCalculation, onCalculationUpdate]);
 
-    // This function now checks if the instance is temporary.
-    // If so, it does NOT call the API, preventing the 404 error.
-    const handleNameBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-        const newName = e.target.value.trim();
-        if (!activeCalculation || !newName || activeCalculation.name === newName) {
-            return; // Exit if no change, no name, or no active calc
-        }
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setLocalName(e.target.value);
+    };
 
-        // If it's a temporary instance, the name is already updated in the React state
-        // by the `onChange` handler. We don't need to call the API.
-        // The final name will be saved when the calculation is actually run.
-        if (activeCalculation.id.startsWith('new-calculation-')) {
+    const handleNameBlur = () => {
+        const newName = localName.trim();
+
+        if (!activeCalculation || !newName || activeCalculation.name === newName) {
+            if (activeCalculation) setLocalName(activeCalculation.name);
             return;
         }
 
-        // Only call the rename API for existing, saved calculations.
-        onCalculationRename(activeCalculation.id, newName);
+        if (activeCalculation.id.startsWith('new-calculation-')) {
+            onCalculationUpdate({
+                ...activeCalculation,
+                name: newName,
+                parameters: { ...activeCalculation.parameters, molecule_name: newName },
+            });
+            return;
+        }
+
+        if (window.confirm(`この計算の名前を「${newName}」に変更しますか？`)) {
+            onCalculationRename(activeCalculation.id, newName);
+        } else {
+            setLocalName(activeCalculation.name);
+        }
     };
 
     const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -124,17 +143,20 @@ export const CalculationSettingsPage = ({
         setCalculationStatus('running');
         setCalculationError(null);
 
+        const finalParams = { ...params, molecule_name: localName.trim() };
+
         try {
-            const responseData = await startCalculation(params);
+            const responseData = await startCalculation(finalParams);
             setCalculationStatus('completed');
 
             if (onCalculationSuccess) {
                 const completedInstance: CalculationInstance = {
                     ...activeCalculation,
                     id: responseData.calculation_id,
+                    name: localName.trim(),
                     status: 'completed',
                     updatedAt: new Date().toISOString(),
-                    parameters: params,
+                    parameters: finalParams,
                     results: responseData.calculation_results,
                     workingDirectory: responseData.calculation_results.working_directory,
                 };
@@ -154,24 +176,24 @@ export const CalculationSettingsPage = ({
 
         try {
             let data: PubChemSearchResponse | SmilesConvertResponse;
+            let moleculeName = localName;
 
             if (inputMethod === 'smiles') {
                 data = await convertSmilesToXyz(pubchemInput.trim());
+                moleculeName = pubchemInput.trim();
             } else {
                 const searchType = /^\d+$/.test(pubchemInput.trim()) ? 'cid' : 'name';
                 data = await searchPubChem(pubchemInput.trim(), searchType);
-            }
-
-            let moleculeName = params.molecule_name;
-            if ('compound_info' in data && data.compound_info?.iupac_name) {
-                moleculeName = data.compound_info.iupac_name;
-            } else {
-                moleculeName = pubchemInput.trim();
+                if ('compound_info' in data && data.compound_info?.iupac_name) {
+                    moleculeName = data.compound_info.iupac_name;
+                }
             }
             
+            setLocalName(moleculeName);
             const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
             onCalculationUpdate({
                 ...activeCalculation,
+                name: moleculeName,
                 parameters: updatedParams,
             });
 
@@ -197,14 +219,14 @@ export const CalculationSettingsPage = ({
                             <input
                                 type="text"
                                 placeholder="Molecule name..."
-                                value={params.molecule_name || ''}
+                                value={localName}
                                 onBlur={handleNameBlur}
                                 onKeyDown={handleNameKeyDown}
-                                onChange={(e) => handleParamChange('molecule_name', e.target.value)}
+                                onChange={handleNameChange}
                                 className="molecule-name-input"
                             />
-                            {params.molecule_name && (
-                                <button onClick={() => handleParamChange('molecule_name', '')} className="clear-molecule-name" aria-label="Clear molecule name"> × </button>
+                            {localName && (
+                                <button onClick={() => setLocalName('')} className="clear-molecule-name" aria-label="Clear molecule name"> × </button>
                             )}
                         </div>
                         <div className="computation-settings">
@@ -268,10 +290,11 @@ export const CalculationSettingsPage = ({
                             </div>
                             <div className="setting-row">
                                 <label>Basis functions</label>
-                                <select value={params.basis_function || 'STO-3G'} onChange={(e) => handleParamChange('basis_function', e.target.value)}>
+                                <select value={params.basis_function || '6-31G(d)'} onChange={(e) => handleParamChange('basis_function', e.target.value)}>
                                     <option value="STO-3G">STO-3G</option>
                                     <option value="3-21G">3-21G</option>
                                     <option value="6-31G">6-31G</option>
+                                    <option value="6-31G(d)">6-31G(d)</option>
                                     <option value="cc-pVDZ">cc-pVDZ</option>
                                 </select>
                             </div>
