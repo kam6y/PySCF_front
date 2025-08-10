@@ -106,12 +106,6 @@ export const App = () => {
     }
   };
 
-  const handleCalculationSuccess = async (completedCalculation: CalculationInstance) => {
-    updateCalculation(completedCalculation);
-    await refreshCalculations(); 
-    setActiveCalculationById(completedCalculation.id);
-    setCurrentPage('calculation-results');
-  };
 
   const handleCalculationRename = async (calculationId: string, newName: string) => {
     try {
@@ -157,7 +151,6 @@ export const App = () => {
             activeCalculation={activeCalculation}
             onCalculationUpdate={handleActiveCalculationUpdate}
             onStartCalculation={handleStartCalculation}
-            onCalculationSuccess={handleCalculationSuccess}
             onCalculationRename={handleCalculationRename}
             createNewCalculationFromExisting={handleCreateNewFromExisting}
           />
@@ -168,6 +161,7 @@ export const App = () => {
             activeCalculation={activeCalculation}
             isLoadingDetails={isLoadingDetails}
             detailsError={detailsError}
+            onCalculationUpdate={handleActiveCalculationUpdate}
           />
         );
       case 'draw-molecule':
@@ -178,7 +172,6 @@ export const App = () => {
             activeCalculation={activeCalculation}
             onCalculationUpdate={handleActiveCalculationUpdate}
             onStartCalculation={handleStartCalculation}
-            onCalculationSuccess={handleCalculationSuccess}
             onCalculationRename={handleCalculationRename}
             createNewCalculationFromExisting={handleCreateNewFromExisting}
           />

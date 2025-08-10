@@ -16,7 +16,6 @@ interface CalculationSettingsPageProps {
     activeCalculation?: CalculationInstance;
     onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
     onStartCalculation: (params: CalculationParameters) => Promise<CalculationInstance>;
-    onCalculationSuccess: (completedCalculation: CalculationInstance) => void;
     onCalculationRename: (id: string, newName: string) => Promise<void>;
     createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: CalculationParameters) => void;
 }
@@ -25,7 +24,6 @@ export const CalculationSettingsPage = ({
     activeCalculation,
     onCalculationUpdate,
     onStartCalculation,
-    onCalculationSuccess,
     onCalculationRename,
     createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
@@ -56,7 +54,7 @@ export const CalculationSettingsPage = ({
 
                 if (updatedCalc.status === 'completed' || updatedCalc.status === 'error') {
                     stopPolling();
-                    onCalculationSuccess(updatedCalc); // Use success handler to update global state
+                    onCalculationUpdate(updatedCalc); // Update calculation state when completed
                 } else {
                     onCalculationUpdate(updatedCalc); // Update status locally while running
                 }
@@ -66,7 +64,7 @@ export const CalculationSettingsPage = ({
                 stopPolling();
             }
         }, 3000); // Poll every 3 seconds
-    }, [onCalculationSuccess, onCalculationUpdate]);
+    }, [onCalculationUpdate]);
 
     useEffect(() => {
         // Stop polling when the component unmounts or the active calculation changes

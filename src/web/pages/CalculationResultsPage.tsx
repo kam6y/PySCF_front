@@ -1,22 +1,70 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { CalculationResults, CalculationParameters, CalculationInstance } from "../types/calculation";
+import { getCalculationDetails } from "../apiClient";
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
   isLoadingDetails?: boolean;
   detailsError?: string | null;
+  onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
 }
 
 export const CalculationResultsPage = ({ 
   activeCalculation, 
   isLoadingDetails = false, 
-  detailsError = null 
+  detailsError = null,
+  onCalculationUpdate
 }: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopPolling = () => {
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+  };
+
+  const startPolling = useCallback((calculationId: string) => {
+    stopPolling(); // To prevent multiple pollers from running
+
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const response = await getCalculationDetails(calculationId);
+        const updatedCalc = response.calculation;
+
+        if (updatedCalc.status === 'completed' || updatedCalc.status === 'error') {
+          stopPolling();
+          onCalculationUpdate(updatedCalc); // Update calculation state when completed
+        } else {
+          onCalculationUpdate(updatedCalc); // Update status locally while running
+        }
+      } catch (error) {
+        console.error(`Polling failed for calculation ${calculationId}:`, error);
+        stopPolling();
+      }
+    }, 3000); // Poll every 3 seconds
+  }, [onCalculationUpdate]);
 
   useEffect(() => {
     setError(detailsError);
   }, [detailsError]);
+
+  useEffect(() => {
+    // Stop polling when the component unmounts or the active calculation changes
+    return () => {
+      stopPolling();
+    };
+  }, []);
+
+  useEffect(() => {
+    // If activeCalculation is running, start polling for its status
+    if (activeCalculation && activeCalculation.status === 'running') {
+      startPolling(activeCalculation.id);
+    } else {
+      stopPolling();
+    }
+  }, [activeCalculation, startPolling]);
 
   // Show loading state
   if (isLoadingDetails) {
