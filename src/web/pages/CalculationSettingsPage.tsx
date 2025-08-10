@@ -41,7 +41,7 @@ export const CalculationSettingsPage = ({
         } else {
             moleculeViewerRef.current?.clearModels();
         }
-    }, [activeCalculation?.id, activeCalculation?.parameters?.xyz]); // Depend on ID to reload viewer for new instances
+    }, [activeCalculation?.id, activeCalculation?.parameters?.xyz]);
 
     const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
         if (!activeCalculation || !onCalculationUpdate) return;
@@ -50,12 +50,10 @@ export const CalculationSettingsPage = ({
         const isParamChange = field !== 'molecule_name' && field !== 'xyz';
         const currentParams = activeCalculation.parameters;
         
-        // If calculation is completed and a parameter (not name/xyz) is changed, create a new derived calculation
         if (isCompleted && isParamChange) {
             const newParams = { ...currentParams, [field]: value };
             createNewCalculationFromExisting(activeCalculation, newParams);
         } else {
-            // Otherwise, just update the current active calculation's state
             const updatedParams = { ...currentParams, [field]: value };
             onCalculationUpdate({
                 ...activeCalculation,
@@ -71,9 +69,28 @@ export const CalculationSettingsPage = ({
         }
     }, [activeCalculation, onCalculationUpdate]);
 
+    // This function now checks if the instance is temporary.
+    // If so, it does NOT call the API, preventing the 404 error.
     const handleNameBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-        if (activeCalculation && activeCalculation.name !== e.target.value.trim() && e.target.value.trim()) {
-            onCalculationRename(activeCalculation.id, e.target.value.trim());
+        const newName = e.target.value.trim();
+        if (!activeCalculation || !newName || activeCalculation.name === newName) {
+            return; // Exit if no change, no name, or no active calc
+        }
+
+        // If it's a temporary instance, the name is already updated in the React state
+        // by the `onChange` handler. We don't need to call the API.
+        // The final name will be saved when the calculation is actually run.
+        if (activeCalculation.id.startsWith('new-calculation-')) {
+            return;
+        }
+
+        // Only call the rename API for existing, saved calculations.
+        onCalculationRename(activeCalculation.id, newName);
+    };
+
+    const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.currentTarget.blur();
         }
     };
     
@@ -181,6 +198,8 @@ export const CalculationSettingsPage = ({
                                 type="text"
                                 placeholder="Molecule name..."
                                 value={params.molecule_name || ''}
+                                onBlur={handleNameBlur}
+                                onKeyDown={handleNameKeyDown}
                                 onChange={(e) => handleParamChange('molecule_name', e.target.value)}
                                 className="molecule-name-input"
                             />

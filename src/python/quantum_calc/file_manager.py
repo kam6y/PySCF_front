@@ -44,8 +44,8 @@ class CalculationFileManager:
             return None
 
         # タイムスタンプ部分を維持しつつ、新しいディレクトリ名を生成
-        # ▼▼▼ エラー修正箇所 ▼▼▼
-        timestamp_match = re.search(r'_(\d{8}_\d{6})$', old_id)
+        # ✨✨✨ CHANGE: Corrected regular expression ✨✨✨
+        timestamp_match = re.search(r'_(\d{8}_\d{6})', old_id)
         timestamp = timestamp_match.group(1) if timestamp_match else datetime.now().strftime("%Y%m%d_%H%M%S")
         
         clean_new_name = "".join(c for c in new_name if c.isalnum() or c in "._-").strip() or "unnamed"
@@ -79,8 +79,8 @@ class CalculationFileManager:
             if item.is_dir():
                 params = self.read_calculation_parameters(str(item))
                 # Use molecule_name from JSON if available, otherwise parse from directory name
-                # ▼▼▼ エラー修正箇所 ▼▼▼
-                display_name = params.get('molecule_name', re.sub(r'_(\d{8}_\d{6})$', '', item.name)) if params else re.sub(r'_(\d{8}_\d{6})$', '', item.name)
+                # ✨✨✨ CHANGE: Corrected regular expression ✨✨✨
+                display_name = params.get('molecule_name', re.sub(r'_(\d{8}_\d{6})', '', item.name)) if params else re.sub(r'_(\d{8}_\d{6})', '', item.name)
                 status = self.read_calculation_status(str(item))
                 
                 calculations.append({
