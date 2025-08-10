@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
@@ -7,74 +7,100 @@ import { CalculationSettingsPage } from "./pages/CalculationSettingsPage";
 import { CalculationResultsPage } from "./pages/CalculationResultsPage";
 import { DrawMoleculePage } from "./pages/DrawMoleculePage";
 import { useCalculations, useActiveCalculation } from "./hooks";
-import { CalculationParameters } from "./types/calculation";
+import { CalculationInstance, CalculationParameters } from "./types/calculation";
 
 export const App = () => {
-  // UI state
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // --- State Management ---
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<DropdownOption>('calculation-settings');
 
-  // Calculation management state
   const {
     calculations,
     isLoading: calculationsLoading,
     error: calculationsError,
     refreshCalculations,
-    getCalculationById,
     updateCalculationName,
     deleteCalculation,
-    createCalculation
   } = useCalculations();
 
   const {
     activeCalculationId,
     activeCalculation,
+    isLoadingDetails,
+    detailsError,
     setActiveCalculation,
     setActiveCalculationById,
     loadCalculationDetails,
-    clearActiveCalculation
+    clearActiveCalculation,
   } = useActiveCalculation(calculations);
 
-  // Get page title based on current page
-  const getPageTitle = (page: DropdownOption): string => {
-    switch (page) {
-      case 'calculation-settings':
-        return 'Calculation settings';
-      case 'calculation-results':
-        return 'Calculation results';
-      case 'draw-molecule':
-        return 'Draw molecule';
-      default:
-        return 'Calculation settings';
+  // --- Effect Hooks ---
+  useEffect(() => {
+    if (!activeCalculationId && calculations.length > 0) {
+      const firstCalculation = calculations[0];
+      setActiveCalculationById(firstCalculation.id);
     }
+  }, [calculations, activeCalculationId, setActiveCalculationById]);
+
+  // --- Helper Functions ---
+  const getPageTitle = (page: DropdownOption): string => {
+    const titles: Record<DropdownOption, string> = {
+      'calculation-settings': 'Calculation Settings',
+      'calculation-results': 'Calculation Results',
+      'draw-molecule': 'Draw Molecule',
+    };
+    return titles[page] || 'PySCF Front';
   };
 
-  // Event handlers for UI components
-  const handleSidebarToggle = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  // --- Event Handlers ---
+  const handleSidebarToggle = () => setIsSidebarOpen(!isSidebarOpen);
+  const handleSidebarClose = () => setIsSidebarOpen(false);
+  const handleDropdownToggle = () => setIsDropdownOpen(!isDropdownOpen);
+  const handleDropdownClose = () => setIsDropdownOpen(false);
+  const handleDropdownOptionSelect = (option: DropdownOption) => setCurrentPage(option);
 
-  const handleSidebarClose = () => {
-    setIsSidebarOpen(false);
-  };
-
-  const handleDropdownToggle = () => {
-    setIsDropdownOpen(!isDropdownOpen);
-  };
-
-  const handleDropdownClose = () => {
-    setIsDropdownOpen(false);
-  };
-
-  const handleDropdownOptionSelect = (option: DropdownOption) => {
-    setCurrentPage(option);
-  };
-
-  // Handle calculation management actions
+  /**
+   * Handles selecting a calculation from the sidebar.
+   * This function now ONLY sets the active calculation and loads its details.
+   * It no longer changes the current page.
+   */
   const handleCalculationSelect = (calculationId: string) => {
     setActiveCalculationById(calculationId);
-    setIsSidebarOpen(false); // Close sidebar when selecting calculation
+    loadCalculationDetails(calculationId, true); // Force refresh details
+    handleSidebarClose();
+  };
+
+  const handleNewCalculation = () => {
+    const now = new Date().toISOString();
+    const tempId = `new-calculation-${Date.now()}`;
+    const newCalculation: CalculationInstance = {
+      id: tempId,
+      name: 'New Calculation',
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+      parameters: {
+        calculation_method: 'DFT',
+        basis_function: '6-31G(d)',
+        exchange_correlation: 'B3LYP',
+        charges: 0,
+        spin_multiplicity: 1,
+        solvent_method: 'none',
+        solvent: '-',
+        xyz: '',
+        molecule_name: 'New Calculation'
+      },
+    };
+    setActiveCalculation(newCalculation);
+    setCurrentPage('calculation-settings');
+    handleSidebarClose();
+  };
+  
+  const handleCalculationSuccess = async (completedCalculation: CalculationInstance) => {
+    await refreshCalculations(); 
+    setActiveCalculation(completedCalculation);
+    setCurrentPage('calculation-results');
   };
 
   const handleCalculationRename = async (calculationId: string, newName: string) => {
@@ -82,113 +108,77 @@ export const App = () => {
       await updateCalculationName(calculationId, newName);
     } catch (error) {
       console.error('Failed to rename calculation:', error);
+      alert(`Error: Could not rename calculation. ${error instanceof Error ? error.message : ''}`);
     }
   };
 
   const handleCalculationDelete = async (calculationId: string) => {
     try {
       await deleteCalculation(calculationId);
-      // If deleted calculation was active, clear it
       if (activeCalculationId === calculationId) {
         clearActiveCalculation();
+        setCurrentPage('calculation-settings');
       }
     } catch (error) {
       console.error('Failed to delete calculation:', error);
+      alert(`Error: Could not delete calculation. ${error instanceof Error ? error.message : ''}`);
     }
   };
 
-  const handlePlusClick = () => {
-    // Create a new calculation and make it active
-    const defaultParams: CalculationParameters = {
-      calculation_method: 'DFT',
-      basis_function: '6-31G(d)',
-      exchange_correlation: 'B3LYP',
-      charges: 0,
-      spin_multiplicity: 1,
-      solvent_method: 'none',
-      solvent: '-',
-      xyz: '',
-      molecule_name: 'New Calculation'
-    };
-
-    const newCalculation = createCalculation('New Calculation', defaultParams);
-    setActiveCalculation(newCalculation);
-    setCurrentPage('calculation-settings'); // Navigate to settings page
-  };
-
-  // Render current page component
+  // --- Page Rendering Logic ---
   const renderCurrentPage = () => {
     switch (currentPage) {
       case 'calculation-settings':
         return (
-          <CalculationSettingsPage 
+          <CalculationSettingsPage
             activeCalculation={activeCalculation}
-            onCalculationUpdate={(updatedCalculation) => {
-              setActiveCalculation(updatedCalculation);
-            }}
+            onCalculationUpdate={setActiveCalculation}
+            onCalculationSuccess={handleCalculationSuccess}
+            refreshCalculations={refreshCalculations}
           />
         );
       case 'calculation-results':
         return (
-          <CalculationResultsPage 
+          <CalculationResultsPage
             activeCalculation={activeCalculation}
+            isLoadingDetails={isLoadingDetails}
+            detailsError={detailsError}
           />
         );
       case 'draw-molecule':
         return <DrawMoleculePage />;
       default:
         return (
-          <CalculationSettingsPage 
+          <CalculationSettingsPage
             activeCalculation={activeCalculation}
-            onCalculationUpdate={(updatedCalculation) => {
-              setActiveCalculation(updatedCalculation);
-            }}
+            onCalculationUpdate={setActiveCalculation}
+            onCalculationSuccess={handleCalculationSuccess}
+            refreshCalculations={refreshCalculations}
           />
         );
     }
   };
 
+  // --- Main Component Render ---
   return (
     <div className="app-container">
-      {/* Independent Sidebar Toggle */}
       <button
         className={`independent-sidebar-toggle ${isSidebarOpen ? 'sidebar-open' : ''}`}
         onClick={handleSidebarToggle}
         aria-label="Toggle sidebar"
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
           {isSidebarOpen ? (
-            // Arrow pointing left (close sidebar)
-            <path
-              d="M10 4L6 8L10 12"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="M10 4L6 8L10 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           ) : (
-            // Arrow pointing right (open sidebar)
-            <path
-              d="M6 4L10 8L6 12"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           )}
         </svg>
       </button>
 
-      {/* Header */}
       <Header
         onDropdownToggle={handleDropdownToggle}
-        onPlusClick={handlePlusClick}
+        onPlusClick={handleNewCalculation}
         isDropdownOpen={isDropdownOpen}
         isSidebarOpen={isSidebarOpen}
         currentPageTitle={getPageTitle(currentPage)}
@@ -197,8 +187,6 @@ export const App = () => {
         onDropdownClose={handleDropdownClose}
       />
 
-
-      {/* Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={handleSidebarClose}
@@ -211,11 +199,9 @@ export const App = () => {
         onCalculationDelete={handleCalculationDelete}
       />
 
-      {/* Main Content */}
-      <div className={`app-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <main className={`app-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
         {renderCurrentPage()}
-      </div>
-
+      </main>
     </div>
   );
 };
