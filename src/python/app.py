@@ -306,7 +306,7 @@ def get_calculation_details(calculation_id):
         results = file_manager.read_calculation_results(calc_path)
         status = file_manager.read_calculation_status(calc_path)
         
-        display_name = parameters.get('molecule_name', calculation_id.rsplit('_', 1)[0])
+        display_name = file_manager._get_display_name(calculation_id, parameters)
         creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
 
         calculation_instance = {

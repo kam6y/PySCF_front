@@ -69,6 +69,42 @@ class CalculationFileManager:
             
         return new_id
 
+    def _get_display_name(self, directory_name: str, parameters: Optional[Dict[str, Any]]) -> str:
+        """Get display name with robust fallback logic.
+        
+        Fallback hierarchy:
+        1. Use molecule_name from parameters.json if available
+        2. Use "Unnamed Calculation" as default
+        3. As last resort, use simple directory parsing (no regex dependency)
+        
+        Args:
+            directory_name: The calculation directory name
+            parameters: Parameters dict from parameters.json (may be None)
+        
+        Returns:
+            Display name for the calculation
+        """
+        # First priority: molecule_name from parameters.json
+        if parameters and parameters.get('molecule_name'):
+            return parameters['molecule_name'].strip()
+        
+        # Second priority: generic fallback for missing molecule_name
+        if parameters:
+            return "Unnamed Calculation"
+        
+        # Last resort: simple directory parsing for legacy calculations
+        # This avoids regex dependency and gracefully handles any naming format
+        if '_' in directory_name:
+            # Try to extract meaningful part before what looks like a timestamp
+            parts = directory_name.split('_')
+            if len(parts) >= 2:
+                # Check if the last part looks like a timestamp (all digits)
+                if parts[-1].isdigit() and len(parts[-1]) == 6:
+                    return '_'.join(parts[:-1]) if len(parts) > 2 else parts[0]
+        
+        # Absolute fallback
+        return directory_name
+
     def list_calculations(self) -> list:
         """List all calculation directories."""
         if not self.base_dir.exists():
@@ -78,9 +114,8 @@ class CalculationFileManager:
         for item in self.base_dir.iterdir():
             if item.is_dir():
                 params = self.read_calculation_parameters(str(item))
-                # Use molecule_name from JSON if available, otherwise parse from directory name
-                # ✨✨✨ CHANGE: Corrected regular expression ✨✨✨
-                display_name = params.get('molecule_name', re.sub(r'_(\d{8}_\d{6})', '', item.name)) if params else re.sub(r'_(\d{8}_\d{6})', '', item.name)
+                # Use robust fallback logic for display names
+                display_name = self._get_display_name(item.name, params)
                 status = self.read_calculation_status(str(item))
                 
                 calculations.append({
