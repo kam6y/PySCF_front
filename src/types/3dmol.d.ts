@@ -118,6 +118,5 @@ declare module '3dmol' {
   ): void;
   
   export const ElementColors: { [element: string]: number };
-  export const CC: { [color: string]: number };
 }
 
