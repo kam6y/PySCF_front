@@ -15,6 +15,9 @@ npm run dev
 # Production build
 npm run build
 
+# Package application for distribution (includes production build)
+npm run package
+
 # Clean build directory (automatically done before dev)
 rimraf dist
 
@@ -38,7 +41,8 @@ npx tsc --noEmit       # Type check without emitting files
 - `electronmon` watches `dist/**/*` and restarts Electron automatically on changes
 - `wait-on` ensures build artifacts exist before starting Electron to prevent startup errors
 - Development mode includes source maps and opens DevTools in detached mode
-- Python Flask server (port 5000) starts automatically and provides PubChem API integration
+- Python Flask server (port 5000) starts automatically via Electron main process subprocess management
+- Main process includes health check mechanism to ensure Python server is ready before UI loads
 - SSL verification is disabled in development for PubChem HTTPS requests
 
 ## Architecture Overview
@@ -136,9 +140,10 @@ Custom TypeScript definitions are provided for:
 ### Code Organization & Standards
 - TypeScript strict mode enabled with comprehensive type definitions in `src/types/`
 - Custom TypeScript definitions for 3Dmol.js library and Electron APIs
+- TypeScript configured with ESNext target, React JSX transform, and bundler module resolution
 - XYZ parser supports standard molecular coordinate format with validation
 - Sample molecules available for testing: water, methane, benzene
-- Python backend follows modern practices with uv package management
+- Python backend follows modern practices with uv package management (Python >=3.12)
 - Flask API uses REST conventions with JSON responses and proper error handling
 - SSL certificate verification disabled in development for PubChem API access
 - Comprehensive test coverage for both Python backend and TypeScript frontend
@@ -149,6 +154,8 @@ Custom TypeScript definitions are provided for:
 - CSS extracted to separate files (no style-loader for security)
 - Assets processed as resources and placed in `dist/assets/`
 - `fsevents` externalized for macOS compatibility
+- electron-builder configured for cross-platform packaging (Windows NSIS, macOS DMG, Linux AppImage)
+- Production builds include Python backend as extraResources in `python_dist/` directory
 
 ### UI Architecture
 - Independent sidebar toggle button with custom SVG icons
