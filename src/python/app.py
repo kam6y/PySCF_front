@@ -81,10 +81,12 @@ def search_pubchem():
             }
         })
             
+    except PubChemNotFoundError as e:
+        logger.warning(f"PubChem search failed (Not Found): {e}")
+        return jsonify({'success': False, 'error': str(e)}), 404
     except PubChemError as e:
-        logger.error(f"A PubChem API error occurred: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-        
+        logger.error(f"A PubChem API error occurred: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), e.status_code or 500
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
