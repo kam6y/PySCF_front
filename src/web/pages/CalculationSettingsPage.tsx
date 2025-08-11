@@ -510,6 +510,10 @@ export const CalculationSettingsPage = ({
                     <option value="ief-pcm">IEF-PCM</option>
                     <option value="c-pcm">C-PCM</option>
                     <option value="cosmo">COSMO</option>
+                    <option value="ssvpe">SS(V)PE</option>
+                  </optgroup>
+                  <optgroup label="ddCOSMO Method">
+                    <option value="ddcosmo">ddCOSMO</option>
                   </optgroup>
                 </select>
               </div>

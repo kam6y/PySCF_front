@@ -284,7 +284,7 @@ components:
 
     SolventMethod:
       type: string
-      enum: [none, pcm, ief-pcm, c-pcm, cosmo]
+      enum: [none, ief-pcm, c-pcm, cosmo, ssvpe, ddcosmo]
       description: Solvent calculation method
 
     CalculationMethod:

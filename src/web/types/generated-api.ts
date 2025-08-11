@@ -165,7 +165,7 @@ export interface components {
          * @description Solvent calculation method
          * @enum {string}
          */
-        SolventMethod: "none" | "pcm" | "ief-pcm" | "c-pcm" | "cosmo";
+        SolventMethod: "none" | "pcm" | "ief-pcm" | "c-pcm" | "cosmo" | "ssvpe" | "ddcosmo";
         /**
          * @description Quantum calculation method
          * @enum {string}
