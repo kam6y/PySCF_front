@@ -1,6 +1,7 @@
 """DFT calculator implementation using PySCF."""
 
 import os
+import logging
 import numpy as np
 from typing import Dict, Any, List, Optional
 from pyscf import gto, dft
@@ -9,6 +10,8 @@ from pyscf.geomopt import geometric_solver
 from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
+
+logger = logging.getLogger(__name__)
 
 
 class DFTCalculator(BaseCalculator):
@@ -74,12 +77,12 @@ class DFTCalculator(BaseCalculator):
         
         try:
             # Step 1: Structure optimization
-            print("Starting geometry optimization...")
+            logger.info("Starting geometry optimization...")
             optimized_mol = geometric_solver.optimize(self.mf)
             self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
             
             # Step 2: SCF calculation with optimized geometry
-            print("Running SCF calculation with optimized geometry...")
+            logger.info("Running SCF calculation with optimized geometry...")
             self.mf = dft.RKS(optimized_mol)
             self.mf.chkfile = self.get_checkpoint_path()
             self.mf.xc = self.results['xc_functional']
@@ -95,8 +98,8 @@ class DFTCalculator(BaseCalculator):
             if self.mf.mo_occ is None or len(self.mf.mo_occ) == 0:
                 raise CalculationError("SCF calculation failed: mo_occ not properly assigned")
             
-            print("SCF calculation completed successfully.")
-            print(f"Number of occupied orbitals: {sum(self.mf.mo_occ > 0)}")
+            logger.info("SCF calculation completed successfully.")
+            logger.info(f"Number of occupied orbitals: {sum(self.mf.mo_occ > 0)}")
             
             # Step 3: Orbital analysis
             homo_idx, lumo_idx = self._analyze_orbitals()
@@ -122,7 +125,7 @@ class DFTCalculator(BaseCalculator):
             if self.keep_files:
                 self.file_manager.save_calculation_results(self.working_dir, self.results)
                 self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
-                print(f"Calculation files saved to: {self.working_dir}")
+                logger.info(f"Calculation files saved to: {self.working_dir}")
             
             return self.results
             

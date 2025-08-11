@@ -477,6 +477,42 @@ components:
         data:
           type: object
           description: Validation result
+          required: [valid]
+          properties:
+            valid:
+              type: boolean
+              description: Whether the XYZ format is valid
+            error:
+              type: string
+              description: Error message if validation failed
+            num_atoms:
+              type: integer
+              description: Number of atoms in the molecule (if valid)
+            title:
+              type: string
+              description: Title line from XYZ file (if valid)
+            atoms:
+              type: array
+              description: Array of atom data (if valid)
+              items:
+                type: object
+                required: [element, x, y, z]
+                properties:
+                  element:
+                    type: string
+                    description: Element symbol
+                  x:
+                    type: number
+                    format: float
+                    description: X coordinate
+                  y:
+                    type: number
+                    format: float
+                    description: Y coordinate
+                  z:
+                    type: number
+                    format: float
+                    description: Z coordinate
 
     CalculationParameters:
       type: object
