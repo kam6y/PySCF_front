@@ -12,6 +12,7 @@ import threading
 import socket
 import shutil
 from typing import Dict
+from werkzeug.serving import make_server
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
@@ -38,11 +39,6 @@ CORS(app)  # Enable CORS for cross-origin requests
 pubchem_client = PubChemClient(timeout=30)
 
 
-def find_free_port():
-    """Finds an available TCP port on the system."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
-        return s.getsockname()[1]
 
 def run_calculation_in_background(calculation_id: str, parameters: dict):
     """
@@ -397,12 +393,20 @@ def method_not_allowed(error):
 
 if __name__ == '__main__':
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
-    # If a port is passed as a command-line argument, use it. Otherwise, find a free one.
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else find_free_port()
+    # If a port is passed as a command-line argument, use it. Otherwise, let OS assign one.
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     debug = os.environ.get('FLASK_ENV') == 'development'
     
-    # Print the port to stdout so the Electron process can capture it.
-    print(f"FLASK_SERVER_PORT:{port}", file=sys.stdout, flush=True)
+    # Create server with OS-assigned port (port=0)
+    server = make_server(host, port, app)
+    actual_port = server.server_port
     
-    logger.info(f"Starting API server on http://{host}:{port} (Debug: {debug})")
-    app.run(host=host, port=port, debug=debug)
+    # Print the actual port to stdout so the Electron process can capture it.
+    print(f"FLASK_SERVER_PORT:{actual_port}", file=sys.stdout, flush=True)
+    
+    logger.info(f"Starting API server on http://{host}:{actual_port} (Debug: {debug})")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        logger.info("Server stopped by user.")
+        server.shutdown()
