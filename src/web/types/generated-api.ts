@@ -279,7 +279,36 @@ export interface components {
             /** @example true */
             success: boolean;
             /** @description Validation result */
-            data: Record<string, never>;
+            data: {
+                /** @description Whether the XYZ format is valid */
+                valid: boolean;
+                /** @description Error message if validation failed */
+                error?: string;
+                /** @description Number of atoms in the molecule (if valid) */
+                num_atoms?: number;
+                /** @description Title line from XYZ file (if valid) */
+                title?: string;
+                /** @description Array of atom data (if valid) */
+                atoms?: {
+                    /** @description Element symbol */
+                    element: string;
+                    /**
+                     * Format: float
+                     * @description X coordinate
+                     */
+                    x: number;
+                    /**
+                     * Format: float
+                     * @description Y coordinate
+                     */
+                    y: number;
+                    /**
+                     * Format: float
+                     * @description Z coordinate
+                     */
+                    z: number;
+                }[];
+            };
         };
         CalculationParameters: {
             calculation_method: components["schemas"]["CalculationMethod"];
