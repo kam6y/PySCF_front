@@ -1,9 +1,9 @@
 // src/web/pages/CalculationSettingsPage.tsx
 
 import { useRef, useState, useEffect, useCallback } from "react";
-import { MoleculeViewer, MoleculeViewerRef } from "../components/MoleculeViewer";
+import { MoleculeViewerRef } from "../components/MoleculeViewer";
 import { XYZInput } from "../components/XYZInput";
-import { StyleControls } from "../components/StyleControls";
+import { MoleculeViewerSection } from "../components/MoleculeViewerSection";
 import { StyleSpec } from "../../types/3dmol";
 import {
   QuantumCalculationRequest,
@@ -556,8 +556,7 @@ export const CalculationSettingsPage = ({
                   <label>Custom Dielectric Constant</label>
                   <input
                     type="number"
-                    min="1"
-                    placeholder="e.g., 15.5"
+                    min="0"
                     value={getCustomDielectricValue()}
                     onChange={(e) => handleParamChange('solvent', e.target.value || '78.36')}
                     className="number-input"
@@ -568,26 +567,11 @@ export const CalculationSettingsPage = ({
             </section>
           </div>
         </div>
-        <div className="main-content">
-          <div className="left-column">
-            <div className="viewer-container">
-              <MoleculeViewer ref={moleculeViewerRef} width={600} height={500} backgroundColor="white" className="main-viewer" />
-              {!hasValidMolecule && (
-                <div className="viewer-placeholder">
-                  <div className="placeholder-content">
-                    <h3>No Molecule Loaded</h3>
-                    <p>Enter a molecular structure in the right panel to see the 3D visualization</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="right-column">
-            <section className="visualization-section">
-              <StyleControls onStyleChange={handleStyleChange} />
-            </section>
-          </div>
-        </div>
+        <MoleculeViewerSection
+          moleculeViewerRef={moleculeViewerRef}
+          hasValidMolecule={hasValidMolecule}
+          onStyleChange={handleStyleChange}
+        />
       </div>
       <section className="molecular-input-section">
         <h3>Molecular Structure Input</h3>
