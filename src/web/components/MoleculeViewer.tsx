@@ -27,7 +27,6 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
       if (!containerRef.current) return;
 
       try {
-        // 変更点: 'as any' を削除
         const viewer = $3Dmol.createViewer(containerRef.current, {
           backgroundColor,
         });

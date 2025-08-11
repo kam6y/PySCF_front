@@ -165,7 +165,7 @@ export interface components {
          * @description Solvent calculation method
          * @enum {string}
          */
-        SolventMethod: "none" | "pcm";
+        SolventMethod: "none" | "pcm" | "ief-pcm" | "c-pcm" | "cosmo";
         /**
          * @description Quantum calculation method
          * @enum {string}
@@ -196,12 +196,12 @@ export interface components {
             /** @default DFT */
             calculation_method: components["schemas"]["CalculationMethod"];
             /**
-             * @description Basis function for calculation
+             * @description Basis set for calculation (e.g., STO-3G, 6-31G(d), 6-31+G(d,p), cc-pVDZ, aug-cc-pVTZ, def2-SVP)
              * @default 6-31G(d)
              */
             basis_function: string;
             /**
-             * @description Exchange-correlation functional
+             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS)
              * @default B3LYP
              */
             exchange_correlation: string;
@@ -218,7 +218,10 @@ export interface components {
             /** @default none */
             solvent_method: components["schemas"]["SolventMethod"];
             /**
-             * @description Solvent type
+             * @description Solvent type or custom parameters. Options include:
+             *     - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, nitromethane, methanol, ethanol, acetone, dichloroethane, dichloromethane, tetrahydrofuran, chlorobenzene, chloroform, diethylether, toluene, benzene, 1,4-dioxane, cyclohexane
+             *     - Custom dielectric constant (numeric value > 1.0)
+             *
              * @default -
              */
             solvent: string;

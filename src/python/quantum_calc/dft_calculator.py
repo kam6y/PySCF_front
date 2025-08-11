@@ -14,6 +14,7 @@ from .file_manager import CalculationFileManager
 logger = logging.getLogger(__name__)
 
 
+
 class DFTCalculator(BaseCalculator):
     """DFT calculator using PySCF for structure optimization and orbital analysis."""
     
@@ -38,6 +39,8 @@ class DFTCalculator(BaseCalculator):
             charge = kwargs.get('charge', 0)
             spin = kwargs.get('spin', 0)
             max_cycle = kwargs.get('max_cycle', 150)
+            solvent_method = kwargs.get('solvent_method', 'none')
+            solvent = kwargs.get('solvent', '-')
             
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
@@ -51,8 +54,16 @@ class DFTCalculator(BaseCalculator):
                 verbose=0
             )
             
-            # Setup DFT calculation
-            self.mf = dft.RKS(self.mol)
+            # Setup DFT calculation with solvent effects
+            if solvent_method == 'none' or solvent == '-':
+                self.mf = dft.RKS(self.mol)
+            elif solvent_method.lower() in ['pcm', 'ief-pcm', 'c-pcm', 'cosmo']:
+                self.mf = dft.RKS(self.mol).PCM()
+                self._setup_pcm_solvent(solvent_method, solvent)
+            else:
+                logger.warning(f"Unsupported solvent method: {solvent_method}, using no solvent")
+                self.mf = dft.RKS(self.mol)
+            
             self.mf.chkfile = self.get_checkpoint_path()
             self.mf.xc = xc
             self.mf.max_cycle = max_cycle
@@ -64,6 +75,8 @@ class DFTCalculator(BaseCalculator):
                 'charge': charge,
                 'spin_multiplicity': 2 * spin + 1,
                 'max_cycle': max_cycle,
+                'solvent_method': solvent_method,
+                'solvent': solvent,
                 'atom_count': len(atoms)
             })
             
@@ -83,7 +96,20 @@ class DFTCalculator(BaseCalculator):
             
             # Step 2: SCF calculation with optimized geometry
             logger.info("Running SCF calculation with optimized geometry...")
-            self.mf = dft.RKS(optimized_mol)
+            
+            # Recreate mf object with optimized geometry while preserving solvent effects
+            solvent_method = self.results.get('solvent_method', 'none')
+            solvent = self.results.get('solvent', '-')
+            
+            if solvent_method == 'none' or solvent == '-':
+                self.mf = dft.RKS(optimized_mol)
+            elif solvent_method.lower() in ['pcm', 'ief-pcm', 'c-pcm', 'cosmo']:
+                self.mf = dft.RKS(optimized_mol).PCM()
+                self._setup_pcm_solvent(solvent_method, solvent)
+            else:
+                logger.warning(f"Unsupported solvent method: {solvent_method}, using no solvent")
+                self.mf = dft.RKS(optimized_mol)
+            
             self.mf.chkfile = self.get_checkpoint_path()
             self.mf.xc = self.results['xc_functional']
             self.mf.max_cycle = self.results['max_cycle']
@@ -119,9 +145,6 @@ class DFTCalculator(BaseCalculator):
                 'optimized_geometry': self._geometry_to_xyz_string()
             })
             
-            # ▼▼▼ エラー修正箇所 ▼▼▼
-            # 'save_calculation_info' -> 'save_calculation_results' に修正
-            # 'save_geometry'の呼び出しは、対応する関数をfile_managerに追加するため、このままにします
             if self.keep_files:
                 self.file_manager.save_calculation_results(self.working_dir, self.results)
                 self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
@@ -177,3 +200,57 @@ class DFTCalculator(BaseCalculator):
             lines.append(f"{symbol:2s} {coords[0]:12.6f} {coords[1]:12.6f} {coords[2]:12.6f}")
         
         return "\n".join(lines)
+    
+    def _setup_pcm_solvent(self, method: str, solvent: str) -> None:
+        """Setup PCM solvent effects."""
+        # Set PCM method
+        method_lower = method.lower()
+        if method_lower == 'ief-pcm':
+            self.mf.with_solvent.method = 'IEF-PCM'
+        elif method_lower == 'c-pcm':
+            self.mf.with_solvent.method = 'C-PCM'
+        elif method_lower == 'cosmo':
+            self.mf.with_solvent.method = 'COSMO'
+        else:  # default to IEF-PCM for 'pcm'
+            self.mf.with_solvent.method = 'IEF-PCM'
+        
+        # Set dielectric constant based on solvent
+        solvent_dielectric = {
+            'water': 78.3553,
+            'dimethylsulfoxide': 46.826,
+            'dmso': 46.826,  # alias
+            'n,n-dimethylformamide': 37.219,
+            'dmf': 37.219,  # alias
+            'nitromethane': 36.562,
+            'methanol': 32.613,
+            'ethanol': 24.852,
+            'acetone': 20.493,
+            'dichloroethane': 10.125,
+            'dichloromethane': 8.93,
+            'tetrahydrofuran': 7.4297,
+            'thf': 7.4297,  # alias
+            'chlorobenzene': 5.6968,
+            'chloroform': 4.7113,
+            'diethylether': 4.2400,
+            'toluene': 2.3741,
+            'benzene': 2.2706,
+            '1,4-dioxane': 2.2099,
+            'dioxane': 2.2099,  # alias
+            'cyclohexane': 2.0160
+        }
+        
+        if solvent.lower() in solvent_dielectric:
+            self.mf.with_solvent.eps = solvent_dielectric[solvent.lower()]
+        else:
+            # Try to parse as custom dielectric constant
+            try:
+                eps_value = float(solvent)
+                if eps_value > 1.0:
+                    self.mf.with_solvent.eps = eps_value
+                else:
+                    logger.warning(f"Invalid dielectric constant: {solvent}, using water (78.36)")
+                    self.mf.with_solvent.eps = 78.3553
+            except ValueError:
+                logger.warning(f"Unknown solvent: {solvent}, using water dielectric constant")
+                self.mf.with_solvent.eps = 78.3553
+    

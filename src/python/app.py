@@ -63,7 +63,9 @@ def run_calculation_in_background(calculation_id: str, parameters: dict):
             xc=parameters['exchange_correlation'],
             charge=parameters['charges'],
             spin=(parameters['spin_multiplicity'] - 1) // 2,
-            max_cycle=150
+            max_cycle=150,
+            solvent_method=parameters['solvent_method'],
+            solvent=parameters['solvent']
         )
         
         # Run calculation

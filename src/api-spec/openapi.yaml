@@ -284,7 +284,7 @@ components:
 
     SolventMethod:
       type: string
-      enum: [none, pcm]
+      enum: [none, pcm, ief-pcm, c-pcm, cosmo]
       description: Solvent calculation method
 
     CalculationMethod:
@@ -342,11 +342,11 @@ components:
         basis_function:
           type: string
           default: "6-31G(d)"
-          description: Basis function for calculation
+          description: Basis set for calculation (e.g., STO-3G, 6-31G(d), 6-31+G(d,p), cc-pVDZ, aug-cc-pVTZ, def2-SVP)
         exchange_correlation:
           type: string
           default: "B3LYP"
-          description: Exchange-correlation functional
+          description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS)
         charges:
           type: integer
           minimum: -10
@@ -365,7 +365,10 @@ components:
         solvent:
           type: string
           default: "-"
-          description: Solvent type
+          description: |
+            Solvent type or custom parameters. Options include:
+            - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, nitromethane, methanol, ethanol, acetone, dichloroethane, dichloromethane, tetrahydrofuran, chlorobenzene, chloroform, diethylether, toluene, benzene, 1,4-dioxane, cyclohexane
+            - Custom dielectric constant (numeric value > 1.0)
         name:
           type: string
           minLength: 1
