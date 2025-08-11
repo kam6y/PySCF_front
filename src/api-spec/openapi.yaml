@@ -366,7 +366,7 @@ components:
           type: string
           default: "-"
           description: Solvent type
-        molecule_name:
+        name:
           type: string
           minLength: 1
           maxLength: 100

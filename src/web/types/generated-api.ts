@@ -226,7 +226,7 @@ export interface components {
              * @description Name for the calculation
              * @default Unnamed Calculation
              */
-            molecule_name: string;
+            name: string;
             /** @description Number of CPU cores */
             cpu_cores?: number | null;
             /** @description Memory in MB */

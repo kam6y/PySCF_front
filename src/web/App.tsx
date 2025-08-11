@@ -77,7 +77,7 @@ export const App = () => {
       solvent_method: 'none',
       solvent: '-',
       xyz: '',
-      molecule_name: '' // no default name (must be set by user)
+      name: '' // no default name (must be set by user)
     };
     const newCalculation = createCalculation('', defaultParams); // no default name (must be set by user)
     setActiveCalculationById(newCalculation.id);

@@ -85,9 +85,9 @@ export const CalculationSettingsPage = ({
     const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number) => {
         if (!activeCalculation || !onCalculationUpdate) return;
         
-        // For molecule_name, we handle it differently via the dedicated name input field
+        // For name, we handle it differently via the dedicated name input field
         // This prevents conflicts between the main name input and parameter updates
-        if (field === 'molecule_name') {
+        if (field === 'name') {
             // For new calculations, allow direct parameter updates
             if (activeCalculation.id.startsWith('new-calculation-')) {
                 const stringValue = String(value);
@@ -115,7 +115,7 @@ export const CalculationSettingsPage = ({
             spin_multiplicity: currentParams.spin_multiplicity || 1,
             solvent_method: currentParams.solvent_method || 'none',
             solvent: currentParams.solvent || '-',
-            molecule_name: currentParams.molecule_name || 'Unnamed Calculation',
+            name: (currentParams as any).name || (currentParams as any).molecule_name || 'Unnamed Calculation',
             cpu_cores: currentParams.cpu_cores || undefined,
             memory_mb: currentParams.memory_mb || undefined
         };
@@ -205,7 +205,7 @@ export const CalculationSettingsPage = ({
         }
 
         setCalculationError(null);
-        const finalParams = { ...activeCalculation.parameters, molecule_name: moleculeName };
+        const finalParams = { ...activeCalculation.parameters, name: moleculeName };
 
         try {
             const runningCalculation = await onStartCalculation(finalParams);

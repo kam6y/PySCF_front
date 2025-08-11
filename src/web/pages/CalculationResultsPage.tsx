@@ -118,7 +118,7 @@ export const CalculationResultsPage = ({
           <h2>Calculation Summary</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
             <div>
-              <strong>Molecule:</strong> {parameters.molecule_name || 'Unknown'}
+              <strong>Molecule:</strong> {(parameters as any).name|| 'Unknown'}
             </div>
             <div>
               <strong>Method:</strong> {parameters.calculation_method}

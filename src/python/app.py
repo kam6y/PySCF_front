@@ -57,7 +57,7 @@ def run_calculation_in_background(calculation_id: str, parameters: dict):
         file_manager.save_calculation_status(calc_dir, 'running')
         
         # Initialize calculator
-        calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['molecule_name'])
+        calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         
         # Parse XYZ and setup calculation
         atoms = calculator.parse_xyz(parameters['xyz'])
@@ -203,7 +203,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'solvent_method': body.solvent_method.value if hasattr(body.solvent_method, 'value') else body.solvent_method,
             'solvent': body.solvent,
             'xyz': body.xyz,
-            'molecule_name': body.molecule_name,
+            'name': body.name,
             'cpu_cores': body.cpu_cores,
             'memory_mb': body.memory_mb,
             'created_at': datetime.now().isoformat()
@@ -211,7 +211,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
         
         # Initialize file manager and create directory
         file_manager = CalculationFileManager()
-        calc_dir = file_manager.create_calculation_dir(parameters['molecule_name'])
+        calc_dir = file_manager.create_calculation_dir(parameters['name'])
         calculation_id = os.path.basename(calc_dir)
         
         # Save initial parameters and status
@@ -226,12 +226,12 @@ def quantum_calculate(body: QuantumCalculationRequest):
         thread.daemon = True
         thread.start()
         
-        logger.info(f"Queued calculation {calculation_id} for molecule '{parameters['molecule_name']}'")
+        logger.info(f"Queued calculation {calculation_id} for molecule '{parameters['name']}'")
 
         # Return immediately with the new calculation instance
         initial_instance = {
             'id': calculation_id,
-            'name': parameters['molecule_name'],
+            'name': parameters['name'],
             'status': 'running', # Frontend polls for actual status, so this is fine
             'createdAt': parameters['created_at'],
             'updatedAt': parameters['created_at'],
