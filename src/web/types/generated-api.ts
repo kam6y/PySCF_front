@@ -433,12 +433,8 @@ export interface components {
             data: {
                 /** @example Calculation renamed successfully. */
                 message: string;
-                /** @description Previous calculation ID */
-                old_id: string;
-                /** @description New calculation ID */
-                new_id: string;
-                /** @description New calculation name */
-                new_name: string;
+                /** @description Updated calculation name */
+                name: string;
             };
         };
         CalculationDeleteResponse: {

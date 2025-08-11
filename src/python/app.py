@@ -325,26 +325,19 @@ def update_calculation(calculation_id, body: CalculationUpdateRequest):
         
         new_name = body.name
         
-        try:
-            new_id = file_manager.rename_calculation(calculation_id, new_name)
-            if not new_id:
-                return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
-            
-            logger.info(f"Renamed calculation {calculation_id} to {new_id}")
-            return jsonify({
-                'success': True,
-                'data': {
-                    'message': 'Calculation renamed successfully.',
-                    'old_id': calculation_id,
-                    'new_id': new_id,
-                    'new_name': new_name
-                }
-            })
-        except FileExistsError as e:
-            return jsonify({'success': False, 'error': str(e)}), 409 # Conflict
-        except Exception as e:
-            logger.error(f"Error renaming calculation {calculation_id}: {e}", exc_info=True)
-            return jsonify({'success': False, 'error': 'Failed to rename calculation.'}), 500
+        # Update the display name (calculation_id remains the same)
+        result_id = file_manager.rename_calculation(calculation_id, new_name)
+        if not result_id:
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        logger.info(f"Updated display name for calculation {calculation_id} to '{new_name}'")
+        return jsonify({
+            'success': True,
+            'data': {
+                'message': 'Calculation renamed successfully.',
+                'name': new_name
+            }
+        })
 
     except Exception as e:
         logger.error(f"Error updating calculation {calculation_id}: {e}", exc_info=True)

@@ -2,28 +2,46 @@ CLAUDE.md
 This file provides guidance to Claude when working with code in this repository.
 
 Project Overview
-This is a PySCF Native App, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
+This is a PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
+
+A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend.
+
+## Development Philosophy
+
+**This is a development-stage application.** Backward compatibility is not a concern, and breaking changes should be made freely in favor of better design and simpler code. When refactoring or improving the codebase:
+
+- **Prioritize simplicity over compatibility** - Remove deprecated patterns and complex fallback logic
+- **Make breaking changes confidently** - Don't hesitate to change APIs, data structures, or file formats
+- **Clean up legacy code** - Remove old implementations when better alternatives are available
+- **Focus on the best solution** - Don't compromise design quality for compatibility with older versions
+
+This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
 
 Development Commands
+Bash
+
 # Install Node.js and Python dependencies
 npm install
 cd src/python
 uv sync
 cd ../..
 
-# Development mode (builds and runs Electron with hot reload + Python backend)
+# Development mode (generates code, builds, and runs Electron with hot reload + Python backend)
 npm run dev
 
-# Production build (builds frontend and creates Python executable)
+# Production build (generates code, builds frontend and creates Python executable)
 npm run build
 
 # Package application for distribution (includes production build)
 npm run package
-
-# --- Individual Commands ---
+Individual Commands
+Bash
 
 # Clean build directory
-npm run clean # (Assuming 'rimraf dist' is aliased or used directly)
+npm run clean
+
+# Generate TypeScript types and Python models from OpenAPI spec
+npm run codegen
 
 # Build frontend with webpack in development mode
 npm run dev:webpack
@@ -42,21 +60,33 @@ uv run pytest tests/
 
 # Build Python executable only (uses PyInstaller)
 npm run build:python
-
 Development Workflow
 The npm run dev script is the primary command for development. It automatically:
 
-Cleans the dist/ directory.
+Generates Code: Runs npm run codegen to generate TypeScript types and Python Pydantic models from src/api-spec/openapi.yaml. This ensures the frontend and backend are always in sync with the API specification.
 
-Builds the frontend code (main process, preload script, and renderer) using Webpack in watch mode.
+Cleans: Cleans the dist/ directory.
 
-Starts the Python Flask server as a subprocess from within the Electron main process.
+Builds Frontend: Builds the frontend code (main process, preload script, and renderer) using Webpack in watch mode.
 
-Starts the Electron application using electronmon, which watches the dist/ directory for changes and automatically restarts the app.
+Starts Backend: Starts the Python Flask server as a subprocess from within the Electron main process.
+
+Starts Electron: Starts the Electron application using electronmon, which watches the dist/ directory for changes and automatically restarts the app.
 
 The Electron main process (src/main.ts) launches the Python Flask server. In development, it uses uv run python app.py. In a packaged application, it runs the PyInstaller executable. The main process includes a health check mechanism; it continuously pings the /health endpoint of the Python server to ensure the backend is fully initialized before loading the UI. The Flask server dynamically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
 
 Architecture Overview
+API-First Development with OpenAPI
+The single source of truth for the API is src/api-spec/openapi.yaml.
+
+The npm run codegen command (run automatically with dev and build) uses this file to generate:
+
+Python Pydantic Models (src/python/generated_models.py) via datamodel-code-generator, ensuring type-safe request/response handling in the Flask backend.
+
+TypeScript Type Definitions (src/web/types/generated-api.ts) via openapi-typescript, ensuring the frontend API client is always synchronized with the backend.
+
+This approach prevents mismatches between the frontend and backend interfaces.
+
 Electron Structure
 Main Process (src/main.ts): Creates the BrowserWindow, manages the Python Flask subprocess, handles application lifecycle events, and implements the backend health check. It passes the dynamically assigned Flask port number to the renderer process.
 
@@ -97,7 +127,9 @@ useActiveCalculation: Manages the currently selected calculation. It fetches det
 
 useCalculationPolling: Manages polling for the status of a running calculation. When a calculation is started, this hook periodically requests updates from the backend until the status is completed or error.
 
-API Client (src/web/apiClient.ts): A centralized module containing fetch functions for all communication with the Python backend.
+API Client (src/web/apiClient.ts): A centralized module containing fetch functions for all communication with the Python backend. It uses the auto-generated TypeScript types for type safety.
+
+Type Wrappers (src/web/types/api-types.ts): This file re-exports types from the auto-generated generated-api.ts to provide convenient, application-wide aliases.
 
 State Flow Example (Starting a Calculation)
 This is an asynchronous process involving the frontend, backend, and background threads.
@@ -128,30 +160,36 @@ When the backend thread finishes, it updates the status.json on the filesystem t
 
 File Structure
 src/
-├── main.ts              # Electron main process
-├── preload.ts           # Electron preload script
-├── types/               # Global TypeScript definitions
+├── api-spec/
+│   └── openapi.yaml          # Single source of truth for the API
+├── main.ts                   # Electron main process
+├── preload.ts                # Electron preload script
+├── types/                    # Global TypeScript definitions
 ├── web/
-│   ├── apiClient.ts     # Centralized API client for the frontend
-│   ├── App.tsx          # Main React application component
-│   ├── components/      # Reusable React components (Sidebar, MoleculeViewer, etc.)
-│   ├── hooks/           # Custom React hooks for state management
-│   ├── pages/           # Page components (CalculationSettingsPage, etc.)
-│   └── ...
+│   ├── apiClient.ts          # Centralized API client for the frontend
+│   ├── App.tsx               # Main React application component
+│   ├── components/           # Reusable React components
+│   ├── hooks/                # Custom React hooks for state management
+│   ├── pages/                # Page components
+│   └── types/
+│       ├── api-types.ts      # Convenience wrapper for generated types
+│       └── generated-api.ts  # (auto-generated) TypeScript types from OpenAPI spec
 └── python/
-    ├── app.py           # Flask API server main entry point
-    ├── pyproject.toml   # Python dependencies (managed by uv)
-    ├── pubchem/         # PubChem integration modules
-    ├── SMILES/          # SMILES conversion modules
-    ├── quantum_calc/    # PySCF calculation logic and file management
-    └── tests/           # Python unit tests
-
+    ├── app.py                # Flask API server main entry point
+    ├── pyproject.toml        # Python dependencies (managed by uv)
+    ├── generated_models.py   # (auto-generated) Pydantic models from OpenAPI spec
+    ├── pubchem/              # PubChem integration modules
+    ├── SMILES/               # SMILES conversion modules
+    ├── quantum_calc/         # PySCF calculation logic and file management
+    └── tests/                # Python unit tests
 Key API Endpoints
 GET /health: Health check endpoint used by the Electron main process during startup.
 
 POST /api/pubchem/search: Search PubChem by name, CID, or formula.
 
 POST /api/smiles/convert: Convert a SMILES string to XYZ format.
+
+POST /api/pubchem/validate: Validate an XYZ format string.
 
 POST /api/quantum/calculate: Asynchronously starts a DFT calculation in a background thread.
 

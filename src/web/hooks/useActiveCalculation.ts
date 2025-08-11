@@ -15,7 +15,6 @@ export interface UseActiveCalculationReturn {
   loadCalculationDetails: (id: string, forceRefresh?: boolean) => Promise<CalculationInstance | null>;
   clearActiveCalculation: () => void;
   updateActiveCalculationInCache: (updatedCalculation: CalculationInstance) => void;
-  renameIdInCache: (oldId: string, newId: string, newName: string) => void;
 }
 
 export const useActiveCalculation = (
@@ -98,22 +97,6 @@ export const useActiveCalculation = (
     });
   }, []);
 
-  const renameIdInCache = useCallback((oldId: string, newId: string, newName: string) => {
-    setDetailedCalculations(prev => {
-        const newMap = new Map(prev);
-        const data = newMap.get(oldId);
-        if (data) {
-            newMap.delete(oldId);
-            newMap.set(newId, { 
-                ...data, 
-                id: newId, 
-                name: newName,
-                parameters: { ...data.parameters, molecule_name: newName }
-            });
-        }
-        return newMap;
-    });
-  }, []);
 
   useEffect(() => {
     if (activeCalculationId && calculations.length > 0 && !calculations.some(calc => calc.id === activeCalculationId)) {
@@ -138,7 +121,6 @@ export const useActiveCalculation = (
     setActiveCalculationById,
     loadCalculationDetails,
     clearActiveCalculation,
-    updateActiveCalculationInCache,
-    renameIdInCache
+    updateActiveCalculationInCache
   };
 };

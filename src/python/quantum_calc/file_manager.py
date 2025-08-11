@@ -37,73 +37,32 @@ class CalculationFileManager:
         
         return str(calc_dir)
 
-    def rename_calculation(self, old_id: str, new_name: str) -> Optional[str]:
-        """Renames a calculation directory and updates its metadata."""
-        old_path = self.base_dir / old_id
-        if not old_path.is_dir():
+    def rename_calculation(self, calculation_id: str, new_name: str) -> Optional[str]:
+        """Updates the display name of a calculation without changing the directory name."""
+        calc_path = self.base_dir / calculation_id
+        if not calc_path.is_dir():
             return None
 
-        # タイムスタンプ部分を維持しつつ、新しいディレクトリ名を生成
-        # ✨✨✨ CHANGE: Corrected regular expression ✨✨✨
-        timestamp_match = re.search(r'_(\d{8}_\d{6})', old_id)
-        timestamp = timestamp_match.group(1) if timestamp_match else datetime.now().strftime("%Y%m%d_%H%M%S")
+        # Read existing parameters
+        params = self.read_calculation_parameters(str(calc_path))
+        if params is None:
+            params = {}
+
+        # Update the display name
+        params['name'] = new_name
         
-        clean_new_name = "".join(c for c in new_name if c.isalnum() or c in "._-").strip() or "unnamed"
-        new_id = f"{clean_new_name}_{timestamp}"
-        new_path = self.base_dir / new_id
-
-        if old_path == new_path:
-            return old_id # 名前が実質的に変わらない場合は何もしない
-
-        if new_path.exists():
-            raise FileExistsError(f"A calculation with the name '{new_id}' already exists.")
-
-        # ディレクトリ名を変更
-        os.rename(old_path, new_path)
-
-        # parameters.json内のmolecule_nameを更新
-        params = self.read_calculation_parameters(str(new_path))
-        if params:
-            params['molecule_name'] = new_name
-            self.save_calculation_parameters(str(new_path), params)
-            
-        return new_id
+        # Save updated parameters
+        self.save_calculation_parameters(str(calc_path), params)
+        
+        # Return the same ID
+        return calculation_id
 
     def _get_display_name(self, directory_name: str, parameters: Optional[Dict[str, Any]]) -> str:
-        """Get display name with robust fallback logic.
+        """Get display name from parameters."""
+        if parameters and parameters.get('name'):
+            return parameters['name'].strip()
         
-        Fallback hierarchy:
-        1. Use molecule_name from parameters.json if available
-        2. Use "Unnamed Calculation" as default
-        3. As last resort, use simple directory parsing (no regex dependency)
-        
-        Args:
-            directory_name: The calculation directory name
-            parameters: Parameters dict from parameters.json (may be None)
-        
-        Returns:
-            Display name for the calculation
-        """
-        # First priority: molecule_name from parameters.json
-        if parameters and parameters.get('molecule_name'):
-            return parameters['molecule_name'].strip()
-        
-        # Second priority: generic fallback for missing molecule_name
-        if parameters:
-            return "Unnamed Calculation"
-        
-        # Last resort: simple directory parsing for legacy calculations
-        # This avoids regex dependency and gracefully handles any naming format
-        if '_' in directory_name:
-            # Try to extract meaningful part before what looks like a timestamp
-            parts = directory_name.split('_')
-            if len(parts) >= 2:
-                # Check if the last part looks like a timestamp (all digits)
-                if parts[-1].isdigit() and len(parts[-1]) == 6:
-                    return '_'.join(parts[:-1]) if len(parts) > 2 else parts[0]
-        
-        # Absolute fallback
-        return directory_name
+        return "Unnamed Calculation"
 
     def list_calculations(self) -> list:
         """List all calculation directories."""

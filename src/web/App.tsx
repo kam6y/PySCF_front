@@ -38,7 +38,6 @@ export const App = () => {
     loadCalculationDetails,
     clearActiveCalculation,
     updateActiveCalculationInCache,
-    renameIdInCache,
   } = useActiveCalculation(calculations);
 
   useEffect(() => {
@@ -109,11 +108,9 @@ export const App = () => {
 
   const handleCalculationRename = async (calculationId: string, newName: string) => {
     try {
-      const response = await updateCalculationName(calculationId, newName);
-      renameIdInCache(response.old_id, response.new_id, response.new_name);
-      if (activeCalculationId === response.old_id) {
-        setActiveCalculationById(response.new_id);
-      }
+      await updateCalculationName(calculationId, newName);
+      // Refresh calculations to get updated display name
+      await refreshCalculations();
     } catch (error) {
       console.error('Failed to rename calculation:', error);
       alert(`Error: Could not rename calculation. ${error instanceof Error ? error.message : ''}`);
