@@ -29,7 +29,7 @@ class TestFlaskAPI:
         
         data = json.loads(response.data)
         assert data['status'] == 'ok'
-        assert data['service'] == 'pyscf-pubchem-api'
+        assert data['service'] == 'pyscf-front-api'
     
     #
     # 変更点: モックを簡素化し、テストの保守性を向上
