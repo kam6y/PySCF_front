@@ -9,7 +9,7 @@ import { CalculationSettingsPage } from "./pages/CalculationSettingsPage";
 import { CalculationResultsPage } from "./pages/CalculationResultsPage";
 import { DrawMoleculePage } from "./pages/DrawMoleculePage";
 import { useCalculations, useActiveCalculation } from "./hooks";
-import { CalculationInstance, CalculationParameters } from "./types/calculation";
+import { CalculationInstance, QuantumCalculationRequest } from "./types/api-types";
 import { startCalculation } from "./apiClient"; // apiClientからstartCalculationを直接インポート
 
 export const App = () => {
@@ -69,7 +69,7 @@ export const App = () => {
   };
 
   const handleNewCalculation = () => {
-    const defaultParams: CalculationParameters = {
+    const defaultParams: QuantumCalculationRequest = {
       calculation_method: 'DFT',
       basis_function: '6-31G(d)',
       exchange_correlation: 'B3LYP',
@@ -86,7 +86,7 @@ export const App = () => {
     handleSidebarClose();
   };
   
-  const handleStartCalculation = async (params: CalculationParameters) => {
+  const handleStartCalculation = async (params: QuantumCalculationRequest) => {
     try {
       // 1. APIを呼び出して計算を開始し、新しい永続的な計算インスタンスを取得
       const response = await startCalculation(params);
@@ -138,7 +138,7 @@ export const App = () => {
     updateActiveCalculationInCache(updatedCalculation);
   };
 
-  const handleCreateNewFromExisting = (originalCalc: CalculationInstance, newParams: CalculationParameters) => {
+  const handleCreateNewFromExisting = (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => {
     const newInstance = createNewCalculationFromExisting(originalCalc, newParams);
     setActiveCalculationById(newInstance.id);
   };

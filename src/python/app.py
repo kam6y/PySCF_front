@@ -18,9 +18,9 @@ from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, CalculationError, ConvergenceError, InputError
 from quantum_calc.file_manager import CalculationFileManager
-from validation_models import (
-    PubChemSearchModel, SMILESConvertModel, PubChemValidateModel,
-    QuantumCalculateModel, CalculationUpdateModel
+from generated_models import (
+    PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
+    QuantumCalculationRequest, CalculationUpdateRequest
 )
 
 # Configure logging
@@ -103,11 +103,11 @@ def health_check():
 
 @app.route('/api/pubchem/search', methods=['POST'])
 @validate()
-def search_pubchem(body: PubChemSearchModel):
+def search_pubchem(body: PubChemSearchRequest):
     """Search PubChem for a compound and return its 3D structure in XYZ format."""
     try:
         query = body.query
-        search_type = body.search_type.value
+        search_type = body.search_type.value if hasattr(body.search_type, 'value') else body.search_type
         
         logger.info(f"Searching PubChem for '{query}' (type: {search_type})")
         
@@ -150,7 +150,7 @@ def search_pubchem(body: PubChemSearchModel):
 
 @app.route('/api/smiles/convert', methods=['POST'])
 @validate()
-def convert_smiles(body: SMILESConvertModel):
+def convert_smiles(body: SMILESConvertRequest):
     """Converts a SMILES string to XYZ format."""
     try:
         smiles = body.smiles
@@ -171,7 +171,7 @@ def convert_smiles(body: SMILESConvertModel):
 
 @app.route('/api/pubchem/validate', methods=['POST'])
 @validate()
-def validate_xyz_endpoint(body: PubChemValidateModel):
+def validate_xyz_endpoint(body: XYZValidateRequest):
     """Validate an XYZ format string."""
     try:
         xyz_string = body.xyz
@@ -187,7 +187,7 @@ def validate_xyz_endpoint(body: PubChemValidateModel):
 
 @app.route('/api/quantum/calculate', methods=['POST'])
 @validate()
-def quantum_calculate(body: QuantumCalculateModel):
+def quantum_calculate(body: QuantumCalculationRequest):
     """
     Starts a quantum chemistry calculation in the background.
     Immediately returns a calculation ID to track the job.
@@ -195,12 +195,12 @@ def quantum_calculate(body: QuantumCalculateModel):
     try:
         # Prepare parameters using validated data from Pydantic model
         parameters = {
-            'calculation_method': body.calculation_method,
+            'calculation_method': body.calculation_method.value if hasattr(body.calculation_method, 'value') else body.calculation_method,
             'basis_function': body.basis_function,
             'exchange_correlation': body.exchange_correlation,
             'charges': body.charges,
             'spin_multiplicity': body.spin_multiplicity,
-            'solvent_method': body.solvent_method.value,
+            'solvent_method': body.solvent_method.value if hasattr(body.solvent_method, 'value') else body.solvent_method,
             'solvent': body.solvent,
             'xyz': body.xyz,
             'molecule_name': body.molecule_name,
@@ -318,7 +318,7 @@ def get_calculation_details(calculation_id):
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['PUT'])
 @validate()
-def update_calculation(calculation_id, body: CalculationUpdateModel):
+def update_calculation(calculation_id, body: CalculationUpdateRequest):
     """Update calculation metadata (currently only name)."""
     try:
         file_manager = CalculationFileManager()

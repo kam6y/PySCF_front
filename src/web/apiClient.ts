@@ -1,13 +1,15 @@
 // src/web/apiClient.ts
 
 import {
-  CalculationDetailsResponse,
-  CalculationListResponse,
-  CalculationParameters,
-  DeleteResponse,
-  RenameResponse,
-  CalculationInstance,
-} from './types/calculation';
+  CalculationDetailsResponseData,
+  CalculationListResponseData,
+  QuantumCalculationRequest,
+  CalculationUpdateResponseData,
+  CalculationDeleteResponseData,
+  PubChemSearchResponseData,
+  SMILESConvertResponseData,
+  StartCalculationResponseData,
+} from './types/api-types';
 
 let API_BASE_URL = 'http://127.0.0.1:5000'; // Default, will be updated
 
@@ -16,28 +18,8 @@ export const setApiBaseUrl = (port: number) => {
     console.log(`API base URL set to: ${API_BASE_URL}`);
 };
 
-// --- Response Type Definitions ---
-interface PubChemCompoundInfo {
-  cid: number;
-  iupac_name: string;
-  molecular_formula: string;
-  molecular_weight: number;
-  synonyms: string[];
-}
-
-export interface PubChemSearchResponse {
-  xyz: string;
-  compound_info: PubChemCompoundInfo;
-}
-
-export interface SmilesConvertResponse {
-  xyz: string;
-}
-
-// API Response for starting a calculation (now async)
-export interface StartCalculationResponse {
-    calculation: CalculationInstance;
-}
+// Re-export the generated type for backward compatibility
+export type StartCalculationResponse = StartCalculationResponseData;
 
 type ApiResponse<T> = {
     success: boolean;
@@ -68,46 +50,46 @@ const request = async <T>(endpoint: string, options: RequestInit = {}): Promise<
 
 // --- API Functions ---
 
-export const getCalculations = (): Promise<CalculationListResponse['data']> => {
-  return request<CalculationListResponse['data']>('/api/quantum/calculations', { method: 'GET' });
+export const getCalculations = (): Promise<CalculationListResponseData> => {
+  return request<CalculationListResponseData>('/api/quantum/calculations', { method: 'GET' });
 };
 
-export const getCalculationDetails = (id: string): Promise<CalculationDetailsResponse['data']> => {
+export const getCalculationDetails = (id: string): Promise<CalculationDetailsResponseData> => {
   if (!id || id === 'undefined' || id === 'null') {
     return Promise.reject(new Error('Invalid calculation ID provided.'));
   }
-  return request<CalculationDetailsResponse['data']>(`/api/quantum/calculations/${id}`, { method: 'GET' });
+  return request<CalculationDetailsResponseData>(`/api/quantum/calculations/${id}`, { method: 'GET' });
 };
 
-export const startCalculation = (params: CalculationParameters): Promise<StartCalculationResponse> => {
+export const startCalculation = (params: QuantumCalculationRequest): Promise<StartCalculationResponse> => {
     return request<StartCalculationResponse>('/api/quantum/calculate', {
         method: 'POST',
         body: JSON.stringify(params),
     });
 };
 
-export const updateCalculationName = (id: string, newName: string): Promise<RenameResponse> => {
-    return request<RenameResponse>(`/api/quantum/calculations/${id}`, {
+export const updateCalculationName = (id: string, newName: string): Promise<CalculationUpdateResponseData> => {
+    return request<CalculationUpdateResponseData>(`/api/quantum/calculations/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ name: newName }),
     });
 };
   
-export const deleteCalculation = (id: string): Promise<DeleteResponse> => {
-    return request<DeleteResponse>(`/api/quantum/calculations/${id}`, {
+export const deleteCalculation = (id: string): Promise<CalculationDeleteResponseData> => {
+    return request<CalculationDeleteResponseData>(`/api/quantum/calculations/${id}`, {
       method: 'DELETE',
     });
 };
 
-export const searchPubChem = (query: string, searchType: 'name' | 'cid'): Promise<PubChemSearchResponse> => {
-    return request<PubChemSearchResponse>('/api/pubchem/search', {
+export const searchPubChem = (query: string, searchType: 'name' | 'cid'): Promise<PubChemSearchResponseData> => {
+    return request<PubChemSearchResponseData>('/api/pubchem/search', {
         method: 'POST',
         body: JSON.stringify({ query, search_type: searchType }),
     });
 };
 
-export const convertSmilesToXyz = (smiles: string): Promise<SmilesConvertResponse> => {
-    return request<SmilesConvertResponse>('/api/smiles/convert', {
+export const convertSmilesToXyz = (smiles: string): Promise<SMILESConvertResponseData> => {
+    return request<SMILESConvertResponseData>('/api/smiles/convert', {
         method: 'POST',
         body: JSON.stringify({ smiles }),
     });

@@ -1,5 +1,5 @@
 import React from "react";
-import { CalculationInstance } from "../types/calculation";
+import { CalculationInstance } from "../types/api-types";
 
 // Status display configuration
 const STATUS_CONFIG = {

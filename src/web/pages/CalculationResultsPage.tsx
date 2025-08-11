@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CalculationInstance } from "../types/calculation";
+import { CalculationInstance } from "../types/api-types";
 import { useCalculationPolling } from "../hooks/useCalculationPolling";
 
 interface CalculationResultsPageProps {
@@ -148,7 +148,7 @@ export const CalculationResultsPage = ({
         <section style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#e8f6f3', borderRadius: '8px' }}>
           <h2>Energy Results</h2>
           <div style={{ fontSize: '18px' }}>
-            <strong>SCF Energy:</strong> <code>{results.scf_energy.toFixed(8)} hartree</code>
+            <strong>SCF Energy:</strong> <code>{results.scf_energy?.toFixed(8) || 'N/A'} hartree</code>
           </div>
         </section>
 

@@ -1,0 +1,738 @@
+openapi: 3.1.1
+info:
+  title: PySCF Native App API
+  description: API for quantum chemistry calculations using PySCF with PubChem and SMILES integration
+  version: 0.3.0
+  license:
+    name: Apache-2.0
+    url: https://opensource.org/licenses/Apache-2.0
+
+servers:
+  - url: http://127.0.0.1:5000
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Check if the API server is running
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /api/pubchem/search:
+    post:
+      summary: Search PubChem for compounds
+      description: Search PubChem by name, CID, or formula and return 3D structure in XYZ format
+      operationId: searchPubChem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PubChemSearchRequest'
+      responses:
+        '200':
+          description: Compound found and XYZ generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PubChemSearchResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Compound not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/smiles/convert:
+    post:
+      summary: Convert SMILES to XYZ format
+      description: Convert a SMILES string to 3D XYZ molecular structure
+      operationId: convertSmiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SMILESConvertRequest'
+      responses:
+        '200':
+          description: SMILES converted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SMILESConvertResponse'
+        '400':
+          description: Invalid SMILES string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/pubchem/validate:
+    post:
+      summary: Validate XYZ format
+      description: Validate an XYZ format string
+      operationId: validateXYZ
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/XYZValidateRequest'
+      responses:
+        '200':
+          description: XYZ validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/XYZValidateResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculate:
+    post:
+      summary: Start quantum chemistry calculation
+      description: Start a DFT calculation in the background
+      operationId: startCalculation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuantumCalculationRequest'
+      responses:
+        '202':
+          description: Calculation queued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartCalculationResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to queue calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculations:
+    get:
+      summary: List all calculations
+      description: Get a list of all available calculation directories
+      operationId: listCalculations
+      responses:
+        '200':
+          description: List of calculations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationListResponse'
+        '500':
+          description: Failed to list calculations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculations/{calculationId}:
+    get:
+      summary: Get calculation details
+      description: Get detailed information about a specific calculation
+      operationId: getCalculationDetails
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Calculation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationDetailsResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get calculation details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update calculation metadata
+      description: Update calculation name and other metadata
+      operationId: updateCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalculationUpdateRequest'
+      responses:
+        '200':
+          description: Calculation updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationUpdateResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Name conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to update calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete calculation
+      description: Delete a calculation and all its associated files
+      operationId: deleteCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Calculation deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationDeleteResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to delete calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    # Enums
+    SearchType:
+      type: string
+      enum: [name, cid, formula]
+      description: Type of PubChem search
+
+    SolventMethod:
+      type: string
+      enum: [none, pcm]
+      description: Solvent calculation method
+
+    CalculationMethod:
+      type: string
+      enum: [DFT]
+      description: Quantum calculation method
+
+    CalculationStatus:
+      type: string
+      enum: [pending, running, completed, error]
+      description: Status of a calculation
+
+    # Request Models
+    PubChemSearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          description: Search query for PubChem
+        search_type:
+          $ref: '#/components/schemas/SearchType'
+          default: name
+
+    SMILESConvertRequest:
+      type: object
+      required: [smiles]
+      properties:
+        smiles:
+          type: string
+          minLength: 1
+          description: SMILES string to convert to XYZ format
+
+    XYZValidateRequest:
+      type: object
+      required: [xyz]
+      properties:
+        xyz:
+          type: string
+          minLength: 1
+          description: XYZ string to validate
+
+    QuantumCalculationRequest:
+      type: object
+      required: [xyz]
+      properties:
+        xyz:
+          type: string
+          minLength: 1
+          description: XYZ molecular structure data
+        calculation_method:
+          $ref: '#/components/schemas/CalculationMethod'
+          default: DFT
+        basis_function:
+          type: string
+          default: "6-31G(d)"
+          description: Basis function for calculation
+        exchange_correlation:
+          type: string
+          default: "B3LYP"
+          description: Exchange-correlation functional
+        charges:
+          type: integer
+          minimum: -10
+          maximum: 10
+          default: 0
+          description: Molecular charge
+        spin_multiplicity:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+          description: Spin multiplicity
+        solvent_method:
+          $ref: '#/components/schemas/SolventMethod'
+          default: none
+        solvent:
+          type: string
+          default: "-"
+          description: Solvent type
+        molecule_name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          default: "Unnamed Calculation"
+          description: Name for the calculation
+        cpu_cores:
+          type: integer
+          minimum: 1
+          maximum: 32
+          nullable: true
+          description: Number of CPU cores
+        memory_mb:
+          type: integer
+          minimum: 512
+          maximum: 32768
+          nullable: true
+          description: Memory in MB
+
+    CalculationUpdateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Updated name for the calculation
+
+    # Response Models
+    HealthResponse:
+      type: object
+      required: [status, service, version]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: pyscf-front-api
+        version:
+          type: string
+          example: "0.3.0"
+
+    PubChemCompoundInfo:
+      type: object
+      required: [cid, iupac_name, molecular_formula, molecular_weight, synonyms]
+      properties:
+        cid:
+          type: integer
+          description: PubChem Compound ID
+        iupac_name:
+          type: string
+          description: IUPAC name
+        molecular_formula:
+          type: string
+          description: Molecular formula
+        molecular_weight:
+          type: number
+          description: Molecular weight
+        synonyms:
+          type: array
+          items:
+            type: string
+          description: List of synonyms
+
+    PubChemSearchResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [xyz, compound_info, atom_count]
+          properties:
+            xyz:
+              type: string
+              description: XYZ format molecular structure
+            compound_info:
+              $ref: '#/components/schemas/PubChemCompoundInfo'
+            atom_count:
+              type: integer
+              description: Number of atoms in the molecule
+
+    SMILESConvertResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [xyz]
+          properties:
+            xyz:
+              type: string
+              description: XYZ format molecular structure
+
+    XYZValidateResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          description: Validation result
+
+    CalculationParameters:
+      type: object
+      required: [calculation_method, basis_function, exchange_correlation, charges, spin_multiplicity, solvent_method, solvent, xyz]
+      properties:
+        calculation_method:
+          $ref: '#/components/schemas/CalculationMethod'
+        basis_function:
+          type: string
+        exchange_correlation:
+          type: string
+        charges:
+          type: integer
+        spin_multiplicity:
+          type: integer
+        solvent_method:
+          $ref: '#/components/schemas/SolventMethod'
+        solvent:
+          type: string
+        xyz:
+          type: string
+        molecule_name:
+          type: string
+          nullable: true
+        cpu_cores:
+          type: integer
+          nullable: true
+        memory_mb:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    CalculationResults:
+      type: object
+      properties:
+        scf_energy:
+          type: number
+          description: SCF energy result
+        converged:
+          type: boolean
+          description: Whether calculation converged
+        homo_index:
+          type: integer
+          description: HOMO orbital index
+        lumo_index:
+          type: integer
+          description: LUMO orbital index
+        num_occupied_orbitals:
+          type: integer
+          description: Number of occupied orbitals
+        num_virtual_orbitals:
+          type: integer
+          description: Number of virtual orbitals
+        checkpoint_file:
+          type: string
+          description: Path to checkpoint file
+        checkpoint_exists:
+          type: boolean
+          description: Whether checkpoint file exists
+        working_directory:
+          type: string
+          description: Working directory path
+        optimized_geometry:
+          type: string
+          description: Optimized molecular geometry
+        basis:
+          type: string
+          description: Basis set used
+        xc_functional:
+          type: string
+          description: Exchange-correlation functional used
+        charge:
+          type: number
+          description: Molecular charge
+        spin_multiplicity:
+          type: integer
+          description: Spin multiplicity
+        max_cycle:
+          type: integer
+          description: Maximum SCF cycles
+        atom_count:
+          type: integer
+          description: Number of atoms
+        error:
+          type: string
+          nullable: true
+          description: Error message if calculation failed
+
+    CalculationInstance:
+      type: object
+      required: [id, name, status, createdAt, updatedAt, parameters]
+      properties:
+        id:
+          type: string
+          description: Unique calculation ID
+        name:
+          type: string
+          description: Display name for the calculation
+        status:
+          $ref: '#/components/schemas/CalculationStatus'
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+        parameters:
+          $ref: '#/components/schemas/CalculationParameters'
+        results:
+          $ref: '#/components/schemas/CalculationResults'
+          nullable: true
+        workingDirectory:
+          type: string
+          nullable: true
+          description: Path to calculation files
+        errorMessage:
+          type: string
+          nullable: true
+          description: Error details if status is error
+
+    CalculationSummary:
+      type: object
+      required: [id, name, path, date, has_checkpoint, status]
+      properties:
+        id:
+          type: string
+          description: Unique calculation ID
+        name:
+          type: string
+          description: Display name
+        path:
+          type: string
+          description: Directory path
+        date:
+          type: string
+          description: Date string
+        has_checkpoint:
+          type: boolean
+          description: Whether checkpoint file exists
+        status:
+          $ref: '#/components/schemas/CalculationStatus'
+
+    StartCalculationResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [calculation]
+          properties:
+            calculation:
+              $ref: '#/components/schemas/CalculationInstance'
+
+    CalculationListResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [base_directory, calculations, count]
+          properties:
+            base_directory:
+              type: string
+              description: Base directory for calculations
+            calculations:
+              type: array
+              items:
+                $ref: '#/components/schemas/CalculationSummary'
+            count:
+              type: integer
+              description: Number of calculations
+
+    CalculationDetailsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [calculation, files]
+          properties:
+            calculation:
+              $ref: '#/components/schemas/CalculationInstance'
+            files:
+              type: object
+              required: [checkpoint_exists, parameters_file_exists, results_file_exists]
+              properties:
+                checkpoint_exists:
+                  type: boolean
+                parameters_file_exists:
+                  type: boolean
+                results_file_exists:
+                  type: boolean
+
+    CalculationUpdateResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message, old_id, new_id, new_name]
+          properties:
+            message:
+              type: string
+              example: Calculation renamed successfully.
+            old_id:
+              type: string
+              description: Previous calculation ID
+            new_id:
+              type: string
+              description: New calculation ID
+            new_name:
+              type: string
+              description: New calculation name
+
+    CalculationDeleteResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message, deleted_id]
+          properties:
+            message:
+              type: string
+              example: Calculation deleted successfully
+            deleted_id:
+              type: string
+              description: ID of deleted calculation
+
+    ErrorResponse:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error message

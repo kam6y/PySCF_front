@@ -1,7 +1,7 @@
 // src/web/hooks/useActiveCalculation.ts
 
 import { useState, useEffect, useCallback } from 'react';
-import { CalculationInstance } from '../types/calculation';
+import { CalculationInstance } from '../types/api-types';
 import { getCalculationDetails } from '../apiClient';
 
 const ACTIVE_CALCULATION_KEY = 'pyscf-active-calculation-id';

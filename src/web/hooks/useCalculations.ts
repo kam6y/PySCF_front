@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
     CalculationInstance,
-    CalculationParameters,
-    CalculationListResponse,
-    RenameResponse,
-} from '../types/calculation';
+    QuantumCalculationRequest,
+    CalculationListResponseData,
+    CalculationUpdateResponseData,
+} from '../types/api-types';
 import * as apiClient from '../apiClient';
 
 export interface UseCalculationsReturn {
@@ -15,11 +15,11 @@ export interface UseCalculationsReturn {
     error: string | null;
     refreshCalculations: () => Promise<void>;
     getCalculationById: (id: string) => CalculationInstance | undefined;
-    updateCalculationName: (id: string, newName: string) => Promise<RenameResponse>;
+    updateCalculationName: (id: string, newName: string) => Promise<CalculationUpdateResponseData>;
     deleteCalculation: (id: string) => Promise<void>;
-    createCalculation: (name: string, parameters: CalculationParameters) => CalculationInstance;
+    createCalculation: (name: string, parameters: QuantumCalculationRequest) => CalculationInstance;
     updateCalculation: (updatedCalculation: CalculationInstance) => void;
-    createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: CalculationParameters) => CalculationInstance;
+    createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => CalculationInstance;
 }
 
 export const useCalculations = (): UseCalculationsReturn => {
@@ -27,14 +27,14 @@ export const useCalculations = (): UseCalculationsReturn => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const convertToCalculationInstance = (backendCalc: CalculationListResponse['data']['calculations'][0]): CalculationInstance => {
+    const convertToCalculationInstance = (backendCalc: CalculationListResponseData['calculations'][0]): CalculationInstance => {
         return {
             id: backendCalc.id,
             name: backendCalc.name,
             status: backendCalc.status,
             createdAt: new Date(backendCalc.date).toISOString(),
             updatedAt: new Date(backendCalc.date).toISOString(),
-            parameters: {} as CalculationParameters, // Details are loaded separately
+            parameters: {} as any, // Details are loaded separately
             results: undefined
         };
     };
@@ -78,6 +78,14 @@ export const useCalculations = (): UseCalculationsReturn => {
     }, [refreshCalculations]);
 
     const deleteCalculation = useCallback(async (id: string) => {
+        // Check if this is a temporary/pending calculation (frontend-only)
+        if (id.startsWith('new-calculation-')) {
+            // For pending calculations, only remove from local state (no API call needed)
+            setCalculations(prev => prev.filter(calc => calc.id !== id));
+            return;
+        }
+
+        // For server-side calculations, make API call then update local state
         try {
             await apiClient.deleteCalculation(id);
             setCalculations(prev => prev.filter(calc => calc.id !== id));
@@ -88,7 +96,7 @@ export const useCalculations = (): UseCalculationsReturn => {
         }
     }, [refreshCalculations]);
 
-    const createCalculation = useCallback((name: string, parameters: CalculationParameters): CalculationInstance => {
+    const createCalculation = useCallback((name: string, parameters: QuantumCalculationRequest): CalculationInstance => {
         const now = new Date().toISOString();
         const id = `new-calculation-${Date.now()}`;
         
@@ -106,7 +114,7 @@ export const useCalculations = (): UseCalculationsReturn => {
         return newCalculation;
     }, []);
 
-    const createNewCalculationFromExisting = useCallback((originalCalc: CalculationInstance, newParams: CalculationParameters): CalculationInstance => {
+    const createNewCalculationFromExisting = useCallback((originalCalc: CalculationInstance, newParams: QuantumCalculationRequest): CalculationInstance => {
         const now = new Date().toISOString();
         const id = `new-calculation-${Date.now()}`;
 

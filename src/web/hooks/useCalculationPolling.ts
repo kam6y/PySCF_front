@@ -1,7 +1,7 @@
 // src/web/hooks/useCalculationPolling.ts
 
 import { useRef, useCallback, useEffect } from 'react';
-import { CalculationInstance } from '../types/calculation';
+import { CalculationInstance } from '../types/api-types';
 import { getCalculationDetails } from '../apiClient';
 
 export interface UseCalculationPollingOptions {

@@ -6,19 +6,20 @@ import { XYZInput } from "../components/XYZInput";
 import { StyleControls } from "../components/StyleControls";
 import { StyleSpec } from "../../types/3dmol";
 import {
-    CalculationParameters,
-    CalculationInstance
-} from "../types/calculation";
+    QuantumCalculationRequest,
+    CalculationInstance,
+    PubChemSearchResponseData,
+    SMILESConvertResponseData
+} from "../types/api-types";
 import { searchPubChem, convertSmilesToXyz } from "../apiClient";
-import type { PubChemSearchResponse, SmilesConvertResponse } from "../apiClient";
 import { useCalculationPolling } from "../hooks/useCalculationPolling";
 
 interface CalculationSettingsPageProps {
     activeCalculation?: CalculationInstance;
     onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
-    onStartCalculation: (params: CalculationParameters) => Promise<CalculationInstance>;
+    onStartCalculation: (params: QuantumCalculationRequest) => Promise<CalculationInstance>;
     onCalculationRename: (id: string, newName: string) => Promise<void>;
-    createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: CalculationParameters) => void;
+    createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => void;
 }
 
 export const CalculationSettingsPage = ({
@@ -81,7 +82,7 @@ export const CalculationSettingsPage = ({
         previousCalculationIdRef.current = currentCalculationId;
     }, [activeCalculation, isEditingName, startPolling, stopPolling]);
 
-    const handleParamChange = useCallback((field: keyof CalculationParameters, value: string | number) => {
+    const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number) => {
         if (!activeCalculation || !onCalculationUpdate) return;
         
         // For molecule_name, we handle it differently via the dedicated name input field
@@ -104,11 +105,26 @@ export const CalculationSettingsPage = ({
         const isParamChange = field !== 'xyz';
         const currentParams = activeCalculation.parameters;
         
+        // Ensure required fields have default values for QuantumCalculationRequest
+        const safeParams: QuantumCalculationRequest = {
+            xyz: currentParams.xyz || '',
+            calculation_method: currentParams.calculation_method || 'DFT',
+            basis_function: currentParams.basis_function || '6-31G(d)',
+            exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
+            charges: currentParams.charges || 0,
+            spin_multiplicity: currentParams.spin_multiplicity || 1,
+            solvent_method: currentParams.solvent_method || 'none',
+            solvent: currentParams.solvent || '-',
+            molecule_name: currentParams.molecule_name || 'Unnamed Calculation',
+            cpu_cores: currentParams.cpu_cores || undefined,
+            memory_mb: currentParams.memory_mb || undefined
+        };
+        
         if (isCompleted && isParamChange) {
-            const newParams = { ...currentParams, [field]: value };
+            const newParams = { ...safeParams, [field]: value };
             createNewCalculationFromExisting(activeCalculation, newParams);
         } else {
-            const updatedParams = { ...currentParams, [field]: value };
+            const updatedParams = { ...safeParams, [field]: value };
             onCalculationUpdate({
                 ...activeCalculation,
                 parameters: updatedParams,
@@ -230,7 +246,7 @@ export const CalculationSettingsPage = ({
         setConvertError(null);
 
         try {
-            let data: PubChemSearchResponse | SmilesConvertResponse;
+            let data: PubChemSearchResponseData | SMILESConvertResponseData;
             let moleculeName = localName;
 
             if (inputMethod === 'smiles') {
