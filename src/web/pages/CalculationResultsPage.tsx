@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CalculationInstance } from "../types/api-types";
-import { useCalculationPolling } from "../hooks/useCalculationPolling";
+// useCalculationPolling を useCalculationSubscription に変更
+import { useCalculationSubscription } from "../hooks/useCalculationSubscription";
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -17,23 +18,28 @@ export const CalculationResultsPage = ({
 }: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
 
-  const { startPolling, stopPolling } = useCalculationPolling({
+  // --- ここから変更 ---
+  // useCalculationPolling を削除し、useCalculationSubscription を呼び出す
+  useCalculationSubscription({
     calculationId: activeCalculation?.id || null,
-    onUpdate: onCalculationUpdate
+    status: activeCalculation?.status,
+    onUpdate: onCalculationUpdate,
+    onError: (err) => setError(err)
   });
-
+  // --- ここまで変更 ---
+  
   useEffect(() => {
     setError(detailsError);
   }, [detailsError]);
 
-  useEffect(() => {
-    // If activeCalculation is running, start polling for its status
-    if (activeCalculation && activeCalculation.status === 'running') {
-      startPolling();
-    } else {
-      stopPolling();
-    }
-  }, [activeCalculation, startPolling, stopPolling]);
+  // このuseEffectは不要になったので削除します
+  // useEffect(() => {
+  //   if (activeCalculation && activeCalculation.status === 'running') {
+  //     startPolling();
+  //   } else {
+  //     stopPolling();
+  //   }
+  // }, [activeCalculation, startPolling, stopPolling]);
 
   // Show loading state
   if (isLoadingDetails) {

@@ -12,7 +12,7 @@ import {
   SMILESConvertResponseData
 } from "../types/api-types";
 import { searchPubChem, convertSmilesToXyz } from "../apiClient";
-import { useCalculationPolling } from "../hooks/useCalculationPolling";
+import { useCalculationSubscription } from "../hooks/useCalculationSubscription";
 
 interface CalculationSettingsPageProps {
   activeCalculation?: CalculationInstance;
@@ -39,8 +39,9 @@ export const CalculationSettingsPage = ({
   const [localName, setLocalName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
 
-  const { startPolling, stopPolling } = useCalculationPolling({
+  useCalculationSubscription({
     calculationId: activeCalculation?.id || null,
+    status: activeCalculation?.status,
     onUpdate: onCalculationUpdate,
     onError: (error: string) => setCalculationError(error)
   });
@@ -65,22 +66,16 @@ export const CalculationSettingsPage = ({
       } else {
         moleculeViewerRef.current?.clearModels();
       }
-      // If calculation is running, start polling for its status
-      if (activeCalculation.status === 'running') {
-        startPolling();
-      } else {
-        stopPolling();
-      }
+      // WebSocketサブスクリプションが自動的にステータス管理するため、手動制御は不要
     } else {
       setLocalName("");
       moleculeViewerRef.current?.clearModels();
-      stopPolling();
       setIsEditingName(false); // Reset editing state when no calculation
     }
 
     // Update the previous calculation ID reference
     previousCalculationIdRef.current = currentCalculationId;
-  }, [activeCalculation, isEditingName, startPolling, stopPolling]);
+  }, [activeCalculation, isEditingName]);
 
   const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number) => {
     if (!activeCalculation || !onCalculationUpdate) return;

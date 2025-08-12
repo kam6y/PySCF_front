@@ -3,9 +3,12 @@
 import logging
 import os
 import sys
+import json  # jsonをインポート
+import time  # timeをインポート
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_sock import Sock  # flask-sockをインポート
 from flask_pydantic import validate
 from pydantic import ValidationError
 import threading
@@ -34,6 +37,7 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app and extensions
 app = Flask(__name__)
 CORS(app)  # Enable CORS for cross-origin requests
+sock = Sock(app)  # Sockインスタンスを作成
 
 # Initialize PubChem client
 pubchem_client = PubChemClient(timeout=30)
@@ -369,6 +373,124 @@ def delete_calculation(calculation_id):
     except Exception as e:
         logger.error(f"Error deleting calculation {calculation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'Failed to delete calculation.'}), 500
+
+
+#
+# ===== ここから新しいWebSocketエンドポイントを追加 =====
+#
+@sock.route('/ws/calculations/<calculation_id>')
+def calculation_status_socket(ws, calculation_id):
+    """
+    WebSocketエンドポイント。計算のステータスを監視し、クライアントに送信する。
+    """
+    logger.info(f"WebSocket connection established for calculation {calculation_id}")
+    file_manager = CalculationFileManager()
+    calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+    last_known_status = None
+
+    # 計算ディレクトリの存在確認
+    if not os.path.isdir(calc_path):
+        logger.warning(f"Calculation directory not found: {calc_path}")
+        try:
+            ws.send(json.dumps({
+                'error': f'Calculation "{calculation_id}" not found.',
+                'id': calculation_id
+            }))
+        except Exception as send_error:
+            logger.error(f"Failed to send error message: {send_error}")
+        finally:
+            try:
+                ws.close()
+            except:
+                pass
+        return
+
+    try:
+        while True:
+            try:
+                # ファイルシステムから現在の状態を取得
+                current_status = file_manager.read_calculation_status(calc_path)
+                
+                if current_status is None:
+                    logger.warning(f"Could not read status for calculation {calculation_id}")
+                    current_status = 'unknown'
+
+                # ステータスが変更された場合のみデータを送信
+                if current_status != last_known_status:
+                    logger.info(f"Status changed for {calculation_id} to '{current_status}'. Sending update.")
+                    
+                    try:
+                        # get_calculation_detailsと同様のロジックで詳細データを取得
+                        parameters = file_manager.read_calculation_parameters(calc_path) or {}
+                        results = file_manager.read_calculation_results(calc_path)
+                        display_name = file_manager._get_display_name(calculation_id, parameters)
+                        
+                        # 作成日時の安全な取得
+                        try:
+                            creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
+                            updated_date = datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat()
+                        except OSError:
+                            current_time = datetime.now().isoformat()
+                            creation_date = current_time
+                            updated_date = current_time
+
+                        # CalculationInstance と同じ形式のデータを作成
+                        calculation_instance = {
+                            'id': calculation_id,
+                            'name': display_name,
+                            'status': current_status,
+                            'createdAt': creation_date,
+                            'updatedAt': updated_date,
+                            'parameters': parameters,
+                            'results': results,
+                            'workingDirectory': calc_path,
+                        }
+                        
+                        # JSON送信をtry-catchで包む
+                        try:
+                            ws.send(json.dumps(calculation_instance))
+                            last_known_status = current_status
+                        except Exception as send_error:
+                            logger.error(f"Failed to send WebSocket message: {send_error}")
+                            break  # 送信に失敗した場合は接続を終了
+                            
+                    except Exception as data_error:
+                        logger.error(f"Error preparing calculation data for {calculation_id}: {data_error}")
+                        try:
+                            ws.send(json.dumps({
+                                'error': 'Failed to read calculation data',
+                                'id': calculation_id,
+                                'status': current_status
+                            }))
+                        except:
+                            pass  # エラーメッセージ送信に失敗してもログ出力は行わない
+
+                # 計算が完了またはエラーになったらループを終了
+                if current_status in ['completed', 'error']:
+                    logger.info(f"Calculation {calculation_id} finished with status '{current_status}'. Closing WebSocket.")
+                    break
+                
+                # 1秒待機して次のチェックへ
+                time.sleep(1)
+                
+            except Exception as loop_error:
+                logger.error(f"Error in WebSocket loop for {calculation_id}: {loop_error}")
+                break
+            
+    except Exception as e:
+        logger.error(f"WebSocket error for {calculation_id}: {e}", exc_info=True)
+    finally:
+        # 接続が閉じることを確認
+        logger.info(f"Closing WebSocket connection for calculation {calculation_id}")
+        try:
+            if hasattr(ws, 'close'):
+                ws.close()
+        except Exception as close_error:
+            logger.debug(f"Error closing WebSocket: {close_error}")
+
+#
+# ===== WebSocketエンドポイントの追加はここまで =====
+#
 
 
 @app.errorhandler(ValidationError)

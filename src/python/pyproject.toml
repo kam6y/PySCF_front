@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.11.7",
     "flask-pydantic>=0.13.1",
     "datamodel-code-generator>=0.25.0",
+    "flask-sock>=0.7.0",
 ]
 
 [tool.uv]
