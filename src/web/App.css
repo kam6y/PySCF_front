@@ -414,7 +414,8 @@ body {
 /* Calculation Settings Page Styles */
 
 .calculation-settings-containers {
-  display: flex;
+  display: grid;
+  grid-template-columns: 3fr 1fr;
   width: 100%;
   padding: 12px 0;
   height: calc(100vh - 40px);
@@ -623,7 +624,7 @@ body {
 /* Main Content Three Column Layout */
 .main-content {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 3fr 1fr;
   gap: 16px;
   flex: 1;
   align-items: start;
@@ -704,22 +705,9 @@ body {
 
 /* Left Column - 3D Viewer */
 .left-column {
-  display: flex;
-  background: white;
-  height: fit-content;
-  border-radius: 8px;
-  padding: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  border: 1px solid #e0e0e0;
-}
-
-.left-column .viewer-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex: 1;
   position: relative;
-  min-height: 506px;
+  height: 100%;
+  width: 100%;
 }
 
 /* Right Column - Visualization Controls and Input */
@@ -727,7 +715,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  height: fit-content;
+  height: 100%;
 }
 
 .visualization-section,
@@ -737,7 +725,7 @@ body {
   padding: 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   border: 1px solid #e0e0e0;
-  height: fit-content;
+  height: 100%;
 }
 
 .molecular-input-section {
@@ -1067,7 +1055,8 @@ body {
 
 .xyz-textarea {
   width: 100%;
-  height: 180px;
+  height: auto;
+  min-height: 28dvh;
   padding: 12px;
   font-size: 12px;
   font-family: 'Courier New', monospace;

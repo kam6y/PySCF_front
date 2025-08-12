@@ -273,6 +273,7 @@ export interface components {
         SMILESConvertResponse: {
             /** @example true */
             success: boolean;
+            /** SMILESConvertData */
             data: {
                 /** @description XYZ format molecular structure */
                 xyz: string;

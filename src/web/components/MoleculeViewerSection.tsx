@@ -17,17 +17,15 @@ export const MoleculeViewerSection = ({
   return (
     <div className="main-content">
       <div className="left-column">
-        <div className="viewer-container">
-          <MoleculeViewer ref={moleculeViewerRef} width={600} height={500} backgroundColor="white" className="main-viewer" />
-          {!hasValidMolecule && (
-            <div className="viewer-placeholder">
-              <div className="placeholder-content">
-                <h3>No Molecule Loaded</h3>
-                <p>Enter a molecular structure in the right panel to see the 3D visualization</p>
-              </div>
+        <MoleculeViewer ref={moleculeViewerRef} width={"100%"} height={"100%"} backgroundColor="white"/>
+        {!hasValidMolecule && (
+          <div className="viewer-placeholder">
+            <div className="placeholder-content">
+              <h3>No Molecule Loaded</h3>
+              <p>Enter a molecular structure in the right panel to see the 3D visualization</p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       <div className="right-column">
         <section className="visualization-section">
