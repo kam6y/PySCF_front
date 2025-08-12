@@ -44,6 +44,23 @@ export interface ViewerSpec {
   backgroundColor?: string;
 }
 
+// 👈 追加: ラベルのスタイルを指定する型
+export interface LabelSpec {
+  position?: { x: number; y: number; z: number };
+  fontColor?: string;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  fontSize?: number;
+  inFront?: boolean;
+}
+
+// 👈 追加: addLabelが返すオブジェクトの型
+export interface Label {
+  setText(text: string): void;
+  remove(): void;
+}
+
+
 export interface GLViewer {
   addModel(data: string, format?: string, options?: any): GLModel;
   removeModel(model: GLModel): void;
@@ -78,6 +95,10 @@ export interface GLViewer {
   
   screenshot(width?: number, height?: number, format?: string): string;
   getModel(id?: number): GLModel;
+
+  // 👈 追加: 不足していたメソッドの型定義
+  addLabel(text: string, options: LabelSpec): Label;
+  removeAllLabels(): GLViewer;
 }
 
 export interface GLModel {
@@ -119,4 +140,3 @@ declare module '3dmol' {
   
   export const ElementColors: { [element: string]: number };
 }
-
