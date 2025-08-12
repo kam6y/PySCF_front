@@ -20,7 +20,7 @@ from gevent.pywsgi import WSGIServer
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
-from quantum_calc import DFTCalculator, HFCalculator, CalculationError, ConvergenceError, InputError
+from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CalculationError, ConvergenceError, InputError
 from quantum_calc.file_manager import CalculationFileManager
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
@@ -60,6 +60,8 @@ def run_calculation_in_background(calculation_id: str, parameters: dict):
         calculation_method = parameters.get('calculation_method', 'DFT')
         if calculation_method == 'HF':
             calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        elif calculation_method == 'MP2':
+            calculator = MP2Calculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         else:  # Default to DFT
             calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         

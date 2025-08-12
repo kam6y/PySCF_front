@@ -289,7 +289,7 @@ components:
 
     CalculationMethod:
       type: string
-      enum: [DFT, HF]
+      enum: [DFT, HF, MP2]
       description: Quantum calculation method
 
     CalculationStatus:
