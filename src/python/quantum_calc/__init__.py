@@ -2,11 +2,13 @@
 
 from .base_calculator import BaseCalculator
 from .dft_calculator import DFTCalculator
+from .hf_calculator import HFCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError
 
 __all__ = [
     'BaseCalculator',
     'DFTCalculator',
+    'HFCalculator',
     'CalculationError',
     'ConvergenceError',
     'InputError'

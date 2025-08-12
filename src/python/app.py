@@ -20,7 +20,7 @@ from gevent.pywsgi import WSGIServer
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
-from quantum_calc import DFTCalculator, CalculationError, ConvergenceError, InputError
+from quantum_calc import DFTCalculator, HFCalculator, CalculationError, ConvergenceError, InputError
 from quantum_calc.file_manager import CalculationFileManager
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
@@ -46,7 +46,7 @@ pubchem_client = PubChemClient(timeout=30)
 
 def run_calculation_in_background(calculation_id: str, parameters: dict):
     """
-    Worker function to run the DFT calculation in a separate thread.
+    Worker function to run quantum chemistry calculations in a separate thread.
     Updates the calculation status and results directly on the file system.
     """
     file_manager = CalculationFileManager()
@@ -56,21 +56,31 @@ def run_calculation_in_background(calculation_id: str, parameters: dict):
         # Update status to running on the file system
         file_manager.save_calculation_status(calc_dir, 'running')
         
-        # Initialize calculator
-        calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        # Initialize calculator based on calculation method
+        calculation_method = parameters.get('calculation_method', 'DFT')
+        if calculation_method == 'HF':
+            calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        else:  # Default to DFT
+            calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         
         # Parse XYZ and setup calculation
         atoms = calculator.parse_xyz(parameters['xyz'])
-        calculator.setup_calculation(
-            atoms,
-            basis=parameters['basis_function'],
-            xc=parameters['exchange_correlation'],
-            charge=parameters['charges'],
-            spin=(parameters['spin_multiplicity'] - 1) // 2,
-            max_cycle=150,
-            solvent_method=parameters['solvent_method'],
-            solvent=parameters['solvent']
-        )
+        
+        # Prepare setup parameters
+        setup_params = {
+            'basis': parameters['basis_function'],
+            'charge': parameters['charges'],
+            'spin': (parameters['spin_multiplicity'] - 1) // 2,
+            'max_cycle': 150,
+            'solvent_method': parameters['solvent_method'],
+            'solvent': parameters['solvent']
+        }
+        
+        # Add exchange-correlation functional only for DFT calculations
+        if calculation_method == 'DFT':
+            setup_params['xc'] = parameters['exchange_correlation']
+        
+        calculator.setup_calculation(atoms, **setup_params)
         
         # Run calculation
         results = calculator.run_calculation()

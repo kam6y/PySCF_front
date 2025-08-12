@@ -170,7 +170,7 @@ export interface components {
          * @description Quantum calculation method
          * @enum {string}
          */
-        CalculationMethod: "DFT";
+        CalculationMethod: "DFT" | "HF";
         /**
          * @description Status of a calculation
          * @enum {string}

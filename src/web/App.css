@@ -722,7 +722,7 @@ body {
 .molecular-input-section {
   background: white;
   border-radius: 8px;
-  padding: 16px;
+  padding: 8px 16px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   border: 1px solid #e0e0e0;
   height: 100%;
@@ -887,20 +887,15 @@ body {
   font-style: italic;
 }
 
-/* StyleControls Component Styles */
-.style-controls-header {
-  margin-bottom: 16px;
-}
-
 .section-title {
-  margin: 0 0 12px 0;
+  margin: 0 0 4px 0;
   font-size: 16px;
   font-weight: 600;
   color: #333;
 }
 
 .style-options {
-  margin-bottom: 20px;
+  margin-bottom: 4px;
 }
 
 .style-option {
@@ -951,7 +946,7 @@ body {
 }
 
 .slider-control {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .slider-label {

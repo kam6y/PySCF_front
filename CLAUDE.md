@@ -1,25 +1,24 @@
-CLAUDE.md
 This file provides guidance to Claude when working with code in this repository.Your owner is Japanese, so you must use Japanese when reporting your plans.
 
 Project Overview
 This is a PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
 
-A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend.
+A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend. The application now uses WebSockets for real-time status updates of running calculations, providing a more efficient and responsive user experience than the previous polling-based system.
 
-## Development Philosophy
+Development Philosophy
+This is a development-stage application. Backward compatibility is not a concern, and breaking changes should be made freely in favor of better design and simpler code. When refactoring or improving the codebase:
 
-**This is a development-stage application.** Backward compatibility is not a concern, and breaking changes should be made freely in favor of better design and simpler code. When refactoring or improving the codebase:
+Prioritize simplicity over compatibility - Remove deprecated patterns and complex fallback logic
 
-- **Prioritize simplicity over compatibility** - Remove deprecated patterns and complex fallback logic
-- **Make breaking changes confidently** - Don't hesitate to change APIs, data structures, or file formats
-- **Clean up legacy code** - Remove old implementations when better alternatives are available
-- **Focus on the best solution** - Don't compromise design quality for compatibility with older versions
+Make breaking changes confidently - Don't hesitate to change APIs, data structures, or file formats
+
+Clean up legacy code - Remove old implementations when better alternatives are available
+
+Focus on the best solution - Don't compromise design quality for compatibility with older versions
 
 This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
 
 Development Commands
-Bash
-
 # Install Node.js and Python dependencies
 npm install
 cd src/python
@@ -34,9 +33,8 @@ npm run build
 
 # Package application for distribution (includes production build)
 npm run package
-Individual Commands
-Bash
 
+Individual Commands
 # Clean build directory
 npm run clean
 
@@ -60,6 +58,7 @@ uv run pytest tests/
 
 # Build Python executable only (uses PyInstaller)
 npm run build:python
+
 Development Workflow
 The npm run dev script is the primary command for development. It automatically:
 
@@ -95,13 +94,15 @@ Preload Script (src/preload.ts): Securely exposes specific Electron APIs to the 
 Renderer Process (src/web/): The React (TypeScript) application that provides the entire user interface.
 
 Python Backend (src/python/)
-A Flask API server that provides endpoints for:
+A Flask API server that provides REST endpoints and a WebSocket interface for:
 
 PubChem Integration: Searching compounds by name, CID, or formula and converting the data to XYZ format.
 
 SMILES Conversion: Converting SMILES strings to 3D XYZ format using RDKit.
 
 Quantum Chemistry Calculations: Running DFT calculations via PySCF. Calculations are executed in background threads to keep the API responsive.
+
+Real-time Status Updates: A WebSocket endpoint (/ws/calculations/<id>) pushes status updates to the frontend as soon as they change on the file system.
 
 File Management: Listing, renaming, and deleting calculation directories and files.
 
@@ -125,14 +126,14 @@ useCalculations: Manages the list of all calculations. It fetches the list from 
 
 useActiveCalculation: Manages the currently selected calculation. It fetches detailed data for the active calculation and caches it.
 
-useCalculationPolling: Manages polling for the status of a running calculation. When a calculation is started, this hook periodically requests updates from the backend until the status is completed or error.
+useCalculationSubscription: Replaces the old polling hook. It establishes a WebSocket connection for a running calculation and listens for real-time status updates pushed from the server.
 
-API Client (src/web/apiClient.ts): A centralized module containing fetch functions for all communication with the Python backend. It uses the auto-generated TypeScript types for type safety.
+API Client (src/web/apiClient.ts): A centralized module containing fetch functions for all REST communication with the Python backend. It also provides a helper function to generate the correct WebSocket URL. It uses the auto-generated TypeScript types for type safety.
 
 Type Wrappers (src/web/types/api-types.ts): This file re-exports types from the auto-generated generated-api.ts to provide convenient, application-wide aliases.
 
 State Flow Example (Starting a Calculation)
-This is an asynchronous process involving the frontend, backend, and background threads.
+This is an asynchronous process involving the frontend, backend, background threads, and WebSockets.
 
 User clicks the "Start Calculation" button in CalculationSettingsPage.
 
@@ -146,22 +147,27 @@ Saves the initial parameters and sets the status to pending.
 
 Starts a new background thread to run the PySCF calculation.
 
-Returns a 202 Accepted response with the newly created (and now persistent) CalculationInstance data.
+Returns a 2022 Accepted response with the newly created (and now persistent) CalculationInstance data.
 
 The useCalculations hook updates the list of calculations, replacing the temporary client-side ID with the new persistent ID from the server. The useActiveCalculation hook updates the active ID.
 
-The CalculationResultsPage detects that the active calculation's status is running and triggers the useCalculationPolling hook.
+The CalculationResultsPage (or any component observing the active calculation) detects that the active calculation's status is running.
 
-The useCalculationPolling hook starts making periodic calls to GET /api/quantum/calculations/<id>.
+The useCalculationSubscription hook is triggered by the running status. It opens a WebSocket connection to ws://.../ws/calculations/<id>.
 
-The hook's onUpdate callback updates the central state in App.tsx each time it receives new status information. This causes the UI to reflect the current state (e.g., in the sidebar).
+The Flask backend's WebSocket handler for that calculationId starts monitoring the status.json file on the filesystem.
 
-When the backend thread finishes, it updates the status.json on the filesystem to completed or error. The next polling request retrieves this final status, and the hook stops polling.
+As the background thread updates the status.json file (e.g., to completed or error), the WebSocket handler detects the change and pushes the complete, updated CalculationInstance data to the connected client.
+
+The useCalculationSubscription hook's onUpdate callback receives the new data and updates the central state in App.tsx. This causes the UI to reflect the current state (e.g., in the sidebar) in real-time.
+
+Once the status is completed or error, the backend WebSocket handler sends the final update and closes the connection.
 
 File Structure
 src/
 ├── api-spec/
 │   └── openapi.yaml          # Single source of truth for the API
+├── assets/                   # Fonts and icons
 ├── main.ts                   # Electron main process
 ├── preload.ts                # Electron preload script
 ├── types/                    # Global TypeScript definitions
@@ -170,18 +176,22 @@ src/
 │   ├── App.tsx               # Main React application component
 │   ├── components/           # Reusable React components
 │   ├── hooks/                # Custom React hooks for state management
+│   │   ├── useCalculations.ts
+│   │   ├── useActiveCalculation.ts
+│   │   └── useCalculationSubscription.ts # Real-time updates via WebSocket
 │   ├── pages/                # Page components
 │   └── types/
 │       ├── api-types.ts      # Convenience wrapper for generated types
 │       └── generated-api.ts  # (auto-generated) TypeScript types from OpenAPI spec
 └── python/
-    ├── app.py                # Flask API server main entry point
+    ├── app.py                # Flask API server main entry point (includes WebSocket handler)
     ├── pyproject.toml        # Python dependencies (managed by uv)
     ├── generated_models.py   # (auto-generated) Pydantic models from OpenAPI spec
     ├── pubchem/              # PubChem integration modules
     ├── SMILES/               # SMILES conversion modules
     ├── quantum_calc/         # PySCF calculation logic and file management
     └── tests/                # Python unit tests
+
 Key API Endpoints
 GET /health: Health check endpoint used by the Electron main process during startup.
 
@@ -200,6 +210,8 @@ GET /api/quantum/calculations/<id>: Gets detailed information and results for a 
 PUT /api/quantum/calculations/<id>: Updates a calculation's metadata (e.g., renames it).
 
 DELETE /api/quantum/calculations/<id>: Deletes a calculation and all its associated files.
+
+WS /ws/calculations/<id>: WebSocket endpoint for real-time status updates of a running calculation.
 
 Troubleshooting
 Backend Server Fails to Start: The Flask server is designed to find a free port automatically. If it still fails, ensure that no firewall is blocking local network communication and that the Python environment (uv sync) is correctly set up.
