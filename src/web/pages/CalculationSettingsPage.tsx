@@ -168,10 +168,31 @@ export const CalculationSettingsPage = ({
 
   const handleXYZChange = useCallback((xyzData: string, isValid: boolean) => {
     if (isValid && activeCalculation) {
-      const updatedParams = { ...activeCalculation.parameters, xyz: xyzData };
-      onCalculationUpdate({ ...activeCalculation, parameters: updatedParams });
+      const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
+      const currentParams = activeCalculation.parameters;
+
+      const safeParams: QuantumCalculationRequest = {
+        xyz: xyzData,
+        calculation_method: currentParams.calculation_method || 'DFT',
+        basis_function: currentParams.basis_function || '6-31G(d)',
+        exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
+        charges: currentParams.charges || 0,
+        spin_multiplicity: currentParams.spin_multiplicity || 1,
+        solvent_method: currentParams.solvent_method || 'none',
+        solvent: currentParams.solvent || '-',
+        name: (currentParams as any).name || (currentParams as any).molecule_name || 'Unnamed Calculation',
+        cpu_cores: currentParams.cpu_cores || undefined,
+        memory_mb: currentParams.memory_mb || undefined
+      };
+
+      if (isCompleted) {
+        createNewCalculationFromExisting(activeCalculation, safeParams);
+      } else {
+        const updatedParams = { ...currentParams, xyz: xyzData };
+        onCalculationUpdate({ ...activeCalculation, parameters: updatedParams });
+      }
     }
-  }, [activeCalculation, onCalculationUpdate]);
+  }, [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]);
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalName(e.target.value);
@@ -297,12 +318,33 @@ export const CalculationSettingsPage = ({
       }
 
       setLocalName(moleculeName);
-      const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
-      onCalculationUpdate({
-        ...activeCalculation,
+      
+      const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
+      
+      const safeParams: QuantumCalculationRequest = {
+        xyz: data.xyz,
+        calculation_method: params.calculation_method || 'DFT',
+        basis_function: params.basis_function || '6-31G(d)',
+        exchange_correlation: params.exchange_correlation || 'B3LYP',
+        charges: params.charges || 0,
+        spin_multiplicity: params.spin_multiplicity || 1,
+        solvent_method: params.solvent_method || 'none',
+        solvent: params.solvent || '-',
         name: moleculeName,
-        parameters: updatedParams,
-      });
+        cpu_cores: params.cpu_cores || undefined,
+        memory_mb: params.memory_mb || undefined
+      };
+
+      if (isCompleted) {
+        createNewCalculationFromExisting(activeCalculation, safeParams);
+      } else {
+        const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
+        onCalculationUpdate({
+          ...activeCalculation,
+          name: moleculeName,
+          parameters: updatedParams,
+        });
+      }
 
     } catch (error) {
       setConvertError(error instanceof Error ? error.message : 'An unknown error occurred during conversion.');
