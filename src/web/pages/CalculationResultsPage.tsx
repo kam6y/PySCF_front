@@ -177,6 +177,193 @@ export const CalculationResultsPage = ({
           </div>
         </section>
 
+        {/* TDDFT Results Section */}
+        {parameters.calculation_method === 'TDDFT' && results.excitation_energies && (
+          <>
+            {/* Excited States Summary */}
+            <section style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#e8f0ff', borderRadius: '8px' }}>
+              <h2>Excited States Summary</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px' }}>
+                <div>
+                  <strong>Number of States:</strong> <code>{results.excitation_energies.length}</code>
+                </div>
+                <div>
+                  <strong>TDDFT Method:</strong> <code>{(parameters as any).tddft_method || 'TDDFT'}</code>
+                </div>
+                <div>
+                  <strong>Lowest Excitation:</strong> <code>{results.excitation_energies[0]?.toFixed(4) || 'N/A'} eV</code>
+                </div>
+                <div>
+                  <strong>UV-Vis Range:</strong> <code>{results.excitation_wavelengths?.[0]?.toFixed(0)} nm</code>
+                </div>
+              </div>
+            </section>
+
+            {/* Excitation Energies Table */}
+            <section style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#fff8dc', borderRadius: '8px' }}>
+              <h2>Excitation Energies and Transitions</h2>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ 
+                  width: '100%', 
+                  borderCollapse: 'collapse', 
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f0f8ff' }}>
+                      <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'left' }}>State</th>
+                      <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Energy (eV)</th>
+                      <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Wavelength (nm)</th>
+                      <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Osc. Strength</th>
+                      <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'left' }}>Transition Type</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.excitation_energies.map((energy: number, index: number) => {
+                      const wavelength = results.excitation_wavelengths?.[index];
+                      const oscStrength = results.oscillator_strengths?.[index];
+                      const transition = results.major_transitions?.[index];
+                      
+                      return (
+                        <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#fafafa' : 'white' }}>
+                          <td style={{ padding: '10px', border: '1px solid #ddd' }}>S{index + 1}</td>
+                          <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                            {energy.toFixed(4)}
+                          </td>
+                          <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                            {wavelength ? wavelength.toFixed(1) : 'N/A'}
+                          </td>
+                          <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                            {oscStrength !== undefined ? oscStrength.toFixed(6) : 'N/A'}
+                          </td>
+                          <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                            {transition?.dominant_transition || 'Unknown'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* UV-Vis Spectrum Visualization */}
+            <section style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#f0fff0', borderRadius: '8px' }}>
+              <h2>UV-Vis Spectrum (Simulated)</h2>
+              <div style={{ 
+                height: '300px', 
+                border: '1px solid #ddd', 
+                borderRadius: '4px', 
+                backgroundColor: 'white',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                <svg width="100%" height="100%" viewBox="0 0 800 300" style={{ display: 'block' }}>
+                  {/* Background Grid */}
+                  <defs>
+                    <pattern id="grid" width="40" height="30" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 30" fill="none" stroke="#f0f0f0" strokeWidth="1"/>
+                    </pattern>
+                  </defs>
+                  <rect width="800" height="300" fill="url(#grid)"/>
+                  
+                  {/* Spectrum Bars */}
+                  {results.excitation_wavelengths?.map((wavelength: number, index: number) => {
+                    if (!wavelength || wavelength < 200 || wavelength > 800) return null;
+                    
+                    const x = ((wavelength - 200) / 600) * 760 + 20;
+                    const intensity = results.oscillator_strengths?.[index] || 0;
+                    const height = Math.min(intensity * 500, 250);
+                    
+                    const getColor = (wl: number) => {
+                      if (wl < 380) return '#8a2be2';
+                      if (wl < 450) return '#4b0082';
+                      if (wl < 495) return '#0000ff';
+                      if (wl < 570) return '#00ff00';
+                      if (wl < 590) return '#ffff00';
+                      if (wl < 620) return '#ffa500';
+                      if (wl < 750) return '#ff0000';
+                      return '#8b4513';
+                    };
+                    
+                    return (
+                      <rect 
+                        key={index}
+                        x={x - 1} 
+                        y={270 - height} 
+                        width="2" 
+                        height={height}
+                        fill={getColor(wavelength)}
+                        opacity="0.7"
+                      />
+                    );
+                  })}
+                  
+                  {/* Axis Labels */}
+                  <text x="20" y="295" fontSize="12" fill="#666">200nm</text>
+                  <text x="400" y="295" fontSize="12" fill="#666">500nm</text>
+                  <text x="780" y="295" fontSize="12" fill="#666" textAnchor="end">800nm</text>
+                  <text x="10" y="15" fontSize="12" fill="#666" transform="rotate(-90, 10, 15)" textAnchor="end">Intensity</text>
+                </svg>
+              </div>
+              <div style={{ marginTop: '10px', fontSize: '14px', color: '#666', textAlign: 'center' }}>
+                UV-Vis absorption spectrum showing calculated transitions. 
+                Colors represent approximate wavelength regions.
+              </div>
+            </section>
+
+            {/* Transition Dipole Moments */}
+            {results.transition_dipoles && results.transition_dipoles.length > 0 && (
+              <section style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#fff0f5', borderRadius: '8px' }}>
+                <h2>Transition Dipole Moments</h2>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ 
+                    width: '100%', 
+                    borderCollapse: 'collapse', 
+                    backgroundColor: 'white',
+                    borderRadius: '4px',
+                    overflow: 'hidden'
+                  }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f0f8ff' }}>
+                        <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'left' }}>State</th>
+                        <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>μx (a.u.)</th>
+                        <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>μy (a.u.)</th>
+                        <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>μz (a.u.)</th>
+                        <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>|μ| (a.u.)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {results.transition_dipoles.map((dipole: any, index: number) => {
+                        const magnitude = Math.sqrt(dipole.x * dipole.x + dipole.y * dipole.y + dipole.z * dipole.z);
+                        
+                        return (
+                          <tr key={index} style={{ backgroundColor: index % 2 === 0 ? '#fafafa' : 'white' }}>
+                            <td style={{ padding: '10px', border: '1px solid #ddd' }}>S{index + 1}</td>
+                            <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                              {dipole.x.toFixed(6)}
+                            </td>
+                            <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                              {dipole.y.toFixed(6)}
+                            </td>
+                            <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                              {dipole.z.toFixed(6)}
+                            </td>
+                            <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                              <strong>{magnitude.toFixed(6)}</strong>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+          </>
+        )}
+
         {/* Checkpoint File Information */}
         <section style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#f0f3ff', borderRadius: '8px' }}>
           <h2>Checkpoint File Information</h2>

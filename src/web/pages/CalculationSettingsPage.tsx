@@ -105,7 +105,7 @@ export const CalculationSettingsPage = ({
     }
   }, [useAtomicRadii, activeCalculation?.parameters?.xyz]);
 
-  const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number) => {
+  const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number | boolean) => {
     if (!activeCalculation || !onCalculationUpdate) return;
 
     if (field === 'name') {
@@ -141,7 +141,10 @@ export const CalculationSettingsPage = ({
       solvent: currentParams.solvent || '-',
       name: (currentParams as any).name || (currentParams as any).molecule_name || 'Unnamed Calculation',
       cpu_cores: currentParams.cpu_cores || undefined,
-      memory_mb: currentParams.memory_mb || undefined
+      memory_mb: currentParams.memory_mb || undefined,
+      tddft_nstates: (currentParams as any).tddft_nstates || 10,
+      tddft_method: (currentParams as any).tddft_method || 'TDDFT',
+      tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false
     };
 
     if (isCompleted && isParamChange) {
@@ -182,7 +185,10 @@ export const CalculationSettingsPage = ({
         solvent: currentParams.solvent || '-',
         name: (currentParams as any).name || (currentParams as any).molecule_name || 'Unnamed Calculation',
         cpu_cores: currentParams.cpu_cores || undefined,
-        memory_mb: currentParams.memory_mb || undefined
+        memory_mb: currentParams.memory_mb || undefined,
+        tddft_nstates: (currentParams as any).tddft_nstates || 10,
+        tddft_method: (currentParams as any).tddft_method || 'TDDFT',
+        tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false
       };
 
       if (isCompleted) {
@@ -269,7 +275,10 @@ export const CalculationSettingsPage = ({
       solvent: currentParams.solvent || '-',
       name: moleculeName,
       cpu_cores: currentParams.cpu_cores || undefined,
-      memory_mb: currentParams.memory_mb || undefined
+      memory_mb: currentParams.memory_mb || undefined,
+      tddft_nstates: (currentParams as any).tddft_nstates || 10,
+      tddft_method: (currentParams as any).tddft_method || 'TDDFT',
+      tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false
     };
 
     try {
@@ -332,7 +341,10 @@ export const CalculationSettingsPage = ({
         solvent: params.solvent || '-',
         name: moleculeName,
         cpu_cores: params.cpu_cores || undefined,
-        memory_mb: params.memory_mb || undefined
+        memory_mb: params.memory_mb || undefined,
+        tddft_nstates: (params as any).tddft_nstates || 10,
+        tddft_method: (params as any).tddft_method || 'TDDFT',
+        tddft_analyze_nto: (params as any).tddft_analyze_nto || false
       };
 
       if (isCompleted) {
@@ -476,6 +488,7 @@ export const CalculationSettingsPage = ({
                   <option value="DFT">DFT</option>
                   <option value="HF">HF</option>
                   <option value="MP2">MP2</option>
+                  <option value="TDDFT">TDDFT</option>
                 </select>
               </div>
               <div className="setting-row">
@@ -507,7 +520,7 @@ export const CalculationSettingsPage = ({
               </div>
               <div className="setting-row">
                 <label>Exchange-Correlation Functional</label>
-                <select value={params.exchange_correlation || 'B3LYP'} onChange={(e) => handleParamChange('exchange_correlation', e.target.value)} disabled={params.calculation_method !== 'DFT' || calculationStatus === 'running'}>
+                <select value={params.exchange_correlation || 'B3LYP'} onChange={(e) => handleParamChange('exchange_correlation', e.target.value)} disabled={!(params.calculation_method === 'DFT' || params.calculation_method === 'TDDFT') || calculationStatus === 'running'}>
                   <optgroup label="Hybrid">
                     <option value="B3LYP">B3LYP</option>
                     <option value="PBE0">PBE0</option>
@@ -550,6 +563,43 @@ export const CalculationSettingsPage = ({
                 />
               </div>
             </section>
+            {params.calculation_method === 'TDDFT' && (
+              <section className="tddft-settings-section">
+                <div className="setting-row">
+                  <label>Number of Excited States</label>
+                  <input
+                    type="number"
+                    value={(params as any).tddft_nstates || 10}
+                    onChange={(e) => handleParamChange('tddft_nstates' as any, Math.max(1, Math.min(50, Number(e.target.value))))}
+                    min={1} max={50} step={1}
+                    className="number-input with-spinner"
+                    disabled={calculationStatus === 'running'}
+                  />
+                </div>
+                <div className="setting-row">
+                  <label>TDDFT Method</label>
+                  <select 
+                    value={(params as any).tddft_method || 'TDDFT'} 
+                    onChange={(e) => handleParamChange('tddft_method' as any, e.target.value)} 
+                    disabled={calculationStatus === 'running'}
+                  >
+                    <option value="TDDFT">Full TDDFT</option>
+                    <option value="TDA">Tamm-Dancoff Approximation (TDA)</option>
+                  </select>
+                </div>
+                <div className="setting-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={(params as any).tddft_analyze_nto || false}
+                      onChange={(e) => handleParamChange('tddft_analyze_nto' as any, e.target.checked)}
+                      disabled={calculationStatus === 'running'}
+                    />
+                    Perform Natural Transition Orbital Analysis
+                  </label>
+                </div>
+              </section>
+            )}
             <section className="solvent-settings-section">
               <div className="setting-row">
                 <label>Solvent Effect Method</label>

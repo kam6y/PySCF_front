@@ -170,7 +170,7 @@ export interface components {
          * @description Quantum calculation method
          * @enum {string}
          */
-        CalculationMethod: "DFT" | "HF" | "MP2";
+        CalculationMethod: "DFT" | "HF" | "MP2" | "TDDFT";
         /**
          * @description Status of a calculation
          * @enum {string}
@@ -234,6 +234,22 @@ export interface components {
             cpu_cores?: number | null;
             /** @description Memory in MB */
             memory_mb?: number | null;
+            /**
+             * @description Number of excited states to calculate (TDDFT only)
+             * @default 10
+             */
+            tddft_nstates: number;
+            /**
+             * @description TDDFT calculation method - TDDFT or Tamm-Dancoff approximation
+             * @default TDDFT
+             * @enum {string}
+             */
+            tddft_method: "TDDFT" | "TDA";
+            /**
+             * @description Perform Natural Transition Orbital analysis (TDDFT only)
+             * @default false
+             */
+            tddft_analyze_nto: boolean;
         };
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */
@@ -328,6 +344,12 @@ export interface components {
             memory_mb?: number | null;
             /** Format: date-time */
             created_at?: string | null;
+            /** @description Number of excited states (TDDFT only) */
+            tddft_nstates?: number | null;
+            /** @description TDDFT method used */
+            tddft_method?: string | null;
+            /** @description Whether NTO analysis was performed */
+            tddft_analyze_nto?: boolean | null;
         };
         CalculationResults: {
             /** @description SCF energy result */
@@ -364,6 +386,31 @@ export interface components {
             atom_count?: number;
             /** @description Error message if calculation failed */
             error?: string | null;
+            /** @description Excitation energies in eV (TDDFT only) */
+            excitation_energies?: number[] | null;
+            /** @description Excitation wavelengths in nm (TDDFT only) */
+            excitation_wavelengths?: number[] | null;
+            /** @description Oscillator strengths for transitions (TDDFT only) */
+            oscillator_strengths?: number[] | null;
+            /** @description Transition dipole moments (TDDFT only) */
+            transition_dipoles?: {
+                x?: number;
+                y?: number;
+                z?: number;
+            }[] | null;
+            /** @description Major orbital transitions (TDDFT only) */
+            major_transitions?: {
+                /** @description Excited state number */
+                state?: number;
+                /** @description Excitation energy in eV */
+                energy?: number;
+                /** @description Wavelength in nm */
+                wavelength?: number;
+                /** @description Oscillator strength */
+                oscillator_strength?: number;
+                /** @description Main orbital transition (e.g., HOMO -> LUMO) */
+                dominant_transition?: string;
+            }[] | null;
         };
         CalculationInstance: {
             /** @description Unique calculation ID */

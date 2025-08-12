@@ -289,7 +289,7 @@ components:
 
     CalculationMethod:
       type: string
-      enum: [DFT, HF, MP2]
+      enum: [DFT, HF, MP2, TDDFT]
       description: Quantum calculation method
 
     CalculationStatus:
@@ -387,6 +387,21 @@ components:
           maximum: 32768
           nullable: true
           description: Memory in MB
+        tddft_nstates:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 10
+          description: Number of excited states to calculate (TDDFT only)
+        tddft_method:
+          type: string
+          enum: [TDDFT, TDA]
+          default: TDDFT
+          description: TDDFT calculation method - TDDFT or Tamm-Dancoff approximation
+        tddft_analyze_nto:
+          type: boolean
+          default: false
+          description: Perform Natural Transition Orbital analysis (TDDFT only)
 
     CalculationUpdateRequest:
       type: object
@@ -551,6 +566,18 @@ components:
           type: string
           format: date-time
           nullable: true
+        tddft_nstates:
+          type: integer
+          nullable: true
+          description: Number of excited states (TDDFT only)
+        tddft_method:
+          type: string
+          nullable: true
+          description: TDDFT method used
+        tddft_analyze_nto:
+          type: boolean
+          nullable: true
+          description: Whether NTO analysis was performed
 
     CalculationResults:
       type: object
@@ -607,6 +634,59 @@ components:
           type: string
           nullable: true
           description: Error message if calculation failed
+        excitation_energies:
+          type: array
+          items:
+            type: number
+          nullable: true
+          description: Excitation energies in eV (TDDFT only)
+        excitation_wavelengths:
+          type: array
+          items:
+            type: number
+          nullable: true
+          description: Excitation wavelengths in nm (TDDFT only)
+        oscillator_strengths:
+          type: array
+          items:
+            type: number
+          nullable: true
+          description: Oscillator strengths for transitions (TDDFT only)
+        transition_dipoles:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: number
+              y:
+                type: number
+              z:
+                type: number
+          nullable: true
+          description: Transition dipole moments (TDDFT only)
+        major_transitions:
+          type: array
+          items:
+            type: object
+            properties:
+              state:
+                type: integer
+                description: Excited state number
+              energy:
+                type: number
+                description: Excitation energy in eV
+              wavelength:
+                type: number
+                description: Wavelength in nm
+              oscillator_strength:
+                type: number
+                description: Oscillator strength
+              dominant_transition:
+                type: string
+                description: Main orbital transition (e.g., HOMO -> LUMO)
+          nullable: true
+          description: Major orbital transitions (TDDFT only)
 
     CalculationInstance:
       type: object

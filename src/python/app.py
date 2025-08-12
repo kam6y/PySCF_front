@@ -20,7 +20,7 @@ from gevent.pywsgi import WSGIServer
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
-from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CalculationError, ConvergenceError, InputError
+from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator, CalculationError, ConvergenceError, InputError
 from quantum_calc.file_manager import CalculationFileManager
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
@@ -62,6 +62,8 @@ def run_calculation_in_background(calculation_id: str, parameters: dict):
             calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         elif calculation_method == 'MP2':
             calculator = MP2Calculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        elif calculation_method == 'TDDFT':
+            calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         else:  # Default to DFT
             calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         
@@ -78,9 +80,15 @@ def run_calculation_in_background(calculation_id: str, parameters: dict):
             'solvent': parameters['solvent']
         }
         
-        # Add exchange-correlation functional only for DFT calculations
-        if calculation_method == 'DFT':
+        # Add exchange-correlation functional for DFT and TDDFT calculations
+        if calculation_method in ['DFT', 'TDDFT']:
             setup_params['xc'] = parameters['exchange_correlation']
+        
+        # Add TDDFT-specific parameters
+        if calculation_method == 'TDDFT':
+            setup_params['nstates'] = parameters.get('tddft_nstates', 10)
+            setup_params['tddft_method'] = parameters.get('tddft_method', 'TDDFT')
+            setup_params['analyze_nto'] = parameters.get('tddft_analyze_nto', False)
         
         calculator.setup_calculation(atoms, **setup_params)
         

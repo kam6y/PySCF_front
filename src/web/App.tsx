@@ -77,7 +77,10 @@ export const App = () => {
       solvent_method: 'none',
       solvent: '-',
       xyz: '',
-      name: '' // no default name (must be set by user)
+      name: '', // no default name (must be set by user)
+      tddft_nstates: 10,
+      tddft_method: 'TDDFT',
+      tddft_analyze_nto: false
     };
     const newCalculation = createCalculation('', defaultParams); // no default name (must be set by user)
     setActiveCalculationById(newCalculation.id);
