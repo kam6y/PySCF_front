@@ -15,7 +15,7 @@ import threading
 import socket
 import shutil
 from typing import Dict
-from werkzeug.serving import make_server
+from gevent.pywsgi import WSGIServer
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
@@ -517,20 +517,26 @@ def method_not_allowed(error):
 
 if __name__ == '__main__':
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
-    # If a port is passed as a command-line argument, use it. Otherwise, let OS assign one.
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     debug = os.environ.get('FLASK_ENV') == 'development'
+
+    # GeventのWSGIServerはポート0を自動割り当てしないため、手動で空きポートを探す
+    if port_arg == 0:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind((host, 0))
+            actual_port = s.getsockname()[1]
+    else:
+        actual_port = port_arg
     
-    # Create server with OS-assigned port (port=0)
-    server = make_server(host, port, app)
-    actual_port = server.server_port
-    
-    # Print the actual port to stdout so the Electron process can capture it.
+    # Electronプロセスにポート番号を通知
     print(f"FLASK_SERVER_PORT:{actual_port}", file=sys.stdout, flush=True)
     
-    logger.info(f"Starting API server on http://{host}:{actual_port} (Debug: {debug})")
+    logger.info(f"Starting API server with gevent on http://{host}:{actual_port} (Debug: {debug})")
+    
+    # Werkzeugのmake_serverの代わりにWSGIServerを使用
+    http_server = WSGIServer((host, actual_port), app)
     try:
-        server.serve_forever()
+        http_server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Server stopped by user.")
-        server.shutdown()
+        http_server.stop()
