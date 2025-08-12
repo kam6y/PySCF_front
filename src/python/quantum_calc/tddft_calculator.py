@@ -113,10 +113,42 @@ class TDDFTCalculator(BaseCalculator):
                 self.mytd = tddft.TDDFT(self.mf)
             
             self.mytd.nstates = nstates
-            excitation_energies = self.mytd.kernel()
             
+            # Validate nstates setting
+            if nstates <= 0:
+                raise InputError(f"Invalid number of excited states: {nstates}. Must be positive.")
+            
+            # Check if requested number of states is reasonable for the system
+            n_orb = len(self.mf.mo_energy) if hasattr(self.mf, 'mo_energy') else 0
+            if nstates > n_orb // 2:
+                logger.warning(f"Requested {nstates} excited states, but system has only {n_orb} orbitals. "
+                             f"Consider reducing nstates to avoid convergence issues.")
+            
+            # Run TDDFT calculation
+            try:
+                excitation_energies = self.mytd.kernel()
+            except Exception as e:
+                if "singular matrix" in str(e).lower():
+                    raise ConvergenceError("TDDFT calculation failed: singular matrix. "
+                                         "Try using a larger basis set or reducing the number of excited states.")
+                elif "memory" in str(e).lower() or "out of memory" in str(e).lower():
+                    raise CalculationError("TDDFT calculation failed: insufficient memory. "
+                                         "Try reducing the number of excited states or using a smaller basis set.")
+                elif "convergence" in str(e).lower():
+                    raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
+                else:
+                    raise CalculationError(f"TDDFT calculation failed: {str(e)}")
+            
+            # Validate results
             if not hasattr(self.mytd, 'e') or self.mytd.e is None:
                 raise CalculationError("TDDFT calculation failed: no excitation energies obtained")
+                
+            if len(self.mytd.e) == 0:
+                raise CalculationError("TDDFT calculation failed: no excited states found")
+                
+            if len(self.mytd.e) < nstates:
+                logger.warning(f"Only {len(self.mytd.e)} excited states found, but {nstates} were requested. "
+                             f"This may indicate convergence issues.")
             
             logger.info(f"TDDFT calculation completed. Found {len(self.mytd.e)} excited states.")
             
@@ -174,17 +206,29 @@ class TDDFTCalculator(BaseCalculator):
             # Analyze transitions to get oscillator strengths and dipole moments
             self.mytd.analyze()
             
-            if hasattr(self.mytd, 'oscillator_strength'):
-                oscillator_strengths = [float(f) for f in self.mytd.oscillator_strength]
+            # Get oscillator strengths (method call, not attribute access)
+            try:
+                osc_strengths_result = self.mytd.oscillator_strength()
+                if osc_strengths_result is not None:
+                    oscillator_strengths = [float(f) for f in osc_strengths_result]
+                    logger.info(f"Retrieved {len(oscillator_strengths)} oscillator strengths")
+            except Exception as osc_error:
+                logger.warning(f"Failed to get oscillator strengths: {osc_error}")
             
-            if hasattr(self.mytd, 'transition_dipole'):
-                for dipole in self.mytd.transition_dipole:
-                    if len(dipole) >= 3:
-                        transition_dipoles.append({
-                            'x': float(dipole[0]),
-                            'y': float(dipole[1]),
-                            'z': float(dipole[2])
-                        })
+            # Get transition dipole moments (method call, not attribute access)
+            try:
+                dipole_result = self.mytd.transition_dipole()
+                if dipole_result is not None:
+                    for dipole in dipole_result:
+                        if hasattr(dipole, '__len__') and len(dipole) >= 3:
+                            transition_dipoles.append({
+                                'x': float(dipole[0]),
+                                'y': float(dipole[1]),
+                                'z': float(dipole[2])
+                            })
+                    logger.info(f"Retrieved {len(transition_dipoles)} transition dipole moments")
+            except Exception as dipole_error:
+                logger.warning(f"Failed to get transition dipole moments: {dipole_error}")
             
         except Exception as e:
             logger.warning(f"Failed to analyze transitions: {e}")
@@ -194,12 +238,35 @@ class TDDFTCalculator(BaseCalculator):
             excitation_energies_ev, excitation_wavelengths, oscillator_strengths
         )
         
+        # Perform NTO analysis if requested
+        nto_analysis = None
+        analyze_nto = self.results.get('tddft_analyze_nto', False)
+        logger.info(f"NTO analysis requested: {analyze_nto}")
+        
+        if analyze_nto:
+            logger.info("Starting Natural Transition Orbital (NTO) analysis...")
+            try:
+                nto_analysis = self._analyze_natural_transition_orbitals(excitation_energies_ev)
+                if nto_analysis:
+                    logger.info(f"NTO analysis completed successfully for {len(nto_analysis)} excited states")
+                    # Log NTO pairs count for each state
+                    for i, state_data in enumerate(nto_analysis):
+                        pairs_count = len(state_data.get('nto_pairs', []))
+                        logger.info(f"State S{state_data.get('state', i+1)}: {pairs_count} NTO pairs found")
+                else:
+                    logger.warning("NTO analysis returned no results")
+            except Exception as e:
+                logger.error(f"NTO analysis failed with exception: {e}", exc_info=True)
+        else:
+            logger.info("NTO analysis skipped (not requested)")
+        
         return {
             'excitation_energies': excitation_energies_ev,
             'excitation_wavelengths': excitation_wavelengths,
             'oscillator_strengths': oscillator_strengths,
             'transition_dipoles': transition_dipoles,
-            'major_transitions': major_transitions
+            'major_transitions': major_transitions,
+            'nto_analysis': nto_analysis
         }
     
     def _analyze_major_transitions(
@@ -273,3 +340,159 @@ class TDDFTCalculator(BaseCalculator):
         lumo_idx = unoccupied_indices[0]
         
         return int(homo_idx), int(lumo_idx)
+    
+    def _analyze_natural_transition_orbitals(self, excitation_energies: List[float]) -> List[Dict[str, Any]]:
+        """Perform Natural Transition Orbital (NTO) analysis for excited states."""
+        if self.mytd is None:
+            raise CalculationError("TDDFT calculation not available for NTO analysis")
+        
+        logger.info(f"Starting NTO analysis for {len(excitation_energies)} excited states")
+        nto_results = []
+        
+        # Check if TDDFT object has get_nto method
+        if not hasattr(self.mytd, 'get_nto'):
+            logger.error("TDDFT object does not have get_nto method")
+            raise CalculationError("TDDFT object does not support NTO analysis (get_nto method not available)")
+        
+        # Analyze NTOs for each excited state
+        for state_idx in range(len(excitation_energies)):
+            state_number = state_idx + 1  # PySCF uses 1-indexed states
+            logger.info(f"Analyzing NTOs for excited state S{state_number} (index {state_idx})")
+            
+            try:
+                # Get NTO weights and coefficients for this state
+                # The get_nto method returns (weights, nto_coefficients)
+                # weights: singular values (λ) from SVD decomposition  
+                # nto_coefficients: natural transition orbitals in AO basis
+                logger.debug(f"Calling mytd.get_nto(state={state_number})")
+                nto_result = self.mytd.get_nto(state=state_number)
+                
+                if nto_result is None or len(nto_result) != 2:
+                    logger.warning(f"Invalid NTO result for state S{state_number}: {nto_result}")
+                    continue
+                    
+                weights, nto_coeff = nto_result
+                logger.info(f"Successfully retrieved NTO data for state S{state_number}")
+                logger.debug(f"Weights type: {type(weights)}, shape: {getattr(weights, 'shape', 'unknown')}")
+                logger.debug(f"NTO coeff type: {type(nto_coeff)}, shape: {getattr(nto_coeff, 'shape', 'unknown')}")
+                
+                # Process NTO data
+                nto_pairs = self._process_nto_data(weights, nto_coeff, state_number)
+                
+                state_result = {
+                    'state': state_number,
+                    'energy': float(excitation_energies[state_idx]),
+                    'nto_pairs': nto_pairs,
+                    'total_nto_pairs': len(nto_pairs)
+                }
+                
+                nto_results.append(state_result)
+                
+            except Exception as e:
+                logger.error(f"Failed to analyze NTO for state {state_number}: {type(e).__name__}: {e}", exc_info=True)
+                # Add empty result for this state to maintain consistency
+                nto_results.append({
+                    'state': state_number,
+                    'energy': float(excitation_energies[state_idx]),
+                    'nto_pairs': [],
+                    'total_nto_pairs': 0
+                })
+        
+        return nto_results
+    
+    def _process_nto_data(self, weights: np.ndarray, nto_coeff: np.ndarray, state_number: int) -> List[Dict[str, Any]]:
+        """Process NTO weights and coefficients to extract orbital pair information."""
+        logger.info(f"Processing NTO data for state S{state_number}")
+        nto_pairs = []
+        
+        # Validate input data
+        if weights is None or nto_coeff is None:
+            logger.error(f"Invalid NTO data: weights={weights}, nto_coeff={nto_coeff}")
+            return nto_pairs
+            
+        if not isinstance(weights, np.ndarray) or not isinstance(nto_coeff, np.ndarray):
+            logger.error(f"NTO data not numpy arrays: weights type={type(weights)}, nto_coeff type={type(nto_coeff)}")
+            return nto_pairs
+            
+        logger.debug(f"Weights array: shape={weights.shape}, min={np.min(weights)}, max={np.max(weights)}")
+        logger.debug(f"NTO coeff array: shape={nto_coeff.shape}")
+        
+        # Find HOMO and LUMO indices for reference
+        if self.mf.mo_occ is None:
+            logger.warning("Orbital occupations not available for NTO analysis")
+            return nto_pairs
+        
+        occupied_indices = np.where(self.mf.mo_occ > 0)[0]
+        virtual_indices = np.where(self.mf.mo_occ == 0)[0]
+        
+        if len(occupied_indices) == 0 or len(virtual_indices) == 0:
+            logger.warning("Cannot determine HOMO/LUMO for NTO analysis")
+            return nto_pairs
+        
+        homo_idx = occupied_indices[-1]
+        lumo_idx = virtual_indices[0]
+        logger.debug(f"Reference orbitals: HOMO idx={homo_idx}, LUMO idx={lumo_idx}")
+        
+        # Calculate total weight for normalization
+        total_weight_squared = np.sum(weights**2)
+        logger.debug(f"Total weight squared: {total_weight_squared}")
+        
+        # Sort weights in descending order and keep significant pairs
+        sorted_indices = np.argsort(weights)[::-1]
+        logger.debug(f"Top 5 weights: {[weights[sorted_indices[i]] for i in range(min(5, len(weights)))]}")
+        
+        # Process the most significant NTO pairs (typically top 5-10)
+        max_pairs = min(10, len(weights))
+        logger.info(f"Processing top {max_pairs} NTO pairs out of {len(weights)} total weights")
+        
+        for i in range(max_pairs):
+            idx = sorted_indices[i]
+            weight = float(weights[idx])
+            
+            # Skip very small contributions (less than 1%)
+            contribution = (weight**2 / total_weight_squared) * 100
+            if contribution < 1.0:
+                break
+            
+            # Determine hole and particle orbital descriptions
+            hole_desc, hole_idx_desc = self._get_orbital_description(idx, homo_idx, True)
+            particle_desc, particle_idx_desc = self._get_orbital_description(idx, lumo_idx, False)
+            
+            nto_pair = {
+                'hole_orbital': hole_desc,
+                'particle_orbital': particle_desc,
+                'weight': weight,
+                'contribution': contribution,
+                'hole_orbital_index': hole_idx_desc,
+                'particle_orbital_index': particle_idx_desc
+            }
+            
+            nto_pairs.append(nto_pair)
+        
+        return nto_pairs
+    
+    def _get_orbital_description(self, nto_index: int, reference_idx: int, is_hole: bool) -> Tuple[str, int]:
+        """Generate human-readable orbital descriptions for NTOs."""
+        # This is a simplified version - in reality, the mapping between
+        # NTO indices and canonical orbital indices is more complex
+        
+        if is_hole:
+            # For hole orbitals (occupied)
+            if nto_index == 0:
+                return "HOMO", reference_idx
+            elif nto_index == 1:
+                return "HOMO-1", reference_idx - 1
+            elif nto_index == 2:
+                return "HOMO-2", reference_idx - 2
+            else:
+                return f"HOMO-{nto_index}", reference_idx - nto_index
+        else:
+            # For particle orbitals (virtual)
+            if nto_index == 0:
+                return "LUMO", reference_idx
+            elif nto_index == 1:
+                return "LUMO+1", reference_idx + 1
+            elif nto_index == 2:
+                return "LUMO+2", reference_idx + 2
+            else:
+                return f"LUMO+{nto_index}", reference_idx + nto_index

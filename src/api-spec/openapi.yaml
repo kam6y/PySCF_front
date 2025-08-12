@@ -687,6 +687,46 @@ components:
                 description: Main orbital transition (e.g., HOMO -> LUMO)
           nullable: true
           description: Major orbital transitions (TDDFT only)
+        nto_analysis:
+          type: array
+          items:
+            type: object
+            properties:
+              state:
+                type: integer
+                description: Excited state number (1-indexed)
+              energy:
+                type: number
+                description: Excitation energy in eV
+              nto_pairs:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    hole_orbital:
+                      type: string
+                      description: Description of hole orbital (e.g., HOMO, HOMO-1)
+                    particle_orbital:
+                      type: string
+                      description: Description of particle orbital (e.g., LUMO, LUMO+1)
+                    weight:
+                      type: number
+                      description: NTO weight (singular value)
+                    contribution:
+                      type: number
+                      description: Percentage contribution to the transition
+                    hole_orbital_index:
+                      type: integer
+                      description: Index of the hole orbital
+                    particle_orbital_index:
+                      type: integer
+                      description: Index of the particle orbital
+                description: NTO orbital pairs for this excited state
+              total_nto_pairs:
+                type: integer
+                description: Total number of NTO pairs analyzed
+          nullable: true
+          description: Natural Transition Orbital analysis results (TDDFT only)
 
     CalculationInstance:
       type: object

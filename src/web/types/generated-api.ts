@@ -411,6 +411,30 @@ export interface components {
                 /** @description Main orbital transition (e.g., HOMO -> LUMO) */
                 dominant_transition?: string;
             }[] | null;
+            /** @description Natural Transition Orbital analysis results (TDDFT only) */
+            nto_analysis?: {
+                /** @description Excited state number (1-indexed) */
+                state?: number;
+                /** @description Excitation energy in eV */
+                energy?: number;
+                /** @description NTO orbital pairs for this excited state */
+                nto_pairs?: {
+                    /** @description Description of hole orbital (e.g., HOMO, HOMO-1) */
+                    hole_orbital?: string;
+                    /** @description Description of particle orbital (e.g., LUMO, LUMO+1) */
+                    particle_orbital?: string;
+                    /** @description NTO weight (singular value) */
+                    weight?: number;
+                    /** @description Percentage contribution to the transition */
+                    contribution?: number;
+                    /** @description Index of the hole orbital */
+                    hole_orbital_index?: number;
+                    /** @description Index of the particle orbital */
+                    particle_orbital_index?: number;
+                }[];
+                /** @description Total number of NTO pairs analyzed */
+                total_nto_pairs?: number;
+            }[] | null;
         };
         CalculationInstance: {
             /** @description Unique calculation ID */

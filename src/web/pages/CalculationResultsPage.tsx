@@ -361,6 +361,108 @@ export const CalculationResultsPage = ({
                 </div>
               </section>
             )}
+
+            {/* Natural Transition Orbital Analysis */}
+            {results.nto_analysis && results.nto_analysis.length > 0 && (
+              <section style={{ marginBottom: '30px', padding: '20px', backgroundColor: '#f0f8ff', borderRadius: '8px' }}>
+                <h2>Natural Transition Orbital (NTO) Analysis</h2>
+                <div style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}>
+                  NTO analysis provides a more intuitive description of electronic excitations by decomposing
+                  the transition density matrix into dominant hole-particle orbital pairs.
+                </div>
+                {results.nto_analysis.map((stateData: any, stateIndex: number) => (
+                  <div key={stateIndex} style={{ marginBottom: '30px' }}>
+                    <h3 style={{ color: '#2c5aa0', marginBottom: '15px' }}>
+                      Excited State S{stateData.state} ({stateData.energy?.toFixed(4)} eV)
+                    </h3>
+                    {stateData.nto_pairs && stateData.nto_pairs.length > 0 ? (
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{
+                          width: '100%',
+                          borderCollapse: 'collapse',
+                          backgroundColor: 'white',
+                          borderRadius: '4px',
+                          overflow: 'hidden'
+                        }}>
+                          <thead>
+                            <tr style={{ backgroundColor: '#e6f3ff' }}>
+                              <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'left' }}>NTO Pair</th>
+                              <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'left' }}>Transition</th>
+                              <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Weight</th>
+                              <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Contribution (%)</th>
+                              <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'center' }}>Orbital Indices</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {stateData.nto_pairs.map((pair: any, pairIndex: number) => (
+                              <tr key={pairIndex} style={{ backgroundColor: pairIndex % 2 === 0 ? '#fafafa' : 'white' }}>
+                                <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                  <strong>#{pairIndex + 1}</strong>
+                                </td>
+                                <td style={{ padding: '10px', border: '1px solid #ddd' }}>
+                                  <span style={{ color: '#d32f2f', fontWeight: 'bold' }}>
+                                    {pair.hole_orbital}
+                                  </span>
+                                  <span style={{ margin: '0 8px', color: '#666' }}>→</span>
+                                  <span style={{ color: '#1976d2', fontWeight: 'bold' }}>
+                                    {pair.particle_orbital}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', fontFamily: 'monospace' }}>
+                                  {pair.weight?.toFixed(6) || 'N/A'}
+                                </td>
+                                <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
+                                  <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'flex-end',
+                                    gap: '8px'
+                                  }}>
+                                    <div
+                                      style={{
+                                        width: `${Math.min(pair.contribution || 0, 100)}%`,
+                                        height: '12px',
+                                        backgroundColor: pair.contribution >= 50 ? '#4caf50' :
+                                          pair.contribution >= 25 ? '#ff9800' : '#f44336',
+                                        borderRadius: '6px',
+                                        minWidth: '2px'
+                                      }}
+                                    />
+                                    <span style={{ fontWeight: 'bold', minWidth: '50px' }}>
+                                      {pair.contribution?.toFixed(1) || 'N/A'}%
+                                    </span>
+                                  </div>
+                                </td>
+                                <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'center', fontSize: '12px', color: '#666' }}>
+                                  {pair.hole_orbital_index} → {pair.particle_orbital_index}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#666', fontStyle: 'italic' }}>
+                        No significant NTO pairs found for this excited state.
+                      </div>
+                    )}
+                    <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+                      Total NTO pairs analyzed: {stateData.total_nto_pairs || 0}
+                    </div>
+                  </div>
+                ))}
+                <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#e8f5e8', borderRadius: '4px', border: '1px solid #4caf50' }}>
+                  <h4 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>💡 NTO解析の読み方</h4>
+                  <ul style={{ margin: '0', paddingLeft: '20px', fontSize: '14px', lineHeight: '1.5' }}>
+                    <li><strong>Hole軌道（赤色）</strong>: 励起により電子が抜ける軌道（主にHOMO系）</li>
+                    <li><strong>Particle軌道（青色）</strong>: 励起により電子が移る軌道（主にLUMO系）</li>
+                    <li><strong>Weight</strong>: その軌道ペアの寄与を表す重み（特異値）</li>
+                    <li><strong>Contribution</strong>: 全遷移に対するそのペアの寄与率（%）</li>
+                    <li>寄与率が高いペアほどその励起状態の主要な電子遷移を表しています</li>
+                  </ul>
+                </div>
+              </section>
+            )}
           </>
         )}
 
