@@ -31,6 +31,7 @@ export const CalculationSettingsPage = ({
 }: CalculationSettingsPageProps) => {
   const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const previousCalculationIdRef = useRef<string | null>(null);
+  const currentStyleRef = useRef<StyleSpec | null>(null);
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [inputMethod, setInputMethod] = useState("pubchem");
   const [pubchemInput, setPubchemInput] = useState("");
@@ -40,6 +41,7 @@ export const CalculationSettingsPage = ({
   const [isEditingName, setIsEditingName] = useState(false);
   const [showAxes, setShowAxes] = useState(false);
   const [showCoordinates, setShowCoordinates] = useState(false);
+  const [useAtomicRadii, setUseAtomicRadii] = useState(false);
 
   useCalculationSubscription({
     calculationId: activeCalculation?.id || null,
@@ -62,6 +64,12 @@ export const CalculationSettingsPage = ({
       const xyz = activeCalculation.parameters?.xyz;
       if (xyz && xyz.trim() !== "") {
         moleculeViewerRef.current?.loadXYZ(xyz);
+        // Apply the current style after loading the molecule
+        if (currentStyleRef.current) {
+          setTimeout(() => {
+            moleculeViewerRef.current?.setStyle(currentStyleRef.current!);
+          }, 100); // Small delay to ensure the molecule is fully loaded
+        }
       } else {
         moleculeViewerRef.current?.clearModels();
       }
@@ -81,6 +89,21 @@ export const CalculationSettingsPage = ({
   useEffect(() => {
     moleculeViewerRef.current?.showAtomCoordinates(showCoordinates);
   }, [showCoordinates, activeCalculation]);
+
+  useEffect(() => {
+    // Re-apply the current style when atomic radii setting changes
+    const hasValidMolecule = !!(activeCalculation?.parameters?.xyz && activeCalculation.parameters.xyz.trim() !== "");
+    if (currentStyleRef.current && hasValidMolecule) {
+      const style = { ...currentStyleRef.current };
+      if (useAtomicRadii) {
+        (style as any)._useAtomicRadii = true;
+        (style as any)._baseAtomRadius = 0.3;
+      } else {
+        (style as any)._useAtomicRadii = false;
+      }
+      moleculeViewerRef.current?.setStyle(style);
+    }
+  }, [useAtomicRadii, activeCalculation?.parameters?.xyz]);
 
   const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number) => {
     if (!activeCalculation || !onCalculationUpdate) return;
@@ -132,6 +155,16 @@ export const CalculationSettingsPage = ({
       });
     }
   }, [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]);
+
+  // Calculate hasValidMolecule before early return
+  const hasValidMolecule = !!(activeCalculation?.parameters?.xyz && activeCalculation.parameters.xyz.trim() !== "");
+
+  const handleStyleChange = useCallback((style: StyleSpec) => {
+    currentStyleRef.current = style;
+    if (hasValidMolecule) {
+      moleculeViewerRef.current?.setStyle(style);
+    }
+  }, [hasValidMolecule]);
 
   const handleXYZChange = useCallback((xyzData: string, isValid: boolean) => {
     if (isValid && activeCalculation) {
@@ -242,13 +275,6 @@ export const CalculationSettingsPage = ({
 
   const { parameters: params, status: calculationStatus } = activeCalculation;
   const xyzInputValue = params.xyz || "";
-  const hasValidMolecule = !!(params.xyz && params.xyz.trim() !== "");
-
-  const handleStyleChange = (style: StyleSpec) => {
-    if (hasValidMolecule) {
-      moleculeViewerRef.current?.setStyle(style);
-    }
-  };
 
   const handleXYZConvert = async () => {
     if (!pubchemInput.trim()) return;
@@ -556,6 +582,8 @@ export const CalculationSettingsPage = ({
           onShowAxesChange={setShowAxes}
           showCoordinates={showCoordinates}
           onShowCoordinatesChange={setShowCoordinates}
+          useAtomicRadii={useAtomicRadii}
+          onUseAtomicRadiiChange={setUseAtomicRadii}
         />
       </div>
       <section className="molecular-input-section">

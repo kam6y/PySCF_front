@@ -11,6 +11,8 @@ interface MoleculeViewerSectionProps {
   onShowAxesChange: (show: boolean) => void;
   showCoordinates: boolean;
   onShowCoordinatesChange: (show: boolean) => void;
+  useAtomicRadii: boolean;
+  onUseAtomicRadiiChange: (use: boolean) => void;
 }
 
 export const MoleculeViewerSection = ({
@@ -21,6 +23,8 @@ export const MoleculeViewerSection = ({
   onShowAxesChange,
   showCoordinates,
   onShowCoordinatesChange,
+  useAtomicRadii,
+  onUseAtomicRadiiChange,
 }: MoleculeViewerSectionProps) => {
   return (
     <div className="main-content">
@@ -43,6 +47,8 @@ export const MoleculeViewerSection = ({
             onShowAxesChange={onShowAxesChange}
             showCoordinates={showCoordinates}
             onShowCoordinatesChange={onShowCoordinatesChange}
+            useAtomicRadii={useAtomicRadii}
+            onUseAtomicRadiiChange={onUseAtomicRadiiChange}
           />
         </section>
       </div>

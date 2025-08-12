@@ -5,7 +5,8 @@ import React, {
   forwardRef,
 } from "react";
 import * as $3Dmol from "3dmol";
-import { GLViewer, GLModel, StyleSpec, Label } from "../../types/3dmol";
+import { GLViewer, GLModel, StyleSpec, Label, AtomSpec } from "../../types/3dmol";
+import { getAtomicRadius, VAN_DER_WAALS_RADII } from "../data/atomicRadii";
 
 export interface MoleculeViewerProps {
   width?: number | string;
@@ -120,7 +121,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
         try {
           viewer.removeAllModels();
           viewer.addModel(xyzData, "xyz");
-          viewer.setStyle({}, { stick: { radius: 0.2 }, sphere: { radius: 0.3 } });
+          // Don't set default style here - it will be set by setStyle method
           updateOverlays(viewer);
           viewer.zoomTo();
         } catch (error) {
@@ -154,8 +155,63 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
       },
       
       setStyle: (style: StyleSpec) => {
-        viewerRef.current?.setStyle({}, style);
-        viewerRef.current?.render();
+        const viewer = viewerRef.current;
+        if (!viewer) return;
+        
+        const useAtomicRadii = (style as any)._useAtomicRadii;
+        const baseAtomRadius = (style as any)._baseAtomRadius || 0.3;
+        
+        if (useAtomicRadii) {
+          // Apply atomic radii: set styles for each element separately
+          const model = viewer.getModel();
+          if (model && model.atoms) {
+            // First clear existing styles
+            viewer.setStyle({}, {});
+            
+            // Group atoms by element
+            const elementGroups: Record<string, AtomSpec[]> = {};
+            for (const atom of model.atoms) {
+              if (atom.elem) {
+                if (!elementGroups[atom.elem]) {
+                  elementGroups[atom.elem] = [];
+                }
+                elementGroups[atom.elem].push(atom);
+              }
+            }
+            
+            // Apply styles for each element with appropriate radius
+            for (const [element, atoms] of Object.entries(elementGroups)) {
+              const atomRadius = getAtomicRadius(element, VAN_DER_WAALS_RADII['H'], baseAtomRadius);
+              const elementSelector = { elem: element };
+              
+              // Create element-specific style
+              const elementStyle = { ...style };
+              if (elementStyle.sphere) {
+                elementStyle.sphere.radius = atomRadius;
+              }
+              
+              // Remove metadata
+              delete (elementStyle as any)._useAtomicRadii;
+              delete (elementStyle as any)._baseAtomRadius;
+              
+              viewer.addStyle(elementSelector, elementStyle);
+            }
+          } else {
+            // Fallback to uniform style if no model loaded
+            const fallbackStyle = { ...style };
+            delete (fallbackStyle as any)._useAtomicRadii;
+            delete (fallbackStyle as any)._baseAtomRadius;
+            viewer.setStyle({}, fallbackStyle);
+          }
+        } else {
+          // Apply uniform style to all atoms
+          const uniformStyle = { ...style };
+          delete (uniformStyle as any)._useAtomicRadii;
+          delete (uniformStyle as any)._baseAtomRadius;
+          viewer.setStyle({}, uniformStyle);
+        }
+        
+        viewer.render();
       },
 
       zoomToFit: () => {

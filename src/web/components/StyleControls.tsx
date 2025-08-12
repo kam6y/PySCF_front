@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { StyleSpec } from "../../types/3dmol";
+import { VAN_DER_WAALS_RADII } from "../data/atomicRadii";
 
 export interface StyleControlsProps {
   onStyleChange: (style: StyleSpec) => void;
@@ -8,14 +9,15 @@ export interface StyleControlsProps {
   onShowAxesChange: (show: boolean) => void;
   showCoordinates: boolean;
   onShowCoordinatesChange: (show: boolean) => void;
+  useAtomicRadii?: boolean;
+  onUseAtomicRadiiChange?: (use: boolean) => void;
 }
 
 export type VisualizationStyle = 
   | "stick"
   | "sphere" 
   | "ball-and-stick"
-  | "line"
-  | "cartoon";
+  | "line";
 
 export interface StyleOption {
   id: VisualizationStyle;
@@ -43,11 +45,6 @@ const styleOptions: StyleOption[] = [
     id: "line",
     label: "Wireframe",
     description: "Show bonds as thin lines"
-  },
-  {
-    id: "cartoon",
-    label: "Cartoon",
-    description: "Simplified representation for biomolecules"
   }
 ];
 
@@ -58,6 +55,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   onShowAxesChange,
   showCoordinates,
   onShowCoordinatesChange,
+  useAtomicRadii = false,
+  onUseAtomicRadiiChange,
 }) => {
   const [selectedStyle, setSelectedStyle] = useState<VisualizationStyle>("ball-and-stick");
   const [atomRadius, setAtomRadius] = useState(0.3);
@@ -100,13 +99,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           }
         };
       
-      case "cartoon":
-        return {
-          cartoon: {
-            colorscheme: "default"
-          }
-        };
-      
       default:
         return {
           stick: { radius: 0.2 },
@@ -117,8 +109,16 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
   useEffect(() => {
     const styleSpec = generateStyleSpec(selectedStyle);
+    // Add metadata to indicate if atomic radii should be used
+    if (useAtomicRadii) {
+      (styleSpec as any)._useAtomicRadii = true;
+      (styleSpec as any)._baseAtomRadius = atomRadius;
+    } else {
+      (styleSpec as any)._useAtomicRadii = false;
+    }
     onStyleChange(styleSpec);
-  }, [selectedStyle, atomRadius, bondRadius, onStyleChange]);
+  }, [selectedStyle, atomRadius, bondRadius, onStyleChange, useAtomicRadii]);
+
 
   return (
     <div className={`style-controls ${className}`}>
@@ -149,9 +149,20 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
       {(selectedStyle === "sphere" || selectedStyle === "ball-and-stick") && (
         <div className="size-control-section">
+          <div className="toggle-switch" style={{ marginBottom: '16px' }}>
+            <span className="toggle-label">Use Atomic Radii</span>
+            <label className="switch">
+              <input 
+                type="checkbox" 
+                checked={useAtomicRadii} 
+                onChange={(e) => onUseAtomicRadiiChange?.(e.target.checked)}
+              />
+              <span className="slider"></span>
+            </label>
+          </div>
           <div className="slider-control">
             <label className="slider-label">
-              Atom Size: {atomRadius.toFixed(2)}
+              {useAtomicRadii ? 'Base Size: ' : 'Atom Size: '}{atomRadius.toFixed(2)}
             </label>
             <input
               type="range"
@@ -162,6 +173,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               onChange={(e) => setAtomRadius(parseFloat(e.target.value))}
               className="size-slider"
             />
+            {useAtomicRadii && (
+              <p className="size-help-text" style={{ fontSize: '0.8em', color: '#666', marginTop: '4px' }}>
+                Atoms will be sized proportionally to their van der Waals radii
+              </p>
+            )}
           </div>
         </div>
       )}
