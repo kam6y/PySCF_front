@@ -5,52 +5,24 @@ import React, {
   forwardRef,
 } from "react";
 import * as $3Dmol from "3dmol";
-
-// 修正点: プロジェクト構成に合わせて型定義ファイルのパスを修正
-import { GLViewer, GLModel, StyleSpec } from "../../types/3dmol";
-
-//================================================
-// PropsとRefのインターフェース定義
-//================================================
+import { GLViewer, GLModel, StyleSpec, Label } from "../../types/3dmol";
 
 export interface MoleculeViewerProps {
-  /**
-   * ビューワーの幅。'500px'や'80dvw'のようなCSS単位が使えます。
-   * @default '600px'
-   */
   width?: number | string;
-  /**
-   * ビューワーの高さ。'500px'や'80dvh'のようなCSS単位が使えます。
-   * @default '600px'
-   */
   height?: number | string;
-  /**
-   * 背景色
-   * @default 'white'
-   */
   backgroundColor?: string;
-  /**
-   * コンポーネントのルート要素に適用するCSSクラス名
-   */
   className?: string;
 }
 
 export interface MoleculeViewerRef {
-  /** XYZ形式の分子データを読み込みます。 */
   loadXYZ: (xyzData: string) => void;
-  /** 表示スタイルを適用します。 */
   setStyle: (style: StyleSpec) => void;
-  /** 表示されているモデルをすべて消去します。 */
   clearModels: () => void;
-  /** モデル全体が収まるようにズームします。 */
   zoomToFit: () => void;
-  /** 現在のビューを画像データとして取得します。 */
   takeScreenshot: () => string;
+  showAxes: (shouldShow: boolean) => void;
+  showAtomCoordinates: (shouldShow: boolean) => void;
 }
-
-//================================================
-// MoleculeViewer コンポーネント本体
-//================================================
 
 export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>(
   (
@@ -64,68 +36,125 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewerRef = useRef<GLViewer | null>(null);
+    const areAxesVisibleRef = useRef(true);
+    const areCoordinatesVisibleRef = useRef(false);
 
     /**
-     * 3Dmol.jsのビューワーを初期化し、リサイズを監視するEffect
+     * 軸やラベルなどのオーバーレイをすべて更新する統一関数
      */
+    const updateOverlays = (viewer: GLViewer) => {
+      // 既存のシェイプとラベルをすべてクリア
+      viewer.removeAllShapes();
+      viewer.removeAllLabels();
+
+      const model = viewer.getModel();
+      if (!model || !model.atoms || model.atoms.length === 0) {
+        viewer.render();
+        return; // モデルがない場合は何も描画しない
+      }
+
+      // --- 軸の描画 (有効な場合) ---
+      if (areAxesVisibleRef.current) {
+        let maxDist = 0;
+        const atoms = model.atoms;
+        let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity, zmin = Infinity, zmax = -Infinity;
+
+        for (const atom of atoms) {
+          if (atom.x === undefined || atom.y === undefined || atom.z === undefined) continue;
+          xmin = Math.min(xmin, atom.x); xmax = Math.max(xmax, atom.x);
+          ymin = Math.min(ymin, atom.y); ymax = Math.max(ymax, atom.y);
+          zmin = Math.min(zmin, atom.z); zmax = Math.max(zmax, atom.z);
+        }
+        const dx = xmax - xmin; const dy = ymax - ymin; const dz = zmax - zmin;
+        maxDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        
+        const axisLength = maxDist > 0 ? maxDist * 0.35 : 3.0;
+        const radius = axisLength * 0.05;
+        const labelOffset = radius * 4;
+
+        viewer.addArrow({ start: { x: 0, y: 0, z: 0 }, end: { x: axisLength, y: 0, z: 0 }, radius, color: 'red' });
+        viewer.addLabel("X", { position: { x: axisLength + labelOffset, y: 0, z: 0 }, fontColor: 'red', fontSize: 32, bold: true, backgroundOpacity: 0 });
+
+        viewer.addArrow({ start: { x: 0, y: 0, z: 0 }, end: { x: 0, y: axisLength, z: 0 }, radius, color: 'green' });
+        viewer.addLabel("Y", { position: { x: 0, y: axisLength + labelOffset, z: 0 }, fontColor: 'green', fontSize: 32, bold: true, backgroundOpacity: 0 });
+
+        viewer.addArrow({ start: { x: 0, y: 0, z: 0 }, end: { x: 0, y: 0, z: axisLength }, radius, color: 'blue' });
+        viewer.addLabel("Z", { position: { x: 0, y: 0, z: axisLength + labelOffset }, fontColor: 'blue', fontSize: 32, bold: true, backgroundOpacity: 0 });
+      }
+
+      // --- 原子座標の描画 (有効な場合) ---
+      if (areCoordinatesVisibleRef.current) {
+        model.atoms.forEach(atom => {
+          if (atom.x === undefined || atom.y === undefined || atom.z === undefined) return;
+          const text = `(${atom.x.toFixed(4)}, ${atom.y.toFixed(4)}, ${atom.z.toFixed(4)})`;
+          viewer.addLabel(text, {
+            position: { x: atom.x, y: atom.y, z: atom.z },
+            fontColor: '#333333',
+            fontSize: 16,
+            inFront: true,
+            backgroundColor: 'white',
+            backgroundOpacity: 0.6,
+          });
+        });
+      }
+      
+      viewer.render();
+    };
+
     useEffect(() => {
       if (!containerRef.current) return;
-
       let viewer: GLViewer | null = null;
       try {
-        viewer = $3Dmol.createViewer(containerRef.current, {
-          backgroundColor,
-        });
+        viewer = $3Dmol.createViewer(containerRef.current, { backgroundColor });
         viewerRef.current = viewer;
-
-        // ResizeObserverでコンテナのサイズ変更を監視し、ビューワーをリサイズする
-        const resizeObserver = new ResizeObserver(() => {
-          viewer?.resize();
-        });
+        const resizeObserver = new ResizeObserver(() => { viewer?.resize(); });
         resizeObserver.observe(containerRef.current);
+        return () => { resizeObserver.disconnect(); };
+      } catch (error) { console.error("Failed to initialize 3Dmol viewer:", error); }
+    }, [backgroundColor]);
 
-        // コンポーネントのアンマウント時に監視を停止
-        return () => {
-          resizeObserver.disconnect();
-        };
-      } catch (error) {
-        console.error("Failed to initialize 3Dmol viewer:", error);
-      }
-    }, [backgroundColor]); // 背景色の変更時のみ再初期化
-
-    /**
-     * 親コンポーネントに公開するメソッドを定義
-     */
     useImperativeHandle(ref, () => ({
       loadXYZ: (xyzData: string) => {
         const viewer = viewerRef.current;
         if (!viewer) return;
-
         try {
           viewer.removeAllModels();
           viewer.addModel(xyzData, "xyz");
-          // デフォルトスタイルを設定
-          viewer.setStyle(
-            {},
-            {
-              stick: { radius: 0.2 },
-              sphere: { radius: 0.3 },
-            }
-          );
+          viewer.setStyle({}, { stick: { radius: 0.2 }, sphere: { radius: 0.3 } });
+          updateOverlays(viewer);
           viewer.zoomTo();
-          viewer.render();
         } catch (error) {
           console.error("Failed to load XYZ data:", error);
         }
       },
 
-      setStyle: (style: StyleSpec) => {
-        viewerRef.current?.setStyle({}, style);
-        viewerRef.current?.render();
+      clearModels: () => {
+        const viewer = viewerRef.current;
+        if (!viewer) return;
+        viewer.removeAllModels();
+        viewer.removeAllShapes();
+        viewer.removeAllLabels();
+        viewer.render();
       },
 
-      clearModels: () => {
-        viewerRef.current?.removeAllModels();
+      showAxes: (shouldShow: boolean) => {
+        areAxesVisibleRef.current = shouldShow;
+        const viewer = viewerRef.current;
+        if (viewer) {
+          updateOverlays(viewer);
+        }
+      },
+
+      showAtomCoordinates: (shouldShow: boolean) => {
+        areCoordinatesVisibleRef.current = shouldShow;
+        const viewer = viewerRef.current;
+        if (viewer) {
+          updateOverlays(viewer);
+        }
+      },
+      
+      setStyle: (style: StyleSpec) => {
+        viewerRef.current?.setStyle({}, style);
         viewerRef.current?.render();
       },
 
@@ -144,9 +173,6 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
       },
     }));
 
-    /**
-     * レンダリングするDOM
-     */
     return (
       <div
         className={`molecule-viewer ${className}`}

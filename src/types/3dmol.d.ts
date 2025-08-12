@@ -44,7 +44,6 @@ export interface ViewerSpec {
   backgroundColor?: string;
 }
 
-// 👈 追加: ラベルのスタイルを指定する型
 export interface LabelSpec {
   position?: { x: number; y: number; z: number };
   fontColor?: string;
@@ -52,9 +51,9 @@ export interface LabelSpec {
   backgroundOpacity?: number;
   fontSize?: number;
   inFront?: boolean;
+  bold?: boolean;
 }
 
-// 👈 追加: addLabelが返すオブジェクトの型
 export interface Label {
   setText(text: string): void;
   remove(): void;
@@ -96,7 +95,8 @@ export interface GLViewer {
   screenshot(width?: number, height?: number, format?: string): string;
   getModel(id?: number): GLModel;
 
-  // 👈 追加: 不足していたメソッドの型定義
+  addArrow(spec: any): void;
+  removeAllShapes(): GLViewer;
   addLabel(text: string, options: LabelSpec): Label;
   removeAllLabels(): GLViewer;
 }

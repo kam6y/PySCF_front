@@ -4,6 +4,10 @@ import { StyleSpec } from "../../types/3dmol";
 export interface StyleControlsProps {
   onStyleChange: (style: StyleSpec) => void;
   className?: string;
+  showAxes: boolean;
+  onShowAxesChange: (show: boolean) => void;
+  showCoordinates: boolean;
+  onShowCoordinatesChange: (show: boolean) => void;
 }
 
 export type VisualizationStyle = 
@@ -47,7 +51,14 @@ const styleOptions: StyleOption[] = [
   }
 ];
 
-export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, className = "" }) => {
+export const StyleControls: React.FC<StyleControlsProps> = ({ 
+  onStyleChange, 
+  className = "",
+  showAxes,
+  onShowAxesChange,
+  showCoordinates,
+  onShowCoordinatesChange,
+}) => {
   const [selectedStyle, setSelectedStyle] = useState<VisualizationStyle>("ball-and-stick");
   const [atomRadius, setAtomRadius] = useState(0.3);
   const [bondRadius, setBondRadius] = useState(0.15);
@@ -104,11 +115,10 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
     }
   };
 
-  // Update 3D viewer as a side effect after state is updated
   useEffect(() => {
     const styleSpec = generateStyleSpec(selectedStyle);
     onStyleChange(styleSpec);
-  }, [selectedStyle, atomRadius, bondRadius, onStyleChange]); // dependency array
+  }, [selectedStyle, atomRadius, bondRadius, onStyleChange]);
 
   return (
     <div className={`style-controls ${className}`}>
@@ -116,7 +126,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
         <h3 className="section-title">Visualization Style</h3>
       </div>
 
-      {/* Style Selection */}
       <div className="style-options">
         {styleOptions.map((option) => (
           <label 
@@ -138,7 +147,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
         ))}
       </div>
 
-      {/* Size Controls */}
       {(selectedStyle === "sphere" || selectedStyle === "ball-and-stick") && (
         <div className="size-control-section">
           <div className="slider-control">
@@ -177,7 +185,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
         </div>
       )}
 
-      {/* Quick Actions */}
       <div className="quick-actions">
         <h4 className="quick-actions-title">Quick Actions</h4>
         <div className="quick-action-buttons">
@@ -209,6 +216,31 @@ export const StyleControls: React.FC<StyleControlsProps> = ({ onStyleChange, cla
           >
             Small
           </button>
+        </div>
+      </div>
+      
+      <div className="toggle-switch-section">
+        <div className="toggle-switch">
+            <span className="toggle-label">Show XYZ Axes</span>
+            <label className="switch">
+                <input 
+                    type="checkbox" 
+                    checked={showAxes} 
+                    onChange={(e) => onShowAxesChange(e.target.checked)}
+                />
+                <span className="slider"></span>
+            </label>
+        </div>
+        <div className="toggle-switch" style={{ marginTop: '12px' }}>
+            <span className="toggle-label">Show Atom Coordinates</span>
+            <label className="switch">
+                <input 
+                    type="checkbox" 
+                    checked={showCoordinates} 
+                    onChange={(e) => onShowCoordinatesChange(e.target.checked)}
+                />
+                <span className="slider"></span>
+            </label>
         </div>
       </div>
     </div>

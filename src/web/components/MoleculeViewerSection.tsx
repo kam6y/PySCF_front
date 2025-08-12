@@ -7,12 +7,20 @@ interface MoleculeViewerSectionProps {
   moleculeViewerRef: RefObject<MoleculeViewerRef | null>;
   hasValidMolecule: boolean;
   onStyleChange: (style: StyleSpec) => void;
+  showAxes: boolean;
+  onShowAxesChange: (show: boolean) => void;
+  showCoordinates: boolean;
+  onShowCoordinatesChange: (show: boolean) => void;
 }
 
 export const MoleculeViewerSection = ({
   moleculeViewerRef,
   hasValidMolecule,
   onStyleChange,
+  showAxes,
+  onShowAxesChange,
+  showCoordinates,
+  onShowCoordinatesChange,
 }: MoleculeViewerSectionProps) => {
   return (
     <div className="main-content">
@@ -29,7 +37,13 @@ export const MoleculeViewerSection = ({
       </div>
       <div className="right-column">
         <section className="visualization-section">
-          <StyleControls onStyleChange={onStyleChange} />
+          <StyleControls 
+            onStyleChange={onStyleChange} 
+            showAxes={showAxes}
+            onShowAxesChange={onShowAxesChange}
+            showCoordinates={showCoordinates}
+            onShowCoordinatesChange={onShowCoordinatesChange}
+          />
         </section>
       </div>
     </div>

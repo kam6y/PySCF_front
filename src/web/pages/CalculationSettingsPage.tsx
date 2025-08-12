@@ -38,6 +38,8 @@ export const CalculationSettingsPage = ({
   const [convertError, setConvertError] = useState<string | null>(null);
   const [localName, setLocalName] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
+  const [showAxes, setShowAxes] = useState(false);
+  const [showCoordinates, setShowCoordinates] = useState(false);
 
   useCalculationSubscription({
     calculationId: activeCalculation?.id || null,
@@ -53,9 +55,6 @@ export const CalculationSettingsPage = ({
     const isNewCalculation = currentCalculationId !== previousCalculationId;
 
     if (activeCalculation) {
-      // Update localName only if:
-      // 1. It's a new calculation (ID changed), OR
-      // 2. User is not currently editing the name
       if (isNewCalculation || !isEditingName) {
         setLocalName(activeCalculation.name || activeCalculation.parameters?.molecule_name || "");
       }
@@ -66,24 +65,27 @@ export const CalculationSettingsPage = ({
       } else {
         moleculeViewerRef.current?.clearModels();
       }
-      // WebSocketサブスクリプションが自動的にステータス管理するため、手動制御は不要
     } else {
       setLocalName("");
       moleculeViewerRef.current?.clearModels();
-      setIsEditingName(false); // Reset editing state when no calculation
+      setIsEditingName(false);
     }
 
-    // Update the previous calculation ID reference
     previousCalculationIdRef.current = currentCalculationId;
   }, [activeCalculation, isEditingName]);
+  
+  useEffect(() => {
+    moleculeViewerRef.current?.showAxes(showAxes);
+  }, [showAxes, activeCalculation]);
+
+  useEffect(() => {
+    moleculeViewerRef.current?.showAtomCoordinates(showCoordinates);
+  }, [showCoordinates, activeCalculation]);
 
   const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number) => {
     if (!activeCalculation || !onCalculationUpdate) return;
 
-    // For name, we handle it differently via the dedicated name input field
-    // This prevents conflicts between the main name input and parameter updates
     if (field === 'name') {
-      // For new calculations, allow direct parameter updates
       if (activeCalculation.id.startsWith('new-calculation-')) {
         const stringValue = String(value);
         const updatedParams = { ...activeCalculation.parameters, [field]: stringValue };
@@ -100,14 +102,11 @@ export const CalculationSettingsPage = ({
     const isParamChange = field !== 'xyz';
     const currentParams = activeCalculation.parameters;
 
-    // Handle special case for solvent field when "custom" is selected
     let processedValue = value;
     if (field === 'solvent' && value === 'custom') {
-      // When "custom" is selected from dropdown, set a default dielectric constant
       processedValue = '78.36';
     }
 
-    // Ensure required fields have default values for QuantumCalculationRequest
     const safeParams: QuantumCalculationRequest = {
       xyz: currentParams.xyz || '',
       calculation_method: currentParams.calculation_method || 'DFT',
@@ -155,7 +154,6 @@ export const CalculationSettingsPage = ({
       return;
     }
 
-    // Handle new calculations (temporary IDs)
     if (activeCalculation.id.startsWith('new-calculation-')) {
       try {
         onCalculationUpdate({
@@ -171,11 +169,9 @@ export const CalculationSettingsPage = ({
       return;
     }
 
-    // Handle existing calculations (require confirmation and API call)
     if (window.confirm(`Are you sure you want to rename this calculation to "${newName}"?`)) {
       try {
         await onCalculationRename(activeCalculation.id, newName);
-        // onCalculationRename should handle the UI updates via the callback chain
       } catch (error) {
         console.error('Error renaming calculation:', error);
         setLocalName(activeCalculation.name || ''); // Revert on error
@@ -199,7 +195,6 @@ export const CalculationSettingsPage = ({
       return;
     }
 
-    // Ensure molecule name is provided
     const moleculeName = localName.trim();
     if (!moleculeName) {
       setCalculationError("A molecule name is required.");
@@ -208,7 +203,6 @@ export const CalculationSettingsPage = ({
 
     setCalculationError(null);
     
-    // Ensure all parameters are properly set with current UI values and defaults
     const currentParams = activeCalculation.parameters;
     const finalParams: QuantumCalculationRequest = {
       xyz: currentParams.xyz || '',
@@ -235,7 +229,6 @@ export const CalculationSettingsPage = ({
     }
   };
 
-  // Add a defensive check for activeCalculation and its parameters
   if (!activeCalculation || !activeCalculation.parameters) {
     return (
       <div className="calculation-settings-containers">
@@ -277,7 +270,6 @@ export const CalculationSettingsPage = ({
         }
       }
 
-      // Update local state and calculation parameters
       setLocalName(moleculeName);
       const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
       onCalculationUpdate({
@@ -316,11 +308,9 @@ export const CalculationSettingsPage = ({
     return `start-calculation-btn ${calculationStatus || 'pending'}`;
   };
 
-  // Helper function to check if solvent value is a custom numeric dielectric constant
   const isCustomDielectricConstant = (solventValue: string | undefined): boolean => {
     if (!solventValue || solventValue === '-') return false;
     
-    // List of predefined solvent names
     const predefinedSolvents = [
       'water', 'dimethylsulfoxide', 'n,n-dimethylformamide', 'nitromethane',
       'methanol', 'ethanol', 'acetone', 'dichloroethane', 'dichloromethane',
@@ -328,21 +318,17 @@ export const CalculationSettingsPage = ({
       'toluene', 'benzene', '1,4-dioxane', 'cyclohexane', 'custom'
     ];
     
-    // If it's a predefined solvent name, it's not custom
     if (predefinedSolvents.includes(solventValue.toLowerCase())) return false;
     
-    // Check if it's a valid numeric string (dielectric constant)
     const numValue = parseFloat(solventValue);
     return !isNaN(numValue) && numValue > 0;
   };
 
-  // Get the display value for solvent dropdown
   const getSolventDisplayValue = (): string => {
     const solventValue = params.solvent || '-';
     return isCustomDielectricConstant(solventValue) ? 'custom' : solventValue;
   };
 
-  // Get the numeric value for custom dielectric input
   const getCustomDielectricValue = (): string => {
     const solventValue = params.solvent || '';
     return isCustomDielectricConstant(solventValue) ? solventValue : '';
@@ -566,6 +552,10 @@ export const CalculationSettingsPage = ({
           moleculeViewerRef={moleculeViewerRef}
           hasValidMolecule={hasValidMolecule}
           onStyleChange={handleStyleChange}
+          showAxes={showAxes}
+          onShowAxesChange={setShowAxes}
+          showCoordinates={showCoordinates}
+          onShowCoordinatesChange={setShowCoordinates}
         />
       </div>
       <section className="molecular-input-section">
