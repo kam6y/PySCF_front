@@ -105,7 +105,7 @@ def search_pubchem(body: PubChemSearchRequest):
     """Search PubChem for a compound and return its 3D structure in XYZ format."""
     try:
         query = body.query
-        search_type = body.search_type.value if hasattr(body.search_type, 'value') else body.search_type
+        search_type = body.search_type.value
         
         logger.info(f"Searching PubChem for '{query}' (type: {search_type})")
         
@@ -193,12 +193,12 @@ def quantum_calculate(body: QuantumCalculationRequest):
     try:
         # Prepare parameters using validated data from Pydantic model
         parameters = {
-            'calculation_method': body.calculation_method.value if hasattr(body.calculation_method, 'value') else body.calculation_method,
+            'calculation_method': body.calculation_method.value,
             'basis_function': body.basis_function,
             'exchange_correlation': body.exchange_correlation,
             'charges': body.charges,
             'spin_multiplicity': body.spin_multiplicity,
-            'solvent_method': body.solvent_method.value if hasattr(body.solvent_method, 'value') else body.solvent_method,
+            'solvent_method': body.solvent_method.value,
             'solvent': body.solvent,
             'xyz': body.xyz,
             'name': body.name,
