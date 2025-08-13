@@ -24,7 +24,7 @@ class TDDFTCalculator(BaseCalculator):
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
         super().__init__(working_dir)
         self.mol: Optional[gto.Mole] = None
-        self.mf: Optional[dft.RKS] = None
+        self.mf: Optional[dft.RKS] = None  # Can be either RKS or UKS
         self.mytd: Optional[tddft.TDDFT] = None
         self.keep_files = keep_files
         self.molecule_name = molecule_name
@@ -65,7 +65,15 @@ class TDDFTCalculator(BaseCalculator):
                 self.mol.max_memory = 4000  # TDDFTはより多くのメモリが必要
             
             # Setup DFT calculation (ground state) first
-            self.mf = dft.RKS(self.mol)
+            # For closed-shell systems (spin=0), use RKS
+            # For open-shell systems (spin>0), use UKS
+            if spin == 0:
+                self.mf = dft.RKS(self.mol)
+                logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell TDDFT ground state")
+            else:
+                self.mf = dft.UKS(self.mol)
+                logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell TDDFT ground state")
+            
             self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
             
             self.mf.chkfile = self.get_checkpoint_path()
@@ -84,7 +92,8 @@ class TDDFTCalculator(BaseCalculator):
                 'atom_count': len(atoms),
                 'tddft_nstates': nstates,
                 'tddft_method': tddft_method,
-                'tddft_analyze_nto': analyze_nto
+                'tddft_analyze_nto': analyze_nto,
+                'method': 'UKS' if spin > 0 else 'RKS'
             })
             
         except Exception as e:
@@ -177,8 +186,8 @@ class TDDFTCalculator(BaseCalculator):
                 'converged': True,
                 'homo_index': homo_idx,
                 'lumo_index': lumo_idx,
-                'num_occupied_orbitals': int(sum(self.mf.mo_occ > 0)),
-                'num_virtual_orbitals': int(sum(self.mf.mo_occ == 0)),
+                'num_occupied_orbitals': int(self._count_occupied_orbitals()),
+                'num_virtual_orbitals': int(self._count_virtual_orbitals()),
                 'checkpoint_file': chk_path,
                 'checkpoint_exists': os.path.exists(chk_path),
                 'working_directory': self.working_dir,
@@ -447,19 +456,51 @@ class TDDFTCalculator(BaseCalculator):
         if self.mf.mo_occ is None:
             raise CalculationError("Orbital occupations not available")
         
+        # Handle both RKS (1D array) and UKS (2D array) cases
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS case: use alpha orbitals
+            mo_occ = mo_occ[0]
+        
         # Find HOMO (highest occupied molecular orbital)
-        occupied_indices = np.where(self.mf.mo_occ > 0)[0]
+        occupied_indices = np.where(mo_occ > 0)[0]
         if len(occupied_indices) == 0:
             raise CalculationError("No occupied orbitals found")
         homo_idx = occupied_indices[-1]
         
         # Find LUMO (lowest unoccupied molecular orbital)
-        unoccupied_indices = np.where(self.mf.mo_occ == 0)[0]
+        unoccupied_indices = np.where(mo_occ == 0)[0]
         if len(unoccupied_indices) == 0:
             raise CalculationError("No unoccupied orbitals found")
         lumo_idx = unoccupied_indices[0]
         
         return int(homo_idx), int(lumo_idx)
+    
+    def _count_occupied_orbitals(self) -> int:
+        """Count the number of occupied orbitals."""
+        if self.mf.mo_occ is None:
+            return 0
+        
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS case: count both alpha and beta orbitals
+            return int(np.sum(mo_occ > 0))
+        else:
+            # RKS case: simple sum
+            return int(np.sum(mo_occ > 0))
+    
+    def _count_virtual_orbitals(self) -> int:
+        """Count the number of virtual orbitals."""
+        if self.mf.mo_occ is None:
+            return 0
+        
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS case: count both alpha and beta orbitals
+            return int(np.sum(mo_occ == 0))
+        else:
+            # RKS case: simple sum
+            return int(np.sum(mo_occ == 0))
     
     def _analyze_natural_transition_orbitals(self, excitation_energies: List[float]) -> List[Dict[str, Any]]:
         """
