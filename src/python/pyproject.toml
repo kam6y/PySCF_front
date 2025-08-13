@@ -10,13 +10,15 @@ dependencies = [
     "flask-cors>=4.0.0",
     "certifi>=2024.7.4",
     "rdkit>=2025.3.5",
-    "pyscf>=2.10.0",
     "geometric>=1.1",
     "pydantic>=2.11.7",
     "flask-pydantic>=0.13.1",
     "datamodel-code-generator>=0.25.0",
     "flask-sock>=0.7.0",
     "gevent>=25.5.1",
+    "pyscf>=2.10.0",
+    "gevent-websocket>=0.10.1",
+    "threadpoolctl>=3.6.0",
 ]
 
 [tool.uv]
