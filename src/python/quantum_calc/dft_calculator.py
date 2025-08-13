@@ -61,8 +61,17 @@ class DFTCalculator(BaseCalculator):
             else:
                 self.mol.max_memory = 2000  # デフォルト2GB
             
-            # Setup DFT calculation with solvent effects
-            self.mf = dft.RKS(self.mol)
+            # Setup DFT calculation based on spin multiplicity
+            # For closed-shell systems (spin=0), use RKS
+            # For open-shell systems (spin>0), use UKS
+            if spin == 0:
+                self.mf = dft.RKS(self.mol)
+                logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell system")
+            else:
+                self.mf = dft.UKS(self.mol)
+                logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell system")
+            
+            # Apply solvent effects if requested
             self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
             
             self.mf.chkfile = self.get_checkpoint_path()
@@ -78,7 +87,8 @@ class DFTCalculator(BaseCalculator):
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,
-                'atom_count': len(atoms)
+                'atom_count': len(atoms),
+                'method': 'UKS' if spin > 0 else 'RKS'
             })
             
         except Exception as e:
@@ -101,8 +111,13 @@ class DFTCalculator(BaseCalculator):
             # Recreate mf object with optimized geometry while preserving solvent effects
             solvent_method = self.results.get('solvent_method', 'none')
             solvent = self.results.get('solvent', '-')
+            spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
             
-            self.mf = dft.RKS(optimized_mol)
+            if spin == 0:
+                self.mf = dft.RKS(optimized_mol)
+            else:
+                self.mf = dft.UKS(optimized_mol)
+            
             self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
             
             self.mf.chkfile = self.get_checkpoint_path()
@@ -120,7 +135,7 @@ class DFTCalculator(BaseCalculator):
                 raise CalculationError("SCF calculation failed: mo_occ not properly assigned")
             
             logger.info("SCF calculation completed successfully.")
-            logger.info(f"Number of occupied orbitals: {sum(self.mf.mo_occ > 0)}")
+            logger.info(f"Number of occupied orbitals: {self._count_occupied_orbitals()}")
             
             # Step 3: Orbital analysis
             homo_idx, lumo_idx = self._analyze_orbitals()
@@ -141,8 +156,8 @@ class DFTCalculator(BaseCalculator):
                 'converged': True,
                 'homo_index': homo_idx,
                 'lumo_index': lumo_idx,
-                'num_occupied_orbitals': int(sum(self.mf.mo_occ > 0)),
-                'num_virtual_orbitals': int(sum(self.mf.mo_occ == 0)),
+                'num_occupied_orbitals': int(self._count_occupied_orbitals()),
+                'num_virtual_orbitals': int(self._count_virtual_orbitals()),
                 'checkpoint_file': chk_path,
                 'checkpoint_exists': os.path.exists(chk_path),
                 'working_directory': self.working_dir,
@@ -177,19 +192,51 @@ class DFTCalculator(BaseCalculator):
         if self.mf.mo_occ is None:
             raise CalculationError("Orbital occupations not available")
         
+        # Handle both RKS (1D array) and UKS (2D array) cases
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS case: use alpha orbitals
+            mo_occ = mo_occ[0]
+        
         # Find HOMO (highest occupied molecular orbital)
-        occupied_indices = np.where(self.mf.mo_occ > 0)[0]
+        occupied_indices = np.where(mo_occ > 0)[0]
         if len(occupied_indices) == 0:
             raise CalculationError("No occupied orbitals found")
         homo_idx = occupied_indices[-1]
         
         # Find LUMO (lowest unoccupied molecular orbital)
-        unoccupied_indices = np.where(self.mf.mo_occ == 0)[0]
+        unoccupied_indices = np.where(mo_occ == 0)[0]
         if len(unoccupied_indices) == 0:
             raise CalculationError("No unoccupied orbitals found")
         lumo_idx = unoccupied_indices[0]
         
         return int(homo_idx), int(lumo_idx)
+    
+    def _count_occupied_orbitals(self) -> int:
+        """Count the number of occupied orbitals."""
+        if self.mf.mo_occ is None:
+            return 0
+        
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS case: count both alpha and beta orbitals
+            return int(np.sum(mo_occ > 0))
+        else:
+            # RKS case: simple sum
+            return int(np.sum(mo_occ > 0))
+    
+    def _count_virtual_orbitals(self) -> int:
+        """Count the number of virtual orbitals."""
+        if self.mf.mo_occ is None:
+            return 0
+        
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS case: count both alpha and beta orbitals
+            return int(np.sum(mo_occ == 0))
+        else:
+            # RKS case: simple sum
+            return int(np.sum(mo_occ == 0))
     
     def _geometry_to_xyz_string(self) -> str:
         """Convert optimized geometry to XYZ format string."""
