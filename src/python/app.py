@@ -6,6 +6,9 @@ import os
 import sys
 import json
 import time
+import signal
+import atexit
+import multiprocessing
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -23,6 +26,7 @@ from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator, CalculationError, ConvergenceError, InputError
 from quantum_calc.file_manager import CalculationFileManager
+from quantum_calc import get_process_manager, shutdown_process_manager
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
     QuantumCalculationRequest, CalculationUpdateRequest
@@ -44,74 +48,30 @@ sock = Sock(app)  # Sockインスタンスを作成
 pubchem_client = PubChemClient(timeout=30)
 
 
-
-def run_calculation_in_background(calculation_id: str, parameters: dict):
-    """
-    Worker function to run quantum chemistry calculations in a separate thread.
-    Updates the calculation status and results directly on the file system.
-    """
-    file_manager = CalculationFileManager()
-    calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
-
+def cleanup_resources():
+    """Clean up resources including the process pool."""
+    logger.info("Cleaning up resources...")
     try:
-        # Update status to running on the file system
-        file_manager.save_calculation_status(calc_dir, 'running')
-        
-        # Initialize calculator based on calculation method
-        calculation_method = parameters.get('calculation_method', 'DFT')
-        if calculation_method == 'HF':
-            calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
-        elif calculation_method == 'MP2':
-            calculator = MP2Calculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
-        elif calculation_method == 'TDDFT':
-            calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
-        else:  # Default to DFT
-            calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
-        
-        # Parse XYZ and setup calculation
-        atoms = calculator.parse_xyz(parameters['xyz'])
-        
-        # Prepare setup parameters
-        setup_params = {
-            'basis': parameters['basis_function'],
-            'charge': parameters['charges'],
-            'spin': (parameters['spin_multiplicity'] - 1) // 2,
-            'max_cycle': 150,
-            'solvent_method': parameters['solvent_method'],
-            'solvent': parameters['solvent']
-        }
-        
-        # Add exchange-correlation functional for DFT and TDDFT calculations
-        if calculation_method in ['DFT', 'TDDFT']:
-            setup_params['xc'] = parameters['exchange_correlation']
-        
-        # Add TDDFT-specific parameters
-        if calculation_method == 'TDDFT':
-            setup_params['nstates'] = parameters.get('tddft_nstates', 10)
-            setup_params['tddft_method'] = parameters.get('tddft_method', 'TDDFT')
-            setup_params['analyze_nto'] = parameters.get('tddft_analyze_nto', False)
-        
-        calculator.setup_calculation(atoms, **setup_params)
-        
-        # Run calculation
-        results = calculator.run_calculation()
-        
-        # Save results and update status to completed
-        file_manager.save_calculation_results(calc_dir, results)
-        file_manager.save_calculation_status(calc_dir, 'completed')
-        
-        logger.info(f"Calculation {calculation_id} completed successfully.")
-
-    except (InputError, ConvergenceError, CalculationError) as e:
-        logger.error(f"Calculation {calculation_id} failed: {e}")
-        file_manager.save_calculation_status(calc_dir, 'error')
-        # エラー情報をresults.jsonに保存することも検討できる
-        file_manager.save_calculation_results(calc_dir, {'error': str(e)})
-
+        shutdown_process_manager()
+        logger.info("Process manager shut down successfully")
     except Exception as e:
-        logger.error(f"Unexpected error in calculation {calculation_id}: {e}", exc_info=True)
-        file_manager.save_calculation_status(calc_dir, 'error')
-        file_manager.save_calculation_results(calc_dir, {'error': 'An unexpected internal server error occurred.'})
+        logger.error(f"Error shutting down process manager: {e}")
+
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals."""
+    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    cleanup_resources()
+    sys.exit(0)
+
+
+# Register cleanup functions
+atexit.register(cleanup_resources)
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
+
+
 
 
 @app.route('/health', methods=['GET'])
@@ -247,8 +207,16 @@ def quantum_calculate(body: QuantumCalculationRequest):
         file_manager.save_calculation_parameters(calc_dir, parameters)
         file_manager.save_calculation_status(calc_dir, 'pending')
 
-        # Start background greenlet for the calculation
-        gevent.spawn(run_calculation_in_background, calculation_id, parameters)
+        # Submit calculation to process pool
+        process_manager = get_process_manager()
+        success = process_manager.submit_calculation(calculation_id, parameters)
+        
+        if not success:
+            # If submission failed, update status to error
+            file_manager.save_calculation_status(calc_dir, 'error')
+            file_manager.save_calculation_results(calc_dir, {'error': 'Failed to submit calculation to process pool.'})
+            logger.error(f"Failed to submit calculation {calculation_id} to process pool")
+            return jsonify({'success': False, 'error': 'Failed to queue calculation.'}), 500
         
         logger.info(f"Queued calculation {calculation_id} for molecule '{parameters['name']}'")
 
@@ -276,18 +244,51 @@ def list_calculations():
         file_manager = CalculationFileManager()
         calculations = file_manager.list_calculations()
         
+        # Add information about active calculations
+        process_manager = get_process_manager()
+        active_calculations = process_manager.get_active_calculations()
+        
         return jsonify({
             'success': True,
             'data': {
                 'base_directory': file_manager.get_base_directory(),
                 'calculations': calculations,
-                'count': len(calculations)
+                'count': len(calculations),
+                'active_calculations': active_calculations,
+                'active_count': len(active_calculations)
             }
         })
         
     except Exception as e:
         logger.error(f"Error listing calculations: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'Failed to list calculations.'}), 500
+
+
+@app.route('/api/quantum/status', methods=['GET'])
+def get_calculation_status():
+    """Get status information about the calculation system."""
+    try:
+        process_manager = get_process_manager()
+        active_calculations = process_manager.get_active_calculations()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'process_pool': {
+                    'max_workers': process_manager.max_workers,
+                    'active_calculations': active_calculations,
+                    'active_count': len(active_calculations),
+                    'is_shutdown': process_manager._shutdown
+                },
+                'system': {
+                    'cpu_count': multiprocessing.cpu_count()
+                }
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting calculation status: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to get calculation status.'}), 500
 
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['GET'])
@@ -368,12 +369,56 @@ def update_calculation(calculation_id, body: CalculationUpdateRequest):
         return jsonify({'success': False, 'error': 'Failed to update calculation.'}), 500
 
 
+@app.route('/api/quantum/calculations/<calculation_id>/cancel', methods=['POST'])
+def cancel_calculation(calculation_id):
+    """Cancel a running calculation."""
+    try:
+        process_manager = get_process_manager()
+        
+        # Check if calculation is running
+        if not process_manager.is_running(calculation_id):
+            return jsonify({
+                'success': False, 
+                'error': f'Calculation "{calculation_id}" is not currently running.'
+            }), 400
+        
+        # Attempt to cancel the calculation
+        cancelled = process_manager.cancel_calculation(calculation_id)
+        
+        if cancelled:
+            logger.info(f"Successfully cancelled calculation {calculation_id}")
+            return jsonify({
+                'success': True,
+                'data': {
+                    'message': f'Calculation "{calculation_id}" has been cancelled successfully',
+                    'calculation_id': calculation_id
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Failed to cancel calculation "{calculation_id}". It may have already completed.'
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error cancelling calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'Failed to cancel calculation.'}), 500
+
+
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['DELETE'])
 def delete_calculation(calculation_id):
     """Delete a calculation and its files."""
     try:
-        file_manager = CalculationFileManager()
+        process_manager = get_process_manager()
         
+        # Try to cancel the calculation if it's running
+        if process_manager.is_running(calculation_id):
+            logger.info(f"Cancelling running calculation {calculation_id} before deletion")
+            process_manager.cancel_calculation(calculation_id)
+            # Wait a moment for the cancellation to take effect
+            time.sleep(0.5)
+        
+        file_manager = CalculationFileManager()
         calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
 
         if not os.path.isdir(calc_path):
@@ -555,4 +600,7 @@ if __name__ == '__main__':
         http_server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Server stopped by user.")
+    finally:
+        logger.info("Shutting down server...")
         http_server.stop()
+        cleanup_resources()

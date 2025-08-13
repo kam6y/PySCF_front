@@ -6,6 +6,7 @@ from .hf_calculator import HFCalculator
 from .mp2_calculator import MP2Calculator
 from .tddft_calculator import TDDFTCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError
+from .process_manager import CalculationProcessManager, get_process_manager, shutdown_process_manager
 
 __all__ = [
     'BaseCalculator',
@@ -15,5 +16,8 @@ __all__ = [
     'TDDFTCalculator',
     'CalculationError',
     'ConvergenceError',
-    'InputError'
+    'InputError',
+    'CalculationProcessManager',
+    'get_process_manager',
+    'shutdown_process_manager'
 ]
