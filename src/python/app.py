@@ -15,9 +15,8 @@ from pydantic import ValidationError
 import socket
 import shutil
 from typing import Dict
-import gevent # geventをインポート
+import gevent
 from gevent.pywsgi import WSGIServer
-# geventwebsocket.handlerのインポートは不要になったため削除
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
