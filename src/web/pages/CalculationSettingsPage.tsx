@@ -564,7 +564,7 @@ export const CalculationSettingsPage = ({
               </div>
             </section>
             {params.calculation_method === 'TDDFT' && (
-              <section className="tddft-settings-section">
+              <section className="calculation-settings-section">
                 <div className="setting-row">
                   <label>Number of Excited States</label>
                   <input
@@ -600,7 +600,7 @@ export const CalculationSettingsPage = ({
                 </div>
               </section>
             )}
-            <section className="solvent-settings-section">
+            <section className="calculation-settings-section">
               <div className="setting-row">
                 <label>Solvent Effect Method</label>
                 <select value={params.solvent_method || 'none'} onChange={(e) => handleParamChange('solvent_method', e.target.value)} disabled={calculationStatus === 'running'}>

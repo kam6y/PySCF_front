@@ -3,6 +3,8 @@ This file provides guidance to Claude when working with code in this repository.
 Project Overview
 This is a PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
 
+The application supports various quantum chemistry calculation methods, including DFT, Hartree-Fock (HF), MP2, and TDDFT, with options for solvent effects and advanced analysis like Natural Transition Orbitals (NTO) for TDDFT.
+
 A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend. The application now uses WebSockets for real-time status updates of running calculations, providing a more efficient and responsive user experience than the previous polling-based system.
 
 Development Philosophy
@@ -19,6 +21,8 @@ Focus on the best solution - Don't compromise design quality for compatibility w
 This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
 
 Development Commands
+Bash
+
 # Install Node.js and Python dependencies
 npm install
 cd src/python
@@ -33,8 +37,9 @@ npm run build
 
 # Package application for distribution (includes production build)
 npm run package
-
 Individual Commands
+Bash
+
 # Clean build directory
 npm run clean
 
@@ -58,7 +63,6 @@ uv run pytest tests/
 
 # Build Python executable only (uses PyInstaller)
 npm run build:python
-
 Development Workflow
 The npm run dev script is the primary command for development. It automatically:
 
@@ -100,7 +104,7 @@ PubChem Integration: Searching compounds by name, CID, or formula and converting
 
 SMILES Conversion: Converting SMILES strings to 3D XYZ format using RDKit.
 
-Quantum Chemistry Calculations: Running DFT calculations via PySCF. Calculations are executed in background threads to keep the API responsive.
+Quantum Chemistry Calculations: Running various calculations via PySCF. This includes DFT, Hartree-Fock (HF), MP2, and TDDFT. Calculations are executed in background threads (gevent greenlets) to keep the API responsive.
 
 Real-time Status Updates: A WebSocket endpoint (/ws/calculations/<id>) pushes status updates to the frontend as soon as they change on the file system.
 
@@ -145,9 +149,9 @@ Creates a new directory for the calculation.
 
 Saves the initial parameters and sets the status to pending.
 
-Starts a new background thread to run the PySCF calculation.
+Starts a new background greenlet (gevent.spawn) to run the appropriate PySCF calculation (DFT, HF, MP2, or TDDFT).
 
-Returns a 2022 Accepted response with the newly created (and now persistent) CalculationInstance data.
+Returns a 202 Accepted response with the newly created (and now persistent) CalculationInstance data.
 
 The useCalculations hook updates the list of calculations, replacing the temporary client-side ID with the new persistent ID from the server. The useActiveCalculation hook updates the active ID.
 
@@ -174,12 +178,14 @@ src/
 ├── web/
 │   ├── apiClient.ts          # Centralized API client for the frontend
 │   ├── App.tsx               # Main React application component
+│   ├── App.css               # Global styles for the React app
 │   ├── components/           # Reusable React components
+│   ├── data/                 # Static data (e.g., atomic radii)
 │   ├── hooks/                # Custom React hooks for state management
 │   │   ├── useCalculations.ts
 │   │   ├── useActiveCalculation.ts
 │   │   └── useCalculationSubscription.ts # Real-time updates via WebSocket
-│   ├── pages/                # Page components
+│   ├── pages/                # Page components (one per view)
 │   └── types/
 │       ├── api-types.ts      # Convenience wrapper for generated types
 │       └── generated-api.ts  # (auto-generated) TypeScript types from OpenAPI spec
@@ -190,8 +196,15 @@ src/
     ├── pubchem/              # PubChem integration modules
     ├── SMILES/               # SMILES conversion modules
     ├── quantum_calc/         # PySCF calculation logic and file management
+    │   ├── base_calculator.py    # Abstract base class for all calculators
+    │   ├── dft_calculator.py     # DFT calculation logic
+    │   ├── hf_calculator.py      # Hartree-Fock calculation logic
+    │   ├── mp2_calculator.py     # MP2 calculation logic
+    │   ├── tddft_calculator.py   # TDDFT calculation logic and NTO analysis
+    │   ├── exceptions.py         # Custom exceptions for calculations
+    │   ├── file_manager.py       # Handles reading/writing calculation files
+    │   └── solvent_effects.py    # Logic for applying solvent models (PCM, ddCOSMO)
     └── tests/                # Python unit tests
-
 Key API Endpoints
 GET /health: Health check endpoint used by the Electron main process during startup.
 
@@ -201,7 +214,7 @@ POST /api/smiles/convert: Convert a SMILES string to XYZ format.
 
 POST /api/pubchem/validate: Validate an XYZ format string.
 
-POST /api/quantum/calculate: Asynchronously starts a DFT calculation in a background thread.
+POST /api/quantum/calculate: Asynchronously starts a quantum chemistry calculation (DFT, HF, MP2, TDDFT) in a background thread.
 
 GET /api/quantum/calculations: Lists all saved calculation directories.
 

@@ -641,8 +641,7 @@ body {
   background-color:#f8f9fa;
 }
 
-.calculation-settings-section,
-.solvent-settings-section {
+.calculation-settings-section {
   display: flex;
   padding: 0 8px;
   gap: 16px;
