@@ -128,14 +128,11 @@ class TDDFTCalculator(BaseCalculator):
             try:
                 excitation_energies = self.mytd.kernel()
             except Exception as e:
-                if "singular matrix" in str(e).lower():
-                    raise ConvergenceError("TDDFT calculation failed: singular matrix. "
-                                         "Try using a larger basis set or reducing the number of excited states.")
-                elif "memory" in str(e).lower() or "out of memory" in str(e).lower():
-                    raise CalculationError("TDDFT calculation failed: insufficient memory. "
-                                         "Try reducing the number of excited states or using a smaller basis set.")
-                elif "convergence" in str(e).lower():
+                error_msg = str(e).lower()
+                if "singular" in error_msg or "convergence" in error_msg:
                     raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
+                elif "memory" in error_msg:
+                    raise CalculationError(f"TDDFT calculation failed due to insufficient memory: {str(e)}")
                 else:
                     raise CalculationError(f"TDDFT calculation failed: {str(e)}")
             
@@ -186,7 +183,24 @@ class TDDFTCalculator(BaseCalculator):
             raise CalculationError(f"TDDFT calculation failed: {str(e)}")
     
     def _analyze_tddft_results(self) -> Dict[str, Any]:
-        """Analyze TDDFT results and extract key information."""
+        """
+        Analyze TDDFT results and extract key spectroscopic information.
+        
+        This method processes the TDDFT calculation results to compute:
+        - Excitation energies in eV
+        - Wavelengths in nm using E = hc/λ relationship  
+        - Oscillator strengths using length gauge
+        - Transition dipole moments
+        - Major orbital transitions with spectroscopic classification
+        - Natural Transition Orbital (NTO) analysis if requested
+        
+        Returns:
+            Dict containing all calculated spectroscopic properties
+            
+        Note:
+            Uses PySCF's standard methods without analyze() as per PySCF documentation.
+            Oscillator strengths calculated in length gauge for better accuracy.
+        """
         if self.mytd is None or not hasattr(self.mytd, 'e'):
             raise CalculationError("TDDFT results not available")
         
@@ -202,36 +216,29 @@ class TDDFTCalculator(BaseCalculator):
         oscillator_strengths = []
         transition_dipoles = []
         
+        # Calculate oscillator strengths using length gauge (standard approach)
         try:
-            # Analyze transitions to get oscillator strengths and dipole moments
-            self.mytd.analyze()
-            
-            # Get oscillator strengths (method call, not attribute access)
-            try:
-                osc_strengths_result = self.mytd.oscillator_strength()
-                if osc_strengths_result is not None:
-                    oscillator_strengths = [float(f) for f in osc_strengths_result]
-                    logger.info(f"Retrieved {len(oscillator_strengths)} oscillator strengths")
-            except Exception as osc_error:
-                logger.warning(f"Failed to get oscillator strengths: {osc_error}")
-            
-            # Get transition dipole moments (method call, not attribute access)
-            try:
-                dipole_result = self.mytd.transition_dipole()
-                if dipole_result is not None:
-                    for dipole in dipole_result:
-                        if hasattr(dipole, '__len__') and len(dipole) >= 3:
-                            transition_dipoles.append({
-                                'x': float(dipole[0]),
-                                'y': float(dipole[1]),
-                                'z': float(dipole[2])
-                            })
-                    logger.info(f"Retrieved {len(transition_dipoles)} transition dipole moments")
-            except Exception as dipole_error:
-                logger.warning(f"Failed to get transition dipole moments: {dipole_error}")
-            
-        except Exception as e:
-            logger.warning(f"Failed to analyze transitions: {e}")
+            osc_strengths_result = self.mytd.oscillator_strength(gauge='length')
+            if osc_strengths_result is not None:
+                oscillator_strengths = [float(f) for f in osc_strengths_result]
+                logger.info(f"Retrieved {len(oscillator_strengths)} oscillator strengths (length gauge)")
+        except Exception as osc_error:
+            logger.warning(f"Failed to get oscillator strengths: {osc_error}")
+        
+        # Calculate transition dipole moments
+        try:
+            dipole_result = self.mytd.transition_dipole()
+            if dipole_result is not None:
+                for dipole in dipole_result:
+                    if hasattr(dipole, '__len__') and len(dipole) >= 3:
+                        transition_dipoles.append({
+                            'x': float(dipole[0]),
+                            'y': float(dipole[1]),
+                            'z': float(dipole[2])
+                        })
+                logger.info(f"Retrieved {len(transition_dipoles)} transition dipole moments")
+        except Exception as dipole_error:
+            logger.warning(f"Failed to get transition dipole moments: {dipole_error}")
         
         # Analyze major transitions
         major_transitions = self._analyze_major_transitions(
@@ -295,21 +302,54 @@ class TDDFTCalculator(BaseCalculator):
         return major_transitions
     
     def _identify_transition_type(self, energy_ev: float, osc_strength: float) -> str:
-        """Identify the likely transition type based on energy and oscillator strength."""
-        if energy_ev > 10.0:
-            return "Core/High energy transition"
-        elif energy_ev > 6.0:
+        """
+        Identify the likely transition type based on wavelength and oscillator strength.
+        
+        Classification based on literature:
+        - π→π* transitions: Allowed, high intensity (f > 0.1), typically 165-400 nm
+        - n→π* transitions: Forbidden, low intensity (f < 0.01), typically 275-350 nm  
+        - σ→σ* transitions: Very high energy, UV-C region < 200 nm
+        
+        References:
+        - Pavia et al., Introduction to Spectroscopy
+        - Skoog et al., Principles of Instrumental Analysis
+        """
+        # Convert energy to wavelength (nm)
+        wavelength_nm = 1239.84 / energy_ev if energy_ev > 0 else float('inf')
+        
+        # High energy transitions (UV-C region)
+        if wavelength_nm < 200:
+            return "σ→σ*/n→σ* transition"
+        
+        # UV-B and UV-A region analysis
+        elif wavelength_nm < 280:
+            # UV-C to UV-B boundary - likely σ→π* or very high energy π→π*
             if osc_strength > 0.1:
+                return "π→π* transition (high energy)"
+            else:
+                return "n→σ*/σ→π* transition"
+        
+        elif wavelength_nm < 350:
+            # UV-B region - characteristic of n→π* and some π→π* transitions
+            if osc_strength > 0.01:
                 return "π→π* transition"
             else:
-                return "n→π* transition"  
-        elif energy_ev > 3.0:
-            if osc_strength > 0.05:
-                return "HOMO→LUMO (π→π*)"
+                return "n→π* transition (forbidden)"
+        
+        elif wavelength_nm < 400:
+            # UV-A region - primarily π→π* transitions in conjugated systems
+            if osc_strength > 0.01:
+                return "π→π* transition (conjugated)"
             else:
-                return "HOMO→LUMO (n→π*)"
+                return "n→π* transition (weak)"
+        
+        elif wavelength_nm < 700:
+            # Visible region - extended conjugation π→π*
+            return "π→π* transition (extended conjugation)"
+        
         else:
-            return "Low energy transition"
+            # Near-IR region - very low energy transitions
+            return "Low energy transition (>700 nm)"
     
     def _atoms_to_string(self, atoms: List[List]) -> str:
         """Convert atoms list to PySCF atom string format."""
@@ -342,7 +382,31 @@ class TDDFTCalculator(BaseCalculator):
         return int(homo_idx), int(lumo_idx)
     
     def _analyze_natural_transition_orbitals(self, excitation_energies: List[float]) -> List[Dict[str, Any]]:
-        """Perform Natural Transition Orbital (NTO) analysis for excited states."""
+        """
+        Perform Natural Transition Orbital (NTO) analysis for excited states.
+        
+        NTO analysis provides a compact description of electronic excitations by 
+        performing Singular Value Decomposition (SVD) of the transition density matrix:
+        T = U * diag(λ) * V†
+        
+        Where:
+        - U contains hole orbitals (where electron is promoted from)
+        - V contains particle orbitals (where electron is promoted to)  
+        - λ are singular values (weights) representing pair contributions
+        
+        Args:
+            excitation_energies: List of excitation energies in eV
+            
+        Returns:
+            List of dictionaries, one per excited state, containing:
+            - state: Excited state number (1-indexed)
+            - energy: Excitation energy in eV
+            - nto_pairs: List of hole-particle orbital pairs with weights
+            - total_nto_pairs: Total number of pairs analyzed
+            
+        References:
+            Martin, R. L., J. Chem. Phys. 118, 4775-4777 (2003)
+        """
         if self.mytd is None:
             raise CalculationError("TDDFT calculation not available for NTO analysis")
         
@@ -433,25 +497,37 @@ class TDDFTCalculator(BaseCalculator):
         lumo_idx = virtual_indices[0]
         logger.debug(f"Reference orbitals: HOMO idx={homo_idx}, LUMO idx={lumo_idx}")
         
-        # Calculate total weight for normalization
-        total_weight_squared = np.sum(weights**2)
-        logger.debug(f"Total weight squared: {total_weight_squared}")
+        # NTO weights interpretation based on SVD theory:
+        # In SVD of transition density matrix T = U * diag(weights) * V†
+        # weights are singular values representing the amplitude of each hole-particle pair
+        # Squares of weights give the relative contribution of each pair
         
-        # Sort weights in descending order and keep significant pairs
+        # Calculate total contribution for normalization
+        # The weights should already be normalized by PySCF, but we verify
+        total_contribution = np.sum(weights**2)
+        logger.debug(f"Total NTO contribution (should be ~1.0): {total_contribution:.6f}")
+        
+        # Sort weights in descending order to get most important transitions first
         sorted_indices = np.argsort(weights)[::-1]
-        logger.debug(f"Top 5 weights: {[weights[sorted_indices[i]] for i in range(min(5, len(weights)))]}")
+        significant_weights = weights[sorted_indices]
+        logger.debug(f"Top 5 NTO weights: {significant_weights[:5]}")
         
-        # Process the most significant NTO pairs (typically top 5-10)
-        max_pairs = min(10, len(weights))
-        logger.info(f"Processing top {max_pairs} NTO pairs out of {len(weights)} total weights")
+        # Process NTO pairs starting from most significant
+        # Typically only 1-3 pairs contribute significantly (>5% each)
+        max_pairs = min(len(weights), 10)  # Reasonable upper limit
+        logger.info(f"Processing up to {max_pairs} NTO pairs out of {len(weights)} total")
         
         for i in range(max_pairs):
             idx = sorted_indices[i]
             weight = float(weights[idx])
             
-            # Skip very small contributions (less than 1%)
-            contribution = (weight**2 / total_weight_squared) * 100
-            if contribution < 1.0:
+            # Calculate contribution as percentage of total transition
+            # Using weight² as this represents the actual contribution amplitude
+            contribution_percent = (weight**2 / total_contribution) * 100
+            
+            # Skip pairs with very small contributions (< 1% of total transition)
+            if contribution_percent < 1.0:
+                logger.debug(f"Skipping NTO pair {i+1} with contribution {contribution_percent:.2f}%")
                 break
             
             # Determine hole and particle orbital descriptions
@@ -462,7 +538,7 @@ class TDDFTCalculator(BaseCalculator):
                 'hole_orbital': hole_desc,
                 'particle_orbital': particle_desc,
                 'weight': weight,
-                'contribution': contribution,
+                'contribution': contribution_percent,  # Now properly calculated as percentage
                 'hole_orbital_index': hole_idx_desc,
                 'particle_orbital_index': particle_idx_desc
             }
