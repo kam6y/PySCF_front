@@ -17,6 +17,7 @@ dependencies = [
     "datamodel-code-generator>=0.25.0",
     "flask-sock>=0.7.0",
     "gevent>=25.5.1",
+    "gevent-websocket>=0.10.1",
 ]
 
 [tool.uv]

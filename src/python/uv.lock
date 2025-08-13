@@ -269,6 +269,18 @@ wheels = [
 ]
 
 [[package]]
+name = "gevent-websocket"
+version = "0.10.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "gevent" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/d2/6fa19239ff1ab072af40ebf339acd91fb97f34617c2ee625b8e34bf42393/gevent-websocket-0.10.1.tar.gz", hash = "sha256:7eaef32968290c9121f7c35b973e2cc302ffb076d018c9068d2f5ca8b2d85fb0", size = 18366, upload-time = "2017-03-12T22:46:05.68Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7b/84/2dc373eb6493e00c884cc11e6c059ec97abae2678d42f06bf780570b0193/gevent_websocket-0.10.1-py3-none-any.whl", hash = "sha256:17b67d91282f8f4c973eba0551183fc84f56f1c90c8f6b6b30256f31f66f5242", size = 22987, upload-time = "2017-03-12T22:46:03.611Z" },
+]
+
+[[package]]
 name = "greenlet"
 version = "3.2.4"
 source = { registry = "https://pypi.org/simple" }
@@ -728,6 +740,7 @@ dependencies = [
     { name = "flask-sock" },
     { name = "geometric" },
     { name = "gevent" },
+    { name = "gevent-websocket" },
     { name = "pydantic" },
     { name = "pyscf" },
     { name = "rdkit" },
@@ -750,6 +763,7 @@ requires-dist = [
     { name = "flask-sock", specifier = ">=0.7.0" },
     { name = "geometric", specifier = ">=1.1" },
     { name = "gevent", specifier = ">=25.5.1" },
+    { name = "gevent-websocket", specifier = ">=0.10.1" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "pyscf", specifier = ">=2.10.0" },
     { name = "rdkit", specifier = ">=2025.3.5" },

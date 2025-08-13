@@ -619,7 +619,6 @@ export const CalculationSettingsPage = ({
               <div className="setting-row">
                 <label>Solvent(dielectric constant)</label>
                 <select value={getSolventDisplayValue()} onChange={(e) => handleParamChange('solvent', e.target.value)} disabled={params.solvent_method === "none" || calculationStatus === 'running'}>
-                  <option value="-">-</option>
                   <optgroup label="Highly Polar">
                     <option value="water">Water (78.36)</option>
                     <option value="dimethylsulfoxide">Dimethylsulfoxide (46.83)</option>

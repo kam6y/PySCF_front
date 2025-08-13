@@ -1,21 +1,23 @@
-# src/python/app.py
+from gevent import monkey
+monkey.patch_all()
 
 import logging
 import os
 import sys
-import json  # jsonをインポート
-import time  # timeをインポート
+import json
+import time
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_sock import Sock  # flask-sockをインポート
+from flask_sock import Sock
 from flask_pydantic import validate
 from pydantic import ValidationError
-import threading
 import socket
 import shutil
 from typing import Dict
+import gevent # geventをインポート
 from gevent.pywsgi import WSGIServer
+# geventwebsocket.handlerのインポートは不要になったため削除
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
@@ -231,6 +233,12 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'created_at': datetime.now().isoformat()
         }
         
+        # Add TDDFT-specific parameters if the method is TDDFT
+        if body.calculation_method == 'TDDFT':
+            parameters['tddft_nstates'] = body.tddft_nstates
+            parameters['tddft_method'] = body.tddft_method.value
+            parameters['tddft_analyze_nto'] = body.tddft_analyze_nto
+        
         # Initialize file manager and create directory
         file_manager = CalculationFileManager()
         calc_dir = file_manager.create_calculation_dir(parameters['name'])
@@ -240,13 +248,8 @@ def quantum_calculate(body: QuantumCalculationRequest):
         file_manager.save_calculation_parameters(calc_dir, parameters)
         file_manager.save_calculation_status(calc_dir, 'pending')
 
-        # Start background thread for the calculation
-        thread = threading.Thread(
-            target=run_calculation_in_background,
-            args=(calculation_id, parameters)
-        )
-        thread.daemon = True
-        thread.start()
+        # Start background greenlet for the calculation
+        gevent.spawn(run_calculation_in_background, calculation_id, parameters)
         
         logger.info(f"Queued calculation {calculation_id} for molecule '{parameters['name']}'")
 
@@ -395,9 +398,6 @@ def delete_calculation(calculation_id):
         return jsonify({'success': False, 'error': 'Failed to delete calculation.'}), 500
 
 
-#
-# ===== ここから新しいWebSocketエンドポイントを追加 =====
-#
 @sock.route('/ws/calculations/<calculation_id>')
 def calculation_status_socket(ws, calculation_id):
     """
@@ -490,8 +490,8 @@ def calculation_status_socket(ws, calculation_id):
                     logger.info(f"Calculation {calculation_id} finished with status '{current_status}'. Closing WebSocket.")
                     break
                 
-                # 1秒待機して次のチェックへ
-                time.sleep(1)
+                # geventのスレッドに制御を譲る
+                gevent.sleep(0.5)
                 
             except Exception as loop_error:
                 logger.error(f"Error in WebSocket loop for {calculation_id}: {loop_error}")
@@ -503,14 +503,9 @@ def calculation_status_socket(ws, calculation_id):
         # 接続が閉じることを確認
         logger.info(f"Closing WebSocket connection for calculation {calculation_id}")
         try:
-            if hasattr(ws, 'close'):
-                ws.close()
+            ws.close()
         except Exception as close_error:
             logger.debug(f"Error closing WebSocket: {close_error}")
-
-#
-# ===== WebSocketエンドポイントの追加はここまで =====
-#
 
 
 @app.errorhandler(ValidationError)
@@ -553,8 +548,10 @@ if __name__ == '__main__':
     
     logger.info(f"Starting API server with gevent on http://{host}:{actual_port} (Debug: {debug})")
     
-    # Werkzeugのmake_serverの代わりにWSGIServerを使用
+    # ===== ここから修正 =====
+    # handler_class の指定を削除し、gevent と Flask-Sock の標準的な連携に任せる
     http_server = WSGIServer((host, actual_port), app)
+    # ===== ここまで修正 =====
     try:
         http_server.serve_forever()
     except KeyboardInterrupt:
