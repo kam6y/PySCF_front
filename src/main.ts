@@ -143,9 +143,9 @@ const createWindow = async () => {
   }
   
   mainWindow = new BrowserWindow({
-    width: 1200,
+    width: 1400,
     height: 800,
-    minWidth: 800,
+    minWidth: 1400,
     minHeight: 600,
     titleBarStyle: 'hidden',
     titleBarOverlay: {

@@ -216,7 +216,7 @@ export const CalculationResultsPage = ({
                       <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Energy (eV)</th>
                       <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Wavelength (nm)</th>
                       <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'right' }}>Osc. Strength</th>
-                      <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'left' }}>Transition Type</th>
+                      <th style={{ padding: '12px', border: '1px solid #ddd', textAlign: 'left' }}>Transition Type (estimation)</th>
                     </tr>
                   </thead>
                   <tbody>
