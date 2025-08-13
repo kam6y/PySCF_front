@@ -48,6 +48,16 @@ class BaseCalculator(ABC):
         """Get the path to the checkpoint file."""
         return os.path.join(self.working_dir, "calculation.chk")
     
+    def apply_resource_settings(self, mol, memory_mb: Optional[int] = None, cpu_cores: Optional[int] = None) -> None:
+        """Apply resource settings to PySCF molecule object."""
+        if memory_mb is not None and memory_mb > 0:
+            # PySCF expects memory in MB
+            mol.max_memory = memory_mb
+            print(f"Set PySCF max_memory to {memory_mb} MB")
+        
+        # CPU cores are now configured at the process level in process_manager.py
+        # This avoids conflicts and ensures proper timing of environment variable setup
+    
     @abstractmethod
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:
         """Setup the quantum chemistry calculation."""

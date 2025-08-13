@@ -40,6 +40,8 @@ class TDDFTCalculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
+            cpu_cores = kwargs.get('cpu_cores')
+            memory_mb = kwargs.get('memory_mb')
             
             # TDDFT-specific parameters
             nstates = kwargs.get('nstates', 10)
@@ -57,6 +59,9 @@ class TDDFTCalculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
+            
+            # Apply resource settings
+            self.apply_resource_settings(self.mol, memory_mb, cpu_cores)
             
             # Setup DFT calculation (ground state) first
             self.mf = dft.RKS(self.mol)
@@ -78,7 +83,9 @@ class TDDFTCalculator(BaseCalculator):
                 'atom_count': len(atoms),
                 'tddft_nstates': nstates,
                 'tddft_method': tddft_method,
-                'tddft_analyze_nto': analyze_nto
+                'tddft_analyze_nto': analyze_nto,
+                'cpu_cores': cpu_cores,
+                'memory_mb': memory_mb
             })
             
         except Exception as e:

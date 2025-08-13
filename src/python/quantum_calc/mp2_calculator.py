@@ -41,6 +41,8 @@ class MP2Calculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
+            cpu_cores = kwargs.get('cpu_cores')
+            memory_mb = kwargs.get('memory_mb')
             
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
@@ -53,6 +55,9 @@ class MP2Calculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
+            
+            # Apply resource settings
+            self.apply_resource_settings(self.mol, memory_mb, cpu_cores)
             
             # Setup HF calculation first (MP2 requires HF reference)
             # For closed-shell systems (spin=0), use RHF
@@ -79,7 +84,9 @@ class MP2Calculator(BaseCalculator):
                 'solvent_method': solvent_method,
                 'solvent': solvent,
                 'atom_count': len(atoms),
-                'method': 'UMP2' if spin > 0 else 'RMP2'
+                'method': 'UMP2' if spin > 0 else 'RMP2',
+                'cpu_cores': cpu_cores,
+                'memory_mb': memory_mb
             })
             
         except Exception as e:
@@ -103,6 +110,11 @@ class MP2Calculator(BaseCalculator):
             solvent_method = self.results.get('solvent_method', 'none')
             solvent = self.results.get('solvent', '-')
             spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+            
+            # Apply resource settings to optimized molecule
+            memory_mb = self.results.get('memory_mb')
+            cpu_cores = self.results.get('cpu_cores')
+            self.apply_resource_settings(optimized_mol, memory_mb, cpu_cores)
             
             if spin == 0:
                 self.mf = scf.RHF(optimized_mol)

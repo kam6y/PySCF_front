@@ -42,6 +42,8 @@ class DFTCalculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
+            cpu_cores = kwargs.get('cpu_cores')
+            memory_mb = kwargs.get('memory_mb')
             
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
@@ -54,6 +56,9 @@ class DFTCalculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
+            
+            # Apply resource settings
+            self.apply_resource_settings(self.mol, memory_mb, cpu_cores)
             
             # Setup DFT calculation with solvent effects
             self.mf = dft.RKS(self.mol)
@@ -72,7 +77,9 @@ class DFTCalculator(BaseCalculator):
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,
-                'atom_count': len(atoms)
+                'atom_count': len(atoms),
+                'cpu_cores': cpu_cores,
+                'memory_mb': memory_mb
             })
             
         except Exception as e:
@@ -95,6 +102,11 @@ class DFTCalculator(BaseCalculator):
             # Recreate mf object with optimized geometry while preserving solvent effects
             solvent_method = self.results.get('solvent_method', 'none')
             solvent = self.results.get('solvent', '-')
+            
+            # Apply resource settings to optimized molecule
+            memory_mb = self.results.get('memory_mb')
+            cpu_cores = self.results.get('cpu_cores')
+            self.apply_resource_settings(optimized_mol, memory_mb, cpu_cores)
             
             self.mf = dft.RKS(optimized_mol)
             self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)

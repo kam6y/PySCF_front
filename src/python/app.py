@@ -205,7 +205,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
         
         # Save initial parameters and status
         file_manager.save_calculation_parameters(calc_dir, parameters)
-        file_manager.save_calculation_status(calc_dir, 'pending')
+        file_manager.save_calculation_status(calc_dir, 'running')
 
         # Submit calculation to process pool
         process_manager = get_process_manager()

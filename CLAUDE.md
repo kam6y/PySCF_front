@@ -104,7 +104,7 @@ PubChem Integration: Searching compounds by name, CID, or formula and converting
 
 SMILES Conversion: Converting SMILES strings to 3D XYZ format using RDKit.
 
-Quantum Chemistry Calculations: Running various calculations via PySCF. This includes DFT, Hartree-Fock (HF), MP2, and TDDFT. Calculations are executed in background threads (gevent greenlets) to keep the API responsive.
+Quantum Chemistry Calculations: Running various calculations via PySCF. This includes DFT, Hartree-Fock (HF), MP2, and TDDFT. Calculations are executed using a ProcessPoolExecutor-based system that provides true multiprocessing parallelism, allowing multiple calculations to run simultaneously across different CPU cores.
 
 Real-time Status Updates: A WebSocket endpoint (/ws/calculations/<id>) pushes status updates to the frontend as soon as they change on the file system.
 
@@ -149,7 +149,7 @@ Creates a new directory for the calculation.
 
 Saves the initial parameters and sets the status to pending.
 
-Starts a new background greenlet (gevent.spawn) to run the appropriate PySCF calculation (DFT, HF, MP2, or TDDFT).
+Submits the calculation to a ProcessPoolExecutor-managed worker process to run the appropriate PySCF calculation (DFT, HF, MP2, or TDDFT) in true parallel execution.
 
 Returns a 202 Accepted response with the newly created (and now persistent) CalculationInstance data.
 
@@ -161,7 +161,7 @@ The useCalculationSubscription hook is triggered by the running status. It opens
 
 The Flask backend's WebSocket handler for that calculationId starts monitoring the status.json file on the filesystem.
 
-As the background thread updates the status.json file (e.g., to completed or error), the WebSocket handler detects the change and pushes the complete, updated CalculationInstance data to the connected client.
+As the worker process updates the status.json file (e.g., to completed or error), the WebSocket handler detects the change and pushes the complete, updated CalculationInstance data to the connected client.
 
 The useCalculationSubscription hook's onUpdate callback receives the new data and updates the central state in App.tsx. This causes the UI to reflect the current state (e.g., in the sidebar) in real-time.
 
@@ -203,6 +203,7 @@ src/
     │   ├── tddft_calculator.py   # TDDFT calculation logic and NTO analysis
     │   ├── exceptions.py         # Custom exceptions for calculations
     │   ├── file_manager.py       # Handles reading/writing calculation files
+    │   ├── process_manager.py    # ProcessPoolExecutor-based parallel calculation manager
     │   └── solvent_effects.py    # Logic for applying solvent models (PCM, ddCOSMO)
     └── tests/                # Python unit tests
 Key API Endpoints
@@ -214,17 +215,36 @@ POST /api/smiles/convert: Convert a SMILES string to XYZ format.
 
 POST /api/pubchem/validate: Validate an XYZ format string.
 
-POST /api/quantum/calculate: Asynchronously starts a quantum chemistry calculation (DFT, HF, MP2, TDDFT) in a background thread.
+POST /api/quantum/calculate: Asynchronously starts a quantum chemistry calculation (DFT, HF, MP2, TDDFT) using ProcessPoolExecutor for true parallel execution.
 
-GET /api/quantum/calculations: Lists all saved calculation directories.
+GET /api/quantum/calculations: Lists all saved calculation directories and provides information about active calculations.
 
 GET /api/quantum/calculations/<id>: Gets detailed information and results for a specific calculation.
 
 PUT /api/quantum/calculations/<id>: Updates a calculation's metadata (e.g., renames it).
 
-DELETE /api/quantum/calculations/<id>: Deletes a calculation and all its associated files.
+POST /api/quantum/calculations/<id>/cancel: Cancels a running calculation if possible.
+
+DELETE /api/quantum/calculations/<id>: Deletes a calculation and all its associated files, canceling it first if running.
+
+GET /api/quantum/status: Gets status information about the calculation system including process pool usage and active calculations.
 
 WS /ws/calculations/<id>: WebSocket endpoint for real-time status updates of a running calculation.
+
+Parallel Processing Architecture
+The application uses a ProcessPoolExecutor-based system for quantum chemistry calculations to achieve true multiprocessing parallelism:
+
+Process Pool Management: The CalculationProcessManager class (src/python/quantum_calc/process_manager.py) manages a pool of worker processes equal to the system's CPU count. This allows multiple calculations to run simultaneously, fully utilizing available CPU cores.
+
+Worker Process Isolation: Each calculation runs in a completely separate Python process, eliminating the Global Interpreter Lock (GIL) limitation that would prevent true parallelism with threading-based approaches.
+
+Resource Management: The process pool automatically starts when the first calculation is submitted and shuts down cleanly when the Flask server terminates. Proper signal handling ensures no zombie processes are left behind.
+
+Calculation Lifecycle: When a calculation is submitted via POST /api/quantum/calculate, it's queued to the process pool. The worker process updates the status.json file directly, which the WebSocket handler monitors for real-time status updates to connected clients.
+
+Cancellation Support: Running calculations can be cancelled via POST /api/quantum/calculations/<id>/cancel. The process manager attempts to cancel the Future and updates the calculation status accordingly.
+
+Error Handling: Process-level errors are properly captured and reported back through the filesystem-based status system, maintaining consistency with the existing WebSocket notification mechanism.
 
 Troubleshooting
 Backend Server Fails to Start: The Flask server is designed to find a free port automatically. If it still fails, ensure that no firewall is blocking local network communication and that the Python environment (uv sync) is correctly set up.
@@ -232,5 +252,7 @@ Backend Server Fails to Start: The Flask server is designed to find a free port 
 Build Failures: Ensure Python dependencies (uv sync in src/python) and Node dependencies (npm install) are up to date. PyInstaller builds can be sensitive; check its logs in the build/pyinstaller directory for errors.
 
 Python Dependencies: This project requires PySCF, RDKit, and geometric. These packages have significant scientific dependencies that may require system-level libraries or compilation. Ensure your Python environment can build them.
+
+Process Pool Issues: If calculations appear to hang or the process pool becomes unresponsive, check the /api/quantum/status endpoint for pool health. The process manager automatically handles cleanup, but in extreme cases, restarting the Flask server will reset the process pool.
 
 SSL/HTTPS: The pubchem/client.py module uses standard HTTPS requests via the requests library with SSL verification enabled. No special configuration should be needed for it to work.

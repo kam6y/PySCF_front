@@ -34,6 +34,17 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         file_manager.save_calculation_status(calc_dir, 'running')
         process_logger.info(f"Starting calculation {calculation_id} in process {os.getpid()}")
         
+        # Configure resource settings
+        cpu_cores = parameters.get('cpu_cores')
+        memory_mb = parameters.get('memory_mb')
+        
+        # Set thread counts for parallel libraries if cpu_cores is specified
+        if cpu_cores is not None and cpu_cores > 0:
+            os.environ['OMP_NUM_THREADS'] = str(cpu_cores)
+            os.environ['OPENBLAS_NUM_THREADS'] = str(cpu_cores)
+            os.environ['MKL_NUM_THREADS'] = str(cpu_cores)
+            process_logger.info(f"Set parallel library thread counts to {cpu_cores}")
+        
         # Initialize calculator based on calculation method
         calculation_method = parameters.get('calculation_method', 'DFT')
         if calculation_method == 'HF':
@@ -55,7 +66,9 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             'spin': (parameters['spin_multiplicity'] - 1) // 2,
             'max_cycle': 150,
             'solvent_method': parameters['solvent_method'],
-            'solvent': parameters['solvent']
+            'solvent': parameters['solvent'],
+            'cpu_cores': cpu_cores,
+            'memory_mb': memory_mb
         }
         
         # Add exchange-correlation functional for DFT and TDDFT calculations
