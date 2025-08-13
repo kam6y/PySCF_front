@@ -17,6 +17,14 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     Worker function to run quantum chemistry calculations in a separate process.
     Returns (success: bool, error_message: str or None)
     """
+    cpu_cores = parameters.get('cpu_cores')
+    if cpu_cores and int(cpu_cores) > 0:
+        os.environ['OMP_NUM_THREADS'] = str(int(cpu_cores))
+    else:
+        os.environ['OMP_NUM_THREADS'] = '1'
+    
+    memory_mb = parameters.get('memory_mb') or 2000  # Noneや空の値をデフォルト値に置き換え
+
     # Import here to avoid issues with multiprocessing and module loading
     from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator
     from quantum_calc import CalculationError, ConvergenceError, InputError
@@ -33,17 +41,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         # Update status to running on the file system
         file_manager.save_calculation_status(calc_dir, 'running')
         process_logger.info(f"Starting calculation {calculation_id} in process {os.getpid()}")
-        
-        # Configure resource settings
-        cpu_cores = parameters.get('cpu_cores')
-        memory_mb = parameters.get('memory_mb')
-        
-        # Set thread counts for parallel libraries if cpu_cores is specified
-        if cpu_cores is not None and cpu_cores > 0:
-            os.environ['OMP_NUM_THREADS'] = str(cpu_cores)
-            os.environ['OPENBLAS_NUM_THREADS'] = str(cpu_cores)
-            os.environ['MKL_NUM_THREADS'] = str(cpu_cores)
-            process_logger.info(f"Set parallel library thread counts to {cpu_cores}")
+        process_logger.info(f"Using {os.environ.get('OMP_NUM_THREADS')} CPU cores for calculation.")
         
         # Initialize calculator based on calculation method
         calculation_method = parameters.get('calculation_method', 'DFT')
@@ -67,8 +65,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             'max_cycle': 150,
             'solvent_method': parameters['solvent_method'],
             'solvent': parameters['solvent'],
-            'cpu_cores': cpu_cores,
-            'memory_mb': memory_mb
+            'memory_mb': memory_mb,  # メモリ設定を渡す (必ず有効な値)
         }
         
         # Add exchange-correlation functional for DFT and TDDFT calculations

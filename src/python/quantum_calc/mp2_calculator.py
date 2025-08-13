@@ -41,9 +41,8 @@ class MP2Calculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
-            cpu_cores = kwargs.get('cpu_cores')
-            memory_mb = kwargs.get('memory_mb')
-            
+            memory_mb = kwargs.get('memory_mb', 2000)  # Default 2GB
+
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
             
@@ -55,9 +54,11 @@ class MP2Calculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
-            
-            # Apply resource settings
-            self.apply_resource_settings(self.mol, memory_mb, cpu_cores)
+            # 安全なメモリ設定を適用
+            if memory_mb and memory_mb > 0:
+                self.mol.max_memory = memory_mb
+            else:
+                self.mol.max_memory = 3000  # MP2はより多くのメモリが必要
             
             # Setup HF calculation first (MP2 requires HF reference)
             # For closed-shell systems (spin=0), use RHF
@@ -84,9 +85,7 @@ class MP2Calculator(BaseCalculator):
                 'solvent_method': solvent_method,
                 'solvent': solvent,
                 'atom_count': len(atoms),
-                'method': 'UMP2' if spin > 0 else 'RMP2',
-                'cpu_cores': cpu_cores,
-                'memory_mb': memory_mb
+                'method': 'UMP2' if spin > 0 else 'RMP2'
             })
             
         except Exception as e:
@@ -110,11 +109,6 @@ class MP2Calculator(BaseCalculator):
             solvent_method = self.results.get('solvent_method', 'none')
             solvent = self.results.get('solvent', '-')
             spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
-            
-            # Apply resource settings to optimized molecule
-            memory_mb = self.results.get('memory_mb')
-            cpu_cores = self.results.get('cpu_cores')
-            self.apply_resource_settings(optimized_mol, memory_mb, cpu_cores)
             
             if spin == 0:
                 self.mf = scf.RHF(optimized_mol)
@@ -160,11 +154,27 @@ class MP2Calculator(BaseCalculator):
             
             # Step 5: Prepare results
             chk_path = self.get_checkpoint_path()
+            
+            # 安全にエネルギーを変換
+            if hf_energy is None:
+                raise CalculationError("HF energy is None - calculation may have failed")
+            if mp2_corr_energy is None:
+                raise CalculationError("MP2 correlation energy is None - calculation may have failed")
+            if mp2_total_energy is None:
+                raise CalculationError("MP2 total energy is None - calculation may have failed")
+            
+            try:
+                hf_energy_float = float(hf_energy)
+                mp2_corr_energy_float = float(mp2_corr_energy)
+                mp2_total_energy_float = float(mp2_total_energy)
+            except (ValueError, TypeError) as e:
+                raise CalculationError(f"Failed to convert MP2 energies to float: {e}")
+            
             self.results.update({
-                'hf_energy': float(hf_energy),
-                'mp2_correlation_energy': float(mp2_corr_energy),
-                'scf_energy': float(mp2_total_energy),  # For consistency with other calculators
-                'mp2_total_energy': float(mp2_total_energy),
+                'hf_energy': hf_energy_float,
+                'mp2_correlation_energy': mp2_corr_energy_float,
+                'scf_energy': mp2_total_energy_float,  # For consistency with other calculators
+                'mp2_total_energy': mp2_total_energy_float,
                 'converged': True,
                 'homo_index': homo_idx,
                 'lumo_index': lumo_idx,

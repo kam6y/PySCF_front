@@ -42,9 +42,8 @@ class DFTCalculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
-            cpu_cores = kwargs.get('cpu_cores')
-            memory_mb = kwargs.get('memory_mb')
-            
+            memory_mb = kwargs.get('memory_mb', 2000)  # Default 2GB
+
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
             
@@ -56,9 +55,11 @@ class DFTCalculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
-            
-            # Apply resource settings
-            self.apply_resource_settings(self.mol, memory_mb, cpu_cores)
+            # 安全なメモリ設定を適用
+            if memory_mb and memory_mb > 0:
+                self.mol.max_memory = memory_mb
+            else:
+                self.mol.max_memory = 2000  # デフォルト2GB
             
             # Setup DFT calculation with solvent effects
             self.mf = dft.RKS(self.mol)
@@ -77,9 +78,7 @@ class DFTCalculator(BaseCalculator):
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,
-                'atom_count': len(atoms),
-                'cpu_cores': cpu_cores,
-                'memory_mb': memory_mb
+                'atom_count': len(atoms)
             })
             
         except Exception as e:
@@ -102,11 +101,6 @@ class DFTCalculator(BaseCalculator):
             # Recreate mf object with optimized geometry while preserving solvent effects
             solvent_method = self.results.get('solvent_method', 'none')
             solvent = self.results.get('solvent', '-')
-            
-            # Apply resource settings to optimized molecule
-            memory_mb = self.results.get('memory_mb')
-            cpu_cores = self.results.get('cpu_cores')
-            self.apply_resource_settings(optimized_mol, memory_mb, cpu_cores)
             
             self.mf = dft.RKS(optimized_mol)
             self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
@@ -133,8 +127,17 @@ class DFTCalculator(BaseCalculator):
             
             # Step 4: Prepare results
             chk_path = self.get_checkpoint_path()
+            
+            # 安全にエネルギーを変換
+            if scf_energy is None:
+                raise CalculationError("SCF energy is None - calculation may have failed")
+            try:
+                scf_energy_float = float(scf_energy)
+            except (ValueError, TypeError) as e:
+                raise CalculationError(f"Failed to convert SCF energy to float: {e}")
+            
             self.results.update({
-                'scf_energy': float(scf_energy),
+                'scf_energy': scf_energy_float,
                 'converged': True,
                 'homo_index': homo_idx,
                 'lumo_index': lumo_idx,
@@ -201,4 +204,3 @@ class DFTCalculator(BaseCalculator):
             lines.append(f"{symbol:2s} {coords[0]:12.6f} {coords[1]:12.6f} {coords[2]:12.6f}")
         
         return "\n".join(lines)
-    

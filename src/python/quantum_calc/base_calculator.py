@@ -52,8 +52,12 @@ class BaseCalculator(ABC):
         """Apply resource settings to PySCF molecule object."""
         if memory_mb is not None and memory_mb > 0:
             # PySCF expects memory in MB
-            mol.max_memory = memory_mb
+            mol.max_memory = int(memory_mb)
             print(f"Set PySCF max_memory to {memory_mb} MB")
+        else:
+            # デフォルトメモリ設定を適用
+            mol.max_memory = 2000
+            print("Using default PySCF max_memory: 2000 MB")
         
         # CPU cores are now configured at the process level in process_manager.py
         # This avoids conflicts and ensures proper timing of environment variable setup

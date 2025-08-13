@@ -40,9 +40,8 @@ class HFCalculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
-            cpu_cores = kwargs.get('cpu_cores')
-            memory_mb = kwargs.get('memory_mb')
-            
+            memory_mb = kwargs.get('memory_mb', 2000)  # Default 2GB
+
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
             
@@ -54,9 +53,11 @@ class HFCalculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
-            
-            # Apply resource settings
-            self.apply_resource_settings(self.mol, memory_mb, cpu_cores)
+            # 安全なメモリ設定を適用
+            if memory_mb and memory_mb > 0:
+                self.mol.max_memory = memory_mb
+            else:
+                self.mol.max_memory = 2000  # デフォルト2GB
             
             # Setup HF calculation based on spin multiplicity
             # For closed-shell systems (spin=0), use RHF
@@ -83,9 +84,7 @@ class HFCalculator(BaseCalculator):
                 'solvent_method': solvent_method,
                 'solvent': solvent,
                 'atom_count': len(atoms),
-                'method': 'UHF' if spin > 0 else 'RHF',
-                'cpu_cores': cpu_cores,
-                'memory_mb': memory_mb
+                'method': 'UHF' if spin > 0 else 'RHF'
             })
             
         except Exception as e:
@@ -109,11 +108,6 @@ class HFCalculator(BaseCalculator):
             solvent_method = self.results.get('solvent_method', 'none')
             solvent = self.results.get('solvent', '-')
             spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
-            
-            # Apply resource settings to optimized molecule
-            memory_mb = self.results.get('memory_mb')
-            cpu_cores = self.results.get('cpu_cores')
-            self.apply_resource_settings(optimized_mol, memory_mb, cpu_cores)
             
             if spin == 0:
                 self.mf = scf.RHF(optimized_mol)
@@ -143,8 +137,17 @@ class HFCalculator(BaseCalculator):
             
             # Step 4: Prepare results
             chk_path = self.get_checkpoint_path()
+            
+            # 安全にエネルギーを変換
+            if scf_energy is None:
+                raise CalculationError("SCF energy is None - calculation may have failed")
+            try:
+                scf_energy_float = float(scf_energy)
+            except (ValueError, TypeError) as e:
+                raise CalculationError(f"Failed to convert SCF energy to float: {e}")
+            
             self.results.update({
-                'scf_energy': float(scf_energy),
+                'scf_energy': scf_energy_float,
                 'converged': True,
                 'homo_index': homo_idx,
                 'lumo_index': lumo_idx,
