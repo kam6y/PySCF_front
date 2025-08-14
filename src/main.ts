@@ -66,7 +66,8 @@ const startPythonServer = (): Promise<void> => {
       console.log('Executing Python server in development mode...');
       pythonProcess = spawn('uv', ['run', 'python', appPath], {
         cwd: pythonPath,
-        stdio: ['pipe', 'pipe', 'pipe']
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, VIRTUAL_ENV: undefined }
       });
     }
 
@@ -157,11 +158,31 @@ const createWindow = async () => {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: true,
     },
   });
 
   if (!app.isPackaged) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    mainWindow.webContents.openDevTools({ 
+      mode: 'detach',
+      activate: false
+    });
+    
+    // DevToolsでAutofillエラーを抑制
+    mainWindow.webContents.once('devtools-opened', () => {
+      mainWindow.webContents.devToolsWebContents?.executeJavaScript(`
+        // Autofill機能を無効化
+        try {
+          if (window.DevToolsAPI) {
+            window.DevToolsAPI.disableAutofill = true;
+          }
+        } catch (e) {
+          // エラーを無視
+        }
+      `).catch(() => {
+        // executeJavaScriptのエラーを無視
+      });
+    });
   }
   
   // レンダラープロセスにFlaskサーバーのポートを通知
