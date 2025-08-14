@@ -52,7 +52,7 @@ const startPythonServer = (): Promise<void> => {
     
     if (app.isPackaged) {
       const executableName = process.platform === 'win32' ? 'pyscf_front_api.exe' : 'pyscf_front_api';
-      const pythonExecutablePath = path.join(process.resourcesPath, 'python_dist', executableName);
+      const pythonExecutablePath = path.join(process.resourcesPath, 'python_dist', 'pyscf_front_api', executableName);
       
       console.log(`Executing packaged Python server at: ${pythonExecutablePath}`);
       pythonProcess = spawn(pythonExecutablePath, [], {

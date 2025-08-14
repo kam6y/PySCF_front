@@ -55,5 +55,5 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 
 ```bash
 npm run package
-これにより release ディレクトリに実行可能ファイルが生成されます。
+これにより PySCF_native_app/dist ディレクトリに実行可能ファイルが生成されます。
 ```

@@ -19,6 +19,7 @@ dependencies = [
     "pyscf>=2.10.0",
     "gevent-websocket>=0.10.1",
     "threadpoolctl>=3.6.0",
+    "pyinstaller>=6.15.0",
 ]
 
 [tool.uv]
