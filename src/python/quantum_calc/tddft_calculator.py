@@ -40,8 +40,7 @@ class TDDFTCalculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
-            memory_mb = kwargs.get('memory_mb', 4000)  # Default 4GB for TDDFT
-            cpu_cores = kwargs.get('cpu_cores')  # CPU cores from user setting
+            memory_mb = kwargs.get('memory_mb', 4000)  # Default 4GB
             
             # TDDFT-specific parameters
             nstates = kwargs.get('nstates', 10)
@@ -59,12 +58,11 @@ class TDDFTCalculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
-            
-            # Apply resource settings (memory and CPU cores)
-            # TDDFT requires more memory than DFT/HF, so default to 4GB
-            if memory_mb is None:
-                memory_mb = 4000
-            self.apply_resource_settings(self.mol, memory_mb=memory_mb, cpu_cores=cpu_cores)
+            # 安全なメモリ設定を適用
+            if memory_mb and memory_mb > 0:
+                self.mol.max_memory = memory_mb
+            else:
+                self.mol.max_memory = 4000  # TDDFTはより多くのメモリが必要
             
             # Setup DFT calculation (ground state) first
             # For closed-shell systems (spin=0), use RKS

@@ -43,7 +43,6 @@ class DFTCalculator(BaseCalculator):
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
             memory_mb = kwargs.get('memory_mb', 2000)  # Default 2GB
-            cpu_cores = kwargs.get('cpu_cores')  # CPU cores from user setting
 
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
@@ -56,9 +55,11 @@ class DFTCalculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
-            
-            # Apply resource settings (memory and CPU cores)
-            self.apply_resource_settings(self.mol, memory_mb=memory_mb, cpu_cores=cpu_cores)
+            # 安全なメモリ設定を適用
+            if memory_mb and memory_mb > 0:
+                self.mol.max_memory = memory_mb
+            else:
+                self.mol.max_memory = 2000  # デフォルト2GB
             
             # Setup DFT calculation based on spin multiplicity
             # For closed-shell systems (spin=0), use RKS
