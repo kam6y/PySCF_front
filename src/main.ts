@@ -64,11 +64,27 @@ const startPythonServer = (): Promise<void> => {
       const appPath = path.join(pythonPath, 'app.py');
       
       console.log('Executing Python server in development mode...');
-      pythonProcess = spawn('uv', ['run', 'python', appPath], {
-        cwd: pythonPath,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, VIRTUAL_ENV: undefined }
-      });
+      
+      // Check if conda environment is available, otherwise fall back to uv
+      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      const condaPath = path.join(homeDir, 'miniforge3', 'envs', 'pyscf-env', 'bin', 'python');
+      const fs = require('fs');
+      
+      if (fs.existsSync(condaPath)) {
+        console.log('Using conda environment for Python server...');
+        pythonProcess = spawn(condaPath, [appPath], {
+          cwd: pythonPath,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, CONDA_DEFAULT_ENV: 'pyscf-env' }
+        });
+      } else {
+        console.log('Conda environment not found, using uv...');
+        pythonProcess = spawn('uv', ['run', 'python', appPath], {
+          cwd: pythonPath,
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env, VIRTUAL_ENV: undefined }
+        });
+      }
     }
 
     // stdout/stderrのログ出力

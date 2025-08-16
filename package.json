@@ -9,10 +9,11 @@
     "dev:electron": "wait-on ./dist/index.html ./dist/main.js && electronmon .",
     "build": "npm run codegen && npm run build:webpack && npm run build:python",
     "build:webpack": "cross-env NODE_ENV=\"production\" webpack --progress",
-    "build:python": "rimraf python_dist && cd src/python && env -u VIRTUAL_ENV uv run pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec",
+    "build:python": "rimraf python_dist && cd src/python && bash -c 'if [ \"$CONDA_DEFAULT_ENV\" = \"pyscf-env\" ]; then pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec; elif source $HOME/miniforge3/etc/profile.d/conda.sh 2>/dev/null && conda activate pyscf-env 2>/dev/null; then pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec; else env -u VIRTUAL_ENV uv run pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec; fi'",
     "package": "npm run build && electron-builder",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
-    "codegen:python": "cd src/python && env -u VIRTUAL_ENV uv run datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description",
+    "codegen:python": "cd src/python && bash -c 'if [ \"$CONDA_DEFAULT_ENV\" = \"pyscf-env\" ]; then datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description; elif source $HOME/miniforge3/etc/profile.d/conda.sh 2>/dev/null && conda activate pyscf-env 2>/dev/null; then datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description; else env -u VIRTUAL_ENV uv run datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description; fi'",
+    "python-exec": "bash -c 'if [ \"$CONDA_DEFAULT_ENV\" = \"pyscf-env\" ]; then \"$@\"; elif source $HOME/miniforge3/etc/profile.d/conda.sh 2>/dev/null && conda activate pyscf-env 2>/dev/null; then \"$@\"; else env -u VIRTUAL_ENV uv run \"$@\"; fi' --",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts"
   },
   "repository": {

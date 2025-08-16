@@ -21,7 +21,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 - **バックエンド:** Python, Flask, PySCF, RDKit
 - **デスクトップフレームワーク:** Electron
 - **ビルドツール:** Webpack, Electron Builder, PyInstaller
-- **パッケージ管理:** npm (Node.js), uv (Python)
+- **パッケージ管理:** npm (Node.js), conda (Python)
 
 ## 🚀 開発の始め方
 
@@ -36,18 +36,31 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     npm install
     ```
 
-3.  Pythonの依存関係をインストールします。（`uv` が必要です）
+3.  Python環境を設定します。（最適なパフォーマンスのためconda環境を推奨）
     ```bash
-    cd src/python
-    uv sync
-    cd ../..
+    # Miniforgeのインストール (Apple Silicon Macの場合)
+    curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
+    bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
+    
+    # conda環境の作成とアクティブ化
+    source $HOME/miniforge3/etc/profile.d/conda.sh
+    conda create -y -n pyscf-env python=3.12
+    conda activate pyscf-env
+    
+    # パッケージのインストール
+    conda install -y -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
+    pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
     ```
 
 4.  開発モードでアプリケーションを起動します。
     ```bash
+    # conda環境をアクティブ化 (必要に応じて)
+    conda activate pyscf-env
+    
+    # アプリケーションの起動
     npm run dev
     ```
-    これにより、フロントエンドとバックエンドがホットリロード付きで起動します。
+    これにより、フロントエンドとバックエンドがホットリロード付きで起動します。conda環境が検出されない場合は自動的にuvにフォールバックします。
 
 ## 📦 アプリケーションのパッケージ化
 

@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 import os
 import tempfile
+from contextlib import contextmanager
 
 
 class BaseCalculator(ABC):
@@ -61,6 +62,31 @@ class BaseCalculator(ABC):
         
         # CPU cores are now configured at the process level in process_manager.py
         # This avoids conflicts and ensures proper timing of environment variable setup
+    
+    @contextmanager
+    def controlled_threading(self, cpu_cores: Optional[int] = None):
+        """
+        Context manager to control BLAS/LAPACK threading for specific operations.
+        
+        Args:
+            cpu_cores: Number of threads to use for BLAS/LAPACK operations
+        """
+        try:
+            from threadpoolctl import threadpool_limits
+            
+            if cpu_cores is not None and cpu_cores > 0:
+                print(f"Applying threadpool_limits(limits={cpu_cores}, user_api='blas')")
+                with threadpool_limits(limits=int(cpu_cores), user_api='blas'):
+                    yield
+            else:
+                # No thread control - proceed normally
+                yield
+        except ImportError:
+            print("threadpoolctl not available, proceeding without thread control")
+            yield
+        except Exception as e:
+            print(f"Error in thread control: {e}, proceeding without thread control")
+            yield
     
     @abstractmethod
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:

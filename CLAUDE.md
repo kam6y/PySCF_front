@@ -21,13 +21,46 @@ Focus on the best solution - Don't compromise design quality for compatibility w
 This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
 
 Development Commands
-Bash
 
+## Initial Setup
+
+### Option 1: Conda Environment (Recommended for macOS/Apple Silicon)
+For optimal PySCF performance with OpenMP multi-core support:
+
+```bash
+# Install Node.js dependencies
+npm install
+
+# Install Miniforge (if not already installed)
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
+bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
+
+# Create and activate conda environment
+source $HOME/miniforge3/etc/profile.d/conda.sh
+conda create -y -n pyscf-env python=3.12
+conda activate pyscf-env
+
+# Install conda packages
+conda install -y -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
+
+# Install pip packages
+pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
+```
+
+### Option 2: UV Environment (Fallback)
+```bash
 # Install Node.js and Python dependencies
 npm install
 cd src/python
 uv sync
 cd ../..
+```
+
+## Development Commands
+
+```bash
+# Activate conda environment (if using conda)
+conda activate pyscf-env
 
 # Development mode (generates code, builds, and runs Electron with hot reload + Python backend)
 npm run dev
@@ -37,6 +70,7 @@ npm run build
 
 # Package application for distribution (includes production build)
 npm run package
+```
 Individual Commands
 Bash
 
@@ -55,11 +89,14 @@ npm run dev:electron
 # --- Python Backend Development (in a separate terminal) ---
 cd src/python
 
+# Activate conda environment (if using conda)
+conda activate pyscf-env
+
 # Start Flask API server
-uv run python app.py
+python app.py
 
 # Run Python backend tests
-uv run pytest tests/
+pytest tests/
 
 # Build Python executable only (uses PyInstaller)
 npm run build:python
@@ -76,7 +113,7 @@ Starts Backend: Starts the Python Flask server as a subprocess from within the E
 
 Starts Electron: Starts the Electron application using electronmon, which watches the dist/ directory for changes and automatically restarts the app.
 
-The Electron main process (src/main.ts) launches the Python Flask server. In development, it uses uv run python app.py. In a packaged application, it runs the PyInstaller executable. The main process includes a health check mechanism; it continuously pings the /health endpoint of the Python server to ensure the backend is fully initialized before loading the UI. The Flask server dynamically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
+The Electron main process (src/main.ts) launches the Python Flask server. In development, it automatically detects and uses the conda environment (pyscf-env) if available, otherwise falls back to uv. In a packaged application, it runs the PyInstaller executable. The main process includes a health check mechanism; it continuously pings the /health endpoint of the Python server to ensure the backend is fully initialized before loading the UI. The Flask server dynamically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
 
 Architecture Overview
 API-First Development with OpenAPI
@@ -191,7 +228,7 @@ src/
 │       └── generated-api.ts  # (auto-generated) TypeScript types from OpenAPI spec
 └── python/
     ├── app.py                # Flask API server main entry point (includes WebSocket handler)
-    ├── pyproject.toml        # Python dependencies (managed by uv)
+    ├── pyproject.toml        # Python dependencies (conda environment recommended)
     ├── generated_models.py   # (auto-generated) Pydantic models from OpenAPI spec
     ├── pubchem/              # PubChem integration modules
     ├── SMILES/               # SMILES conversion modules
@@ -247,9 +284,9 @@ Cancellation Support: Running calculations can be cancelled via POST /api/quantu
 Error Handling: Process-level errors are properly captured and reported back through the filesystem-based status system, maintaining consistency with the existing WebSocket notification mechanism.
 
 Troubleshooting
-Backend Server Fails to Start: The Flask server is designed to find a free port automatically. If it still fails, ensure that no firewall is blocking local network communication and that the Python environment (uv sync) is correctly set up.
+Backend Server Fails to Start: The Flask server is designed to find a free port automatically. If it still fails, ensure that no firewall is blocking local network communication and that the Python environment (conda activate pyscf-env) is correctly set up.
 
-Build Failures: Ensure Python dependencies (uv sync in src/python) and Node dependencies (npm install) are up to date. PyInstaller builds can be sensitive; check its logs in the build/pyinstaller directory for errors.
+Build Failures: Ensure Python dependencies (conda environment or fallback uv environment) and Node dependencies (npm install) are up to date. PyInstaller builds can be sensitive; check its logs in the build/pyinstaller directory for errors.
 
 Python Dependencies: This project requires PySCF, RDKit, and geometric. These packages have significant scientific dependencies that may require system-level libraries or compilation. Ensure your Python environment can build them.
 

@@ -8,6 +8,7 @@ from concurrent.futures import ProcessPoolExecutor, Future
 from typing import Dict, Any, Optional
 import time
 from datetime import datetime
+from threadpoolctl import threadpool_limits
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,18 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     Worker function to run quantum chemistry calculations in a separate process.
     Returns (success: bool, error_message: str or None)
     """
-    cpu_cores = parameters.get('cpu_cores')
-    if cpu_cores and int(cpu_cores) > 0:
-        os.environ['OMP_NUM_THREADS'] = str(int(cpu_cores))
-    else:
-        os.environ['OMP_NUM_THREADS'] = '1'
+    # Get user-specified CPU cores or default to 1
+    cpu_cores = parameters.get('cpu_cores') or 1
+    cpu_cores_str = str(int(cpu_cores))
+    
+    # Set all parallel processing environment variables to control CPU usage
+    # This ensures that user-specified CPU count is respected by all underlying libraries
+    os.environ['OMP_NUM_THREADS'] = cpu_cores_str
+    os.environ['MKL_NUM_THREADS'] = cpu_cores_str       # Intel MKL
+    os.environ['OPENBLAS_NUM_THREADS'] = cpu_cores_str  # OpenBLAS
+    os.environ['BLIS_NUM_THREADS'] = cpu_cores_str      # BLIS
+    os.environ['VECLIB_MAXIMUM_THREADS'] = cpu_cores_str # macOS Accelerate Framework
+    os.environ['NUMEXPR_NUM_THREADS'] = cpu_cores_str   # NumExpr
     
     memory_mb = parameters.get('memory_mb') or 2000  # Noneや空の値をデフォルト値に置き換え
 
@@ -29,6 +37,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator
     from quantum_calc import CalculationError, ConvergenceError, InputError
     from quantum_calc.file_manager import CalculationFileManager
+    from threadpoolctl import threadpool_info
     
     # Setup logging for this process
     process_logger = logging.getLogger(f'worker_{calculation_id}')
@@ -41,7 +50,17 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         # Update status to running on the file system
         file_manager.save_calculation_status(calc_dir, 'running')
         process_logger.info(f"Starting calculation {calculation_id} in process {os.getpid()}")
-        process_logger.info(f"Using {os.environ.get('OMP_NUM_THREADS')} CPU cores for calculation.")
+        process_logger.info(f"Using {cpu_cores} CPU cores per process for calculation.")
+        process_logger.info(f"Set environment variables: OMP_NUM_THREADS={cpu_cores_str}, MKL_NUM_THREADS={cpu_cores_str}, OPENBLAS_NUM_THREADS={cpu_cores_str}")
+        
+        # Log detected threadpool libraries for debugging
+        try:
+            thread_info = threadpool_info()
+            process_logger.info(f"Detected threadpool libraries: {len(thread_info)} found")
+            for info in thread_info:
+                process_logger.info(f"  {info.get('user_api', 'unknown')}: {info.get('internal_api', 'unknown')} - threads: {info.get('num_threads', 'unknown')}")
+        except Exception as e:
+            process_logger.warning(f"Could not get threadpool info: {e}")
         
         # Initialize calculator based on calculation method
         calculation_method = parameters.get('calculation_method', 'DFT')
@@ -80,8 +99,10 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         
         calculator.setup_calculation(atoms, **setup_params)
         
-        # Run calculation
-        results = calculator.run_calculation()
+        # Run calculation with controlled BLAS/LAPACK threading
+        process_logger.info(f"Executing calculation with threadpool_limits(limits={cpu_cores}, user_api='blas')")
+        with threadpool_limits(limits=int(cpu_cores), user_api='blas'):
+            results = calculator.run_calculation()
         
         # Save results and update status to completed
         file_manager.save_calculation_results(calc_dir, results)
@@ -114,21 +135,49 @@ class CalculationProcessManager:
         Args:
             max_workers: Maximum number of worker processes. If None, defaults to CPU count.
         """
-        self.max_workers = max_workers or multiprocessing.cpu_count()
+        self.default_max_workers = max_workers or multiprocessing.cpu_count()
         self.executor: Optional[ProcessPoolExecutor] = None
         self.active_futures: Dict[str, Future] = {}
         self._shutdown = False
+        self._current_max_workers = 0  # Track current executor capacity
         
-        logger.info(f"Initializing CalculationProcessManager with {self.max_workers} max workers")
+        logger.info(f"Initializing CalculationProcessManager with default {self.default_max_workers} max workers")
     
-    def start(self):
-        """Start the process pool."""
+    @property
+    def max_workers(self) -> int:
+        """Get current max workers (for compatibility with existing code)."""
+        return self._current_max_workers if self._current_max_workers > 0 else self.default_max_workers
+    
+    def start(self, max_workers: Optional[int] = None):
+        """Start the process pool with specified max_workers."""
         if self.executor is None and not self._shutdown:
+            workers = max_workers or self.default_max_workers
             self.executor = ProcessPoolExecutor(
-                max_workers=self.max_workers,
+                max_workers=workers,
                 mp_context=multiprocessing.get_context('spawn')  # Better cross-platform compatibility
             )
-            logger.info(f"Started ProcessPoolExecutor with {self.max_workers} workers")
+            self._current_max_workers = workers
+            logger.info(f"Started ProcessPoolExecutor with {workers} workers")
+    
+    def _ensure_executor(self, required_workers: int) -> bool:
+        """Ensure executor exists with the exact required number of workers."""
+        if self._shutdown:
+            return False
+            
+        # If we need different number of workers than current, restart the executor
+        if self.executor is None or required_workers != self._current_max_workers:
+            if self.executor is not None:
+                logger.info(f"Restarting executor: need {required_workers} workers, current capacity: {self._current_max_workers}")
+                # Wait for proper shutdown to avoid process conflicts
+                self.executor.shutdown(wait=True)
+                self.executor = None
+            
+            self.start(max_workers=required_workers)
+            return True
+        
+        # Executor already has the correct number of workers
+        logger.debug(f"Using existing executor with {self._current_max_workers} workers")
+        return self.executor is not None
     
     def submit_calculation(self, calculation_id: str, parameters: dict) -> bool:
         """
@@ -145,8 +194,27 @@ class CalculationProcessManager:
             logger.error("Cannot submit calculation: process manager is shut down")
             return False
         
-        if self.executor is None:
-            self.start()
+        # Determine required workers based on user's CPU specification
+        user_cpu_cores = parameters.get('cpu_cores')
+        if user_cpu_cores and int(user_cpu_cores) > 0:
+            # Use user-specified CPU count directly as worker count (1 worker = 1 CPU core)
+            required_workers = int(user_cpu_cores)
+        else:
+            # Default to 1 worker if no CPU count specified
+            required_workers = 1
+        
+        # Limit to system's available CPU count as a safety measure
+        max_available = self.default_max_workers
+        if required_workers > max_available:
+            logger.warning(f"Calculation {calculation_id}: requested {required_workers} CPUs, limited to {max_available} (system maximum)")
+            required_workers = max_available
+        
+        logger.info(f"Calculation {calculation_id}: requested {user_cpu_cores} CPUs, using {required_workers} workers (current pool: {self._current_max_workers})")
+        
+        # Ensure executor with appropriate worker count
+        if not self._ensure_executor(required_workers):
+            logger.error("Failed to initialize executor")
+            return False
         
         try:
             future = self.executor.submit(calculation_worker, calculation_id, parameters)
@@ -155,7 +223,7 @@ class CalculationProcessManager:
             # Add callback to clean up completed futures
             future.add_done_callback(lambda f: self._cleanup_future(calculation_id, f))
             
-            logger.info(f"Submitted calculation {calculation_id} to process pool")
+            logger.info(f"Submitted calculation {calculation_id} to process pool (using {required_workers} workers max)")
             return True
             
         except Exception as e:

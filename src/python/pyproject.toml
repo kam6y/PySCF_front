@@ -17,14 +17,23 @@ dependencies = [
     "datamodel-code-generator>=0.25.0",
     "flask-sock>=0.7.0",
     "gevent>=25.5.1",
-    "pyscf>=2.10.0",
     "gevent-websocket>=0.10.1",
     "threadpoolctl>=3.6.0",
     "pyinstaller>=6.15.0",
 ]
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=7.0.0",
-    "pytest-flask>=1.3.0",
-]
+# Development dependencies for testing (install with conda/pip when needed):
+# conda install -c conda-forge pytest
+# pip install pytest-flask
+
+# Conda Environment Configuration
+# For better PySCF performance with OpenMP support on macOS (especially Apple Silicon),
+# use the conda environment instead of uv:
+#
+# 1. Install Miniforge: https://github.com/conda-forge/miniforge
+# 2. Create environment: conda create -n pyscf-env python=3.12
+# 3. Activate: conda activate pyscf-env
+# 4. Install packages: conda install -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
+# 5. Install pip packages: pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket
+#
+# The conda environment provides OpenMP-enabled PySCF for multi-core calculations
