@@ -12,7 +12,6 @@ import {
   SMILESConvertResponseData
 } from "../types/api-types";
 import { searchPubChem, convertSmilesToXyz } from "../apiClient";
-import { useCalculationSubscription } from "../hooks/useCalculationSubscription";
 
 interface CalculationSettingsPageProps {
   activeCalculation?: CalculationInstance;
@@ -42,14 +41,6 @@ export const CalculationSettingsPage = ({
   const [showAxes, setShowAxes] = useState(false);
   const [showCoordinates, setShowCoordinates] = useState(false);
   const [useAtomicRadii, setUseAtomicRadii] = useState(false);
-
-  useCalculationSubscription({
-    calculationId: activeCalculation?.id || null,
-    status: activeCalculation?.status,
-    onUpdate: onCalculationUpdate,
-    onError: (error: string) => setCalculationError(error)
-  });
-
 
   useEffect(() => {
     const currentCalculationId = activeCalculation?.id || null;

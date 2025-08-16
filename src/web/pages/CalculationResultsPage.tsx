@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import { CalculationInstance } from "../types/api-types";
-// useCalculationPolling を useCalculationSubscription に変更
-import { useCalculationSubscription } from "../hooks/useCalculationSubscription";
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -18,15 +16,6 @@ export const CalculationResultsPage = ({
 }: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
 
-  // --- ここから変更 ---
-  // useCalculationPolling を削除し、useCalculationSubscription を呼び出す
-  useCalculationSubscription({
-    calculationId: activeCalculation?.id || null,
-    status: activeCalculation?.status,
-    onUpdate: onCalculationUpdate,
-    onError: (err) => setError(err)
-  });
-  // --- ここまで変更 ---
   
   useEffect(() => {
     setError(detailsError);

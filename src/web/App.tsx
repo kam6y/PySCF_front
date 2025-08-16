@@ -8,7 +8,7 @@ import { DropdownOption } from "./components/DropdownMenu";
 import { CalculationSettingsPage } from "./pages/CalculationSettingsPage";
 import { CalculationResultsPage } from "./pages/CalculationResultsPage";
 import { DrawMoleculePage } from "./pages/DrawMoleculePage";
-import { useCalculations, useActiveCalculation } from "./hooks";
+import { useCalculations, useActiveCalculation, useCalculationSubscription } from "./hooks";
 import { CalculationInstance, QuantumCalculationRequest } from "./types/api-types";
 import { startCalculation } from "./apiClient"; // apiClientからstartCalculationを直接インポート
 
@@ -137,6 +137,15 @@ export const App = () => {
     updateCalculation(updatedCalculation);
     updateActiveCalculationInCache(updatedCalculation);
   };
+
+  useCalculationSubscription({
+    calculationId: activeCalculationId,
+    status: activeCalculation?.status,
+    onUpdate: handleActiveCalculationUpdate,
+    onError: (error: string) => {
+      console.error('WebSocket error:', error);
+    }
+  });
 
   const handleCreateNewFromExisting = (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => {
     const newInstance = createNewCalculationFromExisting(originalCalc, newParams);
