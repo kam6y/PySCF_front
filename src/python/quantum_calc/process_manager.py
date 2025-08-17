@@ -150,54 +150,25 @@ class CalculationProcessManager:
     
     def __init__(self, max_workers: Optional[int] = None):
         """
-        Initialize the process manager.
+        Initialize the process manager with a fixed process pool.
         
         Args:
             max_workers: Maximum number of worker processes. If None, defaults to CPU count.
         """
-        self.default_max_workers = max_workers or multiprocessing.cpu_count()
-        self.executor: Optional[ProcessPoolExecutor] = None
+        self.max_workers = max_workers or multiprocessing.cpu_count()
         self.active_futures: Dict[str, Future] = {}
         self._shutdown = False
-        self._current_max_workers = 0  # Track current executor capacity
         
-        logger.info(f"Initializing CalculationProcessManager with default {self.default_max_workers} max workers")
-    
-    @property
-    def max_workers(self) -> int:
-        """Get current max workers (for compatibility with existing code)."""
-        return self._current_max_workers if self._current_max_workers > 0 else self.default_max_workers
-    
-    def start(self, max_workers: Optional[int] = None):
-        """Start the process pool with specified max_workers."""
-        if self.executor is None and not self._shutdown:
-            workers = max_workers or self.default_max_workers
-            self.executor = ProcessPoolExecutor(
-                max_workers=workers,
-                mp_context=multiprocessing.get_context('spawn')  # Better cross-platform compatibility
-            )
-            self._current_max_workers = workers
-            logger.info(f"Started ProcessPoolExecutor with {workers} workers")
-    
-    def _ensure_executor(self, required_workers: int) -> bool:
-        """Ensure executor exists with the exact required number of workers."""
-        if self._shutdown:
-            return False
-            
-        # If we need different number of workers than current, restart the executor
-        if self.executor is None or required_workers != self._current_max_workers:
-            if self.executor is not None:
-                logger.info(f"Restarting executor: need {required_workers} workers, current capacity: {self._current_max_workers}")
-                # Wait for proper shutdown to avoid process conflicts
-                self.executor.shutdown(wait=True)
-                self.executor = None
-            
-            self.start(max_workers=required_workers)
-            return True
+        # Create executor immediately with fixed worker count
+        self.executor = ProcessPoolExecutor(
+            max_workers=self.max_workers,
+            mp_context=multiprocessing.get_context('spawn')  # Better cross-platform compatibility
+        )
         
-        # Executor already has the correct number of workers
-        logger.debug(f"Using existing executor with {self._current_max_workers} workers")
-        return self.executor is not None
+        logger.info(f"Initialized CalculationProcessManager with {self.max_workers} worker processes")
+    
+    
+    
     
     def submit_calculation(self, calculation_id: str, parameters: dict) -> bool:
         """
@@ -214,17 +185,12 @@ class CalculationProcessManager:
             logger.error("Cannot submit calculation: process manager is shut down")
             return False
         
-        # ProcessPoolExecutor should use fixed worker count, not based on user CPU cores
-        # User CPU cores are controlled at the thread level within each worker process
-        required_workers = 1  # Always use 1 worker for single calculation
+        if self.executor is None:
+            logger.error("Process pool executor is not available")
+            return False
         
         user_cpu_cores = parameters.get('cpu_cores') or 1
-        logger.info(f"Calculation {calculation_id}: requested {user_cpu_cores} CPU cores, using {required_workers} worker process (current pool: {self._current_max_workers})")
-        
-        # Ensure executor with appropriate worker count
-        if not self._ensure_executor(required_workers):
-            logger.error("Failed to initialize executor")
-            return False
+        logger.info(f"Submitting calculation {calculation_id} with {user_cpu_cores} CPU cores to process pool ({self.max_workers} workers available)")
         
         try:
             future = self.executor.submit(calculation_worker, calculation_id, parameters)
@@ -233,7 +199,7 @@ class CalculationProcessManager:
             # Add callback to clean up completed futures
             future.add_done_callback(lambda f: self._cleanup_future(calculation_id, f))
             
-            logger.info(f"Submitted calculation {calculation_id} to process pool (using {required_workers} workers max)")
+            logger.info(f"Successfully submitted calculation {calculation_id} to process pool")
             return True
             
         except Exception as e:
