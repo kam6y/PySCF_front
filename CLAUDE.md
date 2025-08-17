@@ -152,26 +152,43 @@ Backend: Uses PyInstaller to bundle the Flask application and its Python depende
 Packaging: electron-builder packages the Electron app and the Python executable (included as an extraResource) into distributable formats (DMG for macOS, NSIS for Windows, AppImage for Linux).
 
 Core Components & State Management
-App.tsx: The root React component. It manages the overall UI state, such as the active page and sidebar visibility, and orchestrates data flow between hooks and components.
 
-Custom Hooks (src/web/hooks/):
+The application uses a modern state management architecture with clear separation of concerns:
 
-useCalculations: Manages the list of all calculations. It fetches the list from the backend, handles creating new calculations, and triggers API calls for renaming and deletion.
+State Management Architecture
+TanStack Query: Manages all server-side state including API data fetching, caching, synchronization, and error handling. Provides automatic request deduplication, background updates, and optimistic updates.
 
-useActiveCalculation: Manages the currently selected calculation. It fetches detailed data for the active calculation and caches it.
+Zustand: Manages global UI state such as the active calculation ID and staged (temporary) calculations for new calculation creation workflows.
 
-useCalculationSubscription: Replaces the old polling hook. It establishes a WebSocket connection for a running calculation and listens for real-time status updates pushed from the server.
+App.tsx: The root React component orchestrates the application flow. It's significantly simplified from the previous architecture, focusing on UI logic while delegating data management to specialized hooks and stores.
+
+Global State Store (src/web/store/):
+
+calculationStore.ts: Zustand-based store managing UI state including activeCalculationId and stagedCalculation for handling "create from completed" workflows.
+
+Query Hooks (src/web/hooks/):
+
+useCalculationQueries.ts: TanStack Query-based hooks for server state management:
+- useGetCalculations: Fetches and caches the calculation list
+- useGetCalculationDetails: Fetches detailed calculation data with smart caching
+- useStartCalculation: Mutation for starting new calculations with cache invalidation
+- useDeleteCalculation: Mutation for calculation deletion with automatic cache updates
+- useUpdateCalculationName: Mutation for renaming calculations
+- useSearchPubChem: Mutation for PubChem API integration
+- useConvertSmilesToXyz: Mutation for SMILES conversion
+
+useCalculationSubscription: Establishes WebSocket connections for real-time status updates and directly updates TanStack Query cache for seamless state synchronization.
 
 API Client (src/web/apiClient.ts): A centralized module containing fetch functions for all REST communication with the Python backend. It also provides a helper function to generate the correct WebSocket URL. It uses the auto-generated TypeScript types for type safety.
 
 Type Wrappers (src/web/types/api-types.ts): This file re-exports types from the auto-generated generated-api.ts to provide convenient, application-wide aliases.
 
 State Flow Example (Starting a Calculation)
-This is an asynchronous process involving the frontend, backend, background threads, and WebSockets.
+This is an asynchronous process involving the frontend, backend, background threads, TanStack Query cache, and WebSockets.
 
 User clicks the "Start Calculation" button in CalculationSettingsPage.
 
-The handleStartCalculation function in App.tsx is called. It calls apiClient.startCalculation with the calculation parameters.
+The handleStartCalculation function in App.tsx is called. It uses the useStartCalculation mutation from TanStack Query to call apiClient.startCalculation with the calculation parameters.
 
 The Flask backend (POST /api/quantum/calculate) receives the request. It immediately:
 
@@ -183,9 +200,9 @@ Submits the calculation to a ProcessPoolExecutor-managed worker process to run t
 
 Returns a 202 Accepted response with the newly created (and now persistent) CalculationInstance data.
 
-The useCalculations hook updates the list of calculations, replacing the temporary client-side ID with the new persistent ID from the server. The useActiveCalculation hook updates the active ID.
+The useStartCalculation mutation's onSuccess callback automatically invalidates the calculations query cache, triggering a background refetch of the calculation list. The Zustand store clears any staged calculation and updates the activeCalculationId to the new persistent ID.
 
-The CalculationResultsPage (or any component observing the active calculation) detects that the active calculation's status is running.
+The CalculationResultsPage (or any component observing the active calculation) detects that the active calculation's status is running through the TanStack Query cache.
 
 The useCalculationSubscription hook is triggered by the running status. It opens a WebSocket connection to ws://.../ws/calculations/<id>.
 
@@ -193,9 +210,9 @@ The Flask backend's WebSocket handler for that calculationId starts monitoring t
 
 As the worker process updates the status.json file (e.g., to completed or error), the WebSocket handler detects the change and pushes the complete, updated CalculationInstance data to the connected client.
 
-The useCalculationSubscription hook's onUpdate callback receives the new data and updates the central state in App.tsx. This causes the UI to reflect the current state (e.g., in the sidebar) in real-time.
+The useCalculationSubscription hook's onUpdate callback receives the new data and directly updates the TanStack Query cache using queryClient.setQueryData(). This triggers automatic re-renders in all components that depend on this calculation data, providing real-time UI updates.
 
-Once the status is completed or error, the backend WebSocket handler sends the final update and closes the connection.
+Once the status is completed or error, the backend WebSocket handler sends the final update and closes the connection. The TanStack Query cache retains the final calculation state for instant access.
 
 File Structure
 src/
@@ -212,10 +229,11 @@ src/
 │   ├── components/           # Reusable React components
 │   ├── data/                 # Static data (e.g., atomic radii)
 │   ├── hooks/                # Custom React hooks for state management
-│   │   ├── useCalculations.ts
-│   │   ├── useActiveCalculation.ts
+│   │   ├── useCalculationQueries.ts    # TanStack Query hooks for server state
 │   │   └── useCalculationSubscription.ts # Real-time updates via WebSocket
 │   ├── pages/                # Page components (one per view)
+│   ├── store/                # Global state management
+│   │   └── calculationStore.ts         # Zustand store for UI state
 │   └── types/
 │       ├── api-types.ts      # Convenience wrapper for generated types
 │       └── generated-api.ts  # (auto-generated) TypeScript types from OpenAPI spec

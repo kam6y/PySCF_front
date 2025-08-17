@@ -1,6 +1,7 @@
 // src/web/App.tsx
 
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import "./App.css";
 import { Header } from "./components/Header";
 import { Sidebar } from "./components/Sidebar";
@@ -8,43 +9,76 @@ import { DropdownOption } from "./components/DropdownMenu";
 import { CalculationSettingsPage } from "./pages/CalculationSettingsPage";
 import { CalculationResultsPage } from "./pages/CalculationResultsPage";
 import { DrawMoleculePage } from "./pages/DrawMoleculePage";
-import { useCalculations, useActiveCalculation, useCalculationSubscription } from "./hooks";
+import { useCalculationSubscription } from "./hooks/useCalculationSubscription";
+import { useCalculationStore } from "./store/calculationStore";
+import {
+  useGetCalculations,
+  useGetCalculationDetails,
+  useDeleteCalculation,
+  useUpdateCalculationName,
+  useStartCalculation,
+} from "./hooks/useCalculationQueries";
 import { CalculationInstance, QuantumCalculationRequest } from "./types/api-types";
-import { startCalculation } from "./apiClient"; // apiClientからstartCalculationを直接インポート
 
 export const App = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<DropdownOption>('calculation-settings');
 
-  const {
-    calculations,
-    isLoading: calculationsLoading,
-    error: calculationsError,
-    refreshCalculations,
-    updateCalculationName,
-    deleteCalculation,
-    createCalculation,
-    updateCalculation,
-    createNewCalculationFromExisting,
-  } = useCalculations();
+  const queryClient = useQueryClient();
+  
+  // Zustandストアからの状態
+  const { 
+    activeCalculationId, 
+    stagedCalculation,
+    setActiveCalculationId, 
+    setStagedCalculation,
+    clearStagedCalculation 
+  } = useCalculationStore();
 
-  const {
-    activeCalculationId,
-    activeCalculation,
-    isLoadingDetails,
-    detailsError,
-    setActiveCalculationById,
-    loadCalculationDetails,
-    clearActiveCalculation,
-    updateActiveCalculationInCache,
-  } = useActiveCalculation(calculations);
+  // TanStack Queryフック
+  const { data: calculationsData, isLoading: calculationsLoading, error: calculationsError } = useGetCalculations();
+  const { data: activeCalculationDetails } = useGetCalculationDetails(activeCalculationId);
+  const deleteCalculationMutation = useDeleteCalculation();
+  const updateCalculationNameMutation = useUpdateCalculationName();
+  const startCalculationMutation = useStartCalculation();
 
+  // 計算リストのデータ変換
+  const calculations = calculationsData?.calculations.map(c => ({
+    id: c.id,
+    name: c.name,
+    status: c.status,
+    createdAt: new Date(c.date).toISOString(),
+    updatedAt: new Date(c.date).toISOString(),
+    parameters: {} as any,
+    results: undefined
+  })) || [];
+
+  // アクティブな計算（詳細データがあればそれを使用、なければリストから取得）
+  const activeCalculation = stagedCalculation || 
+    activeCalculationDetails?.calculation || 
+    calculations.find(c => c.id === activeCalculationId);
+
+  // 最初の計算を自動選択（新規計算作成中は除く）
   useEffect(() => {
-    if (!activeCalculationId && calculations.length > 0) {
-      setActiveCalculationById(calculations[0].id);
+    if (!activeCalculationId && calculations.length > 0 && !stagedCalculation) {
+      setActiveCalculationId(calculations[0].id);
     }
-  }, [calculations, activeCalculationId, setActiveCalculationById]);
+  }, [calculations, activeCalculationId, setActiveCalculationId, stagedCalculation]);
+
+  // WebSocketによるリアルタイム更新
+  useCalculationSubscription({
+    calculationId: activeCalculationId,
+    status: activeCalculation?.status,
+    onUpdate: (updatedCalculation: CalculationInstance) => {
+      // Queryキャッシュを直接更新
+      queryClient.setQueryData(['calculation', updatedCalculation.id], { calculation: updatedCalculation });
+      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+    },
+    onError: (error: string) => {
+      console.error('WebSocket error:', error);
+    }
+  });
 
   const getPageTitle = (page: DropdownOption): string => {
     const titles: Record<DropdownOption, string> = {
@@ -62,8 +96,8 @@ export const App = () => {
   const handleDropdownOptionSelect = (option: DropdownOption) => setCurrentPage(option);
 
   const handleCalculationSelect = (calculationId: string) => {
-    setActiveCalculationById(calculationId);
-    loadCalculationDetails(calculationId, true);
+    setActiveCalculationId(calculationId);
+    clearStagedCalculation();
     handleSidebarClose();
   };
 
@@ -77,30 +111,38 @@ export const App = () => {
       solvent_method: 'none',
       solvent: '-',
       xyz: '',
-      name: '', // no default name (must be set by user)
+      name: '',
       tddft_nstates: 10,
       tddft_method: 'TDDFT',
       tddft_analyze_nto: false
     };
-    const newCalculation = createCalculation('', defaultParams); // no default name (must be set by user)
-    setActiveCalculationById(newCalculation.id);
+    
+    const newId = `new-calculation-${Date.now()}`;
+    const newCalculation: CalculationInstance = {
+      id: newId,
+      name: '',
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      parameters: defaultParams,
+      results: undefined
+    };
+    
+    setStagedCalculation(newCalculation);
+    setActiveCalculationId(newId);
     setCurrentPage('calculation-settings');
     handleSidebarClose();
   };
   
   const handleStartCalculation = async (params: QuantumCalculationRequest) => {
     try {
-      // 1. APIを呼び出して計算を開始し、新しい永続的な計算インスタンスを取得
-      const response = await startCalculation(params);
+      const response = await startCalculationMutation.mutateAsync(params);
       const runningCalculation = response.calculation;
-
-      // 2. calculationsリストの状態を更新 (一時IDを永続IDに置き換え)
-      updateCalculation(runningCalculation);
-
-      // 3. アクティブな計算IDを新しい永続IDに直接設定
-      setActiveCalculationById(runningCalculation.id);
-
-      return runningCalculation; // ポーリング開始のために返す
+      
+      clearStagedCalculation();
+      setActiveCalculationId(runningCalculation.id);
+      
+      return runningCalculation;
     } catch (error) {
       console.error("Failed to start calculation:", error);
       alert(`Error starting calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -108,12 +150,9 @@ export const App = () => {
     }
   };
 
-
   const handleCalculationRename = async (calculationId: string, newName: string) => {
     try {
-      await updateCalculationName(calculationId, newName);
-      // Refresh calculations to get updated display name
-      await refreshCalculations();
+      await updateCalculationNameMutation.mutateAsync({ id: calculationId, newName });
     } catch (error) {
       console.error('Failed to rename calculation:', error);
       alert(`Error: Could not rename calculation. ${error instanceof Error ? error.message : ''}`);
@@ -122,9 +161,10 @@ export const App = () => {
 
   const handleCalculationDelete = async (calculationId: string) => {
     try {
-      await deleteCalculation(calculationId);
+      await deleteCalculationMutation.mutateAsync(calculationId);
       if (activeCalculationId === calculationId) {
-        clearActiveCalculation();
+        setActiveCalculationId(null);
+        clearStagedCalculation();
         setCurrentPage('calculation-settings');
       }
     } catch (error) {
@@ -132,24 +172,33 @@ export const App = () => {
       alert(`Error: Could not delete calculation. ${error instanceof Error ? error.message : ''}`);
     }
   };
-  
+
   const handleActiveCalculationUpdate = (updatedCalculation: CalculationInstance) => {
-    updateCalculation(updatedCalculation);
-    updateActiveCalculationInCache(updatedCalculation);
+    if (stagedCalculation && updatedCalculation.id === stagedCalculation.id) {
+      setStagedCalculation(updatedCalculation);
+    } else {
+      // Queryキャッシュを更新
+      queryClient.setQueryData(['calculation', updatedCalculation.id], { calculation: updatedCalculation });
+      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+    }
   };
 
-  useCalculationSubscription({
-    calculationId: activeCalculationId,
-    status: activeCalculation?.status,
-    onUpdate: handleActiveCalculationUpdate,
-    onError: (error: string) => {
-      console.error('WebSocket error:', error);
-    }
-  });
-
   const handleCreateNewFromExisting = (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => {
-    const newInstance = createNewCalculationFromExisting(originalCalc, newParams);
-    setActiveCalculationById(newInstance.id);
+    const newId = `new-calculation-${Date.now()}`;
+    const newCalculation: CalculationInstance = {
+      ...originalCalc,
+      id: newId,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      parameters: newParams,
+      results: undefined,
+      workingDirectory: undefined,
+      errorMessage: undefined,
+    };
+    
+    setStagedCalculation(newCalculation);
+    setActiveCalculationId(newId);
   };
 
   const renderCurrentPage = () => {
@@ -168,8 +217,8 @@ export const App = () => {
         return (
           <CalculationResultsPage
             activeCalculation={activeCalculation}
-            isLoadingDetails={isLoadingDetails}
-            detailsError={detailsError}
+            isLoadingDetails={false}
+            detailsError={null}
             onCalculationUpdate={handleActiveCalculationUpdate}
           />
         );
@@ -225,7 +274,7 @@ export const App = () => {
         calculations={sidebarCalculations}
         activeCalculationId={activeCalculationId}
         calculationsLoading={calculationsLoading}
-        calculationsError={calculationsError}
+        calculationsError={calculationsError ? calculationsError.message : null}
         onCalculationSelect={handleCalculationSelect}
         onCalculationDelete={handleCalculationDelete}
       />
