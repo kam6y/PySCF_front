@@ -244,18 +244,12 @@ def list_calculations():
         file_manager = CalculationFileManager()
         calculations = file_manager.list_calculations()
         
-        # Add information about active calculations
-        process_manager = get_process_manager()
-        active_calculations = process_manager.get_active_calculations()
-        
         return jsonify({
             'success': True,
             'data': {
                 'base_directory': file_manager.get_base_directory(),
                 'calculations': calculations,
-                'count': len(calculations),
-                'active_calculations': active_calculations,
-                'active_count': len(active_calculations)
+                'count': len(calculations)
             }
         })
         
