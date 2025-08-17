@@ -1,0 +1,22 @@
+name: pyscf-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pyscf
+  - rdkit
+  - flask
+  - geometric
+  - requests
+  - flask-cors
+  - pydantic
+  - gevent
+  - threadpoolctl
+  - pip
+  - pip:
+    - flask-sock
+    - flask-pydantic
+    - datamodel-code-generator
+    - pyinstaller
+    - gevent-websocket
+    - certifi

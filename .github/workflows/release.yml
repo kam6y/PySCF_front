@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: darwin
+          - os: windows-latest
+            platform: win32
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        miniforge-version: latest
+        activate-environment: pyscf-env
+        environment-file: .github/environment.yml
+        python-version: 3.12
+        auto-activate-base: false
+    
+    - name: Install Node.js dependencies
+      run: npm ci
+    
+    - name: Install Python dependencies (conda)
+      shell: bash -l {0}
+      run: |
+        conda activate pyscf-env
+        conda install -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
+        pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
+    
+    - name: Generate code and build application
+      shell: bash -l {0}
+      run: |
+        conda activate pyscf-env
+        npm run build
+    
+    - name: Package application
+      shell: bash -l {0}
+      run: |
+        conda activate pyscf-env
+        npm run package
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Upload release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ matrix.platform }}
+        path: |
+          dist/
+          python_dist/
+          release/
+        retention-days: 30
+
+  create-release:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ./artifacts
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        draft: false
+        prerelease: ${{ contains(github.ref, '-') }}
+        files: |
+          ./artifacts/*/release/*
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

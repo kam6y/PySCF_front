@@ -36,7 +36,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     npm install
     ```
 
-3.  Python環境を設定します。（最適なパフォーマンスのためconda環境を推奨）
+3.  Python環境を設定します。（**conda環境が必須です**）
     ```bash
     # Miniforgeのインストール (Apple Silicon Macの場合)
     curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
@@ -51,16 +51,18 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     conda install -y -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
     pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
     ```
+    
+    > **重要**: このプロジェクトはconda環境での開発が必須です。conda環境が正しく設定されていない場合、アプリケーションはエラーダイアログを表示します。
 
 4.  開発モードでアプリケーションを起動します。
     ```bash
-    # conda環境をアクティブ化 (必要に応じて)
+    # conda環境をアクティブ化
     conda activate pyscf-env
     
     # アプリケーションの起動
     npm run dev
     ```
-    これにより、フロントエンドとバックエンドがホットリロード付きで起動します。conda環境が検出されない場合は自動的にuvにフォールバックします。
+    これにより、フロントエンドとバックエンドがホットリロード付きで起動します。
 
 ## 📦 アプリケーションのパッケージ化
 

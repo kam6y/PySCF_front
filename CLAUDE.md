@@ -24,8 +24,8 @@ Development Commands
 
 ## Initial Setup
 
-### Option 1: Conda Environment (Recommended for macOS/Apple Silicon)
-For optimal PySCF performance with OpenMP multi-core support:
+### Conda Environment (Required)
+This project requires conda environment for development. The application no longer supports automatic fallback to other Python environments.
 
 ```bash
 # Install Node.js dependencies
@@ -47,14 +47,7 @@ conda install -y -c conda-forge pyscf rdkit flask geometric requests flask-cors 
 pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
 ```
 
-### Option 2: UV Environment (Fallback)
-```bash
-# Install Node.js and Python dependencies
-npm install
-cd src/python
-uv sync
-cd ../..
-```
+**Note**: The conda environment setup is mandatory. The application will show an error dialog if the conda environment is not properly configured.
 
 ## Development Commands
 
