@@ -38,6 +38,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     from quantum_calc import CalculationError, ConvergenceError, InputError
     from quantum_calc.file_manager import CalculationFileManager
     from threadpoolctl import threadpool_info
+    from pyscf import lib
     
     # Setup logging for this process
     process_logger = logging.getLogger(f'worker_{calculation_id}')
@@ -61,6 +62,16 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
                 process_logger.info(f"  {info.get('user_api', 'unknown')}: {info.get('internal_api', 'unknown')} - threads: {info.get('num_threads', 'unknown')}")
         except Exception as e:
             process_logger.warning(f"Could not get threadpool info: {e}")
+        
+        # Set PySCF thread count using official API
+        original_threads = None
+        try:
+            original_threads = lib.num_threads()
+            lib.num_threads(int(cpu_cores))
+            new_threads = lib.num_threads()
+            process_logger.info(f"PySCF threads: {original_threads} -> {new_threads} (requested: {cpu_cores})")
+        except Exception as e:
+            process_logger.warning(f"Could not set PySCF threads: {e}")
         
         # Initialize calculator based on calculation method
         calculation_method = parameters.get('calculation_method', 'DFT')
@@ -123,6 +134,15 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         file_manager.save_calculation_status(calc_dir, 'error')
         file_manager.save_calculation_results(calc_dir, {'error': 'An unexpected internal server error occurred.'})
         return False, 'An unexpected internal server error occurred.'
+    
+    finally:
+        # Restore original PySCF thread count
+        if original_threads is not None:
+            try:
+                lib.num_threads(original_threads)
+                process_logger.info(f"Restored PySCF threads to {original_threads}")
+            except Exception as e:
+                process_logger.warning(f"Could not restore PySCF threads: {e}")
 
 
 class CalculationProcessManager:
@@ -194,22 +214,12 @@ class CalculationProcessManager:
             logger.error("Cannot submit calculation: process manager is shut down")
             return False
         
-        # Determine required workers based on user's CPU specification
-        user_cpu_cores = parameters.get('cpu_cores')
-        if user_cpu_cores and int(user_cpu_cores) > 0:
-            # Use user-specified CPU count directly as worker count (1 worker = 1 CPU core)
-            required_workers = int(user_cpu_cores)
-        else:
-            # Default to 1 worker if no CPU count specified
-            required_workers = 1
+        # ProcessPoolExecutor should use fixed worker count, not based on user CPU cores
+        # User CPU cores are controlled at the thread level within each worker process
+        required_workers = 1  # Always use 1 worker for single calculation
         
-        # Limit to system's available CPU count as a safety measure
-        max_available = self.default_max_workers
-        if required_workers > max_available:
-            logger.warning(f"Calculation {calculation_id}: requested {required_workers} CPUs, limited to {max_available} (system maximum)")
-            required_workers = max_available
-        
-        logger.info(f"Calculation {calculation_id}: requested {user_cpu_cores} CPUs, using {required_workers} workers (current pool: {self._current_max_workers})")
+        user_cpu_cores = parameters.get('cpu_cores') or 1
+        logger.info(f"Calculation {calculation_id}: requested {user_cpu_cores} CPU cores, using {required_workers} worker process (current pool: {self._current_max_workers})")
         
         # Ensure executor with appropriate worker count
         if not self._ensure_executor(required_workers):
