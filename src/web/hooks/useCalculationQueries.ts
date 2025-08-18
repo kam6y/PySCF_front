@@ -25,7 +25,8 @@ export const useGetCalculationDetails = (id: string | null) => {
 export const useStartCalculation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (params: QuantumCalculationRequest) => apiClient.startCalculation(params),
+    mutationFn: (params: QuantumCalculationRequest) =>
+      apiClient.startCalculation(params),
     onSuccess: () => {
       // 成功したら計算リストのキャッシュを無効化して再取得させる
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
@@ -48,12 +49,14 @@ export const useDeleteCalculation = () => {
 export const useUpdateCalculationName = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, newName }: { id: string; newName: string }) => 
+    mutationFn: ({ id, newName }: { id: string; newName: string }) =>
       apiClient.updateCalculationName(id, newName),
     onSuccess: (data, variables) => {
       // 成功したら関連するキャッシュを更新
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
-      queryClient.invalidateQueries({ queryKey: ['calculation', variables.id] });
+      queryClient.invalidateQueries({
+        queryKey: ['calculation', variables.id],
+      });
     },
   });
 };
@@ -61,8 +64,13 @@ export const useUpdateCalculationName = () => {
 // PubChem検索Mutation
 export const useSearchPubChem = () => {
   return useMutation({
-    mutationFn: ({ query, searchType }: { query: string; searchType: 'name' | 'cid' }) =>
-      apiClient.searchPubChem(query, searchType),
+    mutationFn: ({
+      query,
+      searchType,
+    }: {
+      query: string;
+      searchType: 'name' | 'cid';
+    }) => apiClient.searchPubChem(query, searchType),
   });
 };
 

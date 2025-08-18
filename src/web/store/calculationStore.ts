@@ -11,23 +11,24 @@ interface CalculationState {
   clearStagedCalculation: () => void;
 }
 
-export const useCalculationStore = create<CalculationState>((set) => ({
+export const useCalculationStore = create<CalculationState>(set => ({
   activeCalculationId: null,
   stagedCalculation: null,
-  
-  setActiveCalculationId: (id) => set((state) => {
-    // IDが切り替わったら編集中の一時データはクリア（新規計算IDは除く）
-    if (state.activeCalculationId !== id) {
-      // 新規計算IDの場合はstagedCalculationをクリアしない
-      if (id && id.startsWith('new-calculation-')) {
-        return { activeCalculationId: id };
+
+  setActiveCalculationId: id =>
+    set(state => {
+      // IDが切り替わったら編集中の一時データはクリア（新規計算IDは除く）
+      if (state.activeCalculationId !== id) {
+        // 新規計算IDの場合はstagedCalculationをクリアしない
+        if (id && id.startsWith('new-calculation-')) {
+          return { activeCalculationId: id };
+        }
+        return { activeCalculationId: id, stagedCalculation: null };
       }
-      return { activeCalculationId: id, stagedCalculation: null };
-    }
-    return { activeCalculationId: id };
-  }),
-  
-  setStagedCalculation: (calc) => set({ stagedCalculation: calc }),
-  
+      return { activeCalculationId: id };
+    }),
+
+  setStagedCalculation: calc => set({ stagedCalculation: calc }),
+
   clearStagedCalculation: () => set({ stagedCalculation: null }),
 }));

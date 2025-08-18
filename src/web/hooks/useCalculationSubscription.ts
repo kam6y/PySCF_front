@@ -31,7 +31,10 @@ export const useCalculationSubscription = ({
   const disconnect = useCallback(() => {
     if (wsRef.current) {
       const ws = wsRef.current;
-      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      if (
+        ws.readyState === WebSocket.OPEN ||
+        ws.readyState === WebSocket.CONNECTING
+      ) {
         ws.close();
       }
       wsRef.current = null;
@@ -39,65 +42,78 @@ export const useCalculationSubscription = ({
     currentCalculationIdRef.current = null;
   }, []);
 
-  const connect = useCallback((calcId: string) => {
-    // 既に同じIDで接続中の場合は何もしない
-    if (currentCalculationIdRef.current === calcId && 
-        wsRef.current && 
-        (wsRef.current.readyState === WebSocket.CONNECTING || wsRef.current.readyState === WebSocket.OPEN)) {
-      return;
-    }
-
-    // 既存接続をクリーンアップ
-    disconnect();
-
-    try {
-      const wsUrl = getWebSocketUrl(`/ws/calculations/${calcId}`);
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-      currentCalculationIdRef.current = calcId;
-
-      ws.onopen = () => {
-        console.log(`WebSocket connected for calculation ${calcId}`);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const updatedCalculation = JSON.parse(event.data) as CalculationInstance;
-          if (onUpdateRef.current) {
-            onUpdateRef.current(updatedCalculation);
-          }
-        } catch (e) {
-          console.error('Failed to parse WebSocket message:', e);
-          if (onErrorRef.current) {
-            onErrorRef.current('Failed to parse server response.');
-          }
-        }
-      };
-
-      ws.onerror = (event) => {
-        console.error('WebSocket error:', event);
-        if (onErrorRef.current) {
-          onErrorRef.current('Connection to the calculation status server failed.');
-        }
-      };
-
-      ws.onclose = (event) => {
-        console.log(`WebSocket disconnected for calculation ${calcId}`, event.code, event.reason);
-        if (wsRef.current === ws) {
-          wsRef.current = null;
-        }
-        if (currentCalculationIdRef.current === calcId) {
-          currentCalculationIdRef.current = null;
-        }
-      };
-
-    } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
-      if (onErrorRef.current) {
-        onErrorRef.current('Failed to establish WebSocket connection.');
+  const connect = useCallback(
+    (calcId: string) => {
+      // 既に同じIDで接続中の場合は何もしない
+      if (
+        currentCalculationIdRef.current === calcId &&
+        wsRef.current &&
+        (wsRef.current.readyState === WebSocket.CONNECTING ||
+          wsRef.current.readyState === WebSocket.OPEN)
+      ) {
+        return;
       }
-    }
-  }, [disconnect]);
+
+      // 既存接続をクリーンアップ
+      disconnect();
+
+      try {
+        const wsUrl = getWebSocketUrl(`/ws/calculations/${calcId}`);
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
+        currentCalculationIdRef.current = calcId;
+
+        ws.onopen = () => {
+          console.log(`WebSocket connected for calculation ${calcId}`);
+        };
+
+        ws.onmessage = event => {
+          try {
+            const updatedCalculation = JSON.parse(
+              event.data
+            ) as CalculationInstance;
+            if (onUpdateRef.current) {
+              onUpdateRef.current(updatedCalculation);
+            }
+          } catch (e) {
+            console.error('Failed to parse WebSocket message:', e);
+            if (onErrorRef.current) {
+              onErrorRef.current('Failed to parse server response.');
+            }
+          }
+        };
+
+        ws.onerror = event => {
+          console.error('WebSocket error:', event);
+          if (onErrorRef.current) {
+            onErrorRef.current(
+              'Connection to the calculation status server failed.'
+            );
+          }
+        };
+
+        ws.onclose = event => {
+          console.log(
+            `WebSocket disconnected for calculation ${calcId}`,
+            event.code,
+            event.reason
+          );
+          if (wsRef.current === ws) {
+            wsRef.current = null;
+          }
+          if (currentCalculationIdRef.current === calcId) {
+            currentCalculationIdRef.current = null;
+          }
+        };
+      } catch (error) {
+        console.error('Failed to create WebSocket connection:', error);
+        if (onErrorRef.current) {
+          onErrorRef.current('Failed to establish WebSocket connection.');
+        }
+      }
+    },
+    [disconnect]
+  );
 
   useEffect(() => {
     // 計算が実行中でかつIDが有効な場合のみ接続

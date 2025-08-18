@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+python_dist/
+build/
+
+# Generated files (auto-generated from OpenAPI spec)
+src/web/types/generated-api.ts
+src/python/generated_models.py
+
+# Package manager files
+package-lock.json
+yarn.lock
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE and editor files
+.vscode/
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage reports
+coverage/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+
+# Electron
+out/

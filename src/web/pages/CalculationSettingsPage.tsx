@@ -1,24 +1,29 @@
 // src/web/pages/CalculationSettingsPage.tsx
 
-import { useRef, useState, useEffect, useCallback } from "react";
-import { MoleculeViewerRef } from "../components/MoleculeViewer";
-import { XYZInput } from "../components/XYZInput";
-import { MoleculeViewerSection } from "../components/MoleculeViewerSection";
-import { StyleSpec } from "../../types/3dmol";
+import { useRef, useState, useEffect, useCallback } from 'react';
+import { MoleculeViewerRef } from '../components/MoleculeViewer';
+import { XYZInput } from '../components/XYZInput';
+import { MoleculeViewerSection } from '../components/MoleculeViewerSection';
+import { StyleSpec } from '../../types/3dmol';
 import {
   QuantumCalculationRequest,
   CalculationInstance,
   PubChemSearchResponseData,
-  SMILESConvertResponseData
-} from "../types/api-types";
-import { searchPubChem, convertSmilesToXyz } from "../apiClient";
+  SMILESConvertResponseData,
+} from '../types/api-types';
+import { searchPubChem, convertSmilesToXyz } from '../apiClient';
 
 interface CalculationSettingsPageProps {
   activeCalculation?: CalculationInstance;
   onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
-  onStartCalculation: (params: QuantumCalculationRequest) => Promise<CalculationInstance>;
+  onStartCalculation: (
+    params: QuantumCalculationRequest
+  ) => Promise<CalculationInstance>;
   onCalculationRename: (id: string, newName: string) => Promise<void>;
-  createNewCalculationFromExisting: (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => void;
+  createNewCalculationFromExisting: (
+    originalCalc: CalculationInstance,
+    newParams: QuantumCalculationRequest
+  ) => void;
 }
 
 export const CalculationSettingsPage = ({
@@ -32,11 +37,11 @@ export const CalculationSettingsPage = ({
   const previousCalculationIdRef = useRef<string | null>(null);
   const currentStyleRef = useRef<StyleSpec | null>(null);
   const [calculationError, setCalculationError] = useState<string | null>(null);
-  const [inputMethod, setInputMethod] = useState("pubchem");
-  const [pubchemInput, setPubchemInput] = useState("");
+  const [inputMethod, setInputMethod] = useState('pubchem');
+  const [pubchemInput, setPubchemInput] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
-  const [localName, setLocalName] = useState("");
+  const [localName, setLocalName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [showAxes, setShowAxes] = useState(false);
   const [showCoordinates, setShowCoordinates] = useState(false);
@@ -49,11 +54,15 @@ export const CalculationSettingsPage = ({
 
     if (activeCalculation) {
       if (isNewCalculation || !isEditingName) {
-        setLocalName(activeCalculation.name || activeCalculation.parameters?.molecule_name || "");
+        setLocalName(
+          activeCalculation.name ||
+            activeCalculation.parameters?.molecule_name ||
+            ''
+        );
       }
 
       const xyz = activeCalculation.parameters?.xyz;
-      if (xyz && xyz.trim() !== "") {
+      if (xyz && xyz.trim() !== '') {
         moleculeViewerRef.current?.loadXYZ(xyz);
         // Apply the current style after loading the molecule
         if (currentStyleRef.current) {
@@ -65,14 +74,14 @@ export const CalculationSettingsPage = ({
         moleculeViewerRef.current?.clearModels();
       }
     } else {
-      setLocalName("");
+      setLocalName('');
       moleculeViewerRef.current?.clearModels();
       setIsEditingName(false);
     }
 
     previousCalculationIdRef.current = currentCalculationId;
   }, [activeCalculation, isEditingName]);
-  
+
   useEffect(() => {
     moleculeViewerRef.current?.showAxes(showAxes);
   }, [showAxes, activeCalculation]);
@@ -83,7 +92,10 @@ export const CalculationSettingsPage = ({
 
   useEffect(() => {
     // Re-apply the current style when atomic radii setting changes
-    const hasValidMolecule = !!(activeCalculation?.parameters?.xyz && activeCalculation.parameters.xyz.trim() !== "");
+    const hasValidMolecule = !!(
+      activeCalculation?.parameters?.xyz &&
+      activeCalculation.parameters.xyz.trim() !== ''
+    );
     if (currentStyleRef.current && hasValidMolecule) {
       const style = { ...currentStyleRef.current };
       if (useAtomicRadii) {
@@ -96,77 +108,42 @@ export const CalculationSettingsPage = ({
     }
   }, [useAtomicRadii, activeCalculation?.parameters?.xyz]);
 
-  const handleParamChange = useCallback((field: keyof QuantumCalculationRequest, value: string | number | boolean) => {
-    if (!activeCalculation || !onCalculationUpdate) return;
+  const handleParamChange = useCallback(
+    (
+      field: keyof QuantumCalculationRequest,
+      value: string | number | boolean
+    ) => {
+      if (!activeCalculation || !onCalculationUpdate) return;
 
-    if (field === 'name') {
-      if (activeCalculation.id.startsWith('new-calculation-')) {
-        const stringValue = String(value);
-        const updatedParams = { ...activeCalculation.parameters, [field]: stringValue };
-        onCalculationUpdate({
-          ...activeCalculation,
-          name: stringValue,
-          parameters: updatedParams,
-        });
+      if (field === 'name') {
+        if (activeCalculation.id.startsWith('new-calculation-')) {
+          const stringValue = String(value);
+          const updatedParams = {
+            ...activeCalculation.parameters,
+            [field]: stringValue,
+          };
+          onCalculationUpdate({
+            ...activeCalculation,
+            name: stringValue,
+            parameters: updatedParams,
+          });
+        }
+        return;
       }
-      return;
-    }
 
-    const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
-    const isParamChange = field !== 'xyz';
-    const currentParams = activeCalculation.parameters;
-
-    let processedValue = value;
-    if (field === 'solvent' && value === 'custom') {
-      processedValue = '78.36';
-    }
-
-    const safeParams: QuantumCalculationRequest = {
-      xyz: currentParams.xyz || '',
-      calculation_method: currentParams.calculation_method || 'DFT',
-      basis_function: currentParams.basis_function || '6-31G(d)',
-      exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
-      charges: currentParams.charges || 0,
-      spin_multiplicity: currentParams.spin_multiplicity || 1,
-      solvent_method: currentParams.solvent_method || 'none',
-      solvent: currentParams.solvent || '-',
-      name: (currentParams as any).name || (currentParams as any).molecule_name || 'Unnamed Calculation',
-      cpu_cores: currentParams.cpu_cores || undefined,
-      memory_mb: currentParams.memory_mb || undefined,
-      tddft_nstates: (currentParams as any).tddft_nstates || 10,
-      tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-      tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false
-    };
-
-    if (isCompleted && isParamChange) {
-      const newParams = { ...safeParams, [field]: processedValue };
-      createNewCalculationFromExisting(activeCalculation, newParams);
-    } else {
-      const updatedParams = { ...safeParams, [field]: processedValue };
-      onCalculationUpdate({
-        ...activeCalculation,
-        parameters: updatedParams,
-      });
-    }
-  }, [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]);
-
-  // Calculate hasValidMolecule before early return
-  const hasValidMolecule = !!(activeCalculation?.parameters?.xyz && activeCalculation.parameters.xyz.trim() !== "");
-
-  const handleStyleChange = useCallback((style: StyleSpec) => {
-    currentStyleRef.current = style;
-    if (hasValidMolecule) {
-      moleculeViewerRef.current?.setStyle(style);
-    }
-  }, [hasValidMolecule]);
-
-  const handleXYZChange = useCallback((xyzData: string, isValid: boolean) => {
-    if (isValid && activeCalculation) {
-      const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
+      const isCompleted =
+        activeCalculation.status === 'completed' ||
+        activeCalculation.status === 'error';
+      const isParamChange = field !== 'xyz';
       const currentParams = activeCalculation.parameters;
 
+      let processedValue = value;
+      if (field === 'solvent' && value === 'custom') {
+        processedValue = '78.36';
+      }
+
       const safeParams: QuantumCalculationRequest = {
-        xyz: xyzData,
+        xyz: currentParams.xyz || '',
         calculation_method: currentParams.calculation_method || 'DFT',
         basis_function: currentParams.basis_function || '6-31G(d)',
         exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
@@ -174,22 +151,88 @@ export const CalculationSettingsPage = ({
         spin_multiplicity: currentParams.spin_multiplicity || 1,
         solvent_method: currentParams.solvent_method || 'none',
         solvent: currentParams.solvent || '-',
-        name: (currentParams as any).name || (currentParams as any).molecule_name || 'Unnamed Calculation',
+        name:
+          (currentParams as any).name ||
+          (currentParams as any).molecule_name ||
+          'Unnamed Calculation',
         cpu_cores: currentParams.cpu_cores || undefined,
         memory_mb: currentParams.memory_mb || undefined,
         tddft_nstates: (currentParams as any).tddft_nstates || 10,
         tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-        tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false
+        tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
       };
 
-      if (isCompleted) {
-        createNewCalculationFromExisting(activeCalculation, safeParams);
+      if (isCompleted && isParamChange) {
+        const newParams = { ...safeParams, [field]: processedValue };
+        createNewCalculationFromExisting(activeCalculation, newParams);
       } else {
-        const updatedParams = { ...currentParams, xyz: xyzData };
-        onCalculationUpdate({ ...activeCalculation, parameters: updatedParams });
+        const updatedParams = { ...safeParams, [field]: processedValue };
+        onCalculationUpdate({
+          ...activeCalculation,
+          parameters: updatedParams,
+        });
       }
-    }
-  }, [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]);
+    },
+    [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]
+  );
+
+  // Calculate hasValidMolecule before early return
+  const hasValidMolecule = !!(
+    activeCalculation?.parameters?.xyz &&
+    activeCalculation.parameters.xyz.trim() !== ''
+  );
+
+  const handleStyleChange = useCallback(
+    (style: StyleSpec) => {
+      currentStyleRef.current = style;
+      if (hasValidMolecule) {
+        moleculeViewerRef.current?.setStyle(style);
+      }
+    },
+    [hasValidMolecule]
+  );
+
+  const handleXYZChange = useCallback(
+    (xyzData: string, isValid: boolean) => {
+      if (isValid && activeCalculation) {
+        const isCompleted =
+          activeCalculation.status === 'completed' ||
+          activeCalculation.status === 'error';
+        const currentParams = activeCalculation.parameters;
+
+        const safeParams: QuantumCalculationRequest = {
+          xyz: xyzData,
+          calculation_method: currentParams.calculation_method || 'DFT',
+          basis_function: currentParams.basis_function || '6-31G(d)',
+          exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
+          charges: currentParams.charges || 0,
+          spin_multiplicity: currentParams.spin_multiplicity || 1,
+          solvent_method: currentParams.solvent_method || 'none',
+          solvent: currentParams.solvent || '-',
+          name:
+            (currentParams as any).name ||
+            (currentParams as any).molecule_name ||
+            'Unnamed Calculation',
+          cpu_cores: currentParams.cpu_cores || undefined,
+          memory_mb: currentParams.memory_mb || undefined,
+          tddft_nstates: (currentParams as any).tddft_nstates || 10,
+          tddft_method: (currentParams as any).tddft_method || 'TDDFT',
+          tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
+        };
+
+        if (isCompleted) {
+          createNewCalculationFromExisting(activeCalculation, safeParams);
+        } else {
+          const updatedParams = { ...currentParams, xyz: xyzData };
+          onCalculationUpdate({
+            ...activeCalculation,
+            parameters: updatedParams,
+          });
+        }
+      }
+    },
+    [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]
+  );
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalName(e.target.value);
@@ -210,7 +253,10 @@ export const CalculationSettingsPage = ({
         onCalculationUpdate({
           ...activeCalculation,
           name: newName,
-          parameters: { ...activeCalculation.parameters, molecule_name: newName },
+          parameters: {
+            ...activeCalculation.parameters,
+            molecule_name: newName,
+          },
         });
       } catch (error) {
         console.error('Error updating new calculation name:', error);
@@ -220,13 +266,19 @@ export const CalculationSettingsPage = ({
       return;
     }
 
-    if (window.confirm(`Are you sure you want to rename this calculation to "${newName}"?`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to rename this calculation to "${newName}"?`
+      )
+    ) {
       try {
         await onCalculationRename(activeCalculation.id, newName);
       } catch (error) {
         console.error('Error renaming calculation:', error);
         setLocalName(activeCalculation.name || ''); // Revert on error
-        alert(`Failed to rename calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        alert(
+          `Failed to rename calculation: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
       }
     } else {
       setLocalName(activeCalculation.name || '');
@@ -241,19 +293,23 @@ export const CalculationSettingsPage = ({
   };
 
   const handleStartCalculation = async () => {
-    if (!activeCalculation || !activeCalculation.parameters?.xyz || !activeCalculation.parameters.xyz.trim()) {
-      setCalculationError("A valid molecular structure is required.");
+    if (
+      !activeCalculation ||
+      !activeCalculation.parameters?.xyz ||
+      !activeCalculation.parameters.xyz.trim()
+    ) {
+      setCalculationError('A valid molecular structure is required.');
       return;
     }
 
     const moleculeName = localName.trim();
     if (!moleculeName) {
-      setCalculationError("A molecule name is required.");
+      setCalculationError('A molecule name is required.');
       return;
     }
 
     setCalculationError(null);
-    
+
     const currentParams = activeCalculation.parameters;
     const finalParams: QuantumCalculationRequest = {
       xyz: currentParams.xyz || '',
@@ -269,14 +325,16 @@ export const CalculationSettingsPage = ({
       memory_mb: currentParams.memory_mb || undefined,
       tddft_nstates: (currentParams as any).tddft_nstates || 10,
       tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-      tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false
+      tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
     };
 
     try {
       const runningCalculation = await onStartCalculation(finalParams);
       onCalculationUpdate(runningCalculation);
     } catch (error) {
-      setCalculationError(error instanceof Error ? error.message : 'An unknown error occurred.');
+      setCalculationError(
+        error instanceof Error ? error.message : 'An unknown error occurred.'
+      );
       if (activeCalculation) {
         onCalculationUpdate({ ...activeCalculation, status: 'error' });
       }
@@ -286,7 +344,14 @@ export const CalculationSettingsPage = ({
   if (!activeCalculation || !activeCalculation.parameters) {
     return (
       <div className="calculation-settings-containers">
-        <div style={{ textAlign: 'center', padding: '40px', color: '#666', width: '100%' }}>
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '40px',
+            color: '#666',
+            width: '100%',
+          }}
+        >
           <h2>Loading Calculation...</h2>
           <p>Please wait or select a calculation from the sidebar.</p>
         </div>
@@ -295,7 +360,7 @@ export const CalculationSettingsPage = ({
   }
 
   const { parameters: params, status: calculationStatus } = activeCalculation;
-  const xyzInputValue = params.xyz || "";
+  const xyzInputValue = params.xyz || '';
 
   const handleXYZConvert = async () => {
     if (!pubchemInput.trim()) return;
@@ -318,9 +383,11 @@ export const CalculationSettingsPage = ({
       }
 
       setLocalName(moleculeName);
-      
-      const isCompleted = activeCalculation.status === 'completed' || activeCalculation.status === 'error';
-      
+
+      const isCompleted =
+        activeCalculation.status === 'completed' ||
+        activeCalculation.status === 'error';
+
       const safeParams: QuantumCalculationRequest = {
         xyz: data.xyz,
         calculation_method: params.calculation_method || 'DFT',
@@ -335,22 +402,29 @@ export const CalculationSettingsPage = ({
         memory_mb: params.memory_mb || undefined,
         tddft_nstates: (params as any).tddft_nstates || 10,
         tddft_method: (params as any).tddft_method || 'TDDFT',
-        tddft_analyze_nto: (params as any).tddft_analyze_nto || false
+        tddft_analyze_nto: (params as any).tddft_analyze_nto || false,
       };
 
       if (isCompleted) {
         createNewCalculationFromExisting(activeCalculation, safeParams);
       } else {
-        const updatedParams = { ...params, xyz: data.xyz, molecule_name: moleculeName };
+        const updatedParams = {
+          ...params,
+          xyz: data.xyz,
+          molecule_name: moleculeName,
+        };
         onCalculationUpdate({
           ...activeCalculation,
           name: moleculeName,
           parameters: updatedParams,
         });
       }
-
     } catch (error) {
-      setConvertError(error instanceof Error ? error.message : 'An unknown error occurred during conversion.');
+      setConvertError(
+        error instanceof Error
+          ? error.message
+          : 'An unknown error occurred during conversion.'
+      );
     } finally {
       setIsConverting(false);
     }
@@ -358,8 +432,8 @@ export const CalculationSettingsPage = ({
 
   const getInputPlaceholder = () => {
     return inputMethod === 'smiles'
-      ? "e.g., CCO for ethanol"
-      : "e.g., aspirin, or 2244";
+      ? 'e.g., CCO for ethanol'
+      : 'e.g., aspirin, or 2244';
   };
 
   const getCalculationButtonText = () => {
@@ -379,18 +453,34 @@ export const CalculationSettingsPage = ({
     return `start-calculation-btn ${calculationStatus || 'pending'}`;
   };
 
-  const isCustomDielectricConstant = (solventValue: string | undefined): boolean => {
+  const isCustomDielectricConstant = (
+    solventValue: string | undefined
+  ): boolean => {
     if (!solventValue || solventValue === '-') return false;
-    
+
     const predefinedSolvents = [
-      'water', 'dimethylsulfoxide', 'n,n-dimethylformamide', 'nitromethane',
-      'methanol', 'ethanol', 'acetone', 'dichloroethane', 'dichloromethane',
-      'tetrahydrofuran', 'chlorobenzene', 'chloroform', 'diethylether',
-      'toluene', 'benzene', '1,4-dioxane', 'cyclohexane', 'custom'
+      'water',
+      'dimethylsulfoxide',
+      'n,n-dimethylformamide',
+      'nitromethane',
+      'methanol',
+      'ethanol',
+      'acetone',
+      'dichloroethane',
+      'dichloromethane',
+      'tetrahydrofuran',
+      'chlorobenzene',
+      'chloroform',
+      'diethylether',
+      'toluene',
+      'benzene',
+      '1,4-dioxane',
+      'cyclohexane',
+      'custom',
     ];
-    
+
     if (predefinedSolvents.includes(solventValue.toLowerCase())) return false;
-    
+
     const numValue = parseFloat(solventValue);
     return !isNaN(numValue) && numValue > 0;
   };
@@ -422,7 +512,14 @@ export const CalculationSettingsPage = ({
                 disabled={calculationStatus === 'running'}
               />
               {localName && (
-                <button onClick={() => setLocalName('')} className="clear-molecule-name" aria-label="Clear molecule name"> × </button>
+                <button
+                  onClick={() => setLocalName('')}
+                  className="clear-molecule-name"
+                  aria-label="Clear molecule name"
+                >
+                  {' '}
+                  ×{' '}
+                </button>
               )}
             </div>
             <div className="computation-settings">
@@ -432,14 +529,44 @@ export const CalculationSettingsPage = ({
                   <input
                     type="number"
                     value={params.cpu_cores || 1}
-                    onChange={(e) => handleParamChange('cpu_cores', Math.max(1, Number(e.target.value)))}
-                    min="1" max="32"
+                    onChange={e =>
+                      handleParamChange(
+                        'cpu_cores',
+                        Math.max(1, Number(e.target.value))
+                      )
+                    }
+                    min="1"
+                    max="32"
                     className="cpu-cores-input"
                     disabled={calculationStatus === 'running'}
                   />
                   <div className="spinner-arrows">
-                    <button type="button" className="spinner-btn up" onClick={() => handleParamChange('cpu_cores', Math.min(32, (params.cpu_cores || 1) + 1))} disabled={calculationStatus === 'running'}>▲</button>
-                    <button type="button" className="spinner-btn down" onClick={() => handleParamChange('cpu_cores', Math.max(1, (params.cpu_cores || 1) - 1))} disabled={calculationStatus === 'running'}>▼</button>
+                    <button
+                      type="button"
+                      className="spinner-btn up"
+                      onClick={() =>
+                        handleParamChange(
+                          'cpu_cores',
+                          Math.min(32, (params.cpu_cores || 1) + 1)
+                        )
+                      }
+                      disabled={calculationStatus === 'running'}
+                    >
+                      ▲
+                    </button>
+                    <button
+                      type="button"
+                      className="spinner-btn down"
+                      onClick={() =>
+                        handleParamChange(
+                          'cpu_cores',
+                          Math.max(1, (params.cpu_cores || 1) - 1)
+                        )
+                      }
+                      disabled={calculationStatus === 'running'}
+                    >
+                      ▼
+                    </button>
                   </div>
                 </div>
               </div>
@@ -449,7 +576,12 @@ export const CalculationSettingsPage = ({
                   <input
                     type="number"
                     value={params.memory_mb || 2000}
-                    onChange={(e) => handleParamChange('memory_mb', Math.max(128, Number(e.target.value)))}
+                    onChange={e =>
+                      handleParamChange(
+                        'memory_mb',
+                        Math.max(128, Number(e.target.value))
+                      )
+                    }
                     min="128"
                     className="memory-value-input"
                     disabled={calculationStatus === 'running'}
@@ -460,12 +592,23 @@ export const CalculationSettingsPage = ({
               <button
                 className={getCalculationButtonClass()}
                 onClick={handleStartCalculation}
-                disabled={!hasValidMolecule || calculationStatus === 'running' || calculationStatus === 'completed'}
+                disabled={
+                  !hasValidMolecule ||
+                  calculationStatus === 'running' ||
+                  calculationStatus === 'completed'
+                }
               >
                 {getCalculationButtonText()}
               </button>
               {calculationError && (
-                <div className="calculation-error" style={{ marginTop: '10px', color: '#e74c3c', fontSize: '14px' }}>
+                <div
+                  className="calculation-error"
+                  style={{
+                    marginTop: '10px',
+                    color: '#e74c3c',
+                    fontSize: '14px',
+                  }}
+                >
                   ❌ {calculationError}
                 </div>
               )}
@@ -475,7 +618,13 @@ export const CalculationSettingsPage = ({
             <section className="calculation-settings-section">
               <div className="setting-row">
                 <label>Calculation Method</label>
-                <select value={params.calculation_method || 'DFT'} onChange={(e) => handleParamChange('calculation_method', e.target.value)} disabled={calculationStatus === 'running'}>
+                <select
+                  value={params.calculation_method || 'DFT'}
+                  onChange={e =>
+                    handleParamChange('calculation_method', e.target.value)
+                  }
+                  disabled={calculationStatus === 'running'}
+                >
                   <option value="DFT">DFT</option>
                   <option value="HF">HF</option>
                   <option value="MP2">MP2</option>
@@ -484,7 +633,13 @@ export const CalculationSettingsPage = ({
               </div>
               <div className="setting-row">
                 <label>Basis Function</label>
-                <select value={params.basis_function || '6-31G(d)'} onChange={(e) => handleParamChange('basis_function', e.target.value)} disabled={calculationStatus === 'running'}>
+                <select
+                  value={params.basis_function || '6-31G(d)'}
+                  onChange={e =>
+                    handleParamChange('basis_function', e.target.value)
+                  }
+                  disabled={calculationStatus === 'running'}
+                >
                   <optgroup label="Minimal">
                     <option value="STO-3G">STO-3G</option>
                     <option value="3-21G">3-21G</option>
@@ -511,7 +666,18 @@ export const CalculationSettingsPage = ({
               </div>
               <div className="setting-row">
                 <label>Exchange-Correlation Functional</label>
-                <select value={params.exchange_correlation || 'B3LYP'} onChange={(e) => handleParamChange('exchange_correlation', e.target.value)} disabled={!(params.calculation_method === 'DFT' || params.calculation_method === 'TDDFT') || calculationStatus === 'running'}>
+                <select
+                  value={params.exchange_correlation || 'B3LYP'}
+                  onChange={e =>
+                    handleParamChange('exchange_correlation', e.target.value)
+                  }
+                  disabled={
+                    !(
+                      params.calculation_method === 'DFT' ||
+                      params.calculation_method === 'TDDFT'
+                    ) || calculationStatus === 'running'
+                  }
+                >
                   <optgroup label="Hybrid">
                     <option value="B3LYP">B3LYP</option>
                     <option value="PBE0">PBE0</option>
@@ -537,7 +703,9 @@ export const CalculationSettingsPage = ({
                 <input
                   type="number"
                   value={params.charges || 0}
-                  onChange={(e) => handleParamChange('charges', Number(e.target.value))}
+                  onChange={e =>
+                    handleParamChange('charges', Number(e.target.value))
+                  }
                   className="number-input with-spinner"
                   disabled={calculationStatus === 'running'}
                 />
@@ -547,8 +715,14 @@ export const CalculationSettingsPage = ({
                 <input
                   type="number"
                   value={params.spin_multiplicity || 1}
-                  onChange={(e) => handleParamChange('spin_multiplicity', Number(e.target.value))}
-                  min={1} step={1}
+                  onChange={e =>
+                    handleParamChange(
+                      'spin_multiplicity',
+                      Number(e.target.value)
+                    )
+                  }
+                  min={1}
+                  step={1}
                   className="number-input with-spinner"
                   disabled={calculationStatus === 'running'}
                 />
@@ -561,21 +735,32 @@ export const CalculationSettingsPage = ({
                   <input
                     type="number"
                     value={(params as any).tddft_nstates || 10}
-                    onChange={(e) => handleParamChange('tddft_nstates' as any, Math.max(1, Math.min(50, Number(e.target.value))))}
-                    min={1} max={50} step={1}
+                    onChange={e =>
+                      handleParamChange(
+                        'tddft_nstates' as any,
+                        Math.max(1, Math.min(50, Number(e.target.value)))
+                      )
+                    }
+                    min={1}
+                    max={50}
+                    step={1}
                     className="number-input with-spinner"
                     disabled={calculationStatus === 'running'}
                   />
                 </div>
                 <div className="setting-row">
                   <label>TDDFT Method</label>
-                  <select 
-                    value={(params as any).tddft_method || 'TDDFT'} 
-                    onChange={(e) => handleParamChange('tddft_method' as any, e.target.value)} 
+                  <select
+                    value={(params as any).tddft_method || 'TDDFT'}
+                    onChange={e =>
+                      handleParamChange('tddft_method' as any, e.target.value)
+                    }
                     disabled={calculationStatus === 'running'}
                   >
                     <option value="TDDFT">Full TDDFT</option>
-                    <option value="TDA">Tamm-Dancoff Approximation (TDA)</option>
+                    <option value="TDA">
+                      Tamm-Dancoff Approximation (TDA)
+                    </option>
                   </select>
                 </div>
                 <div className="setting-row">
@@ -583,7 +768,12 @@ export const CalculationSettingsPage = ({
                     <input
                       type="checkbox"
                       checked={(params as any).tddft_analyze_nto || false}
-                      onChange={(e) => handleParamChange('tddft_analyze_nto' as any, e.target.checked)}
+                      onChange={e =>
+                        handleParamChange(
+                          'tddft_analyze_nto' as any,
+                          e.target.checked
+                        )
+                      }
                       disabled={calculationStatus === 'running'}
                     />
                     Perform Natural Transition Orbital Analysis
@@ -594,7 +784,13 @@ export const CalculationSettingsPage = ({
             <section className="calculation-settings-section">
               <div className="setting-row">
                 <label>Solvent Effect Method</label>
-                <select value={params.solvent_method || 'none'} onChange={(e) => handleParamChange('solvent_method', e.target.value)} disabled={calculationStatus === 'running'}>
+                <select
+                  value={params.solvent_method || 'none'}
+                  onChange={e =>
+                    handleParamChange('solvent_method', e.target.value)
+                  }
+                  disabled={calculationStatus === 'running'}
+                >
                   <option value="none">None</option>
                   <optgroup label="PCM Methods">
                     <option value="ief-pcm">IEF-PCM</option>
@@ -609,11 +805,22 @@ export const CalculationSettingsPage = ({
               </div>
               <div className="setting-row">
                 <label>Solvent(dielectric constant)</label>
-                <select value={getSolventDisplayValue()} onChange={(e) => handleParamChange('solvent', e.target.value)} disabled={params.solvent_method === "none" || calculationStatus === 'running'}>
+                <select
+                  value={getSolventDisplayValue()}
+                  onChange={e => handleParamChange('solvent', e.target.value)}
+                  disabled={
+                    params.solvent_method === 'none' ||
+                    calculationStatus === 'running'
+                  }
+                >
                   <optgroup label="Highly Polar">
                     <option value="water">Water (78.36)</option>
-                    <option value="dimethylsulfoxide">Dimethylsulfoxide (46.83)</option>
-                    <option value="n,n-dimethylformamide">N,N-Dimethylformamide (37.22)</option>
+                    <option value="dimethylsulfoxide">
+                      Dimethylsulfoxide (46.83)
+                    </option>
+                    <option value="n,n-dimethylformamide">
+                      N,N-Dimethylformamide (37.22)
+                    </option>
                     <option value="nitromethane">Nitromethane (36.56)</option>
                   </optgroup>
                   <optgroup label="Protic Solvents">
@@ -622,9 +829,15 @@ export const CalculationSettingsPage = ({
                   </optgroup>
                   <optgroup label="Polar Aprotic">
                     <option value="acetone">Acetone (20.49)</option>
-                    <option value="dichloroethane">Dichloroethane (10.13)</option>
-                    <option value="dichloromethane">Dichloromethane (8.93)</option>
-                    <option value="tetrahydrofuran">Tetrahydrofuran (7.43)</option>
+                    <option value="dichloroethane">
+                      Dichloroethane (10.13)
+                    </option>
+                    <option value="dichloromethane">
+                      Dichloromethane (8.93)
+                    </option>
+                    <option value="tetrahydrofuran">
+                      Tetrahydrofuran (7.43)
+                    </option>
                     <option value="chlorobenzene">Chlorobenzene (5.70)</option>
                   </optgroup>
                   <optgroup label="Moderately Polar">
@@ -637,22 +850,28 @@ export const CalculationSettingsPage = ({
                     <option value="1,4-dioxane">1,4-Dioxane (2.21)</option>
                     <option value="cyclohexane">Cyclohexane (2.02)</option>
                   </optgroup>
-                  <option value="custom">Custom (Enter dielectric constant below)</option>
+                  <option value="custom">
+                    Custom (Enter dielectric constant below)
+                  </option>
                 </select>
               </div>
-              {(params.solvent === 'custom' || isCustomDielectricConstant(params.solvent)) && params.solvent_method !== 'none' && (
-                <div className="setting-row">
-                  <label>Custom Dielectric Constant</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={getCustomDielectricValue()}
-                    onChange={(e) => handleParamChange('solvent', e.target.value || '78.36')}
-                    className="number-input"
-                    disabled={calculationStatus === 'running'}
-                  />
-                </div>
-              )}
+              {(params.solvent === 'custom' ||
+                isCustomDielectricConstant(params.solvent)) &&
+                params.solvent_method !== 'none' && (
+                  <div className="setting-row">
+                    <label>Custom Dielectric Constant</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={getCustomDielectricValue()}
+                      onChange={e =>
+                        handleParamChange('solvent', e.target.value || '78.36')
+                      }
+                      className="number-input"
+                      disabled={calculationStatus === 'running'}
+                    />
+                  </div>
+                )}
             </section>
           </div>
         </div>
@@ -673,11 +892,25 @@ export const CalculationSettingsPage = ({
         <div className="input-method-selection">
           <div className="radio-options">
             <label className="radio-option">
-              <input type="radio" name="inputMethod" value="pubchem" checked={inputMethod === "pubchem"} onChange={(e) => setInputMethod(e.target.value)} disabled={calculationStatus === 'running'} />
+              <input
+                type="radio"
+                name="inputMethod"
+                value="pubchem"
+                checked={inputMethod === 'pubchem'}
+                onChange={e => setInputMethod(e.target.value)}
+                disabled={calculationStatus === 'running'}
+              />
               <span className="radio-text">Get from PubChem Name/CID</span>
             </label>
             <label className="radio-option">
-              <input type="radio" name="inputMethod" value="smiles" checked={inputMethod === "smiles"} onChange={(e) => setInputMethod(e.target.value)} disabled={calculationStatus === 'running'} />
+              <input
+                type="radio"
+                name="inputMethod"
+                value="smiles"
+                checked={inputMethod === 'smiles'}
+                onChange={e => setInputMethod(e.target.value)}
+                disabled={calculationStatus === 'running'}
+              />
               <span className="radio-text">Get from SMILES</span>
             </label>
           </div>
@@ -688,23 +921,41 @@ export const CalculationSettingsPage = ({
               type="text"
               value={pubchemInput}
               placeholder={getInputPlaceholder()}
-              onChange={(e) => {
+              onChange={e => {
                 setPubchemInput(e.target.value);
                 if (convertError) setConvertError(null);
               }}
               className="pubchem-input"
               disabled={calculationStatus === 'running'}
             />
-            <button onClick={handleXYZConvert} className="convert-button" disabled={isConverting || !pubchemInput.trim() || calculationStatus === 'running'}>
+            <button
+              onClick={handleXYZConvert}
+              className="convert-button"
+              disabled={
+                isConverting ||
+                !pubchemInput.trim() ||
+                calculationStatus === 'running'
+              }
+            >
               {isConverting ? 'Converting...' : 'Convert to XYZ'}
             </button>
           </div>
           {isConverting && (
-            <div className="validation-message validating" style={{ marginTop: '8px' }}>
+            <div
+              className="validation-message validating"
+              style={{ marginTop: '8px' }}
+            >
               Converting...
             </div>
           )}
-          {convertError && <div className="validation-message invalid" style={{ marginTop: '8px' }}>❌ {convertError}</div>}
+          {convertError && (
+            <div
+              className="validation-message invalid"
+              style={{ marginTop: '8px' }}
+            >
+              ❌ {convertError}
+            </div>
+          )}
         </div>
         <div className="xyz-direct-input">
           <h4 className="subsection-title">Direct XYZ Input/Edit</h4>

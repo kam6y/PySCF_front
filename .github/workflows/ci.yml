@@ -89,11 +89,5 @@ jobs:
     - name: Type check TypeScript
       run: npx tsc --noEmit
     
-    - name: Check code formatting (if prettier is available)
-      run: |
-        if npm list prettier &>/dev/null; then
-          npx prettier --check "src/**/*.{ts,tsx,js,jsx}"
-        else
-          echo "Prettier not configured, skipping format check"
-        fi
-      continue-on-error: true
+    - name: Check code formatting
+      run: npm run format:check

@@ -1,19 +1,19 @@
 // src/web/index.tsx
 
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { setApiBaseUrl } from "./apiClient";
-import { App } from "./App";
+import { setApiBaseUrl } from './apiClient';
+import { App } from './App';
 
 const queryClient = new QueryClient();
-const root = createRoot(document.getElementById("root") as Element);
+const root = createRoot(document.getElementById('root') as Element);
 
 // Listen for the port from the main process
-window.electronAPI.onSetFlaskPort((port) => {
+window.electronAPI.onSetFlaskPort(port => {
   console.log('Received port from main process:', port);
   setApiBaseUrl(port);
-  
+
   // Render the app only after the port is set
   root.render(
     <StrictMode>

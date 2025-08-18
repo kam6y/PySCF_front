@@ -1,62 +1,74 @@
 // src/web/App.tsx
 
-import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import "./App.css";
-import { Header } from "./components/Header";
-import { Sidebar } from "./components/Sidebar";
-import { DropdownOption } from "./components/DropdownMenu";
-import { CalculationSettingsPage } from "./pages/CalculationSettingsPage";
-import { CalculationResultsPage } from "./pages/CalculationResultsPage";
-import { DrawMoleculePage } from "./pages/DrawMoleculePage";
-import { useCalculationSubscription } from "./hooks/useCalculationSubscription";
-import { useCalculationStore } from "./store/calculationStore";
+import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import './App.css';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { DropdownOption } from './components/DropdownMenu';
+import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
+import { CalculationResultsPage } from './pages/CalculationResultsPage';
+import { DrawMoleculePage } from './pages/DrawMoleculePage';
+import { useCalculationSubscription } from './hooks/useCalculationSubscription';
+import { useCalculationStore } from './store/calculationStore';
 import {
   useGetCalculations,
   useGetCalculationDetails,
   useDeleteCalculation,
   useUpdateCalculationName,
   useStartCalculation,
-} from "./hooks/useCalculationQueries";
-import { CalculationInstance, QuantumCalculationRequest } from "./types/api-types";
+} from './hooks/useCalculationQueries';
+import {
+  CalculationInstance,
+  QuantumCalculationRequest,
+} from './types/api-types';
 
 export const App = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<DropdownOption>('calculation-settings');
+  const [currentPage, setCurrentPage] = useState<DropdownOption>(
+    'calculation-settings'
+  );
 
   const queryClient = useQueryClient();
-  
+
   // Zustandストアからの状態
-  const { 
-    activeCalculationId, 
+  const {
+    activeCalculationId,
     stagedCalculation,
-    setActiveCalculationId, 
+    setActiveCalculationId,
     setStagedCalculation,
-    clearStagedCalculation 
+    clearStagedCalculation,
   } = useCalculationStore();
 
   // TanStack Queryフック
-  const { data: calculationsData, isLoading: calculationsLoading, error: calculationsError } = useGetCalculations();
-  const { data: activeCalculationDetails } = useGetCalculationDetails(activeCalculationId);
+  const {
+    data: calculationsData,
+    isLoading: calculationsLoading,
+    error: calculationsError,
+  } = useGetCalculations();
+  const { data: activeCalculationDetails } =
+    useGetCalculationDetails(activeCalculationId);
   const deleteCalculationMutation = useDeleteCalculation();
   const updateCalculationNameMutation = useUpdateCalculationName();
   const startCalculationMutation = useStartCalculation();
 
   // 計算リストのデータ変換
-  const calculations = calculationsData?.calculations.map(c => ({
-    id: c.id,
-    name: c.name,
-    status: c.status,
-    createdAt: new Date(c.date).toISOString(),
-    updatedAt: new Date(c.date).toISOString(),
-    parameters: {} as any,
-    results: undefined
-  })) || [];
+  const calculations =
+    calculationsData?.calculations.map(c => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      createdAt: new Date(c.date).toISOString(),
+      updatedAt: new Date(c.date).toISOString(),
+      parameters: {} as any,
+      results: undefined,
+    })) || [];
 
   // アクティブな計算（詳細データがあればそれを使用、なければリストから取得）
-  const activeCalculation = stagedCalculation || 
-    activeCalculationDetails?.calculation || 
+  const activeCalculation =
+    stagedCalculation ||
+    activeCalculationDetails?.calculation ||
     calculations.find(c => c.id === activeCalculationId);
 
   // 最初の計算を自動選択（新規計算作成中は除く）
@@ -64,7 +76,12 @@ export const App = () => {
     if (!activeCalculationId && calculations.length > 0 && !stagedCalculation) {
       setActiveCalculationId(calculations[0].id);
     }
-  }, [calculations, activeCalculationId, setActiveCalculationId, stagedCalculation]);
+  }, [
+    calculations,
+    activeCalculationId,
+    setActiveCalculationId,
+    stagedCalculation,
+  ]);
 
   // WebSocketによるリアルタイム更新
   useCalculationSubscription({
@@ -72,12 +89,14 @@ export const App = () => {
     status: activeCalculation?.status,
     onUpdate: (updatedCalculation: CalculationInstance) => {
       // Queryキャッシュを直接更新
-      queryClient.setQueryData(['calculation', updatedCalculation.id], { calculation: updatedCalculation });
+      queryClient.setQueryData(['calculation', updatedCalculation.id], {
+        calculation: updatedCalculation,
+      });
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
     },
     onError: (error: string) => {
       console.error('WebSocket error:', error);
-    }
+    },
   });
 
   const getPageTitle = (page: DropdownOption): string => {
@@ -93,7 +112,8 @@ export const App = () => {
   const handleSidebarClose = () => setIsSidebarOpen(false);
   const handleDropdownToggle = () => setIsDropdownOpen(!isDropdownOpen);
   const handleDropdownClose = () => setIsDropdownOpen(false);
-  const handleDropdownOptionSelect = (option: DropdownOption) => setCurrentPage(option);
+  const handleDropdownOptionSelect = (option: DropdownOption) =>
+    setCurrentPage(option);
 
   const handleCalculationSelect = (calculationId: string) => {
     setActiveCalculationId(calculationId);
@@ -114,9 +134,9 @@ export const App = () => {
       name: '',
       tddft_nstates: 10,
       tddft_method: 'TDDFT',
-      tddft_analyze_nto: false
+      tddft_analyze_nto: false,
     };
-    
+
     const newId = `new-calculation-${Date.now()}`;
     const newCalculation: CalculationInstance = {
       id: newId,
@@ -125,37 +145,47 @@ export const App = () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       parameters: defaultParams,
-      results: undefined
+      results: undefined,
     };
-    
+
     setStagedCalculation(newCalculation);
     setActiveCalculationId(newId);
     setCurrentPage('calculation-settings');
     handleSidebarClose();
   };
-  
+
   const handleStartCalculation = async (params: QuantumCalculationRequest) => {
     try {
       const response = await startCalculationMutation.mutateAsync(params);
       const runningCalculation = response.calculation;
-      
+
       clearStagedCalculation();
       setActiveCalculationId(runningCalculation.id);
-      
+
       return runningCalculation;
     } catch (error) {
-      console.error("Failed to start calculation:", error);
-      alert(`Error starting calculation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Failed to start calculation:', error);
+      alert(
+        `Error starting calculation: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
       throw error;
     }
   };
 
-  const handleCalculationRename = async (calculationId: string, newName: string) => {
+  const handleCalculationRename = async (
+    calculationId: string,
+    newName: string
+  ) => {
     try {
-      await updateCalculationNameMutation.mutateAsync({ id: calculationId, newName });
+      await updateCalculationNameMutation.mutateAsync({
+        id: calculationId,
+        newName,
+      });
     } catch (error) {
       console.error('Failed to rename calculation:', error);
-      alert(`Error: Could not rename calculation. ${error instanceof Error ? error.message : ''}`);
+      alert(
+        `Error: Could not rename calculation. ${error instanceof Error ? error.message : ''}`
+      );
     }
   };
 
@@ -169,21 +199,30 @@ export const App = () => {
       }
     } catch (error) {
       console.error('Failed to delete calculation:', error);
-      alert(`Error: Could not delete calculation. ${error instanceof Error ? error.message : ''}`);
+      alert(
+        `Error: Could not delete calculation. ${error instanceof Error ? error.message : ''}`
+      );
     }
   };
 
-  const handleActiveCalculationUpdate = (updatedCalculation: CalculationInstance) => {
+  const handleActiveCalculationUpdate = (
+    updatedCalculation: CalculationInstance
+  ) => {
     if (stagedCalculation && updatedCalculation.id === stagedCalculation.id) {
       setStagedCalculation(updatedCalculation);
     } else {
       // Queryキャッシュを更新
-      queryClient.setQueryData(['calculation', updatedCalculation.id], { calculation: updatedCalculation });
+      queryClient.setQueryData(['calculation', updatedCalculation.id], {
+        calculation: updatedCalculation,
+      });
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
     }
   };
 
-  const handleCreateNewFromExisting = (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => {
+  const handleCreateNewFromExisting = (
+    originalCalc: CalculationInstance,
+    newParams: QuantumCalculationRequest
+  ) => {
     const newId = `new-calculation-${Date.now()}`;
     const newCalculation: CalculationInstance = {
       ...originalCalc,
@@ -196,7 +235,7 @@ export const App = () => {
       workingDirectory: undefined,
       errorMessage: undefined,
     };
-    
+
     setStagedCalculation(newCalculation);
     setActiveCalculationId(newId);
   };
@@ -238,7 +277,11 @@ export const App = () => {
   };
 
   const sidebarCalculations = calculations.filter(
-    (calc) => calc.status !== 'pending' || (calc.parameters && calc.parameters.xyz && calc.parameters.xyz.trim() !== '')
+    calc =>
+      calc.status !== 'pending' ||
+      (calc.parameters &&
+        calc.parameters.xyz &&
+        calc.parameters.xyz.trim() !== '')
   );
 
   return (
@@ -248,11 +291,29 @@ export const App = () => {
         onClick={handleSidebarToggle}
         aria-label="Toggle sidebar"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           {isSidebarOpen ? (
-            <path d="M10 4L6 8L10 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M10 4L6 8L10 12"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           ) : (
-            <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M6 4L10 8L6 12"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           )}
         </svg>
       </button>

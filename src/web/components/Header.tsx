@@ -1,5 +1,5 @@
-import React from "react";
-import { DropdownMenu, DropdownOption } from "./DropdownMenu";
+import React from 'react';
+import { DropdownMenu, DropdownOption } from './DropdownMenu';
 
 interface HeaderProps {
   onDropdownToggle: () => void;
@@ -95,7 +95,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="app-header">
-      <div className={`header-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <div
+        className={`header-container ${isSidebarOpen ? 'sidebar-open' : ''}`}
+      >
         {/* Left Section */}
         <div className="header-left">
           <h1 className="app-title">PySCF_front</h1>
@@ -156,7 +158,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
       </div>
-      
+
       {/* Dropdown Menu */}
       <DropdownMenu
         isOpen={isDropdownOpen}

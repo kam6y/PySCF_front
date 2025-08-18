@@ -1,6 +1,9 @@
-import React from "react";
+import React from 'react';
 
-export type DropdownOption = 'calculation-settings' | 'calculation-results' | 'draw-molecule';
+export type DropdownOption =
+  | 'calculation-settings'
+  | 'calculation-results'
+  | 'draw-molecule';
 
 interface DropdownMenuProps {
   isOpen: boolean;
@@ -26,9 +29,9 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
     <>
       {/* Backdrop to close dropdown when clicking outside */}
       <div className="dropdown-backdrop" onClick={onClose} />
-      
+
       <div className="dropdown-menu">
-        <div 
+        <div
           className={`dropdown-item ${selectedOption === 'calculation-settings' ? 'selected' : ''}`}
           onClick={() => handleOptionClick('calculation-settings')}
         >
@@ -76,7 +79,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
           <span>Calculation settings</span>
         </div>
 
-        <div 
+        <div
           className={`dropdown-item ${selectedOption === 'calculation-results' ? 'selected' : ''}`}
           onClick={() => handleOptionClick('calculation-results')}
         >
@@ -106,7 +109,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
           <span>Calculation results</span>
         </div>
 
-        <div 
+        <div
           className={`dropdown-item ${selectedOption === 'draw-molecule' ? 'selected' : ''}`}
           onClick={() => handleOptionClick('draw-molecule')}
         >

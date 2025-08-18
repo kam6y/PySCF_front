@@ -3,10 +3,16 @@ import React, {
   useEffect,
   useImperativeHandle,
   forwardRef,
-} from "react";
-import * as $3Dmol from "3dmol";
-import { GLViewer, GLModel, StyleSpec, Label, AtomSpec } from "../../types/3dmol";
-import { getAtomicRadius, VAN_DER_WAALS_RADII } from "../data/atomicRadii";
+} from 'react';
+import * as $3Dmol from '3dmol';
+import {
+  GLViewer,
+  GLModel,
+  StyleSpec,
+  Label,
+  AtomSpec,
+} from '../../types/3dmol';
+import { getAtomicRadius, VAN_DER_WAALS_RADII } from '../data/atomicRadii';
 
 export interface MoleculeViewerProps {
   width?: number | string;
@@ -25,13 +31,16 @@ export interface MoleculeViewerRef {
   showAtomCoordinates: (shouldShow: boolean) => void;
 }
 
-export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>(
+export const MoleculeViewer = forwardRef<
+  MoleculeViewerRef,
+  MoleculeViewerProps
+>(
   (
     {
-      width = "600px",
-      height = "600px",
-      backgroundColor = "white",
-      className = "",
+      width = '600px',
+      height = '600px',
+      backgroundColor = 'white',
+      className = '',
     },
     ref
   ) => {
@@ -58,35 +67,88 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
       if (areAxesVisibleRef.current) {
         let maxDist = 0;
         const atoms = model.atoms;
-        let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity, zmin = Infinity, zmax = -Infinity;
+        let xmin = Infinity,
+          xmax = -Infinity,
+          ymin = Infinity,
+          ymax = -Infinity,
+          zmin = Infinity,
+          zmax = -Infinity;
 
         for (const atom of atoms) {
-          if (atom.x === undefined || atom.y === undefined || atom.z === undefined) continue;
-          xmin = Math.min(xmin, atom.x); xmax = Math.max(xmax, atom.x);
-          ymin = Math.min(ymin, atom.y); ymax = Math.max(ymax, atom.y);
-          zmin = Math.min(zmin, atom.z); zmax = Math.max(zmax, atom.z);
+          if (
+            atom.x === undefined ||
+            atom.y === undefined ||
+            atom.z === undefined
+          )
+            continue;
+          xmin = Math.min(xmin, atom.x);
+          xmax = Math.max(xmax, atom.x);
+          ymin = Math.min(ymin, atom.y);
+          ymax = Math.max(ymax, atom.y);
+          zmin = Math.min(zmin, atom.z);
+          zmax = Math.max(zmax, atom.z);
         }
-        const dx = xmax - xmin; const dy = ymax - ymin; const dz = zmax - zmin;
+        const dx = xmax - xmin;
+        const dy = ymax - ymin;
+        const dz = zmax - zmin;
         maxDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        
+
         const axisLength = maxDist > 0 ? maxDist * 0.35 : 3.0;
         const radius = axisLength * 0.05;
         const labelOffset = radius * 4;
 
-        viewer.addArrow({ start: { x: 0, y: 0, z: 0 }, end: { x: axisLength, y: 0, z: 0 }, radius, color: 'red' });
-        viewer.addLabel("X", { position: { x: axisLength + labelOffset, y: 0, z: 0 }, fontColor: 'red', fontSize: 32, bold: true, backgroundOpacity: 0 });
+        viewer.addArrow({
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: axisLength, y: 0, z: 0 },
+          radius,
+          color: 'red',
+        });
+        viewer.addLabel('X', {
+          position: { x: axisLength + labelOffset, y: 0, z: 0 },
+          fontColor: 'red',
+          fontSize: 32,
+          bold: true,
+          backgroundOpacity: 0,
+        });
 
-        viewer.addArrow({ start: { x: 0, y: 0, z: 0 }, end: { x: 0, y: axisLength, z: 0 }, radius, color: 'green' });
-        viewer.addLabel("Y", { position: { x: 0, y: axisLength + labelOffset, z: 0 }, fontColor: 'green', fontSize: 32, bold: true, backgroundOpacity: 0 });
+        viewer.addArrow({
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 0, y: axisLength, z: 0 },
+          radius,
+          color: 'green',
+        });
+        viewer.addLabel('Y', {
+          position: { x: 0, y: axisLength + labelOffset, z: 0 },
+          fontColor: 'green',
+          fontSize: 32,
+          bold: true,
+          backgroundOpacity: 0,
+        });
 
-        viewer.addArrow({ start: { x: 0, y: 0, z: 0 }, end: { x: 0, y: 0, z: axisLength }, radius, color: 'blue' });
-        viewer.addLabel("Z", { position: { x: 0, y: 0, z: axisLength + labelOffset }, fontColor: 'blue', fontSize: 32, bold: true, backgroundOpacity: 0 });
+        viewer.addArrow({
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 0, y: 0, z: axisLength },
+          radius,
+          color: 'blue',
+        });
+        viewer.addLabel('Z', {
+          position: { x: 0, y: 0, z: axisLength + labelOffset },
+          fontColor: 'blue',
+          fontSize: 32,
+          bold: true,
+          backgroundOpacity: 0,
+        });
       }
 
       // --- 原子座標の描画 (有効な場合) ---
       if (areCoordinatesVisibleRef.current) {
         model.atoms.forEach(atom => {
-          if (atom.x === undefined || atom.y === undefined || atom.z === undefined) return;
+          if (
+            atom.x === undefined ||
+            atom.y === undefined ||
+            atom.z === undefined
+          )
+            return;
           const text = `(${atom.x.toFixed(4)}, ${atom.y.toFixed(4)}, ${atom.z.toFixed(4)})`;
           viewer.addLabel(text, {
             position: { x: atom.x, y: atom.y, z: atom.z },
@@ -98,7 +160,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
           });
         });
       }
-      
+
       viewer.render();
     };
 
@@ -108,10 +170,16 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
       try {
         viewer = $3Dmol.createViewer(containerRef.current, { backgroundColor });
         viewerRef.current = viewer;
-        const resizeObserver = new ResizeObserver(() => { viewer?.resize(); });
+        const resizeObserver = new ResizeObserver(() => {
+          viewer?.resize();
+        });
         resizeObserver.observe(containerRef.current);
-        return () => { resizeObserver.disconnect(); };
-      } catch (error) { console.error("Failed to initialize 3Dmol viewer:", error); }
+        return () => {
+          resizeObserver.disconnect();
+        };
+      } catch (error) {
+        console.error('Failed to initialize 3Dmol viewer:', error);
+      }
     }, [backgroundColor]);
 
     useImperativeHandle(ref, () => ({
@@ -120,12 +188,12 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
         if (!viewer) return;
         try {
           viewer.removeAllModels();
-          viewer.addModel(xyzData, "xyz");
+          viewer.addModel(xyzData, 'xyz');
           // Don't set default style here - it will be set by setStyle method
           updateOverlays(viewer);
           viewer.zoomTo();
         } catch (error) {
-          console.error("Failed to load XYZ data:", error);
+          console.error('Failed to load XYZ data:', error);
         }
       },
 
@@ -153,21 +221,21 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
           updateOverlays(viewer);
         }
       },
-      
+
       setStyle: (style: StyleSpec) => {
         const viewer = viewerRef.current;
         if (!viewer) return;
-        
+
         const useAtomicRadii = (style as any)._useAtomicRadii;
         const baseAtomRadius = (style as any)._baseAtomRadius || 0.3;
-        
+
         if (useAtomicRadii) {
           // Apply atomic radii: set styles for each element separately
           const model = viewer.getModel();
           if (model && model.atoms) {
             // First clear existing styles
             viewer.setStyle({}, {});
-            
+
             // Group atoms by element
             const elementGroups: Record<string, AtomSpec[]> = {};
             for (const atom of model.atoms) {
@@ -178,22 +246,26 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
                 elementGroups[atom.elem].push(atom);
               }
             }
-            
+
             // Apply styles for each element with appropriate radius
             for (const [element, atoms] of Object.entries(elementGroups)) {
-              const atomRadius = getAtomicRadius(element, VAN_DER_WAALS_RADII['H'], baseAtomRadius);
+              const atomRadius = getAtomicRadius(
+                element,
+                VAN_DER_WAALS_RADII['H'],
+                baseAtomRadius
+              );
               const elementSelector = { elem: element };
-              
+
               // Create element-specific style
               const elementStyle = { ...style };
               if (elementStyle.sphere) {
                 elementStyle.sphere.radius = atomRadius;
               }
-              
+
               // Remove metadata
               delete (elementStyle as any)._useAtomicRadii;
               delete (elementStyle as any)._baseAtomRadius;
-              
+
               viewer.addStyle(elementSelector, elementStyle);
             }
           } else {
@@ -210,7 +282,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
           delete (uniformStyle as any)._baseAtomRadius;
           viewer.setStyle({}, uniformStyle);
         }
-        
+
         viewer.render();
       },
 
@@ -225,7 +297,7 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
           const h = containerRef.current.clientHeight;
           return viewerRef.current.screenshot(w, h);
         }
-        return "";
+        return '';
       },
     }));
 
@@ -235,17 +307,17 @@ export const MoleculeViewer = forwardRef<MoleculeViewerRef, MoleculeViewerProps>
         style={{
           width,
           height,
-          border: "1px solid #ccc",
-          borderRadius: "8px",
-          overflow: "hidden",
-          position: "relative",
+          border: '1px solid #ccc',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
         <div
           ref={containerRef}
           style={{
-            width: "100%",
-            height: "100%",
+            width: '100%',
+            height: '100%',
           }}
         />
       </div>

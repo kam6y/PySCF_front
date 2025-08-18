@@ -12,27 +12,39 @@ export type CalculationMethod = components['schemas']['CalculationMethod'];
 export type CalculationStatus = components['schemas']['CalculationStatus'];
 
 // Request types
-export type PubChemSearchRequest = components['schemas']['PubChemSearchRequest'];
-export type SMILESConvertRequest = components['schemas']['SMILESConvertRequest'];
+export type PubChemSearchRequest =
+  components['schemas']['PubChemSearchRequest'];
+export type SMILESConvertRequest =
+  components['schemas']['SMILESConvertRequest'];
 export type XYZValidateRequest = components['schemas']['XYZValidateRequest'];
-export type QuantumCalculationRequest = components['schemas']['QuantumCalculationRequest'];
-export type CalculationUpdateRequest = components['schemas']['CalculationUpdateRequest'];
+export type QuantumCalculationRequest =
+  components['schemas']['QuantumCalculationRequest'];
+export type CalculationUpdateRequest =
+  components['schemas']['CalculationUpdateRequest'];
 
 // Response types
 export type HealthResponse = components['schemas']['HealthResponse'];
 export type PubChemCompoundInfo = components['schemas']['PubChemCompoundInfo'];
-export type PubChemSearchResponse = components['schemas']['PubChemSearchResponse'];
-export type SMILESConvertResponse = components['schemas']['SMILESConvertResponse'];
+export type PubChemSearchResponse =
+  components['schemas']['PubChemSearchResponse'];
+export type SMILESConvertResponse =
+  components['schemas']['SMILESConvertResponse'];
 export type XYZValidateResponse = components['schemas']['XYZValidateResponse'];
-export type StartCalculationResponse = components['schemas']['StartCalculationResponse'];
-export type CalculationListResponse = components['schemas']['CalculationListResponse'];
-export type CalculationDetailsResponse = components['schemas']['CalculationDetailsResponse'];
-export type CalculationUpdateResponse = components['schemas']['CalculationUpdateResponse'];
-export type CalculationDeleteResponse = components['schemas']['CalculationDeleteResponse'];
+export type StartCalculationResponse =
+  components['schemas']['StartCalculationResponse'];
+export type CalculationListResponse =
+  components['schemas']['CalculationListResponse'];
+export type CalculationDetailsResponse =
+  components['schemas']['CalculationDetailsResponse'];
+export type CalculationUpdateResponse =
+  components['schemas']['CalculationUpdateResponse'];
+export type CalculationDeleteResponse =
+  components['schemas']['CalculationDeleteResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Data models
-export type CalculationParameters = components['schemas']['CalculationParameters'];
+export type CalculationParameters =
+  components['schemas']['CalculationParameters'];
 export type CalculationResults = components['schemas']['CalculationResults'];
 export type CalculationInstance = components['schemas']['CalculationInstance'];
 export type CalculationSummary = components['schemas']['CalculationSummary'];

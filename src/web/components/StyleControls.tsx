@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { StyleSpec } from "../../types/3dmol";
-import { VAN_DER_WAALS_RADII } from "../data/atomicRadii";
+import React, { useState, useEffect } from 'react';
+import { StyleSpec } from '../../types/3dmol';
+import { VAN_DER_WAALS_RADII } from '../data/atomicRadii';
 
 export interface StyleControlsProps {
   onStyleChange: (style: StyleSpec) => void;
@@ -13,11 +13,7 @@ export interface StyleControlsProps {
   onUseAtomicRadiiChange?: (use: boolean) => void;
 }
 
-export type VisualizationStyle = 
-  | "stick"
-  | "sphere" 
-  | "ball-and-stick"
-  | "line";
+export type VisualizationStyle = 'stick' | 'sphere' | 'ball-and-stick' | 'line';
 
 export interface StyleOption {
   id: VisualizationStyle;
@@ -27,30 +23,30 @@ export interface StyleOption {
 
 const styleOptions: StyleOption[] = [
   {
-    id: "stick",
-    label: "Stick",
-    description: "Show bonds as sticks"
+    id: 'stick',
+    label: 'Stick',
+    description: 'Show bonds as sticks',
   },
   {
-    id: "sphere",
-    label: "Space-filling",
-    description: "Show atoms as spheres"
+    id: 'sphere',
+    label: 'Space-filling',
+    description: 'Show atoms as spheres',
   },
   {
-    id: "ball-and-stick",
-    label: "Ball & Stick",
-    description: "Combination of spheres and sticks"
+    id: 'ball-and-stick',
+    label: 'Ball & Stick',
+    description: 'Combination of spheres and sticks',
   },
   {
-    id: "line",
-    label: "Wireframe",
-    description: "Show bonds as thin lines"
-  }
+    id: 'line',
+    label: 'Wireframe',
+    description: 'Show bonds as thin lines',
+  },
 ];
 
-export const StyleControls: React.FC<StyleControlsProps> = ({ 
-  onStyleChange, 
-  className = "",
+export const StyleControls: React.FC<StyleControlsProps> = ({
+  onStyleChange,
+  className = '',
   showAxes,
   onShowAxesChange,
   showCoordinates,
@@ -58,51 +54,52 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   useAtomicRadii = false,
   onUseAtomicRadiiChange,
 }) => {
-  const [selectedStyle, setSelectedStyle] = useState<VisualizationStyle>("ball-and-stick");
+  const [selectedStyle, setSelectedStyle] =
+    useState<VisualizationStyle>('ball-and-stick');
   const [atomRadius, setAtomRadius] = useState(0.3);
   const [bondRadius, setBondRadius] = useState(0.15);
 
   const generateStyleSpec = (style: VisualizationStyle): StyleSpec => {
     switch (style) {
-      case "stick":
+      case 'stick':
         return {
           stick: {
             radius: bondRadius,
-            colorscheme: "default"
-          }
+            colorscheme: 'default',
+          },
         };
-      
-      case "sphere":
+
+      case 'sphere':
         return {
           sphere: {
             radius: atomRadius,
-            colorscheme: "default"
-          }
+            colorscheme: 'default',
+          },
         };
-      
-      case "ball-and-stick":
+
+      case 'ball-and-stick':
         return {
           stick: {
             radius: bondRadius,
-            colorscheme: "default"
+            colorscheme: 'default',
           },
           sphere: {
             radius: atomRadius,
-            colorscheme: "default"
-          }
+            colorscheme: 'default',
+          },
         };
-      
-      case "line":
+
+      case 'line':
         return {
           line: {
-            linewidth: 2
-          }
+            linewidth: 2,
+          },
         };
-      
+
       default:
         return {
           stick: { radius: 0.2 },
-          sphere: { radius: 0.3 }
+          sphere: { radius: 0.3 },
         };
     }
   };
@@ -119,7 +116,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
     onStyleChange(styleSpec);
   }, [selectedStyle, atomRadius, bondRadius, onStyleChange, useAtomicRadii]);
 
-
   return (
     <div className={`style-controls ${className}`}>
       <div className="style-controls-header">
@@ -127,8 +123,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       </div>
 
       <div className="style-options">
-        {styleOptions.map((option) => (
-          <label 
+        {styleOptions.map(option => (
+          <label
             key={option.id}
             className={`style-option ${selectedStyle === option.id ? 'selected' : ''}`}
           >
@@ -147,22 +143,23 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         ))}
       </div>
 
-      {(selectedStyle === "sphere" || selectedStyle === "ball-and-stick") && (
+      {(selectedStyle === 'sphere' || selectedStyle === 'ball-and-stick') && (
         <div className="size-control-section">
           <div className="toggle-switch" style={{ marginBottom: '16px' }}>
             <span className="toggle-label">Use Atomic Radii</span>
             <label className="switch">
-              <input 
-                type="checkbox" 
-                checked={useAtomicRadii} 
-                onChange={(e) => onUseAtomicRadiiChange?.(e.target.checked)}
+              <input
+                type="checkbox"
+                checked={useAtomicRadii}
+                onChange={e => onUseAtomicRadiiChange?.(e.target.checked)}
               />
               <span className="slider"></span>
             </label>
           </div>
           <div className="slider-control">
             <label className="slider-label">
-              {useAtomicRadii ? 'Base Size: ' : 'Atom Size: '}{atomRadius.toFixed(2)}
+              {useAtomicRadii ? 'Base Size: ' : 'Atom Size: '}
+              {atomRadius.toFixed(2)}
             </label>
             <input
               type="range"
@@ -170,11 +167,14 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               max="1.0"
               step="0.05"
               value={atomRadius}
-              onChange={(e) => setAtomRadius(parseFloat(e.target.value))}
+              onChange={e => setAtomRadius(parseFloat(e.target.value))}
               className="size-slider"
             />
             {useAtomicRadii && (
-              <p className="size-help-text" style={{ fontSize: '0.8em', color: '#666', marginTop: '4px' }}>
+              <p
+                className="size-help-text"
+                style={{ fontSize: '0.8em', color: '#666', marginTop: '4px' }}
+              >
                 Atoms will be sized proportionally to their van der Waals radii
               </p>
             )}
@@ -182,7 +182,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         </div>
       )}
 
-      {(selectedStyle === "stick" || selectedStyle === "ball-and-stick") && (
+      {(selectedStyle === 'stick' || selectedStyle === 'ball-and-stick') && (
         <div className="size-control-section">
           <div className="slider-control">
             <label className="slider-label">
@@ -194,7 +194,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               max="0.5"
               step="0.05"
               value={bondRadius}
-              onChange={(e) => setBondRadius(parseFloat(e.target.value))}
+              onChange={e => setBondRadius(parseFloat(e.target.value))}
               className="size-slider"
             />
           </div>
@@ -206,7 +206,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         <div className="quick-action-buttons">
           <button
             onClick={() => {
-              setSelectedStyle("ball-and-stick");
+              setSelectedStyle('ball-and-stick');
               setAtomRadius(0.3);
               setBondRadius(0.15);
             }}
@@ -234,29 +234,29 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           </button>
         </div>
       </div>
-      
+
       <div className="toggle-switch-section">
         <div className="toggle-switch">
-            <span className="toggle-label">Show XYZ Axes</span>
-            <label className="switch">
-                <input 
-                    type="checkbox" 
-                    checked={showAxes} 
-                    onChange={(e) => onShowAxesChange(e.target.checked)}
-                />
-                <span className="slider"></span>
-            </label>
+          <span className="toggle-label">Show XYZ Axes</span>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={showAxes}
+              onChange={e => onShowAxesChange(e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
         </div>
         <div className="toggle-switch" style={{ marginTop: '12px' }}>
-            <span className="toggle-label">Show Atom Coordinates</span>
-            <label className="switch">
-                <input 
-                    type="checkbox" 
-                    checked={showCoordinates} 
-                    onChange={(e) => onShowCoordinatesChange(e.target.checked)}
-                />
-                <span className="slider"></span>
-            </label>
+          <span className="toggle-label">Show Atom Coordinates</span>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={showCoordinates}
+              onChange={e => onShowCoordinatesChange(e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
         </div>
       </div>
     </div>
