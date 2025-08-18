@@ -78,7 +78,9 @@ export const useCalculationSubscription = ({
           } catch (e) {
             console.error('Failed to parse WebSocket message:', e);
             if (onErrorRef.current) {
-              onErrorRef.current('Failed to parse server response.');
+              onErrorRef.current(
+                'サーバーからの応答が解析できませんでした。計算状況の更新が一時的に停止する可能性があります。'
+              );
             }
           }
         };
@@ -86,9 +88,21 @@ export const useCalculationSubscription = ({
         ws.onerror = event => {
           console.error('WebSocket error:', event);
           if (onErrorRef.current) {
-            onErrorRef.current(
-              'Connection to the calculation status server failed.'
-            );
+            // WebSocketの状態に基づいてより具体的なエラーメッセージを提供
+            let errorMessage = '計算状況の監視に問題が発生しました。';
+
+            if (ws.readyState === WebSocket.CONNECTING) {
+              errorMessage =
+                'サーバーへの接続に失敗しました。ネットワーク接続を確認してください。';
+            } else if (ws.readyState === WebSocket.OPEN) {
+              errorMessage =
+                'サーバーとの通信が中断されました。計算は継続中ですが、状況の更新が停止しています。';
+            } else if (ws.readyState === WebSocket.CLOSED) {
+              errorMessage =
+                'サーバーとの接続が切断されました。ページを更新して状況を確認してください。';
+            }
+
+            onErrorRef.current(errorMessage);
           }
         };
 
@@ -108,7 +122,23 @@ export const useCalculationSubscription = ({
       } catch (error) {
         console.error('Failed to create WebSocket connection:', error);
         if (onErrorRef.current) {
-          onErrorRef.current('Failed to establish WebSocket connection.');
+          let errorMessage = 'リアルタイム監視の開始に失敗しました。';
+
+          if (error instanceof Error) {
+            // 特定のエラータイプに基づいてメッセージを調整
+            if (error.name === 'SecurityError') {
+              errorMessage =
+                'セキュリティ設定により接続できませんでした。HTTPSが必要な可能性があります。';
+            } else if (error.name === 'SyntaxError') {
+              errorMessage =
+                'WebSocketのURL形式が無効です。設定を確認してください。';
+            } else if (error.message.includes('network')) {
+              errorMessage =
+                'ネットワークエラーによりサーバーに接続できませんでした。';
+            }
+          }
+
+          onErrorRef.current(errorMessage);
         }
       }
     },

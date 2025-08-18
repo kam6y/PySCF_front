@@ -4,6 +4,7 @@
  */
 
 import { components, operations } from './generated-api';
+import { ApiError } from '../apiClient';
 
 // Export enum types as union types for convenience
 export type SearchType = components['schemas']['SearchType'];
@@ -81,3 +82,6 @@ export type CalculationListResponseData = CalculationListResponse['data'];
 export type CalculationDetailsResponseData = CalculationDetailsResponse['data'];
 export type CalculationUpdateResponseData = CalculationUpdateResponse['data'];
 export type CalculationDeleteResponseData = CalculationDeleteResponse['data'];
+
+// Error handling
+export { ApiError };

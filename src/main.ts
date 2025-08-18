@@ -43,7 +43,7 @@ const tryCondaCommand = async (command: string[]): Promise<string | null> => {
  */
 const detectCondaEnvironmentPath = async (): Promise<string | null> => {
   const envName = 'pyscf-env';
-  
+
   // 1. 環境変数でのパス指定をチェック
   const envPath = process.env.CONDA_ENV_PATH;
   if (envPath) {
@@ -52,7 +52,9 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
       console.log(`Using conda environment from CONDA_ENV_PATH: ${pythonPath}`);
       return pythonPath;
     } else {
-      console.log(`CONDA_ENV_PATH specified but python not found at: ${pythonPath}`);
+      console.log(
+        `CONDA_ENV_PATH specified but python not found at: ${pythonPath}`
+      );
     }
   }
 
@@ -78,7 +80,9 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
           const envPath = parts[parts.length - 1];
           const pythonPath = path.join(envPath, 'bin', 'python');
           if (fs.existsSync(pythonPath)) {
-            console.log(`Found conda environment from envs list: ${pythonPath}`);
+            console.log(
+              `Found conda environment from envs list: ${pythonPath}`
+            );
             return pythonPath;
           }
         }
@@ -88,22 +92,26 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
 
   // 4. fallback: 一般的なcondaインストール場所を試行
   const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-  const fallbackPaths = [
-    'miniforge3',
-    'miniconda3', 
-    'anaconda3',
-    'mambaforge'
-  ];
+  const fallbackPaths = ['miniforge3', 'miniconda3', 'anaconda3', 'mambaforge'];
 
   for (const condaDir of fallbackPaths) {
-    const pythonPath = path.join(homeDir, condaDir, 'envs', envName, 'bin', 'python');
+    const pythonPath = path.join(
+      homeDir,
+      condaDir,
+      'envs',
+      envName,
+      'bin',
+      'python'
+    );
     if (fs.existsSync(pythonPath)) {
       console.log(`Found conda environment using fallback path: ${pythonPath}`);
       return pythonPath;
     }
   }
 
-  console.log(`conda environment '${envName}' not found in any expected locations`);
+  console.log(
+    `conda environment '${envName}' not found in any expected locations`
+  );
   return null;
 };
 
@@ -135,7 +143,9 @@ const checkServerHealth = (
         })
         .on('error', _err => {
           attempts++;
-          console.log(`Health check attempt ${attempts}/${retries} failed for ${url}`);
+          console.log(
+            `Health check attempt ${attempts}/${retries} failed for ${url}`
+          );
           if (attempts >= retries) {
             clearInterval(interval);
             reject(

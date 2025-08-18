@@ -35,29 +35,145 @@ type ApiResponse<T> = {
 };
 
 /**
+ * HTTPステータスコードやレスポンス詳細を保持するカスタムエラークラス
+ */
+export class ApiError extends Error {
+  public readonly status: number;
+  public readonly statusText: string;
+  public readonly url: string;
+  public readonly response?: any;
+  public readonly isNetworkError: boolean;
+
+  constructor(
+    message: string,
+    status: number,
+    statusText: string,
+    url: string,
+    response?: any,
+    isNetworkError = false
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.statusText = statusText;
+    this.url = url;
+    this.response = response;
+    this.isNetworkError = isNetworkError;
+
+    // Maintains proper stack trace for where our error was thrown (only available on V8)
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ApiError);
+    }
+  }
+
+  /**
+   * エラーのタイプを判定するヘルパーメソッド
+   */
+  get errorType(): 'network' | 'client' | 'server' | 'unknown' {
+    if (this.isNetworkError) return 'network';
+    if (this.status >= 400 && this.status < 500) return 'client';
+    if (this.status >= 500) return 'server';
+    return 'unknown';
+  }
+
+  /**
+   * ユーザーフレンドリーなエラーメッセージを生成
+   */
+  getUserMessage(): string {
+    switch (this.errorType) {
+      case 'network':
+        return 'ネットワーク接続エラーが発生しました。インターネット接続を確認してください。';
+      case 'client':
+        if (this.status === 404) {
+          return 'お探しのリソースが見つかりませんでした。';
+        }
+        if (this.status === 400) {
+          return 'リクエストに問題があります。入力内容を確認してください。';
+        }
+        if (this.status === 401) {
+          return '認証が必要です。';
+        }
+        if (this.status === 403) {
+          return 'このリソースにアクセスする権限がありません。';
+        }
+        return 'リクエストエラーが発生しました。';
+      case 'server':
+        if (this.status === 503) {
+          return 'サーバーが一時的に利用できません。しばらく後にお試しください。';
+        }
+        return 'サーバーエラーが発生しました。管理者に連絡してください。';
+      default:
+        return this.message || '不明なエラーが発生しました。';
+    }
+  }
+}
+
+/**
  * APIリクエストを処理する汎用関数
  */
 const request = async <T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> => {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
+  const url = `${API_BASE_URL}${endpoint}`;
 
-  const apiResponse = (await response.json()) as ApiResponse<T>;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
 
-  if (!response.ok || !apiResponse.success) {
-    throw new Error(
-      apiResponse.error || 'APIとの通信中に不明なエラーが発生しました。'
+    let apiResponse: ApiResponse<T>;
+
+    try {
+      apiResponse = await response.json();
+    } catch (jsonError) {
+      // JSON解析エラー（レスポンスがJSONでない場合）
+      throw new ApiError(
+        'サーバーから無効なレスポンスが返されました。',
+        response.status,
+        response.statusText,
+        url,
+        null,
+        false
+      );
+    }
+
+    if (!response.ok || !apiResponse.success) {
+      const errorMessage =
+        apiResponse.error ||
+        `HTTPエラー: ${response.status} ${response.statusText}`;
+
+      throw new ApiError(
+        errorMessage,
+        response.status,
+        response.statusText,
+        url,
+        apiResponse,
+        false
+      );
+    }
+
+    return apiResponse.data; // Return the 'data' property directly
+  } catch (error) {
+    // fetchそのものが失敗した場合（ネットワークエラーなど）
+    if (error instanceof ApiError) {
+      throw error; // 既にApiErrorの場合はそのまま投げる
+    }
+
+    // ネットワークエラーやその他のfetchエラー
+    throw new ApiError(
+      'ネットワークエラーが発生しました。サーバーに接続できません。',
+      0, // ネットワークエラーの場合はステータスコード0
+      'Network Error',
+      url,
+      null,
+      true
     );
   }
-
-  return apiResponse.data; // Return the 'data' property directly
 };
 
 // --- API Functions ---
@@ -72,7 +188,16 @@ export const getCalculationDetails = (
   id: string
 ): Promise<CalculationDetailsResponseData> => {
   if (!id || id === 'undefined' || id === 'null') {
-    return Promise.reject(new Error('Invalid calculation ID provided.'));
+    return Promise.reject(
+      new ApiError(
+        'Invalid calculation ID provided.',
+        400,
+        'Bad Request',
+        `/api/quantum/calculations/${id}`,
+        null,
+        false
+      )
+    );
   }
   return request<CalculationDetailsResponseData>(
     `/api/quantum/calculations/${id}`,

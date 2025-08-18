@@ -21,6 +21,7 @@ import {
 import {
   CalculationInstance,
   QuantumCalculationRequest,
+  ApiError,
 } from './types/api-types';
 
 export const App = () => {
@@ -108,6 +109,24 @@ export const App = () => {
     return titles[page] || 'PySCF_front';
   };
 
+  /**
+   * エラーを適切に処理し、ユーザーフレンドリーなメッセージを表示するヘルパー関数
+   */
+  const handleApiError = (error: unknown, defaultMessage: string) => {
+    console.error(defaultMessage, error);
+
+    if (error instanceof ApiError) {
+      // ApiErrorの場合、ユーザーフレンドリーなメッセージを表示
+      alert(error.getUserMessage());
+    } else if (error instanceof Error) {
+      // 通常のErrorの場合、エラーメッセージを表示
+      alert(`${defaultMessage}: ${error.message}`);
+    } else {
+      // 不明なエラーの場合、デフォルトメッセージを表示
+      alert(`${defaultMessage}: 不明なエラーが発生しました。`);
+    }
+  };
+
   const handleSidebarToggle = () => setIsSidebarOpen(!isSidebarOpen);
   const handleSidebarClose = () => setIsSidebarOpen(false);
   const handleDropdownToggle = () => setIsDropdownOpen(!isDropdownOpen);
@@ -164,10 +183,7 @@ export const App = () => {
 
       return runningCalculation;
     } catch (error) {
-      console.error('Failed to start calculation:', error);
-      alert(
-        `Error starting calculation: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      handleApiError(error, '計算の開始に失敗しました');
       throw error;
     }
   };
@@ -182,10 +198,7 @@ export const App = () => {
         newName,
       });
     } catch (error) {
-      console.error('Failed to rename calculation:', error);
-      alert(
-        `Error: Could not rename calculation. ${error instanceof Error ? error.message : ''}`
-      );
+      handleApiError(error, '計算名の変更に失敗しました');
     }
   };
 
@@ -198,10 +211,7 @@ export const App = () => {
         setCurrentPage('calculation-settings');
       }
     } catch (error) {
-      console.error('Failed to delete calculation:', error);
-      alert(
-        `Error: Could not delete calculation. ${error instanceof Error ? error.message : ''}`
-      );
+      handleApiError(error, '計算の削除に失敗しました');
     }
   };
 
