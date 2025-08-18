@@ -440,67 +440,6 @@ class TDDFTCalculator(BaseCalculator):
             # Near-IR region - very low energy transitions
             return "Low energy transition (>700 nm)"
     
-    def _atoms_to_string(self, atoms: List[List]) -> str:
-        """Convert atoms list to PySCF atom string format."""
-        atom_lines = []
-        for atom_data in atoms:
-            symbol = atom_data[0]
-            coords = atom_data[1]
-            if len(coords) != 3:
-                raise GeometryError(f"Invalid coordinates for atom {symbol}: expected 3 coordinates, got {len(coords)}")
-            atom_lines.append(f"{symbol} {coords[0]:.6f} {coords[1]:.6f} {coords[2]:.6f}")
-        return "\n".join(atom_lines)
-    
-    def _analyze_orbitals(self) -> Tuple[int, int]:
-        """Analyze molecular orbitals to find HOMO and LUMO indices."""
-        if self.mf.mo_occ is None:
-            raise CalculationError("Orbital occupations not available")
-        
-        # Handle both RKS (1D array) and UKS (2D array) cases
-        mo_occ = self.mf.mo_occ
-        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
-            # UKS case: use alpha orbitals
-            mo_occ = mo_occ[0]
-        
-        # Find HOMO (highest occupied molecular orbital)
-        occupied_indices = np.where(mo_occ > 0)[0]
-        if len(occupied_indices) == 0:
-            raise CalculationError("No occupied orbitals found")
-        homo_idx = occupied_indices[-1]
-        
-        # Find LUMO (lowest unoccupied molecular orbital)
-        unoccupied_indices = np.where(mo_occ == 0)[0]
-        if len(unoccupied_indices) == 0:
-            raise CalculationError("No unoccupied orbitals found")
-        lumo_idx = unoccupied_indices[0]
-        
-        return int(homo_idx), int(lumo_idx)
-    
-    def _count_occupied_orbitals(self) -> int:
-        """Count the number of occupied orbitals."""
-        if self.mf.mo_occ is None:
-            return 0
-        
-        mo_occ = self.mf.mo_occ
-        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
-            # UKS case: count both alpha and beta orbitals
-            return int(np.sum(mo_occ > 0))
-        else:
-            # RKS case: simple sum
-            return int(np.sum(mo_occ > 0))
-    
-    def _count_virtual_orbitals(self) -> int:
-        """Count the number of virtual orbitals."""
-        if self.mf.mo_occ is None:
-            return 0
-        
-        mo_occ = self.mf.mo_occ
-        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
-            # UKS case: count both alpha and beta orbitals
-            return int(np.sum(mo_occ == 0))
-        else:
-            # RKS case: simple sum
-            return int(np.sum(mo_occ == 0))
     
     def _analyze_natural_transition_orbitals(self, excitation_energies: List[float]) -> List[Dict[str, Any]]:
         """

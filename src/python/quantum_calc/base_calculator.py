@@ -1,10 +1,11 @@
 """Base calculator class for quantum chemistry calculations."""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 import os
 import tempfile
 from contextlib import contextmanager
+import numpy as np
 
 
 class BaseCalculator(ABC):
@@ -105,3 +106,85 @@ class BaseCalculator(ABC):
             shutil.rmtree(self.working_dir)
         elif keep_files:
             print(f"Calculation files preserved in: {self.working_dir}")
+    
+    def _atoms_to_string(self, atoms: List[List]) -> str:
+        """Convert atoms list to PySCF atom string format."""
+        from .exceptions import GeometryError
+        
+        atom_lines = []
+        for atom_data in atoms:
+            symbol = atom_data[0]
+            coords = atom_data[1]
+            if len(coords) != 3:
+                raise GeometryError(f"Invalid coordinates for atom {symbol}: expected 3 coordinates, got {len(coords)}")
+            atom_lines.append(f"{symbol} {coords[0]:.6f} {coords[1]:.6f} {coords[2]:.6f}")
+        return "\n".join(atom_lines)
+    
+    def _analyze_orbitals(self) -> Tuple[int, int]:
+        """Analyze molecular orbitals to find HOMO and LUMO indices."""
+        from .exceptions import CalculationError
+        
+        if not hasattr(self, 'mf') or self.mf is None or self.mf.mo_occ is None:
+            raise CalculationError("Orbital occupations not available")
+        
+        # Handle both RKS/RHF (1D array) and UKS/UHF (2D array) cases
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS/UHF case: use alpha orbitals
+            mo_occ = mo_occ[0]
+        
+        # Find HOMO (highest occupied molecular orbital)
+        occupied_indices = np.where(mo_occ > 0)[0]
+        if len(occupied_indices) == 0:
+            raise CalculationError("No occupied orbitals found")
+        homo_idx = occupied_indices[-1]
+        
+        # Find LUMO (lowest unoccupied molecular orbital)
+        unoccupied_indices = np.where(mo_occ == 0)[0]
+        if len(unoccupied_indices) == 0:
+            raise CalculationError("No unoccupied orbitals found")
+        lumo_idx = unoccupied_indices[0]
+        
+        return int(homo_idx), int(lumo_idx)
+    
+    def _count_occupied_orbitals(self) -> int:
+        """Count the number of occupied orbitals."""
+        if not hasattr(self, 'mf') or self.mf is None or self.mf.mo_occ is None:
+            return 0
+        
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS/UHF case: count both alpha and beta orbitals
+            return int(np.sum(mo_occ > 0))
+        else:
+            # RKS/RHF case: simple sum
+            return int(np.sum(mo_occ > 0))
+    
+    def _count_virtual_orbitals(self) -> int:
+        """Count the number of virtual orbitals."""
+        if not hasattr(self, 'mf') or self.mf is None or self.mf.mo_occ is None:
+            return 0
+        
+        mo_occ = self.mf.mo_occ
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            # UKS/UHF case: count both alpha and beta orbitals
+            return int(np.sum(mo_occ == 0))
+        else:
+            # RKS/RHF case: simple sum
+            return int(np.sum(mo_occ == 0))
+    
+    def _geometry_to_xyz_string(self) -> str:
+        """Convert optimized geometry to XYZ format string."""
+        if not hasattr(self, 'optimized_geometry') or self.optimized_geometry is None:
+            return ""
+        if not hasattr(self, 'mol') or self.mol is None:
+            return ""
+        
+        atom_symbols = [self.mol.atom_symbol(i) for i in range(self.mol.natm)]
+        lines = [str(self.mol.natm)]
+        lines.append("Optimized geometry from PySCF calculation")
+        
+        for i, (symbol, coords) in enumerate(zip(atom_symbols, self.optimized_geometry)):
+            lines.append(f"{symbol:2s} {coords[0]:12.6f} {coords[1]:12.6f} {coords[2]:12.6f}")
+        
+        return "\n".join(lines)
