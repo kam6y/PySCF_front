@@ -4,36 +4,16 @@ version = "0.1.0"
 description = "PubChem integration backend for PySCF Native App"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "flask>=3.0.0",
-    "requests>=2.31.0",
-    "flask-cors>=4.0.0",
-    "certifi>=2024.7.4",
-    "rdkit>=2025.3.5",
-    "pyscf>=2.10.0",
-    "geometric>=1.1",
-    "pydantic>=2.11.7",
-    "flask-pydantic>=0.13.1",
-    "datamodel-code-generator>=0.25.0",
-    "flask-sock>=0.7.0",
-    "gevent>=25.5.1",
-    "gevent-websocket>=0.10.1",
-    "threadpoolctl>=3.6.0",
-    "pyinstaller>=6.15.0",
-]
 
-# Development dependencies for testing (install with conda/pip when needed):
-# conda install -c conda-forge pytest
-# pip install pytest-flask
-
-# Conda Environment Configuration
-# For better PySCF performance with OpenMP support on macOS (especially Apple Silicon),
-# use the conda environment instead of uv:
+# Dependencies are managed in .github/environment.yml
+# This ensures consistency between development, CI, and production environments.
+# The conda environment provides optimized scientific computing libraries
+# with OpenMP support for better PySCF performance.
 #
+# To set up the environment:
 # 1. Install Miniforge: https://github.com/conda-forge/miniforge
-# 2. Create environment: conda create -n pyscf-env python=3.12
+# 2. Create environment from file: conda env create -f .github/environment.yml
 # 3. Activate: conda activate pyscf-env
-# 4. Install packages: conda install -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
-# 5. Install pip packages: pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket
 #
-# The conda environment provides OpenMP-enabled PySCF for multi-core calculations
+# For development with testing:
+# The environment includes pytest and pytest-flask for running tests.

@@ -3,20 +3,30 @@ channels:
   - conda-forge
 dependencies:
   - python=3.12
+  # Core scientific computing libraries
   - pyscf
   - rdkit
-  - flask
   - geometric
+  # Web framework and networking
+  - flask
   - requests
   - flask-cors
   - pydantic
   - gevent
   - threadpoolctl
+  # Development and testing dependencies
+  - pytest
   - pip
   - pip:
+    # Flask extensions
     - flask-sock
     - flask-pydantic
+    # Code generation and build tools
     - datamodel-code-generator
     - pyinstaller
+    # WebSocket support
     - gevent-websocket
+    # Security and certificates
     - certifi
+    # Testing framework for Flask
+    - pytest-flask

@@ -41,13 +41,6 @@ jobs:
     - name: Install Node.js dependencies
       run: npm ci
     
-    - name: Install Python dependencies (conda)
-      shell: bash -l {0}
-      run: |
-        conda activate pyscf-env
-        conda install -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
-        pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
-    
     - name: Generate code and build application
       shell: bash -l {0}
       run: |

@@ -9,10 +9,10 @@
     "dev:electron": "wait-on ./dist/index.html ./dist/main.js && electronmon .",
     "build": "npm run codegen && npm run build:webpack && npm run build:python",
     "build:webpack": "cross-env NODE_ENV=\"production\" webpack --progress",
-    "build:python": "rimraf python_dist && cd src/python && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec'",
+    "build:python": "rimraf python_dist && cd src/python && conda run -n pyscf-env pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec",
     "package": "npm run build && electron-builder",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
-    "codegen:python": "cd src/python && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description'",
+    "codegen:python": "cd src/python && conda run -n pyscf-env datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description",
     "python-exec": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && \"$@\"' --",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts"
   },
