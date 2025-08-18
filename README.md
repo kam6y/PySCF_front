@@ -52,6 +52,29 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     
     > **重要**: このプロジェクトはconda環境での開発が必須です。conda環境が正しく設定されていない場合、アプリケーションはエラーダイアログを表示します。
 
+### conda環境のカスタムパス設定
+
+アプリケーションは以下の順序でconda環境を自動検出します：
+
+1. **環境変数** `CONDA_ENV_PATH` （最優先）
+2. **conda info --base** を使用したベースパスからの検出
+3. **conda info --envs** を使用した環境一覧からの検出
+4. **fallback候補パス**: `~/miniforge3`、`~/miniconda3`、`~/anaconda3`、`~/mambaforge`
+
+**カスタムパスを使用する場合:**
+```bash
+# conda環境が標準的でない場所にある場合
+export CONDA_ENV_PATH="/path/to/your/pyscf-env"
+
+# 例: カスタムインストール場所
+export CONDA_ENV_PATH="/opt/miniconda3/envs/pyscf-env"
+```
+
+**トラブルシューティング:**
+- conda環境が見つからない場合は、まず `conda info --envs` で `pyscf-env` が表示されることを確認してください
+- 環境変数を設定した場合は、ターミナルを再起動してから `npm run dev` を実行してください
+- conda がインストールされていない場合は、上記のMiniforgeインストール手順に従ってください
+
 4.  開発モードでアプリケーションを起動します。
     ```bash
     # conda環境をアクティブ化
