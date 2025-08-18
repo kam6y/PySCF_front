@@ -24,7 +24,8 @@ from gevent.pywsgi import WSGIServer
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
-from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator, CalculationError, ConvergenceError, InputError
+from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator, CalculationError, ConvergenceError, InputError, GeometryError
+from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
 from quantum_calc import get_process_manager, shutdown_process_manager
 from generated_models import (
@@ -54,8 +55,10 @@ def cleanup_resources():
     try:
         shutdown_process_manager()
         logger.info("Process manager shut down successfully")
+    except ProcessManagerError as e:
+        logger.warning(f"Process manager already shut down or unavailable: {e}")
     except Exception as e:
-        logger.error(f"Error shutting down process manager: {e}")
+        logger.error(f"Unexpected error shutting down process manager: {e}", exc_info=True)
 
 
 def signal_handler(signum, frame):
@@ -159,12 +162,22 @@ def validate_xyz_endpoint(body: XYZValidateRequest):
     try:
         xyz_string = body.xyz
         
+        # Check for empty or None input
+        if not xyz_string or not xyz_string.strip():
+            return jsonify({'success': False, 'error': 'XYZ string cannot be empty.'}), 400
+        
         validation_result = xyz_parser.validate_xyz(xyz_string)
         
         return jsonify({'success': True, 'data': validation_result})
         
+    except (TypeError, AttributeError) as e:
+        logger.warning(f"Invalid input data for XYZ validation: {e}")
+        return jsonify({'success': False, 'error': 'Invalid input format for XYZ validation.'}), 400
+    except MemoryError as e:
+        logger.error(f"Memory error during XYZ validation: {e}")
+        return jsonify({'success': False, 'error': 'XYZ string too large to process.'}), 413
     except Exception as e:
-        logger.error(f"Error during XYZ validation: {e}", exc_info=True)
+        logger.error(f"Unexpected error during XYZ validation: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
@@ -232,9 +245,24 @@ def quantum_calculate(body: QuantumCalculationRequest):
 
         return jsonify({'success': True, 'data': {'calculation': initial_instance}}), 202
 
+    except (InputError, GeometryError) as e:
+        logger.warning(f"Invalid calculation parameters: {e}")
+        return jsonify({'success': False, 'error': f'Invalid input parameters: {str(e)}'}), 400
+    except FileManagerError as e:
+        logger.error(f"File management error during calculation setup: {e}")
+        return jsonify({'success': False, 'error': 'Failed to set up calculation files.'}), 500
+    except ProcessManagerError as e:
+        logger.error(f"Process manager error during calculation submission: {e}")
+        return jsonify({'success': False, 'error': 'Calculation system is currently unavailable.'}), 503
+    except OSError as e:
+        logger.error(f"System error during calculation setup: {e}")
+        return jsonify({'success': False, 'error': 'Insufficient system resources to start calculation.'}), 507
+    except PermissionError as e:
+        logger.error(f"Permission error during calculation setup: {e}")
+        return jsonify({'success': False, 'error': 'System permission error. Please contact administrator.'}), 500
     except Exception as e:
-        logger.error(f"Error queuing calculation: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Failed to queue calculation.'}), 500
+        logger.error(f"Unexpected error queuing calculation: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
 @app.route('/api/quantum/calculations', methods=['GET'])
@@ -253,9 +281,18 @@ def list_calculations():
             }
         })
         
+    except FileManagerError as e:
+        logger.error(f"File manager error while listing calculations: {e}")
+        return jsonify({'success': False, 'error': 'Unable to access calculation directory.'}), 500
+    except PermissionError as e:
+        logger.error(f"Permission error while listing calculations: {e}")
+        return jsonify({'success': False, 'error': 'Permission denied accessing calculation directory.'}), 403
+    except OSError as e:
+        logger.error(f"System error while listing calculations: {e}")
+        return jsonify({'success': False, 'error': 'System error accessing calculation files.'}), 500
     except Exception as e:
-        logger.error(f"Error listing calculations: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Failed to list calculations.'}), 500
+        logger.error(f"Unexpected error listing calculations: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
 @app.route('/api/quantum/status', methods=['GET'])
@@ -280,9 +317,15 @@ def get_calculation_status():
             }
         })
         
+    except ProcessManagerError as e:
+        logger.error(f"Process manager error getting status: {e}")
+        return jsonify({'success': False, 'error': 'Process manager is unavailable.'}), 503
+    except AttributeError as e:
+        logger.error(f"Process manager attribute error: {e}")
+        return jsonify({'success': False, 'error': 'Process manager not properly initialized.'}), 500
     except Exception as e:
-        logger.error(f"Error getting calculation status: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Failed to get calculation status.'}), 500
+        logger.error(f"Unexpected error getting calculation status: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['GET'])
@@ -330,9 +373,18 @@ def get_calculation_details(calculation_id):
             }
         })
         
+    except FileManagerError as e:
+        logger.error(f"File manager error getting calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Unable to access calculation data.'}), 500
+    except OSError as e:
+        logger.error(f"System error getting calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'System error accessing calculation files.'}), 500
+    except ValueError as e:
+        logger.warning(f"Invalid calculation ID {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Invalid calculation ID format.'}), 400
     except Exception as e:
-        logger.error(f"Error getting calculation details for {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Failed to get calculation details.'}), 500
+        logger.error(f"Unexpected error getting calculation details for {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['PUT'])
@@ -358,9 +410,18 @@ def update_calculation(calculation_id, body: CalculationUpdateRequest):
             }
         })
 
+    except FileManagerError as e:
+        logger.error(f"File manager error updating calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Unable to update calculation data.'}), 500
+    except ValueError as e:
+        logger.warning(f"Invalid input for calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Invalid input data.'}), 400
+    except OSError as e:
+        logger.error(f"System error updating calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'System error updating calculation.'}), 500
     except Exception as e:
-        logger.error(f"Error updating calculation {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Failed to update calculation.'}), 500
+        logger.error(f"Unexpected error updating calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
 @app.route('/api/quantum/calculations/<calculation_id>/cancel', methods=['POST'])
@@ -394,9 +455,15 @@ def cancel_calculation(calculation_id):
                 'error': f'Failed to cancel calculation "{calculation_id}". It may have already completed.'
             }), 400
             
+    except ProcessManagerError as e:
+        logger.error(f"Process manager error cancelling calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Process manager unavailable.'}), 503
+    except ValueError as e:
+        logger.warning(f"Invalid calculation ID for cancellation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Invalid calculation ID.'}), 400
     except Exception as e:
-        logger.error(f"Error cancelling calculation {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Failed to cancel calculation.'}), 500
+        logger.error(f"Unexpected error cancelling calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['DELETE'])
@@ -431,9 +498,24 @@ def delete_calculation(calculation_id):
             }
         })
         
+    except ProcessManagerError as e:
+        logger.error(f"Process manager error deleting calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Process manager unavailable.'}), 503
+    except FileManagerError as e:
+        logger.error(f"File manager error deleting calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Unable to access calculation files.'}), 500
+    except PermissionError as e:
+        logger.error(f"Permission error deleting calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Permission denied deleting calculation.'}), 403
+    except OSError as e:
+        logger.error(f"System error deleting calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'System error deleting calculation files.'}), 500
+    except ValueError as e:
+        logger.warning(f"Invalid calculation ID for deletion {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Invalid calculation ID.'}), 400
     except Exception as e:
-        logger.error(f"Error deleting calculation {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'Failed to delete calculation.'}), 500
+        logger.error(f"Unexpected error deleting calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
 @sock.route('/ws/calculations/<calculation_id>')
@@ -535,8 +617,14 @@ def calculation_status_socket(ws, calculation_id):
                 logger.error(f"Error in WebSocket loop for {calculation_id}: {loop_error}")
                 break
             
+    except WebSocketError as e:
+        logger.error(f"WebSocket communication error for {calculation_id}: {e}")
+    except FileManagerError as e:
+        logger.error(f"File access error in WebSocket for {calculation_id}: {e}")
+    except OSError as e:
+        logger.error(f"System error in WebSocket for {calculation_id}: {e}")
     except Exception as e:
-        logger.error(f"WebSocket error for {calculation_id}: {e}", exc_info=True)
+        logger.error(f"Unexpected WebSocket error for {calculation_id}: {e}", exc_info=True)
     finally:
         # 接続が閉じることを確認
         logger.info(f"Closing WebSocket connection for calculation {calculation_id}")
