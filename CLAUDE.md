@@ -89,6 +89,11 @@ pytest tests/
 
 # Build Python executable only (uses PyInstaller)
 npm run build:python
+
+# Code formatting (using Prettier)
+npm run format      # Format all source code
+npm run format:check # Check if code is properly formatted
+
 Development Workflow
 The npm run dev script is the primary command for development. It automatically:
 
@@ -139,6 +144,17 @@ File Management: Listing, renaming, and deleting calculation directories and fil
 Health Check: An endpoint (/health) for startup coordination with the Electron main process.
 
 Dynamic Port: The Flask server automatically finds and uses a free port on startup, communicating it back to the Electron process.
+
+Code Quality & Formatting
+The project uses Prettier for consistent code formatting across all TypeScript, JavaScript, and JSON files:
+
+Configuration: Code formatting rules are defined in .prettierrc with sensible defaults for the project's style.
+
+Automatic Formatting: Use npm run format to automatically format all source files, or npm run format:check to verify formatting compliance.
+
+CI Integration: GitHub Actions CI enforces code formatting - PRs with formatting issues will fail the build, ensuring consistent code style across all contributions.
+
+Exclusions: Auto-generated files (like generated-api.ts and generated_models.py) are excluded via .prettierignore to prevent conflicts with code generation.
 
 Build System
 Frontend: Uses Webpack with ts-loader to compile TypeScript and React code into three separate bundles: main.js, preload.js, and the renderer's app.js.
