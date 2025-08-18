@@ -35,16 +35,12 @@ npm install
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
 bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
 
-# Create and activate conda environment
+# Create conda environment from environment.yml (includes all dependencies)
 source $HOME/miniforge3/etc/profile.d/conda.sh
-conda create -y -n pyscf-env python=3.12
+conda env create -f .github/environment.yml
+
+# Activate the environment
 conda activate pyscf-env
-
-# Install conda packages
-conda install -y -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
-
-# Install pip packages
-pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
 ```
 
 **Note**: The conda environment setup is mandatory. The application will show an error dialog if the conda environment is not properly configured.

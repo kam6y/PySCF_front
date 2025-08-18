@@ -42,14 +42,12 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
     bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
     
-    # conda環境の作成とアクティブ化
+    # conda環境をenvironment.ymlから作成（全ての依存関係を含む）
     source $HOME/miniforge3/etc/profile.d/conda.sh
-    conda create -y -n pyscf-env python=3.12
-    conda activate pyscf-env
+    conda env create -f .github/environment.yml
     
-    # パッケージのインストール
-    conda install -y -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl
-    pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket certifi
+    # 環境をアクティブ化
+    conda activate pyscf-env
     ```
     
     > **重要**: このプロジェクトはconda環境での開発が必須です。conda環境が正しく設定されていない場合、アプリケーションはエラーダイアログを表示します。
