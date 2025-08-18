@@ -26,6 +26,8 @@ dependencies:
     - pyinstaller
     # WebSocket support
     - gevent-websocket
+    # File system monitoring
+    - watchdog
     # Security and certificates
     - certifi
     # Testing framework for Flask

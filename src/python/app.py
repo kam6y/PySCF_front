@@ -24,7 +24,7 @@ from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator, CalculationError, ConvergenceError, InputError, GeometryError
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
-from quantum_calc import get_process_manager, shutdown_process_manager
+from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
     QuantumCalculationRequest, CalculationUpdateRequest
@@ -47,7 +47,7 @@ pubchem_client = PubChemClient(timeout=30)
 
 
 def cleanup_resources():
-    """Clean up resources including the process pool."""
+    """Clean up resources including the process pool and file watcher."""
     logger.info("Cleaning up resources...")
     try:
         shutdown_process_manager()
@@ -56,6 +56,12 @@ def cleanup_resources():
         logger.warning(f"Process manager already shut down or unavailable: {e}")
     except Exception as e:
         logger.error(f"Unexpected error shutting down process manager: {e}", exc_info=True)
+    
+    try:
+        shutdown_websocket_watcher()
+        logger.info("WebSocket file watcher shut down successfully")
+    except Exception as e:
+        logger.error(f"Unexpected error shutting down WebSocket file watcher: {e}", exc_info=True)
 
 
 def signal_handler(signum, frame):
@@ -518,14 +524,17 @@ def delete_calculation(calculation_id):
 @sock.route('/ws/calculations/<calculation_id>')
 def calculation_status_socket(ws, calculation_id):
     """
-    WebSocketエンドポイント。計算のステータスを監視し、クライアントに送信する。
+    WebSocket endpoint for efficient, event-driven calculation monitoring.
+    Uses file system event watching instead of polling for better performance.
     """
     logger.info(f"WebSocket connection established for calculation {calculation_id}")
     file_manager = CalculationFileManager()
     calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
-    last_known_status = None
-
-    # 計算ディレクトリの存在確認
+    
+    # State management for the connection
+    connection_active = True
+    
+    # Calculation directory existence check
     if not os.path.isdir(calc_path):
         logger.warning(f"Calculation directory not found: {calc_path}")
         try:
@@ -536,83 +545,120 @@ def calculation_status_socket(ws, calculation_id):
         except Exception as send_error:
             logger.error(f"Failed to send error message: {send_error}")
         finally:
-            try:
-                ws.close()
-            except:
-                pass
+            _close_websocket_safely(ws, calculation_id)
         return
 
-    try:
-        while True:
+    def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationFileManager) -> Dict:
+        """Build a complete calculation instance from file system data."""
+        try:
+            parameters = file_manager.read_calculation_parameters(calc_path) or {}
+            results = file_manager.read_calculation_results(calc_path)
+            status = file_manager.read_calculation_status(calc_path) or 'unknown'
+            display_name = file_manager._get_display_name(calc_id, parameters)
+            
+            # Safe date retrieval
             try:
-                # ファイルシステムから現在の状態を取得
-                current_status = file_manager.read_calculation_status(calc_path)
+                creation_date = parameters.get('created_at', 
+                    datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
+                updated_date = datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat()
+            except OSError:
+                current_time = datetime.now().isoformat()
+                creation_date = current_time
+                updated_date = current_time
+
+            return {
+                'id': calc_id,
+                'name': display_name,
+                'status': status,
+                'createdAt': creation_date,
+                'updatedAt': updated_date,
+                'parameters': parameters,
+                'results': results,
+                'workingDirectory': calc_path,
+            }
+        except Exception as e:
+            logger.error(f"Error building calculation instance for {calc_id}: {e}")
+            raise
+
+    def on_file_change(file_data: Dict):
+        """Callback for file system events - sends updated data to WebSocket client."""
+        nonlocal connection_active
+        
+        if not connection_active:
+            return
+            
+        try:
+            # Build complete calculation instance
+            calculation_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
+            
+            # Send update to WebSocket client
+            ws.send(json.dumps(calculation_instance))
+            logger.debug(f"Sent file change update for calculation {calculation_id} (status: {calculation_instance['status']})")
+            
+            # Close connection if calculation is finished
+            if calculation_instance['status'] in ['completed', 'error']:
+                logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'. Closing WebSocket.")
+                connection_active = False
+                # Small delay to ensure client receives the final status update
+                gevent.sleep(0.1)
+                _close_websocket_safely(ws, calculation_id)
                 
-                if current_status is None:
-                    logger.warning(f"Could not read status for calculation {calculation_id}")
-                    current_status = 'unknown'
+        except Exception as e:
+            logger.error(f"Error in file change callback for {calculation_id}: {e}")
+            try:
+                ws.send(json.dumps({
+                    'error': 'Failed to read calculation data',
+                    'id': calculation_id
+                }))
+            except:
+                pass  # Ignore send errors in error handler
+            connection_active = False
 
-                # ステータスが変更された場合のみデータを送信
-                if current_status != last_known_status:
-                    logger.info(f"Status changed for {calculation_id} to '{current_status}'. Sending update.")
-                    
-                    try:
-                        # get_calculation_detailsと同様のロジックで詳細データを取得
-                        parameters = file_manager.read_calculation_parameters(calc_path) or {}
-                        results = file_manager.read_calculation_results(calc_path)
-                        display_name = file_manager._get_display_name(calculation_id, parameters)
-                        
-                        # 作成日時の安全な取得
-                        try:
-                            creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
-                            updated_date = datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat()
-                        except OSError:
-                            current_time = datetime.now().isoformat()
-                            creation_date = current_time
-                            updated_date = current_time
-
-                        # CalculationInstance と同じ形式のデータを作成
-                        calculation_instance = {
-                            'id': calculation_id,
-                            'name': display_name,
-                            'status': current_status,
-                            'createdAt': creation_date,
-                            'updatedAt': updated_date,
-                            'parameters': parameters,
-                            'results': results,
-                            'workingDirectory': calc_path,
-                        }
-                        
-                        # JSON送信をtry-catchで包む
-                        try:
-                            ws.send(json.dumps(calculation_instance))
-                            last_known_status = current_status
-                        except Exception as send_error:
-                            logger.error(f"Failed to send WebSocket message: {send_error}")
-                            break  # 送信に失敗した場合は接続を終了
-                            
-                    except Exception as data_error:
-                        logger.error(f"Error preparing calculation data for {calculation_id}: {data_error}")
-                        try:
-                            ws.send(json.dumps({
-                                'error': 'Failed to read calculation data',
-                                'id': calculation_id,
-                                'status': current_status
-                            }))
-                        except:
-                            pass  # エラーメッセージ送信に失敗してもログ出力は行わない
-
-                # 計算が完了またはエラーになったらループを終了
-                if current_status in ['completed', 'error']:
-                    logger.info(f"Calculation {calculation_id} finished with status '{current_status}'. Closing WebSocket.")
+    try:
+        # Initialize file watcher and register this connection
+        watcher = get_websocket_watcher(file_manager.get_base_directory())
+        watcher.add_connection(calculation_id, on_file_change)
+        
+        # Send initial state immediately
+        try:
+            initial_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
+            ws.send(json.dumps(initial_instance))
+            logger.info(f"Sent initial state for calculation {calculation_id} (status: {initial_instance['status']})")
+            
+            # If calculation is already finished, close after sending initial state
+            if initial_instance['status'] in ['completed', 'error']:
+                logger.info(f"Calculation {calculation_id} already finished. Closing WebSocket after initial state.")
+                connection_active = False
+                _close_websocket_safely(ws, calculation_id)
+                return
+                
+        except Exception as e:
+            logger.error(f"Error sending initial state for {calculation_id}: {e}")
+            ws.send(json.dumps({
+                'error': 'Failed to read initial calculation data',
+                'id': calculation_id
+            }))
+            connection_active = False
+            return
+        
+        # Keep connection alive until client disconnects or calculation completes
+        # The file watcher will trigger on_file_change() when files are modified
+        try:
+            while connection_active:
+                # Use gevent-compatible receive to detect client disconnections
+                try:
+                    message = ws.receive(timeout=30.0)  # 30 second timeout
+                    if message is None:
+                        # Client disconnected
+                        logger.info(f"Client disconnected from calculation {calculation_id}")
+                        break
+                except Exception:
+                    # Timeout or disconnection - break out of loop
+                    logger.debug(f"WebSocket receive timeout or disconnection for {calculation_id}")
                     break
-                
-                # geventのスレッドに制御を譲る
-                gevent.sleep(0.5)
-                
-            except Exception as loop_error:
-                logger.error(f"Error in WebSocket loop for {calculation_id}: {loop_error}")
-                break
+                    
+        except Exception as e:
+            logger.error(f"Error in WebSocket receive loop for {calculation_id}: {e}")
             
     except WebSocketError as e:
         logger.error(f"WebSocket communication error for {calculation_id}: {e}")
@@ -623,12 +669,25 @@ def calculation_status_socket(ws, calculation_id):
     except Exception as e:
         logger.error(f"Unexpected WebSocket error for {calculation_id}: {e}", exc_info=True)
     finally:
-        # 接続が閉じることを確認
-        logger.info(f"Closing WebSocket connection for calculation {calculation_id}")
+        # Always clean up the connection
+        connection_active = False
         try:
-            ws.close()
-        except Exception as close_error:
-            logger.debug(f"Error closing WebSocket: {close_error}")
+            watcher = get_websocket_watcher(file_manager.get_base_directory())
+            watcher.remove_connection(calculation_id, on_file_change)
+            logger.debug(f"Removed WebSocket connection from file watcher for {calculation_id}")
+        except Exception as cleanup_error:
+            logger.error(f"Error cleaning up file watcher for {calculation_id}: {cleanup_error}")
+        
+        _close_websocket_safely(ws, calculation_id)
+
+
+def _close_websocket_safely(ws, calculation_id: str):
+    """Safely close a WebSocket connection with proper logging."""
+    try:
+        ws.close()
+        logger.info(f"WebSocket connection closed for calculation {calculation_id}")
+    except Exception as close_error:
+        logger.debug(f"Error closing WebSocket for {calculation_id}: {close_error}")
 
 
 @app.errorhandler(ValidationError)

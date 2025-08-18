@@ -35,10 +35,28 @@ export const App = () => {
     calculationId: activeCalculationData.activeCalculation?.id || null,
     status: activeCalculationData.activeCalculation?.status,
     onUpdate: (updatedCalculation: CalculationInstance) => {
-      // Queryキャッシュを直接更新
+      // 個別計算詳細のキャッシュを更新
       queryClient.setQueryData(['calculation', updatedCalculation.id], {
         calculation: updatedCalculation,
       });
+
+      // 計算リストのキャッシュも直接更新して即座に反映
+      queryClient.setQueryData(['calculations'], (oldData: any) => {
+        if (!oldData?.calculations) return oldData;
+        
+        const updatedCalculations = oldData.calculations.map((calc: any) => 
+          calc.id === updatedCalculation.id 
+            ? { ...calc, status: updatedCalculation.status }
+            : calc
+        );
+        
+        return {
+          ...oldData,
+          calculations: updatedCalculations
+        };
+      });
+
+      // 念のため計算リストも無効化（バックグラウンドでの最新データ取得用）
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
     },
     onError: (error: string) => {

@@ -7,6 +7,7 @@ from .mp2_calculator import MP2Calculator
 from .tddft_calculator import TDDFTCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError, FileManagerError, ProcessManagerError, WebSocketError, XYZValidationError
 from .process_manager import CalculationProcessManager, get_process_manager, shutdown_process_manager
+from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
 
 __all__ = [
     'BaseCalculator',
@@ -24,5 +25,8 @@ __all__ = [
     'XYZValidationError',
     'CalculationProcessManager',
     'get_process_manager',
-    'shutdown_process_manager'
+    'shutdown_process_manager',
+    'WebSocketCalculationWatcher',
+    'get_websocket_watcher',
+    'shutdown_websocket_watcher'
 ]

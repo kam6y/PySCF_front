@@ -146,8 +146,9 @@ export const useCalculationSubscription = ({
   );
 
   useEffect(() => {
-    // 計算が実行中でかつIDが有効な場合のみ接続
-    if (calculationId && status === 'running') {
+    // 計算が実行中または保留中でかつIDが有効な場合のみ接続
+    // completed/errorになるまで接続を維持することで、最終状態の更新を確実に受信
+    if (calculationId && (status === 'running' || status === 'pending')) {
       connect(calculationId);
     } else {
       disconnect();
