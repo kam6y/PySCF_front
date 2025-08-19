@@ -1,6 +1,6 @@
 // src/web/components/MolecularOrbitalViewer.tsx
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useGetOrbitals, useGetOrbitalCube } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
 
@@ -23,6 +23,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   onError,
 }) => {
   const viewerRef = useRef<HTMLDivElement>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [viewer, setViewer] = useState<any>(null);
   const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<number | null>(null);
   const [viewerOptions, setViewerOptions] = useState<ViewerOptions>({
@@ -31,6 +32,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
     isovalueNeg: -0.02,
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   // 軌道情報を取得
   const {
@@ -46,28 +48,105 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
     error: cubeError,
   } = useGetOrbitalCube(calculationId, selectedOrbitalIndex, viewerOptions);
 
-  // 3Dmol.jsビューアーの初期化
+  // ビューアーのリサイズ処理
+  const handleViewerResize = useCallback(() => {
+    if (viewer && viewerRef.current) {
+      try {
+        viewer.resize();
+        viewer.zoomTo();
+        viewer.render();
+      } catch (error) {
+        console.error('Failed to resize viewer:', error);
+      }
+    }
+  }, [viewer]);
+
+  // 3Dmol.jsビューアーの初期化（遅延実行）
   useEffect(() => {
     if (!viewerRef.current) return;
 
-    try {
-      const newViewer = $3Dmol.createViewer(viewerRef.current, {
-        backgroundColor: 'white',
-        antialias: true,
-      });
-      
-      setViewer(newViewer);
-      
-      return () => {
-        if (newViewer) {
-          newViewer.clear();
+    let animationFrameId: number;
+    let timeoutId: NodeJS.Timeout;
+
+    const initializeViewer = () => {
+      if (!viewerRef.current) return;
+
+      try {
+        const newViewer = $3Dmol.createViewer(viewerRef.current, {
+          backgroundColor: 'white',
+          antialias: true,
+        });
+        
+        setViewer(newViewer);
+        setRetryCount(0);
+
+        // 初期化後にリサイズを実行
+        timeoutId = setTimeout(() => {
+          if (newViewer && viewerRef.current) {
+            try {
+              newViewer.resize();
+              newViewer.render();
+            } catch (error) {
+              console.error('Failed to resize viewer after initialization:', error);
+            }
+          }
+        }, 100);
+        
+      } catch (error) {
+        console.error('Failed to initialize 3Dmol viewer:', error);
+        
+        // 再試行ロジック（最大3回まで）
+        if (retryCount < 3) {
+          setRetryCount(prev => prev + 1);
+          timeoutId = setTimeout(() => {
+            animationFrameId = requestAnimationFrame(initializeViewer);
+          }, 500 * (retryCount + 1)); // 指数バックオフ
+        } else {
+          onError?.('Failed to initialize molecular viewer after multiple attempts');
         }
-      };
-    } catch (error) {
-      console.error('Failed to initialize 3Dmol viewer:', error);
-      onError?.('Failed to initialize molecular viewer');
-    }
-  }, [onError]);
+      }
+    };
+
+    // requestAnimationFrameで遅延実行
+    animationFrameId = requestAnimationFrame(initializeViewer);
+    
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (viewer) {
+        viewer.clear();
+      }
+    };
+  }, [onError, retryCount]);
+
+  // ResizeObserverのセットアップ
+  useEffect(() => {
+    if (!viewerRef.current) return;
+
+    // ResizeObserver を設定してDOM要素のサイズ変更を監視
+    resizeObserverRef.current = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target === viewerRef.current) {
+          // サイズ変更時にビューアーをリサイズ（遅延実行）
+          setTimeout(() => {
+            handleViewerResize();
+          }, 50);
+        }
+      }
+    });
+
+    resizeObserverRef.current.observe(viewerRef.current);
+
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+    };
+  }, [handleViewerResize]);
 
   // HOMOを初期選択として設定
   useEffect(() => {
@@ -112,9 +191,22 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
       viewer.addModel(cubeContent, 'cube');
       viewer.setStyle({}, { stick: { radius: 0.1 }, sphere: { radius: 0.3 } });
 
-      // ビューを最適化
+      // ビューを最適化（即座に実行）
       viewer.zoomTo();
       viewer.render();
+
+      // レンダリング完了後の遅延再描画（レイアウトが確定してから）
+      setTimeout(() => {
+        try {
+          if (viewer && viewerRef.current) {
+            viewer.resize();
+            viewer.zoomTo();
+            viewer.render();
+          }
+        } catch (delayedRenderError) {
+          console.error('Failed to perform delayed re-render:', delayedRenderError);
+        }
+      }, 200);
 
       setIsLoading(false);
     } catch (error) {
@@ -319,19 +411,6 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
             ⚛️ 軌道データを生成中...
           </div>
         )}
-      </div>
-
-      {/* フッター情報 */}
-      <div
-        style={{
-          padding: '12px 16px',
-          backgroundColor: '#f8f9fa',
-          borderTop: '1px solid #ddd',
-          fontSize: '12px',
-          color: '#666',
-        }}
-      >
-        操作: マウスドラッグで回転、ホイールでズーム。赤色は正の位相、青色は負の位相を表します。
       </div>
     </div>
   );
