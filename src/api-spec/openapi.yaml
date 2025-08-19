@@ -200,6 +200,80 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+    put:
+      summary: Update calculation metadata
+      description: Update calculation name and other metadata
+      operationId: updateCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CalculationUpdateRequest'
+      responses:
+        '200':
+          description: Calculation updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationUpdateResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Name conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to update calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete calculation
+      description: Delete a calculation and all its associated files
+      operationId: deleteCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Calculation deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationDeleteResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to delete calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/quantum/calculations/{calculationId}/orbitals:
     get:
       summary: Get molecular orbital information
@@ -298,10 +372,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    put:
-      summary: Update calculation metadata
-      description: Update calculation name and other metadata
-      operationId: updateCalculation
+  /api/quantum/calculations/{calculationId}/orbitals/cube-files:
+    get:
+      summary: List CUBE files for a calculation
+      description: List all saved CUBE files for molecular orbitals in a calculation
+      operationId: listCubeFiles
       parameters:
         - name: calculationId
           in: path
@@ -309,42 +384,30 @@ paths:
           description: Unique calculation ID
           schema:
             type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CalculationUpdateRequest'
       responses:
         '200':
-          description: Calculation updated successfully
+          description: CUBE files list retrieved successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CalculationUpdateResponse'
+                $ref: '#/components/schemas/CubeFilesListResponse'
         '404':
           description: Calculation not found
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: Name conflict
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Failed to update calculation
+          description: Failed to retrieve CUBE files
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
     delete:
-      summary: Delete calculation
-      description: Delete a calculation and all its associated files
-      operationId: deleteCalculation
+      summary: Delete CUBE files for a calculation
+      description: Delete CUBE files for specific orbital or all orbitals in a calculation
+      operationId: deleteCubeFiles
       parameters:
         - name: calculationId
           in: path
@@ -352,13 +415,19 @@ paths:
           description: Unique calculation ID
           schema:
             type: string
+        - name: orbital_index
+          in: query
+          required: false
+          description: Specific orbital index to delete (if not provided, deletes all)
+          schema:
+            type: integer
       responses:
         '200':
-          description: Calculation deleted successfully
+          description: CUBE files deleted successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CalculationDeleteResponse'
+                $ref: '#/components/schemas/CubeFilesDeleteResponse'
         '404':
           description: Calculation not found
           content:
@@ -366,11 +435,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Failed to delete calculation
+          description: Failed to delete CUBE files
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+
 
 components:
   schemas:
@@ -1066,6 +1136,85 @@ components:
                 file_size_kb:
                   type: number
                   description: Generated file size in KB
+            file_path:
+              type: string
+              nullable: true
+              description: Path to saved CUBE file (if saved to disk)
+            cached:
+              type: boolean
+              description: Whether the CUBE file was loaded from cache
+
+    CubeFilesListResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [calculation_id, cube_files, total_files, total_size_kb]
+          properties:
+            calculation_id:
+              type: string
+              description: ID of the calculation
+            cube_files:
+              type: array
+              description: List of CUBE files
+              items:
+                type: object
+                required: [filename, file_path, orbital_index, grid_size, file_size_kb, modified]
+                properties:
+                  filename:
+                    type: string
+                    description: Name of the CUBE file
+                  file_path:
+                    type: string
+                    description: Full path to the CUBE file
+                  orbital_index:
+                    type: integer
+                    description: Index of the molecular orbital
+                  grid_size:
+                    type: integer
+                    description: Grid size used for generation
+                  file_size_kb:
+                    type: number
+                    description: File size in KB
+                  modified:
+                    type: string
+                    format: date-time
+                    description: Last modified timestamp
+            total_files:
+              type: integer
+              description: Total number of CUBE files
+            total_size_kb:
+              type: number
+              description: Total size of all CUBE files in KB
+
+    CubeFilesDeleteResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [calculation_id, deleted_files, message]
+          properties:
+            calculation_id:
+              type: string
+              description: ID of the calculation
+            orbital_index:
+              type: integer
+              nullable: true
+              description: Orbital index that was deleted (if specific)
+            deleted_files:
+              type: integer
+              description: Number of files deleted
+            message:
+              type: string
+              description: Human-readable message about the deletion
 
     ErrorResponse:
       type: object

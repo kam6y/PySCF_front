@@ -136,9 +136,17 @@ export interface paths {
          * @description Get detailed information about a specific calculation
          */
         get: operations["getCalculationDetails"];
-        put?: never;
+        /**
+         * Update calculation metadata
+         * @description Update calculation name and other metadata
+         */
+        put: operations["updateCalculation"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete calculation
+         * @description Delete a calculation and all its associated files
+         */
+        delete: operations["deleteCalculation"];
         options?: never;
         head?: never;
         patch?: never;
@@ -176,17 +184,33 @@ export interface paths {
          * @description Generate CUBE file for specific molecular orbital visualization
          */
         get: operations["getOrbitalCube"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/calculations/{calculationId}/orbitals/cube-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         /**
-         * Update calculation metadata
-         * @description Update calculation name and other metadata
+         * List CUBE files for a calculation
+         * @description List all saved CUBE files for molecular orbitals in a calculation
          */
-        put: operations["updateCalculation"];
+        get: operations["listCubeFiles"];
+        put?: never;
         post?: never;
         /**
-         * Delete calculation
-         * @description Delete a calculation and all its associated files
+         * Delete CUBE files for a calculation
+         * @description Delete CUBE files for specific orbital or all orbitals in a calculation
          */
-        delete: operations["deleteCalculation"];
+        delete: operations["deleteCubeFiles"];
         options?: never;
         head?: never;
         patch?: never;
@@ -614,6 +638,54 @@ export interface components {
                     /** @description Generated file size in KB */
                     file_size_kb?: number;
                 };
+                /** @description Path to saved CUBE file (if saved to disk) */
+                file_path?: string | null;
+                /** @description Whether the CUBE file was loaded from cache */
+                cached?: boolean;
+            };
+        };
+        CubeFilesListResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description ID of the calculation */
+                calculation_id: string;
+                /** @description List of CUBE files */
+                cube_files: {
+                    /** @description Name of the CUBE file */
+                    filename: string;
+                    /** @description Full path to the CUBE file */
+                    file_path: string;
+                    /** @description Index of the molecular orbital */
+                    orbital_index: number;
+                    /** @description Grid size used for generation */
+                    grid_size: number;
+                    /** @description File size in KB */
+                    file_size_kb: number;
+                    /**
+                     * Format: date-time
+                     * @description Last modified timestamp
+                     */
+                    modified: string;
+                }[];
+                /** @description Total number of CUBE files */
+                total_files: number;
+                /** @description Total size of all CUBE files in KB */
+                total_size_kb: number;
+            };
+        };
+        CubeFilesDeleteResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description ID of the calculation */
+                calculation_id: string;
+                /** @description Orbital index that was deleted (if specific) */
+                orbital_index?: number | null;
+                /** @description Number of files deleted */
+                deleted_files: number;
+                /** @description Human-readable message about the deletion */
+                message: string;
             };
         };
         ErrorResponse: {
@@ -889,6 +961,101 @@ export interface operations {
             };
         };
     };
+    updateCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalculationUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Calculation updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationUpdateResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Name conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to update calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculation deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationDeleteResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getOrbitals: {
         parameters: {
             query?: never;
@@ -980,61 +1147,7 @@ export interface operations {
             };
         };
     };
-    updateCalculation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Unique calculation ID */
-                calculationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CalculationUpdateRequest"];
-            };
-        };
-        responses: {
-            /** @description Calculation updated successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalculationUpdateResponse"];
-                };
-            };
-            /** @description Calculation not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Name conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to update calculation */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    deleteCalculation: {
+    listCubeFiles: {
         parameters: {
             query?: never;
             header?: never;
@@ -1046,13 +1159,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Calculation deleted successfully */
+            /** @description CUBE files list retrieved successfully */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CalculationDeleteResponse"];
+                    "application/json": components["schemas"]["CubeFilesListResponse"];
                 };
             };
             /** @description Calculation not found */
@@ -1064,7 +1177,51 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Failed to delete calculation */
+            /** @description Failed to retrieve CUBE files */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteCubeFiles: {
+        parameters: {
+            query?: {
+                /** @description Specific orbital index to delete (if not provided, deletes all) */
+                orbital_index?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CUBE files deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CubeFilesDeleteResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete CUBE files */
             500: {
                 headers: {
                     [name: string]: unknown;

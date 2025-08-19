@@ -11,6 +11,8 @@ import {
   StartCalculationResponseData,
   OrbitalsResponseData,
   OrbitalCubeResponseData,
+  CubeFilesListResponseData,
+  CubeFilesDeleteResponseData,
 } from './types/api-types';
 
 let API_BASE_URL = 'http://127.0.0.1:5000'; // Default, will be updated
@@ -339,4 +341,63 @@ export const getOrbitalCube = (
   }`;
 
   return request<OrbitalCubeResponseData>(endpoint, { method: 'GET' });
+};
+
+/**
+ * List all CUBE files for a calculation
+ */
+export const listCubeFiles = (
+  calculationId: string
+): Promise<CubeFilesListResponseData> => {
+  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid calculation ID provided.',
+        400,
+        'Bad Request',
+        `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
+        null,
+        false
+      )
+    );
+  }
+
+  return request<CubeFilesListResponseData>(
+    `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
+    { method: 'GET' }
+  );
+};
+
+/**
+ * Delete CUBE files for a calculation
+ */
+export const deleteCubeFiles = (
+  calculationId: string,
+  orbitalIndex?: number
+): Promise<CubeFilesDeleteResponseData> => {
+  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid calculation ID provided.',
+        400,
+        'Bad Request',
+        `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
+        null,
+        false
+      )
+    );
+  }
+
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  if (orbitalIndex !== undefined && orbitalIndex >= 0) {
+    queryParams.append('orbital_index', orbitalIndex.toString());
+  }
+
+  const queryString = queryParams.toString();
+  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/cube-files${
+    queryString ? `?${queryString}` : ''
+  }`;
+
+  return request<CubeFilesDeleteResponseData>(endpoint, { method: 'DELETE' });
 };

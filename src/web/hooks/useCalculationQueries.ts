@@ -107,8 +107,10 @@ export const useGetOrbitalCube = (
              orbitalIndex !== null && 
              orbitalIndex >= 0 && 
              !calculationId.startsWith('new-calculation-'),
-    staleTime: 5 * 60 * 1000, // 5分間キャッシュを保持（CUBEファイルは生成に時間がかかるため）
-    gcTime: 30 * 60 * 1000, // 30分間メモリに保持
+    staleTime: 60 * 60 * 1000, // 1時間キャッシュを保持（永続化されたため長期キャッシュ可能）
+    gcTime: 24 * 60 * 60 * 1000, // 24時間メモリに保持（永続化されたファイルアクセス用）
+    refetchOnWindowFocus: false, // ウィンドウフォーカス時の再取得を無効化（永続化されたため）
+    refetchOnMount: false, // マウント時の再取得を無効化（永続化されたため）
   });
 };
 
@@ -135,6 +137,28 @@ export const useGenerateOrbitalCube = () => {
         ['orbital-cube', variables.calculationId, variables.orbitalIndex, variables.options],
         data
       );
+    },
+  });
+};
+
+// CUBE files management
+export const useListCubeFiles = (calculationId: string | null) => {
+  return useQuery({
+    queryKey: ['cube-files', calculationId],
+    queryFn: () => apiClient.listCubeFiles(calculationId!),
+    enabled: !!calculationId && !calculationId.startsWith('new-calculation-'),
+  });
+};
+
+export const useDeleteCubeFiles = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ calculationId, orbitalIndex }: { calculationId: string; orbitalIndex?: number }) =>
+      apiClient.deleteCubeFiles(calculationId, orbitalIndex),
+    onSuccess: (data, variables) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({ queryKey: ['cube-files', variables.calculationId] });
+      queryClient.invalidateQueries({ queryKey: ['orbital-cube', variables.calculationId] });
     },
   });
 };

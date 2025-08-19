@@ -622,10 +622,14 @@ def get_orbital_cube(calculation_id, orbital_index):
             grid_size=grid_size,
             isovalue_pos=isovalue_pos,
             isovalue_neg=isovalue_neg,
-            return_content=True
+            return_content=True,
+            save_to_disk=True
         )
         
-        logger.info(f"Successfully generated CUBE file for calculation {calculation_id}, orbital {orbital_index}")
+        if cube_data.get('cached', False):
+            logger.info(f"Using cached CUBE file for calculation {calculation_id}, orbital {orbital_index}")
+        else:
+            logger.info(f"Successfully generated CUBE file for calculation {calculation_id}, orbital {orbital_index}")
         logger.info(f"File size: {cube_data['generation_params']['file_size_kb']:.1f} KB")
         
         return jsonify({
@@ -644,6 +648,80 @@ def get_orbital_cube(calculation_id, orbital_index):
         return jsonify({'success': False, 'error': 'Invalid orbital index.'}), 400
     except Exception as e:
         logger.error(f"Unexpected error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>/orbitals/cube-files', methods=['GET'])
+def list_cube_files(calculation_id):
+    """List all CUBE files for a calculation."""
+    try:
+        file_manager = CalculationFileManager()
+        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+        
+        if not os.path.isdir(calc_path):
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Get CUBE file information
+        cube_files = file_manager.get_cube_files_info(calc_path)
+        
+        logger.info(f"Found {len(cube_files)} CUBE files for calculation {calculation_id}")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'calculation_id': calculation_id,
+                'cube_files': cube_files,
+                'total_files': len(cube_files),
+                'total_size_kb': sum(f['file_size_kb'] for f in cube_files)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Unexpected error listing CUBE files for {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>/orbitals/cube-files', methods=['DELETE'])
+def delete_cube_files(calculation_id):
+    """Delete CUBE files for a calculation."""
+    try:
+        # Get query parameters
+        orbital_index = request.args.get('orbital_index', type=int)
+        
+        file_manager = CalculationFileManager()
+        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+        
+        if not os.path.isdir(calc_path):
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Delete CUBE files
+        deleted_count = file_manager.delete_cube_files(calc_path, orbital_index)
+        
+        if deleted_count > 0:
+            if orbital_index is not None:
+                logger.info(f"Deleted {deleted_count} CUBE files for orbital {orbital_index} in calculation {calculation_id}")
+                message = f"Deleted {deleted_count} CUBE files for orbital {orbital_index}."
+            else:
+                logger.info(f"Deleted {deleted_count} CUBE files for calculation {calculation_id}")
+                message = f"Deleted {deleted_count} CUBE files."
+        else:
+            if orbital_index is not None:
+                message = f"No CUBE files found for orbital {orbital_index}."
+            else:
+                message = "No CUBE files found."
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'calculation_id': calculation_id,
+                'orbital_index': orbital_index,
+                'deleted_files': deleted_count,
+                'message': message
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Unexpected error deleting CUBE files for {calculation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 

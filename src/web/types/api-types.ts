@@ -43,6 +43,8 @@ export type CalculationDeleteResponse =
   components['schemas']['CalculationDeleteResponse'];
 export type OrbitalsResponse = components['schemas']['OrbitalsResponse'];
 export type OrbitalCubeResponse = components['schemas']['OrbitalCubeResponse'];
+export type CubeFilesListResponse = components['schemas']['CubeFilesListResponse'];
+export type CubeFilesDeleteResponse = components['schemas']['CubeFilesDeleteResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Data models
@@ -66,11 +68,9 @@ export type Operations = {
   deleteCalculation: operations['deleteCalculation'];
   getOrbitals: operations['getOrbitals'];
   getOrbitalCube: operations['getOrbitalCube'];
+  listCubeFiles: operations['listCubeFiles'];
+  deleteCubeFiles: operations['deleteCubeFiles'];
 };
-
-// Legacy compatibility aliases
-export type BasisFunction = string;
-export type ExchangeCorrelation = string;
 
 // Response wrapper for API responses
 export type ApiResponse<T> = {
@@ -89,6 +89,8 @@ export type CalculationUpdateResponseData = CalculationUpdateResponse['data'];
 export type CalculationDeleteResponseData = CalculationDeleteResponse['data'];
 export type OrbitalsResponseData = OrbitalsResponse['data'];
 export type OrbitalCubeResponseData = OrbitalCubeResponse['data'];
+export type CubeFilesListResponseData = CubeFilesListResponse['data'];
+export type CubeFilesDeleteResponseData = CubeFilesDeleteResponse['data'];
 
 // Error handling
 export { ApiError };
