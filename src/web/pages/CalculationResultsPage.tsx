@@ -229,6 +229,7 @@ export const CalculationResultsPage = ({
             量子化学計算で得られた分子軌道を3D可視化します。軌道を選択して形状や分布を確認できます。
           </div>
           <MolecularOrbitalViewer
+            key={activeCalculation.id}
             calculationId={activeCalculation.id}
             onError={error => setError(error)}
           />

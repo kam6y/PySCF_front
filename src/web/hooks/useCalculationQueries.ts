@@ -109,10 +109,10 @@ export const useGetOrbitalCube = (
       orbitalIndex !== null &&
       orbitalIndex >= 0 &&
       !calculationId.startsWith('new-calculation-'),
-    staleTime: 60 * 60 * 1000, // 1時間キャッシュを保持（永続化されたため長期キャッシュ可能）
+    staleTime: 5 * 60 * 1000, // 5分間キャッシュを保持（計算切り替え時の更新を確保）
     gcTime: 24 * 60 * 60 * 1000, // 24時間メモリに保持（永続化されたファイルアクセス用）
-    refetchOnWindowFocus: false, // ウィンドウフォーカス時の再取得を無効化（永続化されたため）
-    refetchOnMount: false, // マウント時の再取得を無効化（永続化されたため）
+    refetchOnWindowFocus: false, // ウィンドウフォーカス時の再取得を無効化
+    refetchOnMount: false, // マウント時の再取得を無効化（staleTimeを優先してキャッシュを活用）
   });
 };
 

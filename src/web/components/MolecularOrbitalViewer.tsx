@@ -1,6 +1,7 @@
 // src/web/components/MolecularOrbitalViewer.tsx
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useGetOrbitals,
   useGetOrbitalCube,
@@ -25,8 +26,11 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   calculationId,
   onError,
 }) => {
+  const queryClient = useQueryClient();
   const viewerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  
+  // State declarations
   const [viewer, setViewer] = useState<any>(null);
   const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
     number | null
@@ -38,6 +42,21 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   });
   const [isLoading, setIsLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isDomReady, setIsDomReady] = useState(false);
+  
+  // Callback ref to properly track when DOM element becomes available
+  const setViewerRef = useCallback((node: HTMLDivElement | null) => {
+    if (viewerRef.current !== node) {
+      viewerRef.current = node;
+      
+      // Update DOM ready state when ref changes
+      const isReady = !!node;
+      if (isReady !== isDomReady) {
+        setIsDomReady(isReady);
+      }
+    }
+  }, [isDomReady]);
+  const previousCalculationIdRef = useRef<string | null>(null);
 
   // 軌道情報を取得
   const {
@@ -68,13 +87,21 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
   // 3Dmol.jsビューアーの初期化（遅延実行）
   useEffect(() => {
-    if (!viewerRef.current) return;
+    if (!isDomReady || !viewerRef.current) {
+      return;
+    }
+
+    if (viewer) {
+      return;
+    }
 
     let animationFrameId: number;
     let timeoutId: NodeJS.Timeout;
 
     const initializeViewer = () => {
-      if (!viewerRef.current) return;
+      if (!viewerRef.current) {
+        return;
+      }
 
       try {
         const newViewer = $3Dmol.createViewer(viewerRef.current, {
@@ -133,11 +160,13 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         viewer.clear();
       }
     };
-  }, [onError, retryCount]);
+  }, [onError, retryCount, isDomReady, viewer]);
 
   // ResizeObserverのセットアップ
   useEffect(() => {
-    if (!viewerRef.current) return;
+    if (!viewerRef.current) {
+      return;
+    }
 
     // ResizeObserver を設定してDOM要素のサイズ変更を監視
     resizeObserverRef.current = new ResizeObserver(entries => {
@@ -160,6 +189,42 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
     };
   }, [handleViewerResize]);
 
+  // calculationIdが変更されたときに状態をリセットとキャッシュ無効化
+  useEffect(() => {
+    const previousCalculationId = previousCalculationIdRef.current;
+    
+    // 実際にcalculationIdが変更された場合のみ処理を実行
+    if (previousCalculationId !== calculationId) {
+      // 状態をリセット
+      setSelectedOrbitalIndex(null);
+      setIsLoading(false);
+      setIsDomReady(false);
+      
+      // 3Dmol.jsビューアーをクリア
+      if (viewer) {
+        try {
+          viewer.clear();
+        } catch (error) {
+          console.error('Failed to clear viewer:', error);
+        }
+      }
+      setViewer(null);
+      
+      // 軌道関連のクエリキャッシュを無効化（新しいcalculationIdが有効な場合のみ）
+      if (calculationId && !calculationId.startsWith('new-calculation-')) {
+        queryClient.invalidateQueries({
+          queryKey: ['orbitals', calculationId]
+        });
+        queryClient.invalidateQueries({
+          queryKey: ['orbital-cube', calculationId]
+        });
+      }
+      
+      // 現在のcalculationIdを記録
+      previousCalculationIdRef.current = calculationId;
+    }
+  }, [calculationId, queryClient, viewer]);
+
   // HOMOを初期選択として設定
   useEffect(() => {
     if (orbitalsData && selectedOrbitalIndex === null) {
@@ -170,11 +235,13 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         setSelectedOrbitalIndex(homoOrbital.index);
       }
     }
-  }, [orbitalsData, selectedOrbitalIndex]);
+  }, [orbitalsData, selectedOrbitalIndex, calculationId]);
 
   // CUBEデータが更新されたときに分子軌道を表示
   useEffect(() => {
-    if (!viewer || !cubeData || !(cubeData as any).cube_data) return;
+    if (!viewer || !cubeData || !(cubeData as any).cube_data) {
+      return;
+    }
 
     setIsLoading(true);
 
@@ -234,12 +301,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   // エラーハンドリング
   useEffect(() => {
     if (orbitalsError) {
+      console.error('Failed to load orbital information:', orbitalsError);
       onError?.(orbitalsError.message || 'Failed to load orbital information');
     }
   }, [orbitalsError, onError]);
 
   useEffect(() => {
     if (cubeError) {
+      console.error('Failed to load orbital visualization data:', cubeError);
       onError?.(
         cubeError.message || 'Failed to load orbital visualization data'
       );
@@ -442,7 +511,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
       {/* 3Dmol.jsビューアー */}
       <div style={{ position: 'relative' }}>
         <div
-          ref={viewerRef}
+          ref={setViewerRef}
           style={{
             width: '100%',
             height: '500px',
