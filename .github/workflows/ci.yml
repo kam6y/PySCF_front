@@ -24,17 +24,12 @@ jobs:
         node-version: '20'
         cache: 'npm'
     
-    - name: Get current date
-      id: date
-      run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
-    
     - name: Cache conda environment
       uses: actions/cache@v4
       with:
         path: ~/conda_pkgs_dir
-        key: ${{ runner.os }}-conda-${{ hashFiles('.github/environment.yml') }}-${{ steps.date.outputs.date }}
+        key: ${{ runner.os }}-conda-${{ hashFiles('.github/environment.yml') }}
         restore-keys: |
-          ${{ runner.os }}-conda-${{ hashFiles('.github/environment.yml') }}-
           ${{ runner.os }}-conda-
     
     - name: Setup Miniconda
