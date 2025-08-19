@@ -21,7 +21,7 @@ from gevent.pywsgi import WSGIServer
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
-from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator, CalculationError, ConvergenceError, InputError, GeometryError
+from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator, MolecularOrbitalGenerator, CalculationError, ConvergenceError, InputError, GeometryError
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
 from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher
@@ -518,6 +518,132 @@ def delete_calculation(calculation_id):
         return jsonify({'success': False, 'error': 'Invalid calculation ID.'}), 400
     except Exception as e:
         logger.error(f"Unexpected error deleting calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>/orbitals', methods=['GET'])
+def get_orbitals(calculation_id):
+    """Get molecular orbital information for a calculation."""
+    try:
+        file_manager = CalculationFileManager()
+        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+        
+        if not os.path.isdir(calc_path):
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Check if calculation is completed
+        status = file_manager.read_calculation_status(calc_path)
+        if status != 'completed':
+            return jsonify({
+                'success': False, 
+                'error': f'Calculation "{calculation_id}" is not completed. Status: {status}'
+            }), 400
+        
+        # Initialize orbital generator
+        orbital_generator = MolecularOrbitalGenerator(calc_path)
+        
+        # Validate calculation data
+        if not orbital_generator.validate_calculation():
+            return jsonify({
+                'success': False,
+                'error': 'Orbital data is not available or calculation data is invalid.'
+            }), 404
+        
+        # Get orbital summary
+        orbital_summary = orbital_generator.get_orbital_summary()
+        
+        logger.info(f"Retrieved orbital information for calculation {calculation_id}")
+        logger.info(f"Total orbitals: {orbital_summary['total_orbitals']}, "
+                   f"HOMO: {orbital_summary['homo_index']}, LUMO: {orbital_summary['lumo_index']}")
+        
+        return jsonify({
+            'success': True,
+            'data': orbital_summary
+        })
+        
+    except CalculationError as e:
+        logger.error(f"Calculation error getting orbitals for {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    except FileManagerError as e:
+        logger.error(f"File manager error getting orbitals for {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Unable to access calculation files.'}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error getting orbitals for {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>/orbitals/<int:orbital_index>/cube', methods=['GET'])
+def get_orbital_cube(calculation_id, orbital_index):
+    """Generate and return CUBE file for specific molecular orbital."""
+    try:
+        file_manager = CalculationFileManager()
+        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+        
+        if not os.path.isdir(calc_path):
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Check if calculation is completed
+        status = file_manager.read_calculation_status(calc_path)
+        if status != 'completed':
+            return jsonify({
+                'success': False, 
+                'error': f'Calculation "{calculation_id}" is not completed. Status: {status}'
+            }), 400
+        
+        # Get query parameters with defaults
+        grid_size = request.args.get('gridSize', 80, type=int)
+        isovalue_pos = request.args.get('isovaluePos', 0.02, type=float)
+        isovalue_neg = request.args.get('isovalueNeg', -0.02, type=float)
+        
+        # Validate parameters
+        if grid_size < 40 or grid_size > 120:
+            return jsonify({'success': False, 'error': 'Grid size must be between 40 and 120.'}), 400
+        if isovalue_pos < 0.001 or isovalue_pos > 0.1:
+            return jsonify({'success': False, 'error': 'Positive isovalue must be between 0.001 and 0.1.'}), 400
+        if isovalue_neg > -0.001 or isovalue_neg < -0.1:
+            return jsonify({'success': False, 'error': 'Negative isovalue must be between -0.1 and -0.001.'}), 400
+        
+        # Initialize orbital generator
+        orbital_generator = MolecularOrbitalGenerator(calc_path)
+        
+        # Validate calculation data
+        if not orbital_generator.validate_calculation():
+            return jsonify({
+                'success': False,
+                'error': 'Orbital data is not available or calculation data is invalid.'
+            }), 404
+        
+        # Generate CUBE file
+        logger.info(f"Generating CUBE file for calculation {calculation_id}, orbital {orbital_index}")
+        logger.info(f"Parameters: grid_size={grid_size}, isovalue_pos={isovalue_pos}, isovalue_neg={isovalue_neg}")
+        
+        cube_data = orbital_generator.generate_cube_file(
+            orbital_index=orbital_index,
+            grid_size=grid_size,
+            isovalue_pos=isovalue_pos,
+            isovalue_neg=isovalue_neg,
+            return_content=True
+        )
+        
+        logger.info(f"Successfully generated CUBE file for calculation {calculation_id}, orbital {orbital_index}")
+        logger.info(f"File size: {cube_data['generation_params']['file_size_kb']:.1f} KB")
+        
+        return jsonify({
+            'success': True,
+            'data': cube_data
+        })
+        
+    except CalculationError as e:
+        logger.error(f"Calculation error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+    except FileManagerError as e:
+        logger.error(f"File manager error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}")
+        return jsonify({'success': False, 'error': 'Unable to access calculation files.'}), 500
+    except ValueError as e:
+        logger.warning(f"Invalid orbital index for calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': 'Invalid orbital index.'}), 400
+    except Exception as e:
+        logger.error(f"Unexpected error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 

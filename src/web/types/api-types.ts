@@ -41,6 +41,8 @@ export type CalculationUpdateResponse =
   components['schemas']['CalculationUpdateResponse'];
 export type CalculationDeleteResponse =
   components['schemas']['CalculationDeleteResponse'];
+export type OrbitalsResponse = components['schemas']['OrbitalsResponse'];
+export type OrbitalCubeResponse = components['schemas']['OrbitalCubeResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Data models
@@ -49,6 +51,7 @@ export type CalculationParameters =
 export type CalculationResults = components['schemas']['CalculationResults'];
 export type CalculationInstance = components['schemas']['CalculationInstance'];
 export type CalculationSummary = components['schemas']['CalculationSummary'];
+export type OrbitalInfo = components['schemas']['OrbitalInfo'];
 
 // Operation types for reference
 export type Operations = {
@@ -61,6 +64,8 @@ export type Operations = {
   getCalculationDetails: operations['getCalculationDetails'];
   updateCalculation: operations['updateCalculation'];
   deleteCalculation: operations['deleteCalculation'];
+  getOrbitals: operations['getOrbitals'];
+  getOrbitalCube: operations['getOrbitalCube'];
 };
 
 // Legacy compatibility aliases
@@ -82,6 +87,8 @@ export type CalculationListResponseData = CalculationListResponse['data'];
 export type CalculationDetailsResponseData = CalculationDetailsResponse['data'];
 export type CalculationUpdateResponseData = CalculationUpdateResponse['data'];
 export type CalculationDeleteResponseData = CalculationDeleteResponse['data'];
+export type OrbitalsResponseData = OrbitalsResponse['data'];
+export type OrbitalCubeResponseData = OrbitalCubeResponse['data'];
 
 // Error handling
 export { ApiError };

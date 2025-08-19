@@ -80,3 +80,61 @@ export const useConvertSmilesToXyz = () => {
     mutationFn: (smiles: string) => apiClient.convertSmilesToXyz(smiles),
   });
 };
+
+// 軌道情報を取得するQuery
+export const useGetOrbitals = (calculationId: string | null) => {
+  return useQuery({
+    queryKey: ['orbitals', calculationId],
+    queryFn: () => apiClient.getOrbitals(calculationId!),
+    enabled: !!calculationId && !calculationId.startsWith('new-calculation-'), // idが存在し、一時IDでない場合にのみ実行
+  });
+};
+
+// 軌道のCUBEファイルを取得するQuery
+export const useGetOrbitalCube = (
+  calculationId: string | null,
+  orbitalIndex: number | null,
+  options?: {
+    gridSize?: number;
+    isovaluePos?: number;
+    isovalueNeg?: number;
+  }
+) => {
+  return useQuery({
+    queryKey: ['orbital-cube', calculationId, orbitalIndex, options],
+    queryFn: () => apiClient.getOrbitalCube(calculationId!, orbitalIndex!, options),
+    enabled: !!calculationId && 
+             orbitalIndex !== null && 
+             orbitalIndex >= 0 && 
+             !calculationId.startsWith('new-calculation-'),
+    staleTime: 5 * 60 * 1000, // 5分間キャッシュを保持（CUBEファイルは生成に時間がかかるため）
+    gcTime: 30 * 60 * 1000, // 30分間メモリに保持
+  });
+};
+
+// 軌道のCUBEファイルを生成するMutation（再生成が必要な場合）
+export const useGenerateOrbitalCube = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      calculationId,
+      orbitalIndex,
+      options,
+    }: {
+      calculationId: string;
+      orbitalIndex: number;
+      options?: {
+        gridSize?: number;
+        isovaluePos?: number;
+        isovalueNeg?: number;
+      };
+    }) => apiClient.getOrbitalCube(calculationId, orbitalIndex, options),
+    onSuccess: (data, variables) => {
+      // 成功したら該当するキャッシュを更新
+      queryClient.setQueryData(
+        ['orbital-cube', variables.calculationId, variables.orbitalIndex, variables.options],
+        data
+      );
+    },
+  });
+};

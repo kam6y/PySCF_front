@@ -9,6 +9,8 @@ import {
   PubChemSearchResponseData,
   SMILESConvertResponseData,
   StartCalculationResponseData,
+  OrbitalsResponseData,
+  OrbitalCubeResponseData,
 } from './types/api-types';
 
 let API_BASE_URL = 'http://127.0.0.1:5000'; // Default, will be updated
@@ -255,4 +257,86 @@ export const convertSmilesToXyz = (
     method: 'POST',
     body: JSON.stringify({ smiles }),
   });
+};
+
+/**
+ * Get molecular orbital information for a calculation
+ */
+export const getOrbitals = (
+  calculationId: string
+): Promise<OrbitalsResponseData> => {
+  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid calculation ID provided.',
+        400,
+        'Bad Request',
+        `/api/quantum/calculations/${calculationId}/orbitals`,
+        null,
+        false
+      )
+    );
+  }
+  return request<OrbitalsResponseData>(
+    `/api/quantum/calculations/${calculationId}/orbitals`,
+    { method: 'GET' }
+  );
+};
+
+/**
+ * Generate and get CUBE file for a specific molecular orbital
+ */
+export const getOrbitalCube = (
+  calculationId: string,
+  orbitalIndex: number,
+  options?: {
+    gridSize?: number;
+    isovaluePos?: number;
+    isovalueNeg?: number;
+  }
+): Promise<OrbitalCubeResponseData> => {
+  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid calculation ID provided.',
+        400,
+        'Bad Request',
+        `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube`,
+        null,
+        false
+      )
+    );
+  }
+
+  if (orbitalIndex < 0 || !Number.isInteger(orbitalIndex)) {
+    return Promise.reject(
+      new ApiError(
+        'Invalid orbital index provided.',
+        400,
+        'Bad Request',
+        `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube`,
+        null,
+        false
+      )
+    );
+  }
+
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  if (options?.gridSize !== undefined) {
+    queryParams.append('gridSize', options.gridSize.toString());
+  }
+  if (options?.isovaluePos !== undefined) {
+    queryParams.append('isovaluePos', options.isovaluePos.toString());
+  }
+  if (options?.isovalueNeg !== undefined) {
+    queryParams.append('isovalueNeg', options.isovalueNeg.toString());
+  }
+
+  const queryString = queryParams.toString();
+  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube${
+    queryString ? `?${queryString}` : ''
+  }`;
+
+  return request<OrbitalCubeResponseData>(endpoint, { method: 'GET' });
 };

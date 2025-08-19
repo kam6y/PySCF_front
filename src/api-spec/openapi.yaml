@@ -200,6 +200,104 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/quantum/calculations/{calculationId}/orbitals:
+    get:
+      summary: Get molecular orbital information
+      description: Get list of all molecular orbitals with energies and indices
+      operationId: getOrbitals
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Molecular orbital information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrbitalsResponse'
+        '404':
+          description: Calculation not found or no orbital data available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get orbital information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculations/{calculationId}/orbitals/{orbitalIndex}/cube:
+    get:
+      summary: Generate and get molecular orbital CUBE file
+      description: Generate CUBE file for specific molecular orbital visualization
+      operationId: getOrbitalCube
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+        - name: orbitalIndex
+          in: path
+          required: true
+          description: Molecular orbital index
+          schema:
+            type: integer
+            minimum: 0
+        - name: gridSize
+          in: query
+          required: false
+          description: Grid size for CUBE file generation (default 80)
+          schema:
+            type: integer
+            minimum: 40
+            maximum: 120
+            default: 80
+        - name: isovaluePos
+          in: query
+          required: false
+          description: Positive isovalue for orbital visualization (default 0.02)
+          schema:
+            type: number
+            minimum: 0.001
+            maximum: 0.1
+            default: 0.02
+        - name: isovalueNeg
+          in: query
+          required: false
+          description: Negative isovalue for orbital visualization (default -0.02)
+          schema:
+            type: number
+            minimum: -0.1
+            maximum: -0.001
+            default: -0.02
+      responses:
+        '200':
+          description: Orbital CUBE file data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrbitalCubeResponse'
+        '404':
+          description: Calculation or orbital not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to generate orbital CUBE file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
     put:
       summary: Update calculation metadata
       description: Update calculation name and other metadata
@@ -879,6 +977,95 @@ components:
             deleted_id:
               type: string
               description: ID of deleted calculation
+
+    # Molecular Orbital Schemas
+    OrbitalInfo:
+      type: object
+      required: [index, energy_hartree, energy_ev, occupancy, orbital_type]
+      properties:
+        index:
+          type: integer
+          description: Orbital index (0-based)
+        energy_hartree:
+          type: number
+          description: Orbital energy in Hartree
+        energy_ev:
+          type: number
+          description: Orbital energy in eV
+        occupancy:
+          type: number
+          description: Orbital occupancy (0.0 for virtual, 1.0 or 2.0 for occupied)
+        orbital_type:
+          type: string
+          enum: [core, homo, lumo, virtual]
+          description: Type of orbital
+        label:
+          type: string
+          description: Human-readable label (e.g., "HOMO", "LUMO", "HOMO-1", "LUMO+2")
+
+    OrbitalsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [orbitals, homo_index, lumo_index, total_orbitals]
+          properties:
+            orbitals:
+              type: array
+              items:
+                $ref: '#/components/schemas/OrbitalInfo'
+              description: List of all molecular orbitals
+            homo_index:
+              type: integer
+              description: Index of HOMO orbital
+            lumo_index:
+              type: integer
+              description: Index of LUMO orbital
+            total_orbitals:
+              type: integer
+              description: Total number of orbitals
+            num_occupied:
+              type: integer
+              description: Number of occupied orbitals
+            num_virtual:
+              type: integer
+              description: Number of virtual orbitals
+
+    OrbitalCubeResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [cube_data, orbital_info, generation_params]
+          properties:
+            cube_data:
+              type: string
+              description: CUBE file content as string
+            orbital_info:
+              $ref: '#/components/schemas/OrbitalInfo'
+            generation_params:
+              type: object
+              properties:
+                grid_size:
+                  type: integer
+                  description: Grid size used for generation
+                isovalue_positive:
+                  type: number
+                  description: Positive isovalue used
+                isovalue_negative:
+                  type: number
+                  description: Negative isovalue used
+                file_size_kb:
+                  type: number
+                  description: Generated file size in KB
 
     ErrorResponse:
       type: object

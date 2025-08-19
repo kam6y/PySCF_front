@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CalculationInstance } from '../types/api-types';
+import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -210,6 +211,25 @@ export const CalculationResultsPage = ({
               <code>{results.num_virtual_orbitals}</code>
             </div>
           </div>
+        </section>
+
+        {/* Molecular Orbital Visualization */}
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#f0f8ff',
+            borderRadius: '8px',
+          }}
+        >
+          <h2>分子軌道可視化</h2>
+          <div style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}>
+            量子化学計算で得られた分子軌道を3D可視化します。軌道を選択して形状や分布を確認できます。
+          </div>
+          <MolecularOrbitalViewer
+            calculationId={activeCalculation.id}
+            onError={(error) => setError(error)}
+          />
         </section>
 
         {/* TDDFT Results Section */}

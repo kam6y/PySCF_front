@@ -136,6 +136,46 @@ export interface paths {
          * @description Get detailed information about a specific calculation
          */
         get: operations["getCalculationDetails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/calculations/{calculationId}/orbitals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get molecular orbital information
+         * @description Get list of all molecular orbitals with energies and indices
+         */
+        get: operations["getOrbitals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/calculations/{calculationId}/orbitals/{orbitalIndex}/cube": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate and get molecular orbital CUBE file
+         * @description Generate CUBE file for specific molecular orbital visualization
+         */
+        get: operations["getOrbitalCube"];
         /**
          * Update calculation metadata
          * @description Update calculation name and other metadata
@@ -522,6 +562,60 @@ export interface components {
                 deleted_id: string;
             };
         };
+        OrbitalInfo: {
+            /** @description Orbital index (0-based) */
+            index: number;
+            /** @description Orbital energy in Hartree */
+            energy_hartree: number;
+            /** @description Orbital energy in eV */
+            energy_ev: number;
+            /** @description Orbital occupancy (0.0 for virtual, 1.0 or 2.0 for occupied) */
+            occupancy: number;
+            /**
+             * @description Type of orbital
+             * @enum {string}
+             */
+            orbital_type: "core" | "homo" | "lumo" | "virtual";
+            /** @description Human-readable label (e.g., "HOMO", "LUMO", "HOMO-1", "LUMO+2") */
+            label?: string;
+        };
+        OrbitalsResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description List of all molecular orbitals */
+                orbitals: components["schemas"]["OrbitalInfo"][];
+                /** @description Index of HOMO orbital */
+                homo_index: number;
+                /** @description Index of LUMO orbital */
+                lumo_index: number;
+                /** @description Total number of orbitals */
+                total_orbitals: number;
+                /** @description Number of occupied orbitals */
+                num_occupied?: number;
+                /** @description Number of virtual orbitals */
+                num_virtual?: number;
+            };
+        };
+        OrbitalCubeResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description CUBE file content as string */
+                cube_data: string;
+                orbital_info: components["schemas"]["OrbitalInfo"];
+                generation_params: {
+                    /** @description Grid size used for generation */
+                    grid_size?: number;
+                    /** @description Positive isovalue used */
+                    isovalue_positive?: number;
+                    /** @description Negative isovalue used */
+                    isovalue_negative?: number;
+                    /** @description Generated file size in KB */
+                    file_size_kb?: number;
+                };
+            };
+        };
         ErrorResponse: {
             /** @example false */
             success: boolean;
@@ -785,6 +879,97 @@ export interface operations {
                 };
             };
             /** @description Failed to get calculation details */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getOrbitals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Molecular orbital information */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrbitalsResponse"];
+                };
+            };
+            /** @description Calculation not found or no orbital data available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to get orbital information */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getOrbitalCube: {
+        parameters: {
+            query?: {
+                /** @description Grid size for CUBE file generation (default 80) */
+                gridSize?: number;
+                /** @description Positive isovalue for orbital visualization (default 0.02) */
+                isovaluePos?: number;
+                /** @description Negative isovalue for orbital visualization (default -0.02) */
+                isovalueNeg?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+                /** @description Molecular orbital index */
+                orbitalIndex: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Orbital CUBE file data */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrbitalCubeResponse"];
+                };
+            };
+            /** @description Calculation or orbital not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to generate orbital CUBE file */
             500: {
                 headers: {
                     [name: string]: unknown;
