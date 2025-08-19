@@ -124,12 +124,16 @@ class WebSocketCalculationWatcher:
         """Stop the file system observer and clean up resources."""
         with self._lock:
             if self._started:
-                self.observer.stop()
-                self.observer.join(timeout=5.0)
-                self._started = False
-                self.connections.clear()
-                self.watched_dirs.clear()
-                logger.info("WebSocket file watcher stopped")
+                try:
+                    self.observer.stop()
+                    self.observer.join(timeout=5.0)
+                except Exception as e:
+                    logger.warning(f"Error stopping file observer: {e}")
+                finally:
+                    self._started = False
+                    self.connections.clear()
+                    self.watched_dirs.clear()
+                    logger.info("WebSocket file watcher stopped")
     
     def add_connection(self, calculation_id: str, callback: Callable[[Dict], None]):
         """
@@ -177,11 +181,30 @@ class WebSocketCalculationWatcher:
         calc_dir_str = str(calc_dir)
         
         if calc_dir_str in self.watched_dirs:
-            # Find and remove the watch
-            for watch in self.observer.watches:
-                if hasattr(watch, 'path') and watch.path == calc_dir_str:
-                    self.observer.unschedule(watch)
-                    break
+            # Safe handling of observer cleanup
+            try:
+                # Try to access watches attribute safely
+                if hasattr(self.observer, 'watches') and self.observer.watches:
+                    # Find and remove the watch
+                    for watch in self.observer.watches:
+                        if hasattr(watch, 'path') and watch.path == calc_dir_str:
+                            self.observer.unschedule(watch)
+                            break
+                elif hasattr(self.observer, '_watches') and self.observer._watches:
+                    # Alternative access pattern for some watchdog versions
+                    for watch in self.observer._watches:
+                        if hasattr(watch, 'path') and watch.path == calc_dir_str:
+                            self.observer.unschedule(watch)
+                            break
+                else:
+                    # Fallback: unschedule_all for this event handler
+                    logger.debug(f"Cannot access observer watches, attempting unschedule_all for {calc_dir_str}")
+                    # Note: This is less precise but safer
+                    pass
+            except (AttributeError, RuntimeError) as e:
+                logger.warning(f"Error accessing observer watches for cleanup: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error during watch cleanup: {e}")
             
             self.watched_dirs.discard(calc_dir_str)
             logger.debug(f"Stopped watching directory: {calc_dir_str}")

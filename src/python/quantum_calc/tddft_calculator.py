@@ -135,9 +135,31 @@ class TDDFTCalculator(BaseCalculator):
             
             # Check if requested number of states is reasonable for the system
             n_orb = len(self.mf.mo_energy) if hasattr(self.mf, 'mo_energy') else 0
-            if nstates > n_orb // 2:
-                logger.warning(f"Requested {nstates} excited states, but system has only {n_orb} orbitals. "
-                               f"Consider reducing nstates to avoid convergence issues.")
+            n_occupied = int(np.sum(self.mf.mo_occ > 0)) if hasattr(self.mf, 'mo_occ') else 0
+            n_virtual = n_orb - n_occupied
+            
+            # Calculate a reasonable maximum number of excited states
+            # Use the smaller of: half total orbitals or occupied * virtual / 4
+            max_reasonable_states = min(n_orb // 2, max(1, (n_occupied * n_virtual) // 4))
+            
+            if n_orb < 4:
+                # Very small systems - limit to 1-2 states
+                max_reasonable_states = min(1, max_reasonable_states)
+                logger.warning(f"Very small molecular system detected ({n_orb} orbitals, {n_occupied} occupied). "
+                               f"TDDFT may not be suitable for such small systems.")
+            
+            if nstates > max_reasonable_states:
+                original_nstates = nstates
+                nstates = max(1, max_reasonable_states)
+                logger.warning(f"Requested {original_nstates} excited states, but system has only {n_orb} orbitals "
+                               f"({n_occupied} occupied, {n_virtual} virtual). Automatically reducing to {nstates} states "
+                               f"to avoid convergence issues.")
+                # Update the stored parameter
+                self.results['tddft_nstates'] = nstates
+                self.mytd.nstates = nstates
+            
+            logger.info(f"TDDFT calculation setup: {nstates} excited states for system with "
+                       f"{n_orb} total orbitals ({n_occupied} occupied, {n_virtual} virtual)")
             
             # Run TDDFT calculation
             try:

@@ -802,33 +802,41 @@ def calculation_status_socket(ws, calculation_id):
         
         if not connection_active:
             return
-            
-        try:
-            # Build complete calculation instance
-            calculation_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
-            
-            # Send update to WebSocket client
-            ws.send(json.dumps(calculation_instance))
-            logger.debug(f"Sent file change update for calculation {calculation_id} (status: {calculation_instance['status']})")
-            
-            # Close connection if calculation is finished
-            if calculation_instance['status'] in ['completed', 'error']:
-                logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'. Closing WebSocket.")
-                connection_active = False
-                # Small delay to ensure client receives the final status update
-                gevent.sleep(0.1)
-                _close_websocket_safely(ws, calculation_id)
-                
-        except Exception as e:
-            logger.error(f"Error in file change callback for {calculation_id}: {e}")
+        
+        # Use gevent spawn to handle the callback in the main greenlet thread
+        # This prevents "Cannot switch to a different thread" errors
+        def handle_file_change():
             try:
-                ws.send(json.dumps({
-                    'error': 'Failed to read calculation data',
-                    'id': calculation_id
-                }))
-            except:
-                pass  # Ignore send errors in error handler
-            connection_active = False
+                # Build complete calculation instance
+                calculation_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
+                
+                # Send update to WebSocket client
+                ws.send(json.dumps(calculation_instance))
+                logger.debug(f"Sent file change update for calculation {calculation_id} (status: {calculation_instance['status']})")
+                
+                # Close connection if calculation is finished
+                if calculation_instance['status'] in ['completed', 'error']:
+                    logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'. Closing WebSocket.")
+                    nonlocal connection_active
+                    connection_active = False
+                    # Small delay to ensure client receives the final status update
+                    gevent.sleep(0.1)
+                    _close_websocket_safely(ws, calculation_id)
+                    
+            except Exception as e:
+                logger.error(f"Error in file change callback for {calculation_id}: {e}")
+                try:
+                    ws.send(json.dumps({
+                        'error': 'Failed to read calculation data',
+                        'id': calculation_id
+                    }))
+                except:
+                    pass  # Ignore send errors in error handler
+                nonlocal connection_active
+                connection_active = False
+        
+        # Spawn the handler in the gevent event loop to ensure proper thread context
+        gevent.spawn(handle_file_change)
 
     try:
         # Initialize file watcher and register this connection
@@ -868,9 +876,16 @@ def calculation_status_socket(ws, calculation_id):
                         # Client disconnected
                         logger.info(f"Client disconnected from calculation {calculation_id}")
                         break
-                except Exception:
-                    # Timeout or disconnection - break out of loop
-                    logger.debug(f"WebSocket receive timeout or disconnection for {calculation_id}")
+                except gevent.Timeout:
+                    # Expected timeout - continue the loop
+                    continue
+                except Exception as receive_error:
+                    # Handle various disconnection scenarios
+                    error_msg = str(receive_error).lower()
+                    if any(keyword in error_msg for keyword in ['connection', 'closed', 'broken', 'reset']):
+                        logger.info(f"Client disconnected from calculation {calculation_id}: {receive_error}")
+                    else:
+                        logger.debug(f"WebSocket receive error for {calculation_id}: {receive_error}")
                     break
                     
         except Exception as e:
@@ -891,8 +906,11 @@ def calculation_status_socket(ws, calculation_id):
             watcher = get_websocket_watcher(file_manager.get_base_directory())
             watcher.remove_connection(calculation_id, on_file_change)
             logger.debug(f"Removed WebSocket connection from file watcher for {calculation_id}")
+        except (AttributeError, RuntimeError) as cleanup_error:
+            # These are expected errors during shutdown or when observer is not available
+            logger.debug(f"Observer cleanup issue for {calculation_id}: {cleanup_error}")
         except Exception as cleanup_error:
-            logger.error(f"Error cleaning up file watcher for {calculation_id}: {cleanup_error}")
+            logger.error(f"Unexpected error cleaning up file watcher for {calculation_id}: {cleanup_error}")
         
         _close_websocket_safely(ws, calculation_id)
 
@@ -900,10 +918,20 @@ def calculation_status_socket(ws, calculation_id):
 def _close_websocket_safely(ws, calculation_id: str):
     """Safely close a WebSocket connection with proper logging."""
     try:
-        ws.close()
+        # Check if WebSocket is still open before attempting to close
+        if hasattr(ws, 'closed') and not ws.closed:
+            ws.close(code=1000, reason="Normal closure")  # Use proper close code
+        elif not hasattr(ws, 'closed'):
+            # Fallback for different WebSocket implementations
+            ws.close()
         logger.info(f"WebSocket connection closed for calculation {calculation_id}")
     except Exception as close_error:
-        logger.debug(f"Error closing WebSocket for {calculation_id}: {close_error}")
+        # Log different types of close errors appropriately
+        error_msg = str(close_error).lower()
+        if any(keyword in error_msg for keyword in ['closed', 'broken', 'connection']):
+            logger.debug(f"WebSocket already closed for {calculation_id}: {close_error}")
+        else:
+            logger.warning(f"Error closing WebSocket for {calculation_id}: {close_error}")
 
 
 @app.errorhandler(ValidationError)
@@ -919,6 +947,21 @@ def validation_error_handler(error):
     combined_message = "Validation failed: " + "; ".join(error_messages)
     logger.warning(f"Validation error: {combined_message}")
     return jsonify({'success': False, 'error': combined_message}), 400
+
+@app.errorhandler(400)
+def bad_request_handler(error):
+    """Handle bad requests, filtering out WebSocket close frame errors."""
+    # Check if this is a WebSocket close frame being misinterpreted as HTTP
+    error_description = str(error).lower()
+    if any(indicator in error_description for indicator in [
+        'invalid http method', 'expected get method', 'x88x82', '\\x88\\x82'
+    ]):
+        # This is likely a WebSocket close frame, log as debug instead of error
+        logger.debug(f"WebSocket close frame misinterpreted as HTTP request: {error}")
+        return '', 400  # Return empty response for WebSocket frames
+    
+    # For genuine bad requests, return proper error response
+    return jsonify({'success': False, 'error': 'Bad request.'}), 400
 
 @app.errorhandler(404)
 def not_found(error):
