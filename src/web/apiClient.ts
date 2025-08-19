@@ -267,7 +267,11 @@ export const convertSmilesToXyz = (
 export const getOrbitals = (
   calculationId: string
 ): Promise<OrbitalsResponseData> => {
-  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+  if (
+    !calculationId ||
+    calculationId === 'undefined' ||
+    calculationId === 'null'
+  ) {
     return Promise.reject(
       new ApiError(
         'Invalid calculation ID provided.',
@@ -297,7 +301,11 @@ export const getOrbitalCube = (
     isovalueNeg?: number;
   }
 ): Promise<OrbitalCubeResponseData> => {
-  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+  if (
+    !calculationId ||
+    calculationId === 'undefined' ||
+    calculationId === 'null'
+  ) {
     return Promise.reject(
       new ApiError(
         'Invalid calculation ID provided.',
@@ -349,7 +357,11 @@ export const getOrbitalCube = (
 export const listCubeFiles = (
   calculationId: string
 ): Promise<CubeFilesListResponseData> => {
-  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+  if (
+    !calculationId ||
+    calculationId === 'undefined' ||
+    calculationId === 'null'
+  ) {
     return Promise.reject(
       new ApiError(
         'Invalid calculation ID provided.',
@@ -375,7 +387,11 @@ export const deleteCubeFiles = (
   calculationId: string,
   orbitalIndex?: number
 ): Promise<CubeFilesDeleteResponseData> => {
-  if (!calculationId || calculationId === 'undefined' || calculationId === 'null') {
+  if (
+    !calculationId ||
+    calculationId === 'undefined' ||
+    calculationId === 'null'
+  ) {
     return Promise.reject(
       new ApiError(
         'Invalid calculation ID provided.',

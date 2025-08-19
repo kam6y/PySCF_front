@@ -43,16 +43,16 @@ export const App = () => {
       // 計算リストのキャッシュも直接更新して即座に反映
       queryClient.setQueryData(['calculations'], (oldData: any) => {
         if (!oldData?.calculations) return oldData;
-        
-        const updatedCalculations = oldData.calculations.map((calc: any) => 
-          calc.id === updatedCalculation.id 
+
+        const updatedCalculations = oldData.calculations.map((calc: any) =>
+          calc.id === updatedCalculation.id
             ? { ...calc, status: updatedCalculation.status }
             : calc
         );
-        
+
         return {
           ...oldData,
-          calculations: updatedCalculations
+          calculations: updatedCalculations,
         };
       });
 
@@ -70,10 +70,14 @@ export const App = () => {
         return (
           <CalculationSettingsPage
             activeCalculation={activeCalculationData.activeCalculation}
-            onCalculationUpdate={activeCalculationData.handleActiveCalculationUpdate}
+            onCalculationUpdate={
+              activeCalculationData.handleActiveCalculationUpdate
+            }
             onStartCalculation={calculationOperations.handleStartCalculation}
             onCalculationRename={calculationOperations.handleCalculationRename}
-            createNewCalculationFromExisting={activeCalculationData.handleCreateNewFromExisting}
+            createNewCalculationFromExisting={
+              activeCalculationData.handleCreateNewFromExisting
+            }
           />
         );
       case 'calculation-results':
@@ -82,7 +86,9 @@ export const App = () => {
             activeCalculation={activeCalculationData.activeCalculation}
             isLoadingDetails={false}
             detailsError={null}
-            onCalculationUpdate={activeCalculationData.handleActiveCalculationUpdate}
+            onCalculationUpdate={
+              activeCalculationData.handleActiveCalculationUpdate
+            }
           />
         );
       case 'draw-molecule':
@@ -91,10 +97,14 @@ export const App = () => {
         return (
           <CalculationSettingsPage
             activeCalculation={activeCalculationData.activeCalculation}
-            onCalculationUpdate={activeCalculationData.handleActiveCalculationUpdate}
+            onCalculationUpdate={
+              activeCalculationData.handleActiveCalculationUpdate
+            }
             onStartCalculation={calculationOperations.handleStartCalculation}
             onCalculationRename={calculationOperations.handleCalculationRename}
-            createNewCalculationFromExisting={activeCalculationData.handleCreateNewFromExisting}
+            createNewCalculationFromExisting={
+              activeCalculationData.handleCreateNewFromExisting
+            }
           />
         );
     }
@@ -149,14 +159,22 @@ export const App = () => {
         isOpen={sidebarState.isSidebarOpen}
         onClose={sidebarState.handleSidebarClose}
         calculations={activeCalculationData.sidebarCalculations}
-        activeCalculationId={activeCalculationData.activeCalculation?.id || null}
+        activeCalculationId={
+          activeCalculationData.activeCalculation?.id || null
+        }
         calculationsLoading={activeCalculationData.calculationsLoading}
-        calculationsError={activeCalculationData.calculationsError ? activeCalculationData.calculationsError.message : null}
+        calculationsError={
+          activeCalculationData.calculationsError
+            ? activeCalculationData.calculationsError.message
+            : null
+        }
         onCalculationSelect={activeCalculationData.handleCalculationSelect}
         onCalculationDelete={calculationOperations.handleCalculationDelete}
       />
 
-      <main className={`app-content ${sidebarState.isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`app-content ${sidebarState.isSidebarOpen ? 'sidebar-open' : ''}`}
+      >
         {renderCurrentPage()}
       </main>
     </div>

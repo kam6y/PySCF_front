@@ -43,8 +43,10 @@ export type CalculationDeleteResponse =
   components['schemas']['CalculationDeleteResponse'];
 export type OrbitalsResponse = components['schemas']['OrbitalsResponse'];
 export type OrbitalCubeResponse = components['schemas']['OrbitalCubeResponse'];
-export type CubeFilesListResponse = components['schemas']['CubeFilesListResponse'];
-export type CubeFilesDeleteResponse = components['schemas']['CubeFilesDeleteResponse'];
+export type CubeFilesListResponse =
+  components['schemas']['CubeFilesListResponse'];
+export type CubeFilesDeleteResponse =
+  components['schemas']['CubeFilesDeleteResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Data models

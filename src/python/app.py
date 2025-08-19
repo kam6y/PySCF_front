@@ -731,7 +731,11 @@ def calculation_status_socket(ws, calculation_id):
     WebSocket endpoint for efficient, event-driven calculation monitoring.
     Uses file system event watching instead of polling for better performance.
     """
-    logger.info(f"WebSocket connection established for calculation {calculation_id}")
+    # 一時的IDの場合は特別なログメッセージを出力
+    if calculation_id.startswith('new-calculation-'):
+        logger.info(f"WebSocket connection attempt for temporary calculation ID: {calculation_id}")
+    else:
+        logger.info(f"WebSocket connection established for calculation {calculation_id}")
     file_manager = CalculationFileManager()
     calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
     
@@ -740,11 +744,19 @@ def calculation_status_socket(ws, calculation_id):
     
     # Calculation directory existence check
     if not os.path.isdir(calc_path):
-        logger.warning(f"Calculation directory not found: {calc_path}")
+        # 一時的IDの場合は特別なログメッセージを出力
+        if calculation_id.startswith('new-calculation-'):
+            logger.info(f"WebSocket connection attempted for temporary calculation ID: {calculation_id}. Closing connection.")
+            error_message = f'Temporary calculation ID "{calculation_id}" does not exist on server.'
+        else:
+            logger.warning(f"Calculation directory not found: {calc_path}")
+            error_message = f'Calculation "{calculation_id}" not found.'
+        
         try:
             ws.send(json.dumps({
-                'error': f'Calculation "{calculation_id}" not found.',
-                'id': calculation_id
+                'error': error_message,
+                'id': calculation_id,
+                'is_temporary': calculation_id.startswith('new-calculation-')
             }))
         except Exception as send_error:
             logger.error(f"Failed to send error message: {send_error}")

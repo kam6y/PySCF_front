@@ -1,7 +1,10 @@
 // src/web/components/MolecularOrbitalViewer.tsx
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useGetOrbitals, useGetOrbitalCube } from '../hooks/useCalculationQueries';
+import {
+  useGetOrbitals,
+  useGetOrbitalCube,
+} from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
 
 // 3dmolライブラリをインポート
@@ -25,7 +28,9 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   const viewerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [viewer, setViewer] = useState<any>(null);
-  const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<number | null>(null);
+  const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
+    number | null
+  >(null);
   const [viewerOptions, setViewerOptions] = useState<ViewerOptions>({
     gridSize: 80,
     isovaluePos: 0.02,
@@ -76,7 +81,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
           backgroundColor: 'white',
           antialias: true,
         });
-        
+
         setViewer(newViewer);
         setRetryCount(0);
 
@@ -87,29 +92,36 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               newViewer.resize();
               newViewer.render();
             } catch (error) {
-              console.error('Failed to resize viewer after initialization:', error);
+              console.error(
+                'Failed to resize viewer after initialization:',
+                error
+              );
             }
           }
         }, 100);
-        
       } catch (error) {
         console.error('Failed to initialize 3Dmol viewer:', error);
-        
+
         // 再試行ロジック（最大3回まで）
         if (retryCount < 3) {
           setRetryCount(prev => prev + 1);
-          timeoutId = setTimeout(() => {
-            animationFrameId = requestAnimationFrame(initializeViewer);
-          }, 500 * (retryCount + 1)); // 指数バックオフ
+          timeoutId = setTimeout(
+            () => {
+              animationFrameId = requestAnimationFrame(initializeViewer);
+            },
+            500 * (retryCount + 1)
+          ); // 指数バックオフ
         } else {
-          onError?.('Failed to initialize molecular viewer after multiple attempts');
+          onError?.(
+            'Failed to initialize molecular viewer after multiple attempts'
+          );
         }
       }
     };
 
     // requestAnimationFrameで遅延実行
     animationFrameId = requestAnimationFrame(initializeViewer);
-    
+
     return () => {
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
@@ -128,7 +140,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
     if (!viewerRef.current) return;
 
     // ResizeObserver を設定してDOM要素のサイズ変更を監視
-    resizeObserverRef.current = new ResizeObserver((entries) => {
+    resizeObserverRef.current = new ResizeObserver(entries => {
       for (const entry of entries) {
         if (entry.target === viewerRef.current) {
           // サイズ変更時にビューアーをリサイズ（遅延実行）
@@ -165,14 +177,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
     if (!viewer || !cubeData || !(cubeData as any).cube_data) return;
 
     setIsLoading(true);
-    
+
     try {
       // ビューアーをクリア
       viewer.clear();
 
       // CUBEファイルデータを追加
       const cubeContent = (cubeData as any).cube_data;
-      
+
       // 正の等値面（赤色）
       viewer.addVolumetricData(cubeContent, 'cube', {
         isoval: viewerOptions.isovaluePos,
@@ -204,7 +216,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
             viewer.render();
           }
         } catch (delayedRenderError) {
-          console.error('Failed to perform delayed re-render:', delayedRenderError);
+          console.error(
+            'Failed to perform delayed re-render:',
+            delayedRenderError
+          );
         }
       }, 200);
 
@@ -225,7 +240,9 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
   useEffect(() => {
     if (cubeError) {
-      onError?.(cubeError.message || 'Failed to load orbital visualization data');
+      onError?.(
+        cubeError.message || 'Failed to load orbital visualization data'
+      );
     }
   }, [cubeError, onError]);
 
@@ -246,7 +263,11 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
     );
   }
 
-  if (!orbitalsData || !orbitalsData.orbitals || orbitalsData.orbitals.length === 0) {
+  if (
+    !orbitalsData ||
+    !orbitalsData.orbitals ||
+    orbitalsData.orbitals.length === 0
+  ) {
     return (
       <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
         <div>📊 No orbital data available for this calculation.</div>
@@ -259,7 +280,13 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   );
 
   return (
-    <div style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden' }}>
+    <div
+      style={{
+        border: '1px solid #ddd',
+        borderRadius: '8px',
+        overflow: 'hidden',
+      }}
+    >
       {/* コントロールパネル */}
       <div
         style={{
@@ -278,7 +305,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         >
           {/* 軌道選択 */}
           <div>
-            <label htmlFor="orbital-select" style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+            <label
+              htmlFor="orbital-select"
+              style={{
+                display: 'block',
+                marginBottom: '4px',
+                fontWeight: 'bold',
+              }}
+            >
               分子軌道:
             </label>
             <select
@@ -302,7 +336,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
           {/* グリッドサイズ */}
           <div>
-            <label htmlFor="grid-size" style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+            <label
+              htmlFor="grid-size"
+              style={{
+                display: 'block',
+                marginBottom: '4px',
+                fontWeight: 'bold',
+              }}
+            >
               グリッドサイズ: {viewerOptions.gridSize}
             </label>
             <input
@@ -312,7 +353,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               max="120"
               step="10"
               value={viewerOptions.gridSize}
-              onChange={(e) =>
+              onChange={e =>
                 handleOptionsChange({ gridSize: parseInt(e.target.value, 10) })
               }
               style={{ width: '100%' }}
@@ -321,7 +362,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
           {/* 正の等値面 */}
           <div>
-            <label htmlFor="isovalue-pos" style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+            <label
+              htmlFor="isovalue-pos"
+              style={{
+                display: 'block',
+                marginBottom: '4px',
+                fontWeight: 'bold',
+              }}
+            >
               正等値面: {viewerOptions.isovaluePos.toFixed(3)}
             </label>
             <input
@@ -331,7 +379,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               max="0.1"
               step="0.001"
               value={viewerOptions.isovaluePos}
-              onChange={(e) =>
+              onChange={e =>
                 handleOptionsChange({ isovaluePos: parseFloat(e.target.value) })
               }
               style={{ width: '100%' }}
@@ -340,7 +388,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
           {/* 負の等値面 */}
           <div>
-            <label htmlFor="isovalue-neg" style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>
+            <label
+              htmlFor="isovalue-neg"
+              style={{
+                display: 'block',
+                marginBottom: '4px',
+                fontWeight: 'bold',
+              }}
+            >
               負等値面: {viewerOptions.isovalueNeg.toFixed(3)}
             </label>
             <input
@@ -350,7 +405,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               max="-0.001"
               step="0.001"
               value={viewerOptions.isovalueNeg}
-              onChange={(e) =>
+              onChange={e =>
                 handleOptionsChange({ isovalueNeg: parseFloat(e.target.value) })
               }
               style={{ width: '100%' }}
@@ -370,10 +425,13 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
             }}
           >
             <div style={{ fontSize: '14px', color: '#333' }}>
-              <strong>{selectedOrbital.label}</strong> (軌道 #{selectedOrbital.index})
+              <strong>{selectedOrbital.label}</strong> (軌道 #
+              {selectedOrbital.index})
               <br />
-              エネルギー: <code>{selectedOrbital.energy_ev.toFixed(4)} eV</code> (
-              <code>{selectedOrbital.energy_hartree.toFixed(6)} a.u.</code>)
+              エネルギー: <code>
+                {selectedOrbital.energy_ev.toFixed(4)} eV
+              </code>{' '}
+              (<code>{selectedOrbital.energy_hartree.toFixed(6)} a.u.</code>)
               <br />
               占有: <code>{selectedOrbital.occupancy}</code>
             </div>
@@ -391,7 +449,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
             backgroundColor: 'white',
           }}
         />
-        
+
         {/* ローディングオーバーレイ */}
         {(isLoading || cubeLoading) && (
           <div

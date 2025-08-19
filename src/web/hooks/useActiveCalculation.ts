@@ -18,7 +18,9 @@ export interface ActiveCalculation {
   calculationsError: Error | null;
   handleCalculationSelect: (calculationId: string) => void;
   handleNewCalculation: () => void;
-  handleActiveCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
+  handleActiveCalculationUpdate: (
+    updatedCalculation: CalculationInstance
+  ) => void;
   handleCreateNewFromExisting: (
     originalCalc: CalculationInstance,
     newParams: QuantumCalculationRequest

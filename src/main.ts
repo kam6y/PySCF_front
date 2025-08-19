@@ -333,7 +333,7 @@ const createWindow = async () => {
     mainWindow.webContents.send('set-flask-port', flaskPort);
   });
 
-  mainWindow.loadFile('dist/index.html');
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
 };
 
 app.whenReady().then(createWindow);

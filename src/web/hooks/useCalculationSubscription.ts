@@ -31,11 +31,16 @@ export const useCalculationSubscription = ({
   const disconnect = useCallback(() => {
     if (wsRef.current) {
       const ws = wsRef.current;
-      if (
-        ws.readyState === WebSocket.OPEN ||
-        ws.readyState === WebSocket.CONNECTING
-      ) {
-        ws.close();
+      try {
+        // WebSocketの状態に関係なく、強制的に接続を閉じる
+        if (ws.readyState !== WebSocket.CLOSED) {
+          console.log(
+            `Disconnecting WebSocket for calculation ${currentCalculationIdRef.current}`
+          );
+          ws.close();
+        }
+      } catch (error) {
+        console.error('Error closing WebSocket:', error);
       }
       wsRef.current = null;
     }
@@ -44,6 +49,14 @@ export const useCalculationSubscription = ({
 
   const connect = useCallback(
     (calcId: string) => {
+      // 一時的IDの場合は接続を試行しない
+      if (calcId.startsWith('new-calculation-')) {
+        console.log(
+          `Skipping WebSocket connection for temporary calculation ID: ${calcId}`
+        );
+        return;
+      }
+
       // 既に同じIDで接続中の場合は何もしない
       if (
         currentCalculationIdRef.current === calcId &&
@@ -51,6 +64,7 @@ export const useCalculationSubscription = ({
         (wsRef.current.readyState === WebSocket.CONNECTING ||
           wsRef.current.readyState === WebSocket.OPEN)
       ) {
+        console.log(`WebSocket already connected for calculation ${calcId}`);
         return;
       }
 
@@ -147,8 +161,13 @@ export const useCalculationSubscription = ({
 
   useEffect(() => {
     // 計算が実行中または保留中でかつIDが有効な場合のみ接続
+    // ただし、一時的ID（new-calculation-で始まるID）の場合は接続しない
     // completed/errorになるまで接続を維持することで、最終状態の更新を確実に受信
-    if (calculationId && (status === 'running' || status === 'pending')) {
+    if (
+      calculationId &&
+      (status === 'running' || status === 'pending') &&
+      !calculationId.startsWith('new-calculation-')
+    ) {
       connect(calculationId);
     } else {
       disconnect();

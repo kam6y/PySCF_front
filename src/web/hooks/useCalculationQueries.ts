@@ -102,11 +102,13 @@ export const useGetOrbitalCube = (
 ) => {
   return useQuery({
     queryKey: ['orbital-cube', calculationId, orbitalIndex, options],
-    queryFn: () => apiClient.getOrbitalCube(calculationId!, orbitalIndex!, options),
-    enabled: !!calculationId && 
-             orbitalIndex !== null && 
-             orbitalIndex >= 0 && 
-             !calculationId.startsWith('new-calculation-'),
+    queryFn: () =>
+      apiClient.getOrbitalCube(calculationId!, orbitalIndex!, options),
+    enabled:
+      !!calculationId &&
+      orbitalIndex !== null &&
+      orbitalIndex >= 0 &&
+      !calculationId.startsWith('new-calculation-'),
     staleTime: 60 * 60 * 1000, // 1時間キャッシュを保持（永続化されたため長期キャッシュ可能）
     gcTime: 24 * 60 * 60 * 1000, // 24時間メモリに保持（永続化されたファイルアクセス用）
     refetchOnWindowFocus: false, // ウィンドウフォーカス時の再取得を無効化（永続化されたため）
@@ -134,7 +136,12 @@ export const useGenerateOrbitalCube = () => {
     onSuccess: (data, variables) => {
       // 成功したら該当するキャッシュを更新
       queryClient.setQueryData(
-        ['orbital-cube', variables.calculationId, variables.orbitalIndex, variables.options],
+        [
+          'orbital-cube',
+          variables.calculationId,
+          variables.orbitalIndex,
+          variables.options,
+        ],
         data
       );
     },
@@ -153,12 +160,21 @@ export const useListCubeFiles = (calculationId: string | null) => {
 export const useDeleteCubeFiles = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ calculationId, orbitalIndex }: { calculationId: string; orbitalIndex?: number }) =>
-      apiClient.deleteCubeFiles(calculationId, orbitalIndex),
+    mutationFn: ({
+      calculationId,
+      orbitalIndex,
+    }: {
+      calculationId: string;
+      orbitalIndex?: number;
+    }) => apiClient.deleteCubeFiles(calculationId, orbitalIndex),
     onSuccess: (data, variables) => {
       // Invalidate related queries
-      queryClient.invalidateQueries({ queryKey: ['cube-files', variables.calculationId] });
-      queryClient.invalidateQueries({ queryKey: ['orbital-cube', variables.calculationId] });
+      queryClient.invalidateQueries({
+        queryKey: ['cube-files', variables.calculationId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['orbital-cube', variables.calculationId],
+      });
     },
   });
 };
