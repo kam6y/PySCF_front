@@ -6,6 +6,7 @@ import time
 import signal
 import atexit
 import multiprocessing
+import threading
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -44,6 +45,75 @@ sock = Sock(app)  # Sockインスタンスを作成
 
 # Initialize PubChem client
 pubchem_client = PubChemClient(timeout=30)
+
+# Global WebSocket connection registry for immediate notifications
+# calculation_id -> set of websocket connections
+active_websockets = {}
+websocket_lock = threading.Lock()
+
+
+def send_immediate_websocket_notification(calculation_id: str, status: str, error_message: str = None):
+    """Send immediate WebSocket notification to all connected clients for a calculation."""
+    with websocket_lock:
+        if calculation_id not in active_websockets:
+            return
+        
+        connections = active_websockets[calculation_id].copy()
+    
+    if not connections:
+        return
+        
+    # Build complete calculation instance
+    try:
+        from quantum_calc.file_manager import CalculationFileManager
+        file_manager = CalculationFileManager()
+        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+        
+        if os.path.exists(calc_dir):
+            # Read current data from files
+            parameters = file_manager.read_calculation_parameters(calc_dir) or {}
+            results = file_manager.read_calculation_results(calc_dir)
+            display_name = file_manager._get_display_name(calculation_id, parameters)
+            
+            # Build calculation instance
+            calculation_instance = {
+                'id': calculation_id,
+                'name': display_name,
+                'status': status,
+                'createdAt': parameters.get('created_at', datetime.now().isoformat()),
+                'updatedAt': datetime.now().isoformat(),
+                'parameters': parameters,
+                'results': results,
+                'workingDirectory': calc_dir,
+            }
+            
+            # Add error if provided
+            if error_message:
+                calculation_instance['error'] = error_message
+            
+            message = json.dumps(calculation_instance)
+            
+            # Send to all connected WebSocket clients
+            failed_connections = set()
+            for ws in connections:
+                try:
+                    ws.send(message)
+                except Exception as e:
+                    logger.warning(f"Failed to send immediate notification to WebSocket client: {e}")
+                    failed_connections.add(ws)
+            
+            # Clean up failed connections
+            if failed_connections:
+                with websocket_lock:
+                    if calculation_id in active_websockets:
+                        active_websockets[calculation_id] -= failed_connections
+                        if not active_websockets[calculation_id]:
+                            del active_websockets[calculation_id]
+        else:
+            logger.warning(f"Calculation directory not found for immediate notification: {calc_dir}")
+            
+    except Exception as e:
+        logger.error(f"Error sending immediate WebSocket notification for {calculation_id}: {e}")
 
 
 def cleanup_resources():
@@ -233,6 +303,14 @@ def quantum_calculate(body: QuantumCalculationRequest):
             file_manager.save_calculation_results(calc_dir, {'error': 'Failed to submit calculation to process pool.'})
             logger.error(f"Failed to submit calculation {calculation_id} to process pool")
             return jsonify({'success': False, 'error': 'Failed to queue calculation.'}), 500
+        
+        # Register completion callback for immediate WebSocket notification
+        def on_calculation_complete(calc_id: str, success: bool, error_message: str):
+            """Callback function to send immediate WebSocket notification when calculation completes."""
+            final_status = 'completed' if success else 'error'
+            send_immediate_websocket_notification(calc_id, final_status, error_message)
+        
+        process_manager.register_completion_callback(calculation_id, on_calculation_complete)
         
         logger.info(f"Queued calculation {calculation_id} for molecule '{parameters['name']}'")
 
@@ -803,42 +881,47 @@ def calculation_status_socket(ws, calculation_id):
         if not connection_active:
             return
         
-        # Use gevent spawn to handle the callback in the main greenlet thread
-        # This prevents "Cannot switch to a different thread" errors
-        def handle_file_change():
+        try:
+            # Build complete calculation instance directly (no gevent.spawn needed)
+            calculation_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
+            
+            # Send update to WebSocket client
             try:
-                # Build complete calculation instance
-                calculation_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
-                
-                # Send update to WebSocket client
                 ws.send(json.dumps(calculation_instance))
-                logger.debug(f"Sent file change update for calculation {calculation_id} (status: {calculation_instance['status']})")
-                
-                # Close connection if calculation is finished
-                if calculation_instance['status'] in ['completed', 'error']:
-                    logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'. Closing WebSocket.")
-                    nonlocal connection_active
-                    connection_active = False
-                    # Small delay to ensure client receives the final status update
+            except Exception as send_error:
+                logger.error(f"Failed to send WebSocket update for {calculation_id}: {send_error}")
+                connection_active = False
+                return
+            
+            # Close connection if calculation is finished
+            if calculation_instance['status'] in ['completed', 'error']:
+                logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'. Closing WebSocket after brief delay.")
+                connection_active = False
+                # Small delay to ensure client receives the final status update
+                try:
                     gevent.sleep(0.1)
                     _close_websocket_safely(ws, calculation_id)
-                    
-            except Exception as e:
-                logger.error(f"Error in file change callback for {calculation_id}: {e}")
-                try:
-                    ws.send(json.dumps({
-                        'error': 'Failed to read calculation data',
-                        'id': calculation_id
-                    }))
-                except:
-                    pass  # Ignore send errors in error handler
-                nonlocal connection_active
-                connection_active = False
-        
-        # Spawn the handler in the gevent event loop to ensure proper thread context
-        gevent.spawn(handle_file_change)
+                except Exception as close_error:
+                    logger.debug(f"Error during delayed WebSocket close for {calculation_id}: {close_error}")
+                
+        except Exception as e:
+            logger.error(f"Error in file change callback for {calculation_id}: {e}")
+            try:
+                ws.send(json.dumps({
+                    'error': 'Failed to read calculation data',
+                    'id': calculation_id
+                }))
+            except:
+                pass  # Ignore send errors in error handler
+            connection_active = False
 
     try:
+        # Register this WebSocket connection for immediate notifications
+        with websocket_lock:
+            if calculation_id not in active_websockets:
+                active_websockets[calculation_id] = set()
+            active_websockets[calculation_id].add(ws)
+        
         # Initialize file watcher and register this connection
         watcher = get_websocket_watcher(file_manager.get_base_directory())
         watcher.add_connection(calculation_id, on_file_change)
@@ -902,10 +985,21 @@ def calculation_status_socket(ws, calculation_id):
     finally:
         # Always clean up the connection
         connection_active = False
+        
+        # Remove from immediate notification registry
+        try:
+            with websocket_lock:
+                if calculation_id in active_websockets:
+                    active_websockets[calculation_id].discard(ws)
+                    if not active_websockets[calculation_id]:
+                        del active_websockets[calculation_id]
+        except Exception as registry_error:
+            logger.debug(f"Error removing WebSocket from registry for {calculation_id}: {registry_error}")
+        
+        # Remove from file watcher
         try:
             watcher = get_websocket_watcher(file_manager.get_base_directory())
             watcher.remove_connection(calculation_id, on_file_change)
-            logger.debug(f"Removed WebSocket connection from file watcher for {calculation_id}")
         except (AttributeError, RuntimeError) as cleanup_error:
             # These are expected errors during shutdown or when observer is not available
             logger.debug(f"Observer cleanup issue for {calculation_id}: {cleanup_error}")

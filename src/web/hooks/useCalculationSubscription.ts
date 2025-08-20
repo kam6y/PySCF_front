@@ -21,6 +21,7 @@ export const useCalculationSubscription = ({
   const onUpdateRef = useRef(onUpdate);
   const onErrorRef = useRef(onError);
   const currentCalculationIdRef = useRef<string | null>(null);
+  const disconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // コールバック関数の参照を最新に保つ
   useEffect(() => {
@@ -28,15 +29,21 @@ export const useCalculationSubscription = ({
     onErrorRef.current = onError;
   }, [onUpdate, onError]);
 
+  // 遅延切断タイマーをクリアするヘルパー関数
+  const clearDisconnectTimer = useCallback(() => {
+    if (disconnectTimerRef.current) {
+      clearTimeout(disconnectTimerRef.current);
+      disconnectTimerRef.current = null;
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
+    clearDisconnectTimer();
     if (wsRef.current) {
       const ws = wsRef.current;
       try {
         // WebSocketの状態に関係なく、強制的に接続を閉じる
         if (ws.readyState !== WebSocket.CLOSED) {
-          console.log(
-            `Disconnecting WebSocket for calculation ${currentCalculationIdRef.current}`
-          );
           ws.close();
         }
       } catch (error) {
@@ -45,15 +52,12 @@ export const useCalculationSubscription = ({
       wsRef.current = null;
     }
     currentCalculationIdRef.current = null;
-  }, []);
+  }, [clearDisconnectTimer]);
 
   const connect = useCallback(
     (calcId: string) => {
       // 一時的IDの場合は接続を試行しない
       if (calcId.startsWith('new-calculation-')) {
-        console.log(
-          `Skipping WebSocket connection for temporary calculation ID: ${calcId}`
-        );
         return;
       }
 
@@ -64,7 +68,6 @@ export const useCalculationSubscription = ({
         (wsRef.current.readyState === WebSocket.CONNECTING ||
           wsRef.current.readyState === WebSocket.OPEN)
       ) {
-        console.log(`WebSocket already connected for calculation ${calcId}`);
         return;
       }
 
@@ -78,7 +81,7 @@ export const useCalculationSubscription = ({
         currentCalculationIdRef.current = calcId;
 
         ws.onopen = () => {
-          console.log(`WebSocket connected for calculation ${calcId}`);
+          // WebSocket接続確立
         };
 
         ws.onmessage = event => {
@@ -86,8 +89,20 @@ export const useCalculationSubscription = ({
             const updatedCalculation = JSON.parse(
               event.data
             ) as CalculationInstance;
+            
             if (onUpdateRef.current) {
               onUpdateRef.current(updatedCalculation);
+            }
+            
+            // 計算が完了または失敗した場合、少し待ってから接続を切断
+            if (updatedCalculation.status === 'completed' || updatedCalculation.status === 'error') {
+              // 既存のタイマーをクリア
+              clearDisconnectTimer();
+              
+              // 3秒後に切断
+              disconnectTimerRef.current = setTimeout(() => {
+                disconnect();
+              }, 3000);
             }
           } catch (e) {
             console.error('Failed to parse WebSocket message:', e);
@@ -160,15 +175,26 @@ export const useCalculationSubscription = ({
   );
 
   useEffect(() => {
-    // 計算が実行中または保留中でかつIDが有効な場合のみ接続
-    // ただし、一時的ID（new-calculation-で始まるID）の場合は接続しない
-    // completed/errorになるまで接続を維持することで、最終状態の更新を確実に受信
+    // 計算IDが有効で一時的IDでない場合に接続
+    // running/pending状態では即座に接続
+    // completed/error状態でも接続を維持（自動切断タイマーで後で切断）
     if (
       calculationId &&
-      (status === 'running' || status === 'pending') &&
       !calculationId.startsWith('new-calculation-')
     ) {
-      connect(calculationId);
+      // running/pending状態では即座に接続
+      if (status === 'running' || status === 'pending') {
+        connect(calculationId);
+      } else if (status === 'completed' || status === 'error') {
+        // completed/error状態でも、まだ接続していない場合は接続する
+        // （既に接続している場合は、onmessageハンドラで自動切断タイマーが設定される）
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          connect(calculationId);
+        }
+      } else {
+        // その他の状態（unknown等）では切断
+        disconnect();
+      }
     } else {
       disconnect();
     }

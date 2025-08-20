@@ -5,7 +5,7 @@ import sys
 import logging
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, Future
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable, List
 import time
 from datetime import datetime
 from threadpoolctl import threadpool_limits
@@ -157,6 +157,7 @@ class CalculationProcessManager:
         """
         self.max_workers = max_workers or multiprocessing.cpu_count()
         self.active_futures: Dict[str, Future] = {}
+        self.completion_callbacks: Dict[str, List[Callable]] = {}  # calculation_id -> list of callbacks
         self._shutdown = False
         
         # Create executor immediately with fixed worker count
@@ -207,21 +208,35 @@ class CalculationProcessManager:
             return False
     
     def _cleanup_future(self, calculation_id: str, future: Future):
-        """Clean up a completed future."""
+        """Clean up a completed future and call completion callbacks."""
+        success = False
+        error_message = None
+        
         try:
             if calculation_id in self.active_futures:
                 del self.active_futures[calculation_id]
             
-            # Log the result
+            # Determine result and log
             if future.exception():
-                logger.error(f"Calculation {calculation_id} failed with exception: {future.exception()}")
+                error_message = str(future.exception())
+                logger.error(f"Calculation {calculation_id} failed with exception: {error_message}")
             else:
-                success, error = future.result()
+                success, calc_error = future.result()
                 if success:
                     logger.info(f"Calculation {calculation_id} completed successfully")
                 else:
-                    logger.warning(f"Calculation {calculation_id} failed: {error}")
-                    
+                    error_message = calc_error
+                    logger.warning(f"Calculation {calculation_id} failed: {error_message}")
+            
+            # Call completion callbacks
+            if calculation_id in self.completion_callbacks:
+                callbacks = self.completion_callbacks.pop(calculation_id)
+                for callback in callbacks:
+                    try:
+                        callback(calculation_id, success, error_message)
+                    except Exception as callback_error:
+                        logger.error(f"Error in completion callback for {calculation_id}: {callback_error}")
+                        
         except Exception as e:
             logger.error(f"Error cleaning up future for {calculation_id}: {e}")
     
@@ -229,6 +244,19 @@ class CalculationProcessManager:
         """Check if a calculation is currently running."""
         future = self.active_futures.get(calculation_id)
         return future is not None and not future.done()
+    
+    def register_completion_callback(self, calculation_id: str, callback: Callable[[str, bool, Optional[str]], None]):
+        """
+        Register a callback to be called when a calculation completes.
+        
+        Args:
+            calculation_id: ID of the calculation to monitor
+            callback: Function to call when calculation completes. 
+                     Signature: callback(calculation_id, success, error_message)
+        """
+        if calculation_id not in self.completion_callbacks:
+            self.completion_callbacks[calculation_id] = []
+        self.completion_callbacks[calculation_id].append(callback)
     
     def get_active_calculations(self) -> list:
         """Get list of active calculation IDs."""
