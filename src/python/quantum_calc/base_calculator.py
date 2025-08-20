@@ -173,51 +173,6 @@ class BaseCalculator(ABC):
             # RKS/RHF case: simple sum
             return int(np.sum(mo_occ == 0))
     
-    def _calculate_mulliken_charges(self) -> List[Dict[str, Any]]:
-        """Calculate Mulliken population analysis and return atomic charges."""
-        from .exceptions import CalculationError
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
-        if not hasattr(self, 'mf') or self.mf is None:
-            raise CalculationError("SCF calculation not available for Mulliken analysis")
-        if not hasattr(self, 'mol') or self.mol is None:
-            raise CalculationError("Molecule object not available for Mulliken analysis")
-        if self.mf.mo_coeff is None or self.mf.mo_occ is None:
-            raise CalculationError("Molecular orbitals not available for Mulliken analysis")
-        
-        try:
-            # Perform Mulliken population analysis
-            # Note: PySCF mulliken_pop() returns (pop, charges) where:
-            # - pop: Mulliken population on each atomic orbital
-            # - charges: Mulliken charges for each atom
-            mulliken_pops, mulliken_charges = self.mf.mulliken_pop()
-            
-            # Validate charge conservation (only warn if significant deviation)
-            total_charge = sum(mulliken_charges)
-            molecular_charge = self.mol.charge
-            charge_difference = abs(total_charge - molecular_charge)
-            
-            if charge_difference > 0.01:  # Only warn for significant errors
-                logger.warning(f"Charge conservation issue: total={total_charge:.4f}, expected={molecular_charge}, diff={charge_difference:.4f}")
-            
-            # Extract atomic charges efficiently
-            mulliken_charges_list = [
-                {
-                    'atom_index': i,
-                    'atom_symbol': self.mol.atom_symbol(i),
-                    'mulliken_charge': mulliken_charges[i]
-                }
-                for i in range(self.mol.natm)
-            ]
-            
-            logger.info(f"Mulliken analysis completed for {self.mol.natm} atoms")
-            return mulliken_charges_list
-            
-        except Exception as e:
-            raise CalculationError(f"Failed to calculate Mulliken charges: {str(e)}")
-    
     def _geometry_to_xyz_string(self) -> str:
         """Convert optimized geometry to XYZ format string."""
         if not hasattr(self, 'optimized_geometry') or self.optimized_geometry is None:

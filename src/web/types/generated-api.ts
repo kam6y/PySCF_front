@@ -499,15 +499,6 @@ export interface components {
                 /** @description Total number of NTO pairs analyzed */
                 total_nto_pairs?: number;
             }[] | null;
-            /** @description Mulliken population analysis charges for each atom */
-            mulliken_charges?: {
-                /** @description Index of the atom (0-based) */
-                atom_index: number;
-                /** @description Atomic symbol (e.g., H, C, N, O) */
-                atom_symbol: string;
-                /** @description Mulliken charge of the atom in atomic units */
-                mulliken_charge: number;
-            }[] | null;
         };
         CalculationInstance: {
             /** @description Unique calculation ID */

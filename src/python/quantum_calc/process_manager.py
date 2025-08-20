@@ -115,11 +115,9 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         with threadpool_limits(limits=int(cpu_cores), user_api='blas'):
             results = calculator.run_calculation()
         
-        # Update status to completed first (for immediate UI feedback)
-        file_manager.save_calculation_status(calc_dir, 'completed')
-        
-        # Save results after status update (this can take time with large data)
+        # Save results and update status to completed
         file_manager.save_calculation_results(calc_dir, results)
+        file_manager.save_calculation_status(calc_dir, 'completed')
         
         process_logger.info(f"Calculation {calculation_id} completed successfully in process {os.getpid()}")
         return True, None
