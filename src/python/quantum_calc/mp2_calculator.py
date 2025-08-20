@@ -152,7 +152,11 @@ class MP2Calculator(BaseCalculator):
             # Step 4: Orbital analysis using HF orbitals
             homo_idx, lumo_idx = self._analyze_orbitals()
             
-            # Step 5: Prepare results
+            # Step 5: Mulliken population analysis
+            logger.info("Performing Mulliken population analysis...")
+            mulliken_charges = self._calculate_mulliken_charges()
+            
+            # Step 6: Prepare results
             chk_path = self.get_checkpoint_path()
             
             # 安全にエネルギーを変換
@@ -183,7 +187,8 @@ class MP2Calculator(BaseCalculator):
                 'checkpoint_file': chk_path,
                 'checkpoint_exists': os.path.exists(chk_path),
                 'working_directory': self.working_dir,
-                'optimized_geometry': self._geometry_to_xyz_string()
+                'optimized_geometry': self._geometry_to_xyz_string(),
+                'mulliken_charges': mulliken_charges
             })
             
             if self.keep_files:

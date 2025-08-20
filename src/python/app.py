@@ -832,7 +832,6 @@ def calculation_status_socket(ws, calculation_id):
                     }))
                 except:
                     pass  # Ignore send errors in error handler
-                nonlocal connection_active
                 connection_active = False
         
         # Spawn the handler in the gevent event loop to ensure proper thread context

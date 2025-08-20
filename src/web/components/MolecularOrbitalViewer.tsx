@@ -29,7 +29,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   const queryClient = useQueryClient();
   const viewerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  
+
   // State declarations
   const [viewer, setViewer] = useState<any>(null);
   const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
@@ -43,19 +43,22 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isDomReady, setIsDomReady] = useState(false);
-  
+
   // Callback ref to properly track when DOM element becomes available
-  const setViewerRef = useCallback((node: HTMLDivElement | null) => {
-    if (viewerRef.current !== node) {
-      viewerRef.current = node;
-      
-      // Update DOM ready state when ref changes
-      const isReady = !!node;
-      if (isReady !== isDomReady) {
-        setIsDomReady(isReady);
+  const setViewerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (viewerRef.current !== node) {
+        viewerRef.current = node;
+
+        // Update DOM ready state when ref changes
+        const isReady = !!node;
+        if (isReady !== isDomReady) {
+          setIsDomReady(isReady);
+        }
       }
-    }
-  }, [isDomReady]);
+    },
+    [isDomReady]
+  );
   const previousCalculationIdRef = useRef<string | null>(null);
 
   // 軌道情報を取得
@@ -192,14 +195,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   // calculationIdが変更されたときに状態をリセットとキャッシュ無効化
   useEffect(() => {
     const previousCalculationId = previousCalculationIdRef.current;
-    
+
     // 実際にcalculationIdが変更された場合のみ処理を実行
     if (previousCalculationId !== calculationId) {
       // 状態をリセット
       setSelectedOrbitalIndex(null);
       setIsLoading(false);
       setIsDomReady(false);
-      
+
       // 3Dmol.jsビューアーをクリア
       if (viewer) {
         try {
@@ -209,17 +212,17 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         }
       }
       setViewer(null);
-      
+
       // 軌道関連のクエリキャッシュを無効化（新しいcalculationIdが有効な場合のみ）
       if (calculationId && !calculationId.startsWith('new-calculation-')) {
         queryClient.invalidateQueries({
-          queryKey: ['orbitals', calculationId]
+          queryKey: ['orbitals', calculationId],
         });
         queryClient.invalidateQueries({
-          queryKey: ['orbital-cube', calculationId]
+          queryKey: ['orbital-cube', calculationId],
         });
       }
-      
+
       // 現在のcalculationIdを記録
       previousCalculationIdRef.current = calculationId;
     }

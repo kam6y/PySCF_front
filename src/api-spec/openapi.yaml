@@ -895,6 +895,23 @@ components:
                 description: Total number of NTO pairs analyzed
           nullable: true
           description: Natural Transition Orbital analysis results (TDDFT only)
+        mulliken_charges:
+          type: array
+          items:
+            type: object
+            required: [atom_index, atom_symbol, mulliken_charge]
+            properties:
+              atom_index:
+                type: integer
+                description: Index of the atom (0-based)
+              atom_symbol:
+                type: string
+                description: Atomic symbol (e.g., H, C, N, O)
+              mulliken_charge:
+                type: number
+                description: Mulliken charge of the atom in atomic units
+          nullable: true
+          description: Mulliken population analysis charges for each atom
 
     CalculationInstance:
       type: object

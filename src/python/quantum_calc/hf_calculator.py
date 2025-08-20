@@ -135,7 +135,11 @@ class HFCalculator(BaseCalculator):
             # Step 3: Orbital analysis
             homo_idx, lumo_idx = self._analyze_orbitals()
             
-            # Step 4: Prepare results
+            # Step 4: Mulliken population analysis
+            logger.info("Performing Mulliken population analysis...")
+            mulliken_charges = self._calculate_mulliken_charges()
+            
+            # Step 5: Prepare results
             chk_path = self.get_checkpoint_path()
             
             # 安全にエネルギーを変換
@@ -156,7 +160,8 @@ class HFCalculator(BaseCalculator):
                 'checkpoint_file': chk_path,
                 'checkpoint_exists': os.path.exists(chk_path),
                 'working_directory': self.working_dir,
-                'optimized_geometry': self._geometry_to_xyz_string()
+                'optimized_geometry': self._geometry_to_xyz_string(),
+                'mulliken_charges': mulliken_charges
             })
             
             if self.keep_files:

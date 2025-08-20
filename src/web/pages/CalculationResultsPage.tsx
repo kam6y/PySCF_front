@@ -17,7 +17,9 @@ export const CalculationResultsPage = ({
   onCalculationUpdate,
 }: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<number | null>(null);
+  const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     setError(detailsError);
@@ -214,6 +216,180 @@ export const CalculationResultsPage = ({
             </div>
           </div>
         </section>
+
+        {/* Mulliken Population Analysis */}
+        {results.mulliken_charges && results.mulliken_charges.length > 0 && (
+          <section
+            style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#e8f5e8',
+              borderRadius: '8px',
+            }}
+          >
+            <h2>Mulliken Population Analysis</h2>
+            <div
+              style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}
+            >
+              Mulliken電荷は各原子上の電子密度を示します。正の値は電子欠乏（カチオン性）、負の値は電子過剰（アニオン性）を表します。
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: '#f0f8ff' }}>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'left',
+                      }}
+                    >
+                      原子番号
+                    </th>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'left',
+                      }}
+                    >
+                      原子記号
+                    </th>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'right',
+                      }}
+                    >
+                      Mulliken電荷
+                    </th>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'center',
+                      }}
+                    >
+                      電荷状態
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.mulliken_charges.map((atomCharge, index) => {
+                    const charge = atomCharge.mulliken_charge;
+                    const isPositive = charge > 0.05;
+                    const isNegative = charge < -0.05;
+                    const chargeColor = isPositive
+                      ? '#e74c3c'
+                      : isNegative
+                        ? '#3498db'
+                        : '#666';
+                    const chargeState = isPositive
+                      ? 'カチオン性'
+                      : isNegative
+                        ? 'アニオン性'
+                        : '中性';
+
+                    return (
+                      <tr
+                        key={index}
+                        style={{
+                          backgroundColor:
+                            index % 2 === 0 ? '#fafafa' : 'white',
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: '10px',
+                            border: '1px solid #ddd',
+                          }}
+                        >
+                          {atomCharge.atom_index + 1}
+                        </td>
+                        <td
+                          style={{
+                            padding: '10px',
+                            border: '1px solid #ddd',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {atomCharge.atom_symbol}
+                        </td>
+                        <td
+                          style={{
+                            padding: '10px',
+                            border: '1px solid #ddd',
+                            textAlign: 'right',
+                            fontFamily: 'monospace',
+                            color: chargeColor,
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {charge >= 0 ? '+' : ''}
+                          {charge.toFixed(4)}
+                        </td>
+                        <td
+                          style={{
+                            padding: '10px',
+                            border: '1px solid #ddd',
+                            textAlign: 'center',
+                            color: chargeColor,
+                            fontSize: '12px',
+                          }}
+                        >
+                          {chargeState}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <div
+              style={{
+                marginTop: '15px',
+                padding: '15px',
+                backgroundColor: '#e8f5e8',
+                borderRadius: '4px',
+                border: '1px solid #4caf50',
+              }}
+            >
+              <h4 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>
+                💡 Mulliken電荷の読み方
+              </h4>
+              <ul
+                style={{
+                  margin: '0',
+                  paddingLeft: '20px',
+                  fontSize: '14px',
+                  lineHeight: '1.5',
+                }}
+              >
+                <li>
+                  <strong style={{ color: '#e74c3c' }}>正の電荷</strong>:
+                  電子が不足している状態（求電子性）
+                </li>
+                <li>
+                  <strong style={{ color: '#3498db' }}>負の電荷</strong>:
+                  電子が過剰な状態（求核性）
+                </li>
+                <li>
+                  絶対値が大きいほど電荷の偏りが強く、化学反応性が高い傾向
+                </li>
+                <li>値は原子単位（a.u.）で表示されています</li>
+              </ul>
+            </div>
+          </section>
+        )}
 
         {/* Molecular Orbital Energy Diagram */}
         <section
