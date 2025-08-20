@@ -4,8 +4,11 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Tuple
 import os
 import tempfile
+import logging
 from contextlib import contextmanager
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class BaseCalculator(ABC):
@@ -188,3 +191,42 @@ class BaseCalculator(ABC):
             lines.append(f"{symbol:2s} {coords[0]:12.6f} {coords[1]:12.6f} {coords[2]:12.6f}")
         
         return "\n".join(lines)
+    
+    def _calculate_mulliken_charges(self) -> Optional[List[Dict[str, Any]]]:
+        """Calculate Mulliken population analysis charges for each atom."""
+        if not hasattr(self, 'mf') or self.mf is None:
+            return None
+        if not hasattr(self, 'mol') or self.mol is None:
+            return None
+        
+        try:
+            # Perform Mulliken population analysis
+            # This returns (pop, charges) where pop are populations and charges are atomic charges
+            pop, charges = self.mf.mulliken_pop()
+            
+            # Extract charges for each atom
+            mulliken_charges = []
+            for i in range(self.mol.natm):
+                atom_symbol = self.mol.atom_symbol(i)
+                # Convert numpy float to Python float for JSON serialization
+                charge = float(charges[i])
+                
+                mulliken_charges.append({
+                    'atom_index': i,
+                    'element': atom_symbol,
+                    'charge': charge
+                })
+            
+            # Verify total charge conservation (should equal molecular charge)
+            total_charge = sum(item['charge'] for item in mulliken_charges)
+            expected_charge = float(self.mol.charge)
+            logger.info(f"Mulliken analysis: calculated total charge = {total_charge:.6f}, expected = {expected_charge:.6f}")
+            
+            if abs(total_charge - expected_charge) > 0.01:
+                logger.warning(f"Mulliken total charge ({total_charge:.6f}) differs from molecular charge ({expected_charge:.6f}) by more than 0.01")
+            
+            return mulliken_charges
+            
+        except Exception as e:
+            logger.warning(f"Mulliken population analysis failed: {str(e)}")
+            return None

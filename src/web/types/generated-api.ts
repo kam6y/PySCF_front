@@ -499,6 +499,15 @@ export interface components {
                 /** @description Total number of NTO pairs analyzed */
                 total_nto_pairs?: number;
             }[] | null;
+            /** @description Mulliken population analysis charges for each atom */
+            mulliken_charges?: {
+                /** @description 0-based index of the atom */
+                atom_index?: number;
+                /** @description Element symbol (e.g., C, H, O, N) */
+                element?: string;
+                /** @description Mulliken charge on this atom (positive = electron deficient, negative = electron rich) */
+                charge?: number;
+            }[] | null;
         };
         CalculationInstance: {
             /** @description Unique calculation ID */

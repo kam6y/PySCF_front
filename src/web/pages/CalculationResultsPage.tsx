@@ -1122,6 +1122,161 @@ export const CalculationResultsPage = ({
           </div>
         </section>
 
+        {/* Mulliken Charges */}
+        {results.mulliken_charges && results.mulliken_charges.length > 0 && (
+          <section
+            style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#f0fff8',
+              borderRadius: '8px',
+            }}
+          >
+            <h2>Mulliken電荷解析</h2>
+            <div
+              style={{
+                marginBottom: '15px',
+                fontSize: '14px',
+                color: '#666',
+              }}
+            >
+              Mulliken人口解析による各原子の部分電荷。正の値は電子不足（正電荷）、負の値は電子過剰（負電荷）を示します。
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  backgroundColor: 'white',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                }}
+              >
+                <thead>
+                  <tr style={{ backgroundColor: '#e8f5e8' }}>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'center',
+                      }}
+                    >
+                      原子番号
+                    </th>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'center',
+                      }}
+                    >
+                      元素
+                    </th>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'center',
+                      }}
+                    >
+                      Mulliken電荷 (e)
+                    </th>
+                    <th
+                      style={{
+                        padding: '12px',
+                        border: '1px solid #ddd',
+                        textAlign: 'center',
+                      }}
+                    >
+                      電荷の性質
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {results.mulliken_charges.map(
+                    (chargeData: any, index: number) => {
+                      const isPositive = chargeData.charge > 0;
+                      const chargeColor = isPositive ? '#d32f2f' : '#1976d2';
+                      const chargeBgColor = isPositive ? '#ffebee' : '#e3f2fd';
+                      
+                      return (
+                        <tr
+                          key={index}
+                          style={{
+                            backgroundColor:
+                              index % 2 === 0 ? '#fafafa' : 'white',
+                          }}
+                        >
+                          <td
+                            style={{
+                              padding: '10px',
+                              border: '1px solid #ddd',
+                              textAlign: 'center',
+                            }}
+                          >
+                            {chargeData.atom_index + 1}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px',
+                              border: '1px solid #ddd',
+                              textAlign: 'center',
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {chargeData.element}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px',
+                              border: '1px solid #ddd',
+                              textAlign: 'center',
+                              fontFamily: 'monospace',
+                              backgroundColor: chargeBgColor,
+                              color: chargeColor,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {chargeData.charge > 0 ? '+' : ''}{chargeData.charge.toFixed(4)}
+                          </td>
+                          <td
+                            style={{
+                              padding: '10px',
+                              border: '1px solid #ddd',
+                              textAlign: 'center',
+                              color: chargeColor,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {isPositive ? '陽性（δ+）' : '陰性（δ−）'}
+                          </td>
+                        </tr>
+                      );
+                    }
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div
+              style={{
+                marginTop: '15px',
+                padding: '10px',
+                backgroundColor: '#e8f5e8',
+                borderRadius: '4px',
+                fontSize: '14px',
+              }}
+            >
+              <strong>合計電荷:</strong>{' '}
+              <code>
+                {results.mulliken_charges
+                  .reduce((sum: number, charge: any) => sum + charge.charge, 0)
+                  .toFixed(4)} e
+              </code>
+              {' '}(分子電荷: <code>{results.charge || 0}</code> e)
+            </div>
+          </section>
+        )}
+
         {/* Molecular Structure */}
         <section
           style={{

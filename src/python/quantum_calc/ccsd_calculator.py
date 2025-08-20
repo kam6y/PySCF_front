@@ -185,7 +185,15 @@ class CCSDCalculator(BaseCalculator):
             # Step 5: Orbital analysis using HF orbitals
             homo_idx, lumo_idx = self._analyze_orbitals()
             
-            # Step 6: Prepare results
+            # Step 6: Mulliken population analysis using HF orbitals
+            logger.info("Performing Mulliken population analysis...")
+            mulliken_charges = self._calculate_mulliken_charges()
+            if mulliken_charges is not None:
+                logger.info(f"Calculated Mulliken charges for {len(mulliken_charges)} atoms")
+            else:
+                logger.warning("Mulliken population analysis failed or was skipped")
+            
+            # Step 7: Prepare results
             chk_path = self.get_checkpoint_path()
             
             # 安全にエネルギーを変換
@@ -219,7 +227,8 @@ class CCSDCalculator(BaseCalculator):
                 'checkpoint_file': chk_path,
                 'checkpoint_exists': os.path.exists(chk_path),
                 'working_directory': self.working_dir,
-                'optimized_geometry': self._geometry_to_xyz_string()
+                'optimized_geometry': self._geometry_to_xyz_string(),
+                'mulliken_charges': mulliken_charges
             })
             
             # Add CCSD(T) specific results if calculated
