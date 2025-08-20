@@ -457,7 +457,7 @@ components:
 
     CalculationMethod:
       type: string
-      enum: [DFT, HF, MP2, TDDFT]
+      enum: [DFT, HF, MP2, CCSD, CCSD_T, TDDFT]
       description: Quantum calculation method
 
     CalculationStatus:

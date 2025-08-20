@@ -234,7 +234,7 @@ export interface components {
          * @description Quantum calculation method
          * @enum {string}
          */
-        CalculationMethod: "DFT" | "HF" | "MP2" | "TDDFT";
+        CalculationMethod: "DFT" | "HF" | "MP2" | "CCSD" | "CCSD_T" | "TDDFT";
         /**
          * @description Status of a calculation
          * @enum {string}

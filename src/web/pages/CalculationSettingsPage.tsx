@@ -142,24 +142,42 @@ export const CalculationSettingsPage = ({
         processedValue = '78.36';
       }
 
-      const safeParams: QuantumCalculationRequest = {
-        xyz: currentParams.xyz || '',
-        calculation_method: currentParams.calculation_method || 'DFT',
-        basis_function: currentParams.basis_function || '6-31G(d)',
-        exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
-        charges: currentParams.charges || 0,
-        spin_multiplicity: currentParams.spin_multiplicity || 1,
-        solvent_method: currentParams.solvent_method || 'none',
-        solvent: currentParams.solvent || '-',
+      // Adjust defaults when calculation method changes
+      let adjustedParams = { ...currentParams };
+      if (field === 'calculation_method') {
+        if (value === 'CCSD' || value === 'CCSD_T') {
+          // CCSD defaults: correlation-consistent basis and higher memory
+          adjustedParams.basis_function = 'cc-pVDZ';
+          adjustedParams.memory_mb = adjustedParams.memory_mb || 4000;
+        } else if (value === 'MP2') {
+          // MP2 defaults: higher memory
+          adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
+        } else {
+          // DFT/HF/TDDFT defaults
+          adjustedParams.basis_function = adjustedParams.basis_function || '6-31G(d)';
+          adjustedParams.memory_mb = adjustedParams.memory_mb || 2000;
+        }
+      }
+
+      const safeParams: QuantumCalculationRequest & { frozen_core?: boolean } = {
+        xyz: adjustedParams.xyz || '',
+        calculation_method: adjustedParams.calculation_method || 'DFT',
+        basis_function: adjustedParams.basis_function || '6-31G(d)',
+        exchange_correlation: adjustedParams.exchange_correlation || 'B3LYP',
+        charges: adjustedParams.charges || 0,
+        spin_multiplicity: adjustedParams.spin_multiplicity || 1,
+        solvent_method: adjustedParams.solvent_method || 'none',
+        solvent: adjustedParams.solvent || '-',
         name:
-          (currentParams as any).name ||
-          (currentParams as any).molecule_name ||
+          (adjustedParams as any).name ||
+          (adjustedParams as any).molecule_name ||
           'Unnamed Calculation',
-        cpu_cores: currentParams.cpu_cores || undefined,
-        memory_mb: currentParams.memory_mb || undefined,
-        tddft_nstates: (currentParams as any).tddft_nstates || 10,
-        tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-        tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
+        cpu_cores: adjustedParams.cpu_cores || undefined,
+        memory_mb: adjustedParams.memory_mb || undefined,
+        tddft_nstates: (adjustedParams as any).tddft_nstates || 10,
+        tddft_method: (adjustedParams as any).tddft_method || 'TDDFT',
+        tddft_analyze_nto: (adjustedParams as any).tddft_analyze_nto || false,
+        frozen_core: (adjustedParams as any).frozen_core !== false, // Default to true
       };
 
       if (isCompleted && isParamChange) {
@@ -200,7 +218,7 @@ export const CalculationSettingsPage = ({
           activeCalculation.status === 'error';
         const currentParams = activeCalculation.parameters;
 
-        const safeParams: QuantumCalculationRequest = {
+        const safeParams: QuantumCalculationRequest & { frozen_core?: boolean } = {
           xyz: xyzData,
           calculation_method: currentParams.calculation_method || 'DFT',
           basis_function: currentParams.basis_function || '6-31G(d)',
@@ -218,6 +236,7 @@ export const CalculationSettingsPage = ({
           tddft_nstates: (currentParams as any).tddft_nstates || 10,
           tddft_method: (currentParams as any).tddft_method || 'TDDFT',
           tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
+          frozen_core: (currentParams as any).frozen_core !== false, // Default to true
         };
 
         if (isCompleted) {
@@ -311,7 +330,7 @@ export const CalculationSettingsPage = ({
     setCalculationError(null);
 
     const currentParams = activeCalculation.parameters;
-    const finalParams: QuantumCalculationRequest = {
+    const finalParams: QuantumCalculationRequest & { frozen_core?: boolean } = {
       xyz: currentParams.xyz || '',
       calculation_method: currentParams.calculation_method || 'DFT',
       basis_function: currentParams.basis_function || '6-31G(d)',
@@ -326,6 +345,7 @@ export const CalculationSettingsPage = ({
       tddft_nstates: (currentParams as any).tddft_nstates || 10,
       tddft_method: (currentParams as any).tddft_method || 'TDDFT',
       tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
+      frozen_core: (currentParams as any).frozen_core !== false, // Default to true
     };
 
     try {
@@ -388,7 +408,7 @@ export const CalculationSettingsPage = ({
         activeCalculation.status === 'completed' ||
         activeCalculation.status === 'error';
 
-      const safeParams: QuantumCalculationRequest = {
+      const safeParams: QuantumCalculationRequest & { frozen_core?: boolean } = {
         xyz: data.xyz,
         calculation_method: params.calculation_method || 'DFT',
         basis_function: params.basis_function || '6-31G(d)',
@@ -403,6 +423,7 @@ export const CalculationSettingsPage = ({
         tddft_nstates: (params as any).tddft_nstates || 10,
         tddft_method: (params as any).tddft_method || 'TDDFT',
         tddft_analyze_nto: (params as any).tddft_analyze_nto || false,
+        frozen_core: (params as any).frozen_core !== false, // Default to true
       };
 
       if (isCompleted) {
@@ -628,6 +649,8 @@ export const CalculationSettingsPage = ({
                   <option value="DFT">DFT</option>
                   <option value="HF">HF</option>
                   <option value="MP2">MP2</option>
+                  <option value="CCSD">CCSD</option>
+                  <option value="CCSD_T">CCSD(T)</option>
                   <option value="TDDFT">TDDFT</option>
                 </select>
               </div>
@@ -778,6 +801,29 @@ export const CalculationSettingsPage = ({
                     />
                     Perform Natural Transition Orbital Analysis
                   </label>
+                </div>
+              </section>
+            )}
+            {(params.calculation_method === 'CCSD' || params.calculation_method === 'CCSD_T') && (
+              <section className="calculation-settings-section">
+                <div className="setting-row">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={(params as any).frozen_core !== false}
+                      onChange={e =>
+                        handleParamChange(
+                          'frozen_core' as any,
+                          e.target.checked
+                        )
+                      }
+                      disabled={calculationStatus === 'running'}
+                    />
+                    Use Frozen Core Approximation
+                  </label>
+                  <div style={{ fontSize: '12px', color: '#666', marginLeft: '20px', marginTop: '4px' }}>
+                    Freeze core orbitals to reduce computational cost (recommended)
+                  </div>
                 </div>
               </section>
             )}

@@ -34,7 +34,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     memory_mb = parameters.get('memory_mb') or 2000  # Noneや空の値をデフォルト値に置き換え
 
     # Import here to avoid issues with multiprocessing and module loading
-    from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, TDDFTCalculator
+    from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator
     from quantum_calc import CalculationError, ConvergenceError, InputError
     from quantum_calc.file_manager import CalculationFileManager
     from threadpoolctl import threadpool_info
@@ -79,6 +79,10 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         elif calculation_method == 'MP2':
             calculator = MP2Calculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        elif calculation_method == 'CCSD':
+            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        elif calculation_method == 'CCSD_T':
+            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         elif calculation_method == 'TDDFT':
             calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         else:  # Default to DFT
@@ -101,6 +105,11 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         # Add exchange-correlation functional for DFT and TDDFT calculations
         if calculation_method in ['DFT', 'TDDFT']:
             setup_params['xc'] = parameters['exchange_correlation']
+        
+        # Add CCSD-specific parameters
+        if calculation_method in ['CCSD', 'CCSD_T']:
+            setup_params['frozen_core'] = parameters.get('frozen_core', True)
+            setup_params['ccsd_t'] = (calculation_method == 'CCSD_T')
         
         # Add TDDFT-specific parameters
         if calculation_method == 'TDDFT':

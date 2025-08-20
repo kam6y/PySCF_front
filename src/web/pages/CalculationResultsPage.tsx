@@ -997,6 +997,65 @@ export const CalculationResultsPage = ({
             </>
           )}
 
+        {/* CCSD Results Section */}
+        {(parameters.calculation_method === 'CCSD' || parameters.calculation_method === 'CCSD_T') && (
+          <section
+            style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#fff0e8',
+              borderRadius: '8px',
+            }}
+          >
+            <h2>CCSD Results</h2>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '15px',
+              }}
+            >
+              <div>
+                <strong>HF Energy:</strong>{' '}
+                <code>{((results as any).hf_energy || results.scf_energy)?.toFixed(6)} Hartree</code>
+              </div>
+              <div>
+                <strong>CCSD Correlation Energy:</strong>{' '}
+                <code>
+                  {(results as any).ccsd_correlation_energy?.toFixed(6)} Hartree
+                </code>
+              </div>
+              <div>
+                <strong>CCSD Total Energy:</strong>{' '}
+                <code>
+                  {(results as any).ccsd_total_energy?.toFixed(6)} Hartree
+                </code>
+              </div>
+              {parameters.calculation_method === 'CCSD_T' && (results as any).ccsd_t_correction && (
+                <>
+                  <div>
+                    <strong>CCSD(T) Triples Correction:</strong>{' '}
+                    <code>
+                      {(results as any).ccsd_t_correction?.toFixed(6)} Hartree
+                    </code>
+                  </div>
+                  <div>
+                    <strong>CCSD(T) Total Energy:</strong>{' '}
+                    <code>
+                      {(results as any).ccsd_t_total_energy?.toFixed(6)} Hartree
+                    </code>
+                  </div>
+                </>
+              )}
+            </div>
+            {(results as any).frozen_core && (
+              <div style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
+                ℹ️ Frozen core approximation was used in this calculation
+              </div>
+            )}
+          </section>
+        )}
+
         {/* Checkpoint File Information */}
         <section
           style={{
@@ -1072,7 +1131,24 @@ export const CalculationResultsPage = ({
             borderRadius: '8px',
           }}
         >
-          <h2>Optimized Geometry</h2>
+          {(parameters.calculation_method === 'HF' || 
+            parameters.calculation_method === 'MP2' || 
+            parameters.calculation_method === 'CCSD' || 
+            parameters.calculation_method === 'CCSD_T') ? (
+            <>
+              <h2>HF-Optimized Geometry</h2>
+              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+                ℹ️ Geometry optimized using Hartree-Fock method
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>DFT-Optimized Geometry</h2>
+              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+                ℹ️ Geometry optimized using DFT method
+              </div>
+            </>
+          )}
           <div>
             <strong>Number of Atoms:</strong> {results.atom_count}
           </div>
