@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CalculationInstance } from '../types/api-types';
 import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
+import { MolecularOrbitalEnergyDiagram } from '../components/MolecularOrbitalEnergyDiagram';
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -16,6 +17,7 @@ export const CalculationResultsPage = ({
   onCalculationUpdate,
 }: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
+  const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<number | null>(null);
 
   useEffect(() => {
     setError(detailsError);
@@ -211,6 +213,30 @@ export const CalculationResultsPage = ({
               <code>{results.num_virtual_orbitals}</code>
             </div>
           </div>
+        </section>
+
+        {/* Molecular Orbital Energy Diagram */}
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#fff9e6',
+            borderRadius: '8px',
+          }}
+        >
+          <h2>分子軌道エネルギー準位図</h2>
+          <div
+            style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}
+          >
+            分子軌道のエネルギー準位を図示します。軌道をクリックすると3D可視化で詳細を確認できます。
+          </div>
+          <MolecularOrbitalEnergyDiagram
+            key={`energy-${activeCalculation.id}`}
+            calculationId={activeCalculation.id}
+            selectedOrbitalIndex={selectedOrbitalIndex}
+            onOrbitalSelect={setSelectedOrbitalIndex}
+            onError={error => setError(error)}
+          />
         </section>
 
         {/* Molecular Orbital Visualization */}
