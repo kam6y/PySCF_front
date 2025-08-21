@@ -21,12 +21,11 @@ dependencies:
   - conda-pack
   - pip:
     # Flask extensions
-    - flask-sock
     - flask-pydantic
     # Code generation and build tools
     - datamodel-code-generator
     - pyinstaller
-    # WebSocket support
+    # WebSocket support (unified on gevent-websocket)
     - gevent-websocket
     # File system monitoring
     - watchdog

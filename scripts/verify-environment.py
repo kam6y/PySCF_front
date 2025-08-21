@@ -63,7 +63,6 @@ def check_required_packages() -> bool:
         ('gevent', 'Gevent - 非同期処理'),
         ('requests', 'Requests - HTTP クライアント'),
         ('conda_pack', 'conda-pack - 環境パッケージ化'),
-        ('flask_sock', 'Flask-Sock - WebSocket サポート'),
         ('datamodel_code_generator', 'datamodel-code-generator - コード生成'),
         ('PyInstaller', 'PyInstaller - Python実行ファイル作成'),
     ]

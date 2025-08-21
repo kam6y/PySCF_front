@@ -11,6 +11,8 @@ from typing import Dict, Callable, Optional, Set
 from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
+import gevent
+from gevent.queue import Queue
 
 from .exceptions import FileManagerError, WebSocketError
 
@@ -93,6 +95,7 @@ class WebSocketCalculationWatcher:
     """
     Manages file system watching for WebSocket connections to calculation directories.
     Provides efficient, event-driven monitoring instead of polling.
+    Now with gevent integration to prevent greenlet thread switching errors.
     """
     
     def __init__(self, base_directory: str):
@@ -109,24 +112,37 @@ class WebSocketCalculationWatcher:
         self._lock = threading.Lock()
         self._started = False
         
-        # Create event handler
-        self.event_handler = CalculationFileWatcher(self._on_file_change)
+        # gevent queue for thread-safe communication
+        self._event_queue = Queue()
+        self._queue_processor = None
+        
+        # Create event handler that puts events in the queue
+        self.event_handler = CalculationFileWatcher(self._queue_file_change)
     
     def start(self):
-        """Start the file system observer."""
+        """Start the file system observer and event queue processor."""
         with self._lock:
             if not self._started:
                 self.observer.start()
+                # Start the gevent queue processor
+                self._queue_processor = gevent.spawn(self._process_file_events)
                 self._started = True
-                logger.info("WebSocket file watcher started")
+                logger.info("WebSocket file watcher started with gevent integration")
     
     def stop(self):
         """Stop the file system observer and clean up resources."""
         with self._lock:
             if self._started:
                 try:
+                    # Stop the observer
                     self.observer.stop()
                     self.observer.join(timeout=5.0)
+                    
+                    # Kill the queue processor
+                    if self._queue_processor:
+                        self._queue_processor.kill()
+                        self._queue_processor = None
+                        
                 except Exception as e:
                     logger.warning(f"Error stopping file observer: {e}")
                 finally:
@@ -209,8 +225,38 @@ class WebSocketCalculationWatcher:
             self.watched_dirs.discard(calc_dir_str)
             logger.debug(f"Stopped watching directory: {calc_dir_str}")
     
-    def _on_file_change(self, calculation_id: str, file_data: Dict):
-        """Handle file change events and notify connected WebSocket clients."""
+    def _queue_file_change(self, calculation_id: str, file_data: Dict):
+        """Queue file change events for processing in gevent context."""
+        # This runs in watchdog thread - just put event in queue
+        try:
+            self._event_queue.put((calculation_id, file_data), block=False)
+        except Exception as e:
+            logger.error(f"Error queuing file change event for {calculation_id}: {e}")
+    
+    def _process_file_events(self):
+        """Process file events from the queue in gevent context."""
+        logger.debug("Started gevent file event processor")
+        try:
+            while True:
+                try:
+                    # Get event from queue (this will yield to other gevent tasks)
+                    calculation_id, file_data = self._event_queue.get()
+                    
+                    # Process the file change in gevent context
+                    self._handle_file_change_in_gevent(calculation_id, file_data)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing file event: {e}")
+                    # Continue processing other events
+                    continue
+        except gevent.GreenletExit:
+            # Normal shutdown
+            logger.debug("File event processor shutting down")
+        except Exception as e:
+            logger.error(f"Unexpected error in file event processor: {e}")
+    
+    def _handle_file_change_in_gevent(self, calculation_id: str, file_data: Dict):
+        """Handle file change events and notify connected WebSocket clients (gevent context)."""
         with self._lock:
             if calculation_id not in self.connections:
                 return
@@ -218,7 +264,7 @@ class WebSocketCalculationWatcher:
             # Get current connections for this calculation
             callbacks = self.connections[calculation_id].copy()
         
-        # Notify all connected WebSocket clients
+        # Notify all connected WebSocket clients (now in gevent context)
         for callback in callbacks:
             try:
                 callback(file_data)

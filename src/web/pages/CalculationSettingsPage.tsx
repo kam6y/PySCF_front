@@ -152,8 +152,18 @@ export const CalculationSettingsPage = ({
         } else if (value === 'MP2') {
           // MP2 defaults: higher memory
           adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
+        } else if (value === 'TDDFT') {
+          // TDDFT defaults
+          adjustedParams.basis_function = adjustedParams.basis_function || '6-31G(d)';
+          adjustedParams.memory_mb = adjustedParams.memory_mb || 2000;
+          // Initialize TDDFT parameters if not already set
+          (adjustedParams as any).tddft_nstates = (adjustedParams as any).tddft_nstates || 10;
+          (adjustedParams as any).tddft_method = (adjustedParams as any).tddft_method || 'TDDFT';
+          (adjustedParams as any).tddft_analyze_nto = (adjustedParams as any).tddft_analyze_nto !== undefined 
+            ? (adjustedParams as any).tddft_analyze_nto 
+            : false;
         } else {
-          // DFT/HF/TDDFT defaults
+          // DFT/HF defaults
           adjustedParams.basis_function = adjustedParams.basis_function || '6-31G(d)';
           adjustedParams.memory_mb = adjustedParams.memory_mb || 2000;
         }
@@ -174,9 +184,13 @@ export const CalculationSettingsPage = ({
           'Unnamed Calculation',
         cpu_cores: adjustedParams.cpu_cores || undefined,
         memory_mb: adjustedParams.memory_mb || undefined,
-        tddft_nstates: (adjustedParams as any).tddft_nstates || 10,
+        tddft_nstates: (adjustedParams as any).tddft_nstates !== undefined 
+          ? (adjustedParams as any).tddft_nstates 
+          : 10,
         tddft_method: (adjustedParams as any).tddft_method || 'TDDFT',
-        tddft_analyze_nto: (adjustedParams as any).tddft_analyze_nto || false,
+        tddft_analyze_nto: (adjustedParams as any).tddft_analyze_nto !== undefined 
+          ? (adjustedParams as any).tddft_analyze_nto 
+          : false,
         frozen_core: (adjustedParams as any).frozen_core !== false, // Default to true
       };
 
@@ -233,9 +247,13 @@ export const CalculationSettingsPage = ({
             'Unnamed Calculation',
           cpu_cores: currentParams.cpu_cores || undefined,
           memory_mb: currentParams.memory_mb || undefined,
-          tddft_nstates: (currentParams as any).tddft_nstates || 10,
+          tddft_nstates: (currentParams as any).tddft_nstates !== undefined 
+            ? (currentParams as any).tddft_nstates 
+            : 10,
           tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-          tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
+          tddft_analyze_nto: (currentParams as any).tddft_analyze_nto !== undefined 
+            ? (currentParams as any).tddft_analyze_nto 
+            : false,
           frozen_core: (currentParams as any).frozen_core !== false, // Default to true
         };
 
@@ -342,9 +360,13 @@ export const CalculationSettingsPage = ({
       name: moleculeName,
       cpu_cores: currentParams.cpu_cores || undefined,
       memory_mb: currentParams.memory_mb || undefined,
-      tddft_nstates: (currentParams as any).tddft_nstates || 10,
+      tddft_nstates: (currentParams as any).tddft_nstates !== undefined 
+        ? (currentParams as any).tddft_nstates 
+        : 10,
       tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-      tddft_analyze_nto: (currentParams as any).tddft_analyze_nto || false,
+      tddft_analyze_nto: (currentParams as any).tddft_analyze_nto !== undefined 
+        ? (currentParams as any).tddft_analyze_nto 
+        : false,
       frozen_core: (currentParams as any).frozen_core !== false, // Default to true
     };
 
@@ -420,9 +442,13 @@ export const CalculationSettingsPage = ({
         name: moleculeName,
         cpu_cores: params.cpu_cores || undefined,
         memory_mb: params.memory_mb || undefined,
-        tddft_nstates: (params as any).tddft_nstates || 10,
+        tddft_nstates: (params as any).tddft_nstates !== undefined 
+          ? (params as any).tddft_nstates 
+          : 10,
         tddft_method: (params as any).tddft_method || 'TDDFT',
-        tddft_analyze_nto: (params as any).tddft_analyze_nto || false,
+        tddft_analyze_nto: (params as any).tddft_analyze_nto !== undefined 
+          ? (params as any).tddft_analyze_nto 
+          : false,
         frozen_core: (params as any).frozen_core !== false, // Default to true
       };
 

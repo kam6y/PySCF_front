@@ -10,14 +10,15 @@ import threading
 from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_sock import Sock
 from flask_pydantic import validate
+from geventwebsocket.handler import WebSocketHandler
 from pydantic import ValidationError
 import socket
 import shutil
 from typing import Dict
 import gevent
 from gevent.pywsgi import WSGIServer
+from geventwebsocket import WebSocketServer
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
@@ -41,7 +42,6 @@ logger = logging.getLogger(__name__)
 # Initialize Flask app and extensions
 app = Flask(__name__)
 CORS(app)  # Enable CORS for cross-origin requests
-sock = Sock(app)  # Sockインスタンスを作成
 
 # Initialize PubChem client
 pubchem_client = PubChemClient(timeout=30)
@@ -275,14 +275,12 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'name': body.name,
             'cpu_cores': body.cpu_cores,
             'memory_mb': body.memory_mb,
-            'created_at': datetime.now().isoformat()
+            'created_at': datetime.now().isoformat(),
+            # Always include TDDFT parameters for consistency
+            'tddft_nstates': body.tddft_nstates,
+            'tddft_method': body.tddft_method.value if body.tddft_method else 'TDDFT',
+            'tddft_analyze_nto': body.tddft_analyze_nto
         }
-        
-        # Add TDDFT-specific parameters if the method is TDDFT
-        if body.calculation_method == 'TDDFT':
-            parameters['tddft_nstates'] = body.tddft_nstates
-            parameters['tddft_method'] = body.tddft_method.value
-            parameters['tddft_analyze_nto'] = body.tddft_analyze_nto
         
         # Initialize file manager and create directory
         file_manager = CalculationFileManager()
@@ -803,17 +801,24 @@ def delete_cube_files(calculation_id):
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
-@sock.route('/ws/calculations/<calculation_id>')
-def calculation_status_socket(ws, calculation_id):
+@app.route('/ws/calculations/<calculation_id>')
+def calculation_status_socket(calculation_id):
     """
     WebSocket endpoint for efficient, event-driven calculation monitoring.
     Uses file system event watching instead of polling for better performance.
     """
+    # Check if this is a WebSocket connection
+    ws = request.environ.get('wsgi.websocket')
+    if not ws:
+        # Not a WebSocket request
+        return jsonify({'error': 'WebSocket connection required'}), 400
+    
     # 一時的IDの場合は特別なログメッセージを出力
     if calculation_id.startswith('new-calculation-'):
         logger.info(f"WebSocket connection attempt for temporary calculation ID: {calculation_id}")
     else:
         logger.info(f"WebSocket connection established for calculation {calculation_id}")
+    
     file_manager = CalculationFileManager()
     calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
     
@@ -952,23 +957,29 @@ def calculation_status_socket(ws, calculation_id):
         # The file watcher will trigger on_file_change() when files are modified
         try:
             while connection_active:
-                # Use gevent-compatible receive to detect client disconnections
+                # Use gevent timeout for receive operations
                 try:
-                    message = ws.receive(timeout=30.0)  # 30 second timeout
-                    if message is None:
-                        # Client disconnected
-                        logger.info(f"Client disconnected from calculation {calculation_id}")
-                        break
+                    with gevent.Timeout(30.0, False):  # 30 second timeout, don't raise
+                        message = ws.receive()
+                        if message is None:
+                            # Client disconnected
+                            logger.info(f"Client disconnected from calculation {calculation_id}")
+                            break
                 except gevent.Timeout:
                     # Expected timeout - continue the loop
                     continue
                 except Exception as receive_error:
-                    # Handle various disconnection scenarios
+                    # Handle various disconnection scenarios with more specific error types
                     error_msg = str(receive_error).lower()
-                    if any(keyword in error_msg for keyword in ['connection', 'closed', 'broken', 'reset']):
-                        logger.info(f"Client disconnected from calculation {calculation_id}: {receive_error}")
+                    error_type = type(receive_error).__name__
+                    
+                    # Common gevent-websocket disconnection scenarios
+                    if any(keyword in error_msg for keyword in ['connection', 'closed', 'broken', 'reset', 'socket']):
+                        logger.info(f"Client disconnected from calculation {calculation_id} ({error_type}): {receive_error}")
+                    elif 'websocketerror' in error_type.lower():
+                        logger.info(f"WebSocket protocol error for {calculation_id}: {receive_error}")
                     else:
-                        logger.debug(f"WebSocket receive error for {calculation_id}: {receive_error}")
+                        logger.debug(f"WebSocket receive error for {calculation_id} ({error_type}): {receive_error}")
                     break
                     
         except Exception as e:
@@ -1012,20 +1023,31 @@ def calculation_status_socket(ws, calculation_id):
 def _close_websocket_safely(ws, calculation_id: str):
     """Safely close a WebSocket connection with proper logging."""
     try:
-        # Check if WebSocket is still open before attempting to close
-        if hasattr(ws, 'closed') and not ws.closed:
-            ws.close(code=1000, reason="Normal closure")  # Use proper close code
-        elif not hasattr(ws, 'closed'):
-            # Fallback for different WebSocket implementations
-            ws.close()
+        # Check various WebSocket state attributes that might exist
+        is_open = True
+        if hasattr(ws, 'closed'):
+            is_open = not ws.closed
+        elif hasattr(ws, 'stream') and hasattr(ws.stream, 'closed'):
+            is_open = not ws.stream.closed
+        elif hasattr(ws, '_closed'):
+            is_open = not ws._closed
+            
+        if is_open:
+            ws.close()  # gevent-websocket doesn't support close codes
+        
         logger.info(f"WebSocket connection closed for calculation {calculation_id}")
+        
     except Exception as close_error:
         # Log different types of close errors appropriately
         error_msg = str(close_error).lower()
-        if any(keyword in error_msg for keyword in ['closed', 'broken', 'connection']):
-            logger.debug(f"WebSocket already closed for {calculation_id}: {close_error}")
+        error_type = type(close_error).__name__
+        
+        if any(keyword in error_msg for keyword in ['closed', 'broken', 'connection', 'socket']):
+            logger.debug(f"WebSocket already closed for {calculation_id} ({error_type}): {close_error}")
+        elif 'websocketerror' in error_type.lower():
+            logger.debug(f"WebSocket protocol error during close for {calculation_id}: {close_error}")
         else:
-            logger.warning(f"Error closing WebSocket for {calculation_id}: {close_error}")
+            logger.warning(f"Error closing WebSocket for {calculation_id} ({error_type}): {close_error}")
 
 
 @app.errorhandler(ValidationError)
@@ -1045,16 +1067,80 @@ def validation_error_handler(error):
 @app.errorhandler(400)
 def bad_request_handler(error):
     """Handle bad requests, filtering out WebSocket close frame errors."""
+    import re
+    
     # Check if this is a WebSocket close frame being misinterpreted as HTTP
     error_description = str(error).lower()
-    if any(indicator in error_description for indicator in [
-        'invalid http method', 'expected get method', 'x88x82', '\\x88\\x82'
-    ]):
-        # This is likely a WebSocket close frame, log as debug instead of error
-        logger.debug(f"WebSocket close frame misinterpreted as HTTP request: {error}")
+    
+    # Expanded list of WebSocket protocol indicators
+    websocket_indicators = [
+        # HTTP method related
+        'invalid http method', 'expected get method', 'invalid method', 
+        'unexpected http method', 'unsupported method',
+        
+        # WebSocket specific
+        'websocket', 'connection upgrade', 'upgrade required', 
+        'websocket handshake', 'sec-websocket',
+        
+        # Protocol frames and binary data
+        'x88x82', '\\x88\\x82', 'x88', '\\x88',  # Close frame
+        'x89', '\\x89',  # Ping frame
+        'x8a', '\\x8a',  # Pong frame
+        'x81', '\\x81',  # Text frame
+        'x82', '\\x82',  # Binary frame
+        
+        # Parser and protocol errors
+        'bad request line', 'malformed request', 'protocol error',
+        'invalid request line', 'request line too long',
+        'invalid header', 'header too long', 'bad http version',
+        
+        # Connection related
+        'connection reset', 'connection closed', 'connection aborted',
+        'broken pipe', 'client disconnected',
+        
+        # Encoding/parsing issues
+        'invalid utf-8', 'decode error', 'unicode error',
+        'invalid character', 'unexpected character'
+    ]
+    
+    # Regular expression patterns for more sophisticated matching
+    websocket_patterns = [
+        r'\\x[0-9a-f]{2}',  # Hexadecimal escape sequences (binary data)
+        r'x[0-9a-f]{2}',    # Hex bytes without backslash
+        r'invalid.*method.*[^a-zA-Z]',  # Invalid method patterns
+        r'malformed.*request.*(?:line|header)',  # Malformed request patterns (specific)
+        r'connection.*(?:reset|closed|aborted)',  # Connection issues
+        r'websocket.*(?:error|frame|close)',  # WebSocket-specific errors
+        r'bad.*(?:request\s+line|header)',  # Bad request line/header (specific)
+        r'invalid.*(?:request\s+line|header)',  # Invalid request line/header
+        r'protocol.*error',  # Protocol errors
+        r'unexpected.*(?:character|data|frame)',  # Unexpected data patterns
+    ]
+    
+    # Check simple string indicators first
+    is_websocket_related = any(indicator in error_description for indicator in websocket_indicators)
+    
+    # If not found, check regex patterns
+    if not is_websocket_related:
+        for pattern in websocket_patterns:
+            if re.search(pattern, error_description, re.IGNORECASE):
+                is_websocket_related = True
+                break
+    
+    # Additional check: if error description contains mostly non-printable characters
+    # This often indicates binary WebSocket frames
+    if not is_websocket_related:
+        non_printable_count = sum(1 for c in str(error) if ord(c) < 32 and c not in '\n\r\t')
+        if non_printable_count > 3:  # Threshold for binary data detection
+            is_websocket_related = True
+    
+    if is_websocket_related:
+        # This is likely a WebSocket close frame or protocol error, log as debug
+        logger.debug(f"WebSocket protocol frame misinterpreted as HTTP: {error}")
         return '', 400  # Return empty response for WebSocket frames
     
     # For genuine bad requests, return proper error response
+    logger.warning(f"Genuine bad request: {error}")
     return jsonify({'success': False, 'error': 'Bad request.'}), 400
 
 @app.errorhandler(404)
@@ -1081,12 +1167,10 @@ if __name__ == '__main__':
     # Electronプロセスにポート番号を通知
     print(f"FLASK_SERVER_PORT:{actual_port}", file=sys.stdout, flush=True)
     
-    logger.info(f"Starting API server with gevent on http://{host}:{actual_port} (Debug: {debug})")
+    logger.info(f"Starting API server with gevent-websocket on http://{host}:{actual_port} (Debug: {debug})")
     
-    # ===== ここから修正 =====
-    # handler_class の指定を削除し、gevent と Flask-Sock の標準的な連携に任せる
-    http_server = WSGIServer((host, actual_port), app)
-    # ===== ここまで修正 =====
+    # Use WebSocketServer for WebSocket support
+    http_server = WebSocketServer((host, actual_port), app)
     try:
         http_server.serve_forever()
     except KeyboardInterrupt:
