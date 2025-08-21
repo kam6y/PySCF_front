@@ -181,6 +181,99 @@ export const CalculationResultsPage = ({
           </div>
         </section>
 
+        {/* Vibrational Frequency Analysis */}
+        {results.frequency_analysis_performed && (
+          <section
+            style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#f0f8ff',
+              borderRadius: '8px',
+            }}
+          >
+            <h2>Vibrational Frequency Analysis</h2>
+            
+            {/* Optimization Quality Assessment */}
+            <div style={{ marginBottom: '15px' }}>
+              <strong>Geometry Optimization Status:</strong>{' '}
+              {results.imaginary_frequencies_count === 0 ? (
+                <span style={{ color: '#059669' }}>✅ Successful (no imaginary frequencies)</span>
+              ) : results.imaginary_frequencies_count === 1 ? (
+                <span style={{ color: '#d97706' }}>⚠️ Possible transition state (1 imaginary frequency)</span>
+              ) : (
+                <span style={{ color: '#dc2626' }}>❌ Poor optimization ({results.imaginary_frequencies_count} imaginary frequencies)</span>
+              )}
+            </div>
+            
+            {/* Vibrational Frequencies */}
+            {results.vibrational_frequencies && results.vibrational_frequencies.length > 0 && (
+              <div style={{ marginBottom: '15px' }}>
+                <strong>Vibrational Frequencies (cm⁻¹):</strong>
+                <div 
+                  style={{ 
+                    marginTop: '8px',
+                    padding: '10px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '4px',
+                    maxHeight: '150px',
+                    overflowY: 'auto',
+                    fontFamily: 'monospace',
+                    fontSize: '14px'
+                  }}
+                >
+                  {results.vibrational_frequencies.map((freq, index) => (
+                    <span key={index} style={{ marginRight: '12px' }}>
+                      {freq.toFixed(1)}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '5px' }}>
+                  Total: {results.vibrational_frequencies.length} normal modes (≥80 cm⁻¹)
+                </div>
+              </div>
+            )}
+            
+            {/* Thermochemical Properties */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+              gap: '15px',
+              fontSize: '14px'
+            }}>
+              {results.zero_point_energy !== undefined && results.zero_point_energy !== null && (
+                <div>
+                  <strong>Zero-Point Energy:</strong><br />
+                  <code>{results.zero_point_energy.toFixed(8)} hartree</code>
+                </div>
+              )}
+              {results.thermal_energy_298K !== undefined && results.thermal_energy_298K !== null && (
+                <div>
+                  <strong>Thermal Energy (298.15 K):</strong><br />
+                  <code>{results.thermal_energy_298K.toFixed(8)} hartree</code>
+                </div>
+              )}
+              {results.entropy_298K !== undefined && results.entropy_298K !== null && (
+                <div>
+                  <strong>Entropy (298.15 K):</strong><br />
+                  <code>{results.entropy_298K.toFixed(8)} hartree/K</code>
+                </div>
+              )}
+              {results.gibbs_free_energy_298K !== undefined && results.gibbs_free_energy_298K !== null && (
+                <div>
+                  <strong>Gibbs Free Energy (298.15 K):</strong><br />
+                  <code>{results.gibbs_free_energy_298K.toFixed(8)} hartree</code>
+                </div>
+              )}
+              {results.heat_capacity_298K !== undefined && results.heat_capacity_298K !== null && (
+                <div>
+                  <strong>Heat Capacity (298.15 K):</strong><br />
+                  <code>{results.heat_capacity_298K.toFixed(8)} hartree/K</code>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         {/* Orbital Information */}
         <section
           style={{

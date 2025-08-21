@@ -193,7 +193,15 @@ class CCSDCalculator(BaseCalculator):
             else:
                 logger.warning("Mulliken population analysis failed or was skipped")
             
-            # Step 7: Prepare results
+            # Step 7: Vibrational frequency analysis using HF orbitals
+            logger.info("Performing vibrational frequency analysis...")
+            frequency_results = self._calculate_frequencies()
+            if frequency_results is not None:
+                logger.info("Vibrational frequency analysis completed successfully")
+            else:
+                logger.warning("Vibrational frequency analysis failed or was skipped")
+            
+            # Step 8: Prepare results
             chk_path = self.get_checkpoint_path()
             
             # 安全にエネルギーを変換
@@ -230,6 +238,10 @@ class CCSDCalculator(BaseCalculator):
                 'optimized_geometry': self._geometry_to_xyz_string(),
                 'mulliken_charges': mulliken_charges
             })
+            
+            # Add frequency analysis results if available
+            if frequency_results is not None:
+                self.results.update(frequency_results)
             
             # Add CCSD(T) specific results if calculated
             if self.calculate_ccsd_t:

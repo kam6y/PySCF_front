@@ -508,6 +508,22 @@ export interface components {
                 /** @description Mulliken charge on this atom (positive = electron deficient, negative = electron rich) */
                 charge?: number;
             }[] | null;
+            /** @description Whether vibrational frequency analysis was performed */
+            frequency_analysis_performed?: boolean | null;
+            /** @description Vibrational frequencies in cm⁻¹ (positive frequencies only, excluding low-frequency modes) */
+            vibrational_frequencies?: number[] | null;
+            /** @description Number of imaginary frequencies (negative eigenvalues) - indicates optimization quality */
+            imaginary_frequencies_count?: number | null;
+            /** @description Zero-point vibrational energy in Hartree */
+            zero_point_energy?: number | null;
+            /** @description Thermal energy at 298.15 K in Hartree */
+            thermal_energy_298K?: number | null;
+            /** @description Entropy at 298.15 K in Hartree/K */
+            entropy_298K?: number | null;
+            /** @description Gibbs free energy at 298.15 K in Hartree */
+            gibbs_free_energy_298K?: number | null;
+            /** @description Heat capacity at 298.15 K in Hartree/K */
+            heat_capacity_298K?: number | null;
         };
         CalculationInstance: {
             /** @description Unique calculation ID */

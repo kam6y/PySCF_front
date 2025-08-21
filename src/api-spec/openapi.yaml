@@ -911,6 +911,40 @@ components:
                 description: Mulliken charge on this atom (positive = electron deficient, negative = electron rich)
           nullable: true
           description: Mulliken population analysis charges for each atom
+        frequency_analysis_performed:
+          type: boolean
+          nullable: true
+          description: Whether vibrational frequency analysis was performed
+        vibrational_frequencies:
+          type: array
+          items:
+            type: number
+          nullable: true
+          description: Vibrational frequencies in cm⁻¹ (positive frequencies only, excluding low-frequency modes)
+        imaginary_frequencies_count:
+          type: integer
+          nullable: true
+          description: Number of imaginary frequencies (negative eigenvalues) - indicates optimization quality
+        zero_point_energy:
+          type: number
+          nullable: true
+          description: Zero-point vibrational energy in Hartree
+        thermal_energy_298K:
+          type: number
+          nullable: true
+          description: Thermal energy at 298.15 K in Hartree
+        entropy_298K:
+          type: number
+          nullable: true
+          description: Entropy at 298.15 K in Hartree/K
+        gibbs_free_energy_298K:
+          type: number
+          nullable: true
+          description: Gibbs free energy at 298.15 K in Hartree
+        heat_capacity_298K:
+          type: number
+          nullable: true
+          description: Heat capacity at 298.15 K in Hartree/K
 
     CalculationInstance:
       type: object
