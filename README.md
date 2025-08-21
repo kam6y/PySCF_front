@@ -14,6 +14,8 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
   - PySCFを利用して、DFT計算などの量子化学計算を実行します。
   - 計算結果（HOMO/LUMO軌道、SCFエネルギーなど）を表示します。
 - **計算履歴の管理:** 過去の計算結果を一覧表示し、名前の変更や削除が可能です。
+- **自動環境構築:** ワンコマンドで開発環境をセットアップできます（`npm run setup-env`）。
+- **環境検証機能:** Python依存関係と環境の健全性を自動チェックします（`npm run verify-env`）。
 
 ## 🛠️ 技術スタック
 
@@ -24,6 +26,42 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 - **パッケージ管理:** npm (Node.js), conda (Python)
 
 ## 🚀 開発の始め方
+
+### 🎯 クイックスタート（推奨）
+
+最も簡単な方法で開発環境をセットアップできます：
+
+1.  リポジトリをクローンします。
+    ```bash
+    git clone [https://github.com/kam6y/Pyscf_front.git](https://github.com/kam6y/Pyscf_front.git)
+    cd Pyscf_front
+    ```
+
+2.  Node.jsの依存関係をインストールします。
+    ```bash
+    npm install
+    ```
+
+3.  **自動環境構築スクリプトを実行します。**
+    ```bash
+    npm run setup-env
+    ```
+    
+    このコマンドは以下を自動的に実行します：
+    - conda環境の存在確認
+    - 必要に応じてconda環境の作成
+    - すべての依存関係のインストール
+    - 環境の検証
+
+4.  開発モードでアプリケーションを起動します。
+    ```bash
+    conda activate pyscf-env
+    npm run dev
+    ```
+
+### 🔧 手動セットアップ
+
+conda環境を手動で管理したい場合：
 
 1.  リポジトリをクローンします。
     ```bash
@@ -75,7 +113,15 @@ export CONDA_ENV_PATH="/opt/miniconda3/envs/pyscf-env"
 - 環境変数を設定した場合は、ターミナルを再起動してから `npm run dev` を実行してください
 - conda がインストールされていない場合は、上記のMiniforgeインストール手順に従ってください
 
-4.  開発モードでアプリケーションを起動します。
+4.  **環境の検証（推奨）**
+    ```bash
+    conda activate pyscf-env
+    npm run verify-env
+    ```
+    
+    環境に問題がある場合、詳細な診断情報とトラブルシューティング手順が表示されます。
+
+5.  開発モードでアプリケーションを起動します。
     ```bash
     # conda環境をアクティブ化
     conda activate pyscf-env
@@ -87,9 +133,154 @@ export CONDA_ENV_PATH="/opt/miniconda3/envs/pyscf-env"
 
 ## 📦 アプリケーションのパッケージ化
 
+### 🎁 配布用ビルド
+
 プラットフォームに応じた配布用のアプリケーションをビルドするには、以下のコマンドを実行します。
 
 ```bash
 npm run package
-これにより PySCF_native_app/dist ディレクトリに実行可能ファイルが生成されます。
 ```
+
+このコマンドは以下を自動的に実行します：
+- フロントエンドのプロダクションビルド
+- **conda環境の完全パッケージ化** (conda-packを使用)
+- Python実行ファイルの生成 (PyInstallerを使用)
+- Electronアプリケーションの配布パッケージ作成
+
+### ✨ 配布の特徴
+
+**エンドユーザーにとっての利点：**
+- 🚫 **condaのインストール不要** - 完全な環境が同梱されています
+- 🚫 **Python環境構築不要** - すべての依存関係が含まれています  
+- ⚡ **即座に実行可能** - インストール後すぐに使用できます
+- 🔒 **環境の隔離** - システムの Python 環境に影響しません
+
+### 📂 生成されるファイル
+
+```
+dist/
+├── PySCF_front-darwin-arm64.dmg     # macOS用
+├── PySCF_front-win32-x64.exe        # Windows用  
+└── PySCF_front-linux-x86_64.AppImage # Linux用
+```
+
+**内部構造：**
+- `conda_env/` - 完全なPython環境（PySCF、RDKit含む）
+- `python_dist/` - PyInstaller実行ファイル（フォールバック用）
+- Electron アプリケーション
+
+## 🛠️ トラブルシューティング
+
+### 🔍 問題の診断
+
+まず環境検証コマンドで問題を特定してください：
+
+```bash
+conda activate pyscf-env
+npm run verify-env
+```
+
+このコマンドは以下をチェックし、詳細な診断情報を提供します：
+- Python バージョンと依存関係
+- PySCF と RDKit の動作確認
+- Flask と WebSocket 機能
+- conda 環境の状態
+- プロジェクト構造の整合性
+
+### ⚡ よくある問題と解決方法
+
+#### 1. 環境構築の問題
+
+**問題:** `conda environment 'pyscf-env' not found`
+
+**解決方法:**
+```bash
+# 自動環境構築を試行
+npm run setup-env
+
+# または手動で環境を作成
+conda env create -f .github/environment.yml
+conda activate pyscf-env
+```
+
+**問題:** `conda command not found`
+
+**解決方法:**
+```bash
+# Miniforge をインストール
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
+bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
+source $HOME/miniforge3/etc/profile.d/conda.sh
+```
+
+#### 2. 開発サーバーの問題
+
+**問題:** `Python backend failed to start`
+
+**解決方法:**
+1. 環境の検証: `npm run verify-env`
+2. conda 環境の確認: `conda info --envs`
+3. 手動でPythonサーバーをテスト:
+   ```bash
+   conda activate pyscf-env
+   cd src/python
+   python app.py
+   ```
+
+**問題:** `Port already in use` や接続エラー
+
+**解決方法:**
+- アプリケーションは自動的に空いているポートを検出します
+- ファイアウォールの設定を確認してください
+- アプリケーションを完全に終了してから再起動してください
+
+#### 3. パッケージ依存関係の問題
+
+**問題:** `ModuleNotFoundError` や依存関係エラー
+
+**解決方法:**
+```bash
+# conda環境を再作成
+conda env remove -n pyscf-env
+npm run setup-env
+
+# または手動で依存関係を更新
+conda activate pyscf-env
+conda env update -f .github/environment.yml
+```
+
+#### 4. ビルドとパッケージ化の問題
+
+**問題:** `PyInstaller build failed`
+
+**解決方法:**
+1. conda 環境をアクティベート: `conda activate pyscf-env`
+2. ビルドディレクトリをクリーン: `rimraf python_dist build/pyinstaller`
+3. 再ビルド: `npm run build:python`
+
+**問題:** パッケージ化後のアプリケーションが起動しない
+
+**診断:**
+- パッケージには両方の実行方法が含まれています
+- アプリケーションはまず同梱conda環境を試行し、失敗時にPyInstaller実行ファイルにフォールバックします
+
+### 🆘 サポートが必要な場合
+
+1. **環境情報の収集:**
+   ```bash
+   # 環境検証の実行（詳細出力）
+   npm run verify-env
+   
+   # システム情報
+   conda info --envs
+   python --version
+   node --version
+   npm --version
+   ```
+
+2. **ログの確認:**
+   - アプリケーション起動時のコンソール出力
+   - `build/pyinstaller/` ディレクトリのログファイル
+
+3. **問題報告:** 
+   Issue報告時は上記の情報を含めてください: [GitHub Issues](https://github.com/kam6y/Pyscf_front/issues)

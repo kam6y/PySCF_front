@@ -25,8 +25,21 @@ Development Commands
 ## Initial Setup
 
 ### Conda Environment (Required)
-This project requires conda environment for development. The application no longer supports automatic fallback to other Python environments.
+This project requires conda environment for development. The application now features automated environment setup and verification tools.
 
+#### Quick Setup (Recommended)
+```bash
+# Install Node.js dependencies
+npm install
+
+# Automated environment setup (handles all conda setup)
+npm run setup-env
+
+# Verify environment health
+npm run verify-env
+```
+
+#### Manual Setup
 ```bash
 # Install Node.js dependencies
 npm install
@@ -41,6 +54,9 @@ conda env create -f .github/environment.yml
 
 # Activate the environment
 conda activate pyscf-env
+
+# Verify the setup
+npm run verify-env
 ```
 
 **Note**: The conda environment setup is mandatory. The application will show an error dialog if the conda environment is not properly configured.
@@ -60,9 +76,20 @@ npm run build
 # Package application for distribution (includes production build)
 npm run package
 ```
-Individual Commands
-Bash
 
+## Individual Commands
+
+### Environment Management
+```bash
+# Automated environment setup (conda + dependencies)
+npm run setup-env
+
+# Verify environment health and dependencies
+npm run verify-env
+```
+
+### Build Commands
+```bash
 # Clean build directory
 npm run clean
 
@@ -74,6 +101,9 @@ npm run dev:webpack
 
 # Start Electron (requires dist files to exist)
 npm run dev:electron
+
+# Package conda environment for distribution
+npm run build:conda-pack
 
 # --- Python Backend Development (in a separate terminal) ---
 cd src/python
@@ -107,7 +137,16 @@ Starts Backend: Starts the Python Flask server as a subprocess from within the E
 
 Starts Electron: Starts the Electron application using electronmon, which watches the dist/ directory for changes and automatically restarts the app.
 
-The Electron main process (src/main.ts) launches the Python Flask server. In development, it automatically detects and uses the conda environment (pyscf-env) if available, otherwise falls back to uv. In a packaged application, it runs the PyInstaller executable. The main process includes a health check mechanism; it continuously pings the /health endpoint of the Python server to ensure the backend is fully initialized before loading the UI. The Flask server dynamically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
+The Electron main process (src/main.ts) launches the Python Flask server using an enhanced environment detection system. The `detectPythonEnvironmentPath` function implements a hierarchical detection strategy:
+
+**Environment Detection Priority:**
+1. **Bundled conda environment** (packaged apps): Uses conda-pack packaged environment at `process.resourcesPath/conda_env/bin/python`
+2. **Development conda environment**: Detects pyscf-env using multiple strategies (environment variables, conda commands, fallback paths)
+3. **PyInstaller executable** (fallback): Uses the standalone executable for packaged apps
+
+**Health Check System:** The main process includes a robust health check mechanism that continuously pings the `/health` endpoint with detailed diagnostic information. If the server fails to start, it provides context-specific error messages with troubleshooting guidance.
+
+**Dynamic Port Management:** The Flask server automatically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
 
 Architecture Overview
 API-First Development with OpenAPI
@@ -159,9 +198,20 @@ Exclusions: Auto-generated files (like generated-api.ts and generated_models.py)
 Build System
 Frontend: Uses Webpack with ts-loader to compile TypeScript and React code into three separate bundles: main.js, preload.js, and the renderer's app.js.
 
-Backend: Uses PyInstaller to bundle the Flask application and its Python dependencies into a single standalone executable for production.
+Backend: Implements a dual-packaging strategy for maximum compatibility:
+1. **conda-pack Integration**: Packages the complete conda environment (including PySCF, RDKit, and all dependencies) into a portable format using `npm run build:conda-pack`. This creates a `conda_env/` directory that can be bundled with the application.
+2. **PyInstaller Executable**: Bundles the Flask application into a standalone executable as a fallback option.
 
-Packaging: electron-builder packages the Electron app and the Python executable (included as an extraResource) into distributable formats (DMG for macOS, NSIS for Windows, AppImage for Linux).
+Packaging: electron-builder packages the Electron app with both Python environments (included as extraResources):
+- `conda_env/` - Complete portable conda environment (primary)
+- `python_dist/` - PyInstaller executable (fallback)
+- Distributable formats: DMG for macOS, NSIS for Windows, AppImage for Linux
+
+**Build Process Flow:**
+1. `npm run build:conda-pack` - Packages conda environment
+2. `npm run build:python` - Creates PyInstaller executable  
+3. `npm run build:webpack` - Builds frontend
+4. `electron-builder` - Creates final distributable with both environments
 
 Core Components & State Management
 
@@ -307,12 +357,75 @@ Cancellation Support: Running calculations can be cancelled via POST /api/quantu
 Error Handling: Process-level errors are properly captured and reported back through the filesystem-based status system, maintaining consistency with the existing WebSocket notification mechanism.
 
 Troubleshooting
-Backend Server Fails to Start: The Flask server is designed to find a free port automatically. If it still fails, ensure that no firewall is blocking local network communication and that the Python environment (conda activate pyscf-env) is correctly set up.
 
-Build Failures: Ensure Python dependencies (conda environment or fallback uv environment) and Node dependencies (npm install) are up to date. PyInstaller builds can be sensitive; check its logs in the build/pyinstaller directory for errors.
+## Environment Setup Issues
 
-Python Dependencies: This project requires PySCF, RDKit, and geometric. These packages have significant scientific dependencies that may require system-level libraries or compilation. Ensure your Python environment can build them.
+**Automated Diagnosis:** Always start with environment verification:
+```bash
+npm run verify-env
+```
+This command provides comprehensive diagnostic information and specific troubleshooting recommendations.
 
-Process Pool Issues: If calculations appear to hang or the process pool becomes unresponsive, check the /api/quantum/status endpoint for pool health. The process manager automatically handles cleanup, but in extreme cases, restarting the Flask server will reset the process pool.
+**Environment Detection Failures:** If the application reports "Python environment not found", check the detection hierarchy:
+1. Verify conda is installed and accessible: `conda --version`
+2. Check if pyscf-env exists: `conda env list`
+3. Try automated setup: `npm run setup-env`
+4. Set custom path if needed: `export CONDA_ENV_PATH=/path/to/your/pyscf-env`
 
-SSL/HTTPS: The pubchem/client.py module uses standard HTTPS requests via the requests library with SSL verification enabled. No special configuration should be needed for it to work.
+**conda-pack Build Issues:** If `npm run build:conda-pack` fails:
+- Ensure conda-pack is installed: `conda install conda-pack`
+- Verify environment is active: `conda activate pyscf-env`
+- Check for disk space and permissions
+
+## Development Server Issues
+
+**Backend Server Fails to Start:** The enhanced error system now provides detailed diagnostic information:
+- **Development mode**: Check conda environment and dependencies
+- **Packaged mode**: Verify bundled environment integrity
+- The Flask server automatically finds free ports, but firewall settings may interfere
+
+**Environment Health Check Failures:** The application performs extensive health checks:
+- Python version compatibility (3.10+)
+- Required packages (PySCF, RDKit, Flask, etc.)
+- Functional tests for critical dependencies
+- Port availability and network configuration
+
+## Build and Packaging Issues
+
+**Build Failures:** The dual-packaging system requires:
+1. Working conda environment for conda-pack
+2. All dependencies installed for PyInstaller
+3. Check `build/pyinstaller/` directory for detailed logs
+
+**PyInstaller Specific Issues:** 
+- Sensitive to Python environment changes
+- Requires all dependencies to be importable
+- Check for missing hidden imports in `pyscf_front_api.spec`
+
+**Packaging Verification:** After packaging, verify both environments:
+- Test bundled conda environment path
+- Confirm PyInstaller executable functionality
+- Check extraResources in electron-builder output
+
+## Runtime Issues
+
+**Process Pool Problems:** Enhanced process management with better error reporting:
+- Check `/api/quantum/status` for pool health
+- Process manager handles cleanup automatically  
+- Restart Flask server if pool becomes unresponsive
+
+**SSL/HTTPS Issues:** PubChem integration uses standard HTTPS with certificate verification enabled.
+
+## Development Tools
+
+**Environment Validation Tools:**
+- `npm run verify-env` - Comprehensive environment testing
+- `npm run setup-env` - Automated environment creation and repair
+- Console output provides detailed diagnostic information
+- Health check system reports specific failure points
+
+**Debugging Tips:**
+- Enable verbose logging in development mode
+- Check both stdout and stderr from Python processes
+- Monitor resource usage during conda-pack operations
+- Verify file permissions for packaged environments

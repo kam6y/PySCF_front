@@ -116,6 +116,63 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
 };
 
 /**
+ * Python環境のパスを階層的に検出する統合関数
+ * 1. 同梱conda環境 (パッケージ時優先)
+ * 2. 開発時conda環境検出
+ * 3. PyInstaller実行可能ファイル (フォールバック)
+ * @returns Python環境のパス、見つからなければnull
+ */
+const detectPythonEnvironmentPath = async (): Promise<string | null> => {
+  // 1. パッケージ時：同梱conda環境を優先チェック
+  if (app.isPackaged) {
+    const bundledCondaPath = path.join(
+      process.resourcesPath,
+      'conda_env',
+      'bin',
+      'python'
+    );
+    if (fs.existsSync(bundledCondaPath)) {
+      console.log(`Using bundled conda environment: ${bundledCondaPath}`);
+      return bundledCondaPath;
+    } else {
+      console.log(
+        `Bundled conda environment not found at: ${bundledCondaPath}`
+      );
+    }
+  }
+
+  // 2. 開発時またはパッケージ時フォールバック：conda環境検出
+  console.log('Attempting to detect conda environment...');
+  const condaPath = await detectCondaEnvironmentPath();
+  if (condaPath) {
+    return condaPath;
+  }
+
+  // 3. パッケージ時のフォールバック：PyInstaller実行可能ファイル
+  if (app.isPackaged) {
+    const executableName =
+      process.platform === 'win32'
+        ? 'pyscf_front_api.exe'
+        : 'pyscf_front_api';
+    const pythonExecutablePath = path.join(
+      process.resourcesPath,
+      'python_dist',
+      'pyscf_front_api',
+      executableName
+    );
+    if (fs.existsSync(pythonExecutablePath)) {
+      console.log(
+        `Using PyInstaller executable as fallback: ${pythonExecutablePath}`
+      );
+      return pythonExecutablePath;
+    }
+  }
+
+  console.log('No Python environment found in any expected locations');
+  return null;
+};
+
+/**
  * Pythonサーバーのヘルスチェックを行い、起動完了を待つ関数
  * @param port チェック対象のポート番号
  * @param retries リトライ回数
@@ -148,11 +205,10 @@ const checkServerHealth = (
           );
           if (attempts >= retries) {
             clearInterval(interval);
-            reject(
-              new Error(
-                `Python server health check failed after ${retries} attempts. Check if the conda environment is properly set up and the Python server can start.`
-              )
-            );
+            const diagnosticMessage = app.isPackaged
+              ? `Python backend failed to start after ${retries} attempts.\n\nDiagnostic information:\n- Port: ${port}\n- Health endpoint: ${url}\n\nThis may indicate:\n1. Bundled Python environment is corrupted\n2. Port ${port} is blocked by firewall\n3. Python dependencies are missing\n\nPlease report this issue with the console output.`
+              : `Python backend failed to start after ${retries} attempts.\n\nDiagnostic information:\n- Port: ${port}\n- Health endpoint: ${url}\n- Environment: Development mode\n\nTroubleshooting steps:\n1. Check if conda environment 'pyscf-env' is activated\n2. Verify all dependencies are installed: conda env create -f .github/environment.yml\n3. Test the Flask server manually: cd src/python && python app.py\n4. Check if port ${port} is available\n\nFor more details, see CLAUDE.md`;
+            reject(new Error(diagnosticMessage));
           }
         });
     }, delay);
@@ -167,42 +223,37 @@ const startPythonServer = async (): Promise<void> => {
   return new Promise(async (resolve, reject) => {
     console.log('Starting Python Flask server...');
 
-    if (app.isPackaged) {
-      const executableName =
-        process.platform === 'win32'
-          ? 'pyscf_front_api.exe'
-          : 'pyscf_front_api';
-      const pythonExecutablePath = path.join(
-        process.resourcesPath,
-        'python_dist',
-        'pyscf_front_api',
-        executableName
-      );
+    // 統一されたPython環境検出
+    const pythonExecutablePath = await detectPythonEnvironmentPath();
+    if (!pythonExecutablePath) {
+      const errorMessage = app.isPackaged
+        ? `Python environment not found.\n\nThis appears to be a packaging issue. Please report this as a bug.\nThe application requires both:\n1. Bundled conda environment at: ${path.join(
+            process.resourcesPath,
+            'conda_env'
+          )}\n2. PyInstaller executable at: ${path.join(
+            process.resourcesPath,
+            'python_dist',
+            'pyscf_front_api'
+          )}`
+        : `Python environment not found.\n\nSetup options:\n1. Set environment variable: export CONDA_ENV_PATH=/path/to/your/pyscf-env\n2. Or ensure conda is available and run:\n   conda env create -f .github/environment.yml\n   conda activate pyscf-env\n\nFor more details, see CLAUDE.md`;
+      console.error(errorMessage);
+      reject(new Error(errorMessage));
+      return;
+    }
 
-      console.log(
-        `Executing packaged Python server at: ${pythonExecutablePath}`
-      );
+    console.log(`Using Python environment: ${pythonExecutablePath}`);
+
+    // パッケージ時：実行ファイルを直接実行
+    if (app.isPackaged) {
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     } else {
+      // 開発時：Pythonスクリプトを実行
       const pythonPath = path.join(__dirname, '..', 'src', 'python');
       const appPath = path.join(pythonPath, 'app.py');
 
-      console.log('Executing Python server in development mode...');
-      console.log('Detecting conda environment...');
-
-      // Use conda environment (required for development)
-      const condaPath = await detectCondaEnvironmentPath();
-      if (!condaPath) {
-        const errorMessage = `Conda environment 'pyscf-env' not found.\n\nSetup options:\n1. Set environment variable: export CONDA_ENV_PATH=/path/to/your/pyscf-env\n2. Or ensure conda is available and run:\n   conda create -n pyscf-env python=3.12\n   conda activate pyscf-env\n   conda install -c conda-forge pyscf rdkit flask geometric requests flask-cors pydantic gevent threadpoolctl\n   pip install flask-sock flask-pydantic datamodel-code-generator pyinstaller gevent-websocket\n\nFor more details, see README.md`;
-        console.error(errorMessage);
-        reject(new Error(errorMessage));
-        return;
-      }
-
-      console.log(`Using conda environment: ${condaPath}`);
-      pythonProcess = spawn(condaPath, [appPath], {
+      pythonProcess = spawn(pythonExecutablePath, [appPath], {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env, CONDA_DEFAULT_ENV: 'pyscf-env' },

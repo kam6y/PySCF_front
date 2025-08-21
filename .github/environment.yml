@@ -17,6 +17,8 @@ dependencies:
   # Development and testing dependencies
   - pytest
   - pip
+  # Environment packaging for distribution
+  - conda-pack
   - pip:
     # Flask extensions
     - flask-sock
