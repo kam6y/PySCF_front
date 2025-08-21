@@ -43,6 +43,7 @@ yarn-error.log*
 # -----------------------------------------------------------------------------
 # Virtual environments
 # 仮想環境
+conda_env
 .venv/
 venv/
 ENV/
