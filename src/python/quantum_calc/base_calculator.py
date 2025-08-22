@@ -451,6 +451,79 @@ class BaseCalculator(ABC):
         optimized_mol = geometric_solver.optimize(self.mf)
         self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
         logger.info("Geometry optimization completed")
+        
+        # Apply coordinate alignment after optimization
+        self._align_optimized_geometry()
+    
+    def _align_optimized_geometry(self) -> None:
+        """
+        Align optimized geometry using ASE following the sample code approach:
+        1. Move center of mass to origin
+        2. Rotate molecule to align principal axes with XYZ axes
+        """
+        if not hasattr(self, 'optimized_geometry') or self.optimized_geometry is None:
+            logger.warning("No optimized geometry available for alignment")
+            return
+        
+        if not hasattr(self, 'mol') or self.mol is None:
+            logger.warning("Molecular object not available for alignment")
+            return
+        
+        try:
+            # Import ASE
+            from ase import Atoms
+            
+            # Get atom symbols from the molecule
+            atom_symbols = [self.mol.atom_symbol(i) for i in range(self.mol.natm)]
+            positions = self.optimized_geometry.copy()
+            
+            logger.info("Starting molecular alignment with ASE...")
+            logger.info(f"Original coordinates (first few atoms): {positions[:min(3, len(positions))]}")
+            
+            # Create ASE Atoms object
+            atoms = Atoms(symbols=atom_symbols, positions=positions)
+            
+            # Move center of mass to origin
+            atoms.center()
+            logger.info("Moved center of mass to origin")
+            
+            # Calculate moments of inertia and get principal axes
+            inertia_moments, principal_axes = atoms.get_moments_of_inertia(vectors=True)
+            
+            # Check for special cases (single atom or linear molecules)
+            if len(atoms) == 1:
+                logger.info("Single atom molecule - only centering applied")
+                aligned_positions = atoms.get_positions()
+            elif np.any(inertia_moments < 1e-10):
+                logger.info("Linear molecule detected - limited alignment applied")
+                # For linear molecules, we can still center but rotation might be problematic
+                aligned_positions = atoms.get_positions()
+            else:
+                # Apply rotation to align principal axes with coordinate axes
+                # This follows the approach from the sample code
+                atoms.set_cell(principal_axes)
+                atoms.wrap()
+                atoms.set_cell([0, 0, 0])
+                aligned_positions = atoms.get_positions()
+            
+            # Update the optimized geometry with aligned coordinates
+            self.optimized_geometry = aligned_positions
+            
+            # Verify alignment by checking the new inertia tensor
+            atoms_aligned = Atoms(symbols=atom_symbols, positions=aligned_positions)
+            new_inertia_moments = atoms_aligned.get_moments_of_inertia()
+            
+            logger.info(f"Molecular alignment completed successfully")
+            logger.info(f"Aligned coordinates (first few atoms): {aligned_positions[:min(3, len(aligned_positions))]}")
+            logger.info(f"Original inertia moments: {inertia_moments}")
+            logger.info(f"Aligned inertia moments: {new_inertia_moments}")
+            
+        except ImportError as e:
+            logger.error(f"ASE library not available for molecular alignment: {str(e)}")
+            logger.info("Proceeding without molecular alignment")
+        except Exception as e:
+            logger.error(f"Molecular alignment failed: {str(e)}")
+            logger.info("Proceeding with unaligned geometry")
     
     def _setup_final_calculation(self) -> None:
         """Setup calculation with optimized geometry."""
