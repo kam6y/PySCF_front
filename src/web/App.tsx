@@ -11,29 +11,34 @@ import { useCalculationSubscription } from './hooks/useCalculationSubscription';
 import {
   useSidebarState,
   usePageNavigation,
-  useCalculationOperations,
-  useActiveCalculation,
+  useActiveCalculationId,
+  useCalculationData,
+  useCalculationActions,
+  useStagedCalculation,
 } from './hooks';
 import { CalculationInstance } from './types/api-types';
 
 export const App = () => {
   const queryClient = useQueryClient();
 
-  // 責務分散されたカスタムフック
+  // 新しいリファクタリングされたフック（責務分離）
   const sidebarState = useSidebarState();
   const pageNavigation = usePageNavigation();
-  const calculationOperations = useCalculationOperations(
-    pageNavigation.handleDropdownOptionSelect
-  );
-  const activeCalculationData = useActiveCalculation(
-    pageNavigation.handleDropdownOptionSelect,
-    sidebarState.handleSidebarClose
-  );
+  const { activeCalculationId, selectCalculation } = useActiveCalculationId();
+  const calculationData = useCalculationData(activeCalculationId);
+  const calculationActions = useCalculationActions();
+  const stagedCalculation = useStagedCalculation();
+
+  // アクティブ計算の決定：staged計算を優先、なければサーバーから詳細データ、最後にリストから基本データ
+  const activeCalculation = 
+    stagedCalculation.stagedCalculation ||
+    calculationData.activeCalculationDetail ||
+    calculationData.activeCalculationBasic;
 
   // WebSocketによるリアルタイム更新
   useCalculationSubscription({
-    calculationId: activeCalculationData.activeCalculation?.id || null,
-    status: activeCalculationData.activeCalculation?.status,
+    calculationId: activeCalculation?.id || null,
+    status: activeCalculation?.status,
     onUpdate: (updatedCalculation: CalculationInstance) => {
       // 個別計算詳細のキャッシュを更新
       queryClient.setQueryData(['calculation', updatedCalculation.id], {
@@ -69,26 +74,24 @@ export const App = () => {
       case 'calculation-settings':
         return (
           <CalculationSettingsPage
-            activeCalculation={activeCalculationData.activeCalculation}
+            activeCalculation={activeCalculation}
             onCalculationUpdate={
-              activeCalculationData.handleActiveCalculationUpdate
+              stagedCalculation.isStagedCalculation(activeCalculation?.id || null)
+                ? stagedCalculation.updateStagedCalculation
+                : calculationActions.handleCalculationUpdate
             }
-            onStartCalculation={calculationOperations.handleStartCalculation}
-            onCalculationRename={calculationOperations.handleCalculationRename}
-            createNewCalculationFromExisting={
-              activeCalculationData.handleCreateNewFromExisting
-            }
+            onStartCalculation={calculationActions.handleStartCalculation}
+            onCalculationRename={calculationActions.handleCalculationRename}
+            createNewCalculationFromExisting={stagedCalculation.createNewFromExisting}
           />
         );
       case 'calculation-results':
         return (
           <CalculationResultsPage
-            activeCalculation={activeCalculationData.activeCalculation}
-            isLoadingDetails={false}
+            activeCalculation={activeCalculation}
+            isLoadingDetails={calculationData.detailsLoading}
             detailsError={null}
-            onCalculationUpdate={
-              activeCalculationData.handleActiveCalculationUpdate
-            }
+            onCalculationUpdate={calculationActions.handleCalculationUpdate}
           />
         );
       case 'draw-molecule':
@@ -96,15 +99,15 @@ export const App = () => {
       default:
         return (
           <CalculationSettingsPage
-            activeCalculation={activeCalculationData.activeCalculation}
+            activeCalculation={activeCalculation}
             onCalculationUpdate={
-              activeCalculationData.handleActiveCalculationUpdate
+              stagedCalculation.isStagedCalculation(activeCalculation?.id || null)
+                ? stagedCalculation.updateStagedCalculation
+                : calculationActions.handleCalculationUpdate
             }
-            onStartCalculation={calculationOperations.handleStartCalculation}
-            onCalculationRename={calculationOperations.handleCalculationRename}
-            createNewCalculationFromExisting={
-              activeCalculationData.handleCreateNewFromExisting
-            }
+            onStartCalculation={calculationActions.handleStartCalculation}
+            onCalculationRename={calculationActions.handleCalculationRename}
+            createNewCalculationFromExisting={stagedCalculation.createNewFromExisting}
           />
         );
     }
@@ -146,7 +149,10 @@ export const App = () => {
 
       <Header
         onDropdownToggle={sidebarState.handleDropdownToggle}
-        onPlusClick={activeCalculationData.handleNewCalculation}
+        onPlusClick={() => stagedCalculation.createNewCalculation(
+          pageNavigation.handleDropdownOptionSelect,
+          sidebarState.handleSidebarClose
+        )}
         isDropdownOpen={sidebarState.isDropdownOpen}
         isSidebarOpen={sidebarState.isSidebarOpen}
         currentPageTitle={pageNavigation.currentPageTitle}
@@ -158,18 +164,28 @@ export const App = () => {
       <Sidebar
         isOpen={sidebarState.isSidebarOpen}
         onClose={sidebarState.handleSidebarClose}
-        calculations={activeCalculationData.sidebarCalculations}
-        activeCalculationId={
-          activeCalculationData.activeCalculation?.id || null
-        }
-        calculationsLoading={activeCalculationData.calculationsLoading}
+        calculations={calculationData.sidebarCalculations}
+        activeCalculationId={activeCalculation?.id || null}
+        calculationsLoading={calculationData.calculationsLoading}
         calculationsError={
-          activeCalculationData.calculationsError
-            ? activeCalculationData.calculationsError.message
+          calculationData.calculationsError
+            ? calculationData.calculationsError.message
             : null
         }
-        onCalculationSelect={activeCalculationData.handleCalculationSelect}
-        onCalculationDelete={calculationOperations.handleCalculationDelete}
+        onCalculationSelect={(calculationId: string) => {
+          selectCalculation(calculationId);
+          stagedCalculation.clearStaged();
+          sidebarState.handleSidebarClose();
+        }}
+        onCalculationDelete={async (calculationId: string) => {
+          await calculationActions.handleCalculationDelete(calculationId);
+          // 削除された計算がアクティブだった場合はクリア
+          if (activeCalculationId === calculationId) {
+            selectCalculation(null);
+            stagedCalculation.clearStaged();
+            pageNavigation.handleDropdownOptionSelect('calculation-settings');
+          }
+        }}
       />
 
       <main
