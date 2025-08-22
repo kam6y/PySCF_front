@@ -1,7 +1,3 @@
-# eventlet monkey patching must be done before any other imports
-import eventlet
-eventlet.monkey_patch()
-
 import logging
 import os
 import sys
@@ -40,18 +36,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Configure Flask-SocketIO and eventlet logging to reduce noise
-logging.getLogger('socketio').setLevel(logging.WARNING)
-logging.getLogger('engineio').setLevel(logging.WARNING)
-logging.getLogger('eventlet').setLevel(logging.WARNING)
-logging.getLogger('werkzeug').setLevel(logging.WARNING)
-
 # Initialize Flask app and extensions
 app = Flask(__name__)
 CORS(app)  # Enable CORS for cross-origin requests
 
-# Initialize SocketIO with eventlet support for proper WebSocket handling
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Initialize SocketIO with threading support (no gevent)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 # Initialize PubChem client
 pubchem_client = PubChemClient(timeout=30)
@@ -933,30 +923,10 @@ def on_leave_calculation(data):
     logger.info(f"Client left calculation {calculation_id}")
 
 
-@socketio.on('connect')
-def on_connect():
-    """Handle client connection."""
-    logger.debug("WebSocket client connected")
-
-
-@socketio.on('connect_error')
-def on_connect_error(data):
-    """Handle WebSocket connection errors."""
-    logger.warning(f"WebSocket connection error: {data}")
-
-
-@socketio.on('error')
-def on_error(error):
-    """Handle WebSocket protocol errors."""
-    logger.warning(f"WebSocket error: {error}")
-
-
 @socketio.on('disconnect')
 def on_disconnect():
     """Handle client disconnection.""" 
     from flask import session
-    
-    logger.debug("WebSocket client disconnected")
     
     calculation_id = session.get('calculation_id')
     if calculation_id and 'file_change_callback' in session:
@@ -964,7 +934,7 @@ def on_disconnect():
             file_manager = CalculationFileManager()
             watcher = get_websocket_watcher(file_manager.get_base_directory())
             watcher.remove_connection(calculation_id, session['file_change_callback'])
-            logger.debug(f"Cleaned up file watcher for disconnected client (calculation {calculation_id})")
+            logger.info(f"Cleaned up file watcher for disconnected client (calculation {calculation_id})")
         except Exception as e:
             logger.debug(f"Error cleaning up file watcher on disconnect for {calculation_id}: {e}")
 
@@ -985,8 +955,81 @@ def validation_error_handler(error):
 
 @app.errorhandler(400)
 def bad_request_handler(error):
-    """Handle bad HTTP requests with proper error responses."""
-    logger.warning(f"Bad request: {error}")
+    """Handle bad requests, filtering out WebSocket close frame errors."""
+    import re
+    
+    # Check if this is a WebSocket close frame being misinterpreted as HTTP
+    error_description = str(error).lower()
+    
+    # Expanded list of WebSocket protocol indicators
+    websocket_indicators = [
+        # HTTP method related
+        'invalid http method', 'expected get method', 'invalid method', 
+        'unexpected http method', 'unsupported method',
+        
+        # WebSocket specific
+        'websocket', 'connection upgrade', 'upgrade required', 
+        'websocket handshake', 'sec-websocket',
+        
+        # Protocol frames and binary data
+        'x88x82', '\\x88\\x82', 'x88', '\\x88',  # Close frame
+        'x89', '\\x89',  # Ping frame
+        'x8a', '\\x8a',  # Pong frame
+        'x81', '\\x81',  # Text frame
+        'x82', '\\x82',  # Binary frame
+        
+        # Parser and protocol errors
+        'bad request line', 'malformed request', 'protocol error',
+        'invalid request line', 'request line too long',
+        'invalid header', 'header too long', 'bad http version',
+        
+        # Connection related
+        'connection reset', 'connection closed', 'connection aborted',
+        'broken pipe', 'client disconnected',
+        
+        # Encoding/parsing issues
+        'invalid utf-8', 'decode error', 'unicode error',
+        'invalid character', 'unexpected character'
+    ]
+    
+    # Regular expression patterns for more sophisticated matching
+    websocket_patterns = [
+        r'\\x[0-9a-f]{2}',  # Hexadecimal escape sequences (binary data)
+        r'x[0-9a-f]{2}',    # Hex bytes without backslash
+        r'invalid.*method.*[^a-zA-Z]',  # Invalid method patterns
+        r'malformed.*request.*(?:line|header)',  # Malformed request patterns (specific)
+        r'connection.*(?:reset|closed|aborted)',  # Connection issues
+        r'websocket.*(?:error|frame|close)',  # WebSocket-specific errors
+        r'bad.*(?:request\s+line|header)',  # Bad request line/header (specific)
+        r'invalid.*(?:request\s+line|header)',  # Invalid request line/header
+        r'protocol.*error',  # Protocol errors
+        r'unexpected.*(?:character|data|frame)',  # Unexpected data patterns
+    ]
+    
+    # Check simple string indicators first
+    is_websocket_related = any(indicator in error_description for indicator in websocket_indicators)
+    
+    # If not found, check regex patterns
+    if not is_websocket_related:
+        for pattern in websocket_patterns:
+            if re.search(pattern, error_description, re.IGNORECASE):
+                is_websocket_related = True
+                break
+    
+    # Additional check: if error description contains mostly non-printable characters
+    # This often indicates binary WebSocket frames
+    if not is_websocket_related:
+        non_printable_count = sum(1 for c in str(error) if ord(c) < 32 and c not in '\n\r\t')
+        if non_printable_count > 3:  # Threshold for binary data detection
+            is_websocket_related = True
+    
+    if is_websocket_related:
+        # This is likely a WebSocket close frame or protocol error, log as debug
+        logger.debug(f"WebSocket protocol frame misinterpreted as HTTP: {error}")
+        return '', 400  # Return empty response for WebSocket frames
+    
+    # For genuine bad requests, return proper error response
+    logger.warning(f"Genuine bad request: {error}")
     return jsonify({'success': False, 'error': 'Bad request.'}), 400
 
 @app.errorhandler(404)
@@ -1001,6 +1044,9 @@ def create_app():
     """Application factory for Gunicorn compatibility."""
     return app
 
+def create_socketio():
+    """SocketIO factory for Gunicorn compatibility."""
+    return socketio
 
 if __name__ == '__main__':
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
@@ -1018,11 +1064,11 @@ if __name__ == '__main__':
     # Electronプロセスにポート番号を通知
     print(f"FLASK_SERVER_PORT:{actual_port}", file=sys.stdout, flush=True)
     
-    logger.info(f"Starting API server with Flask-SocketIO (eventlet) on http://{host}:{actual_port} (Debug: {debug})")
+    logger.info(f"Starting API server with Flask-SocketIO (threading) on http://{host}:{actual_port} (Debug: {debug})")
     
-    # Use Flask-SocketIO server with eventlet for proper WebSocket protocol handling
+    # Use Flask-SocketIO server with allow_unsafe_werkzeug for development
     try:
-        socketio.run(app, host=host, port=actual_port, debug=debug, use_reloader=False)
+        socketio.run(app, host=host, port=actual_port, debug=debug, use_reloader=False, allow_unsafe_werkzeug=True)
     except KeyboardInterrupt:
         logger.info("Server stopped by user.")
     finally:
