@@ -276,15 +276,14 @@ const startPythonServer = async (): Promise<void> => {
       pythonProcess = spawn(pythonExecutablePath, [
         '-m', 'gunicorn',
         '--workers', '1',
-        '--threads', '4',
-        '--worker-class', 'sync',
+        '--worker-class', 'eventlet',
         '--bind', `127.0.0.1:${gunicornPort}`,
         '--timeout', '0',        // 0 = disable timeout for long quantum calculations
         '--keep-alive', '30',
         '--access-logfile', '-',
         '--log-level', 'info',
         '--preload',
-        'app:app'  // Flask application (not socketio object)
+        'app:app'  // Flask application with SocketIO integration
       ], {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],

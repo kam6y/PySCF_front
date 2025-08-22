@@ -23,6 +23,8 @@ dependencies:
     # Flask extensions
     - flask-pydantic
     - flask-socketio
+    # WebSocket async support
+    - eventlet
     # Code generation and build tools
     - datamodel-code-generator
     - pyinstaller
