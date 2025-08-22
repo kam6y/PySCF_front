@@ -319,7 +319,7 @@ const startPythonServer = async (): Promise<void> => {
     });
 
     pythonProcess.stderr?.on('data', data => {
-      console.error(`Python server error: ${data.toString().trim()}`);
+      console.log(`Python server: ${data.toString().trim()}`);
     });
 
     pythonProcess.on('error', error => {
