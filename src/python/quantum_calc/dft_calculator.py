@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from typing import Dict, Any, List, Optional
 from pyscf import gto, dft
-from pyscf.geomopt import geometric_solver
+# geometric_solver is now imported in BaseCalculator
 
 from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
@@ -78,6 +78,12 @@ class DFTCalculator(BaseCalculator):
             self.mf.xc = xc
             self.mf.max_cycle = max_cycle
             
+            # Store parameters for template method
+            self.max_cycle = max_cycle
+            self.xc_functional = xc
+            self.solvent_method = solvent_method
+            self.solvent = solvent
+            
             # Store parameters
             self.results.update({
                 'basis': basis,
@@ -94,106 +100,42 @@ class DFTCalculator(BaseCalculator):
         except Exception as e:
             raise InputError(f"Failed to setup DFT calculation: {str(e)}")
     
-    def run_calculation(self) -> Dict[str, Any]:
-        """Run structure optimization and orbital analysis."""
-        if self.mol is None or self.mf is None:
-            raise CalculationError("Calculation not properly setup. Call setup_calculation first.")
-        
+    # ===== Template Method Pattern Implementation =====
+    
+    def _perform_specific_calculation(self, base_energy: float) -> Dict[str, Any]:
+        """Perform DFT-specific calculation (just return SCF energy)."""
+        # 安全にエネルギーを変換
+        if base_energy is None:
+            raise CalculationError("SCF energy is None - calculation may have failed")
         try:
-            # Step 1: Structure optimization
-            logger.info("Starting geometry optimization...")
-            optimized_mol = geometric_solver.optimize(self.mf)
-            self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
-            
-            # Step 2: SCF calculation with optimized geometry
-            logger.info("Running SCF calculation with optimized geometry...")
-            
-            # Recreate mf object with optimized geometry while preserving solvent effects
-            solvent_method = self.results.get('solvent_method', 'none')
-            solvent = self.results.get('solvent', '-')
-            spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
-            
-            if spin == 0:
-                self.mf = dft.RKS(optimized_mol)
-            else:
-                self.mf = dft.UKS(optimized_mol)
-            
-            self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
-            
-            self.mf.chkfile = self.get_checkpoint_path()
-            self.mf.xc = self.results['xc_functional']
-            self.mf.max_cycle = self.results['max_cycle']
-            
-            scf_energy = self.mf.kernel()
-            
-            # Check SCF convergence
-            if not self.mf.converged:
-                raise ConvergenceError("SCF calculation failed to converge")
-            
-            # Verify orbital occupations
-            if self.mf.mo_occ is None or len(self.mf.mo_occ) == 0:
-                raise CalculationError("SCF calculation failed: mo_occ not properly assigned")
-            
-            logger.info("SCF calculation completed successfully.")
-            logger.info(f"Number of occupied orbitals: {self._count_occupied_orbitals()}")
-            
-            # Step 3: Orbital analysis
-            homo_idx, lumo_idx = self._analyze_orbitals()
-            
-            # Step 4: Mulliken population analysis
-            logger.info("Performing Mulliken population analysis...")
-            mulliken_charges = self._calculate_mulliken_charges()
-            if mulliken_charges is not None:
-                logger.info(f"Calculated Mulliken charges for {len(mulliken_charges)} atoms")
-            else:
-                logger.warning("Mulliken population analysis failed or was skipped")
-            
-            # Step 5: Vibrational frequency analysis
-            logger.info("Performing vibrational frequency analysis...")
-            frequency_results = self._calculate_frequencies()
-            if frequency_results is not None:
-                logger.info("Vibrational frequency analysis completed successfully")
-            else:
-                logger.warning("Vibrational frequency analysis failed or was skipped")
-            
-            # Step 6: Prepare results
-            chk_path = self.get_checkpoint_path()
-            
-            # 安全にエネルギーを変換
-            if scf_energy is None:
-                raise CalculationError("SCF energy is None - calculation may have failed")
-            try:
-                scf_energy_float = float(scf_energy)
-            except (ValueError, TypeError) as e:
-                raise CalculationError(f"Failed to convert SCF energy to float: {e}")
-            
-            self.results.update({
-                'scf_energy': scf_energy_float,
-                'converged': True,
-                'homo_index': homo_idx,
-                'lumo_index': lumo_idx,
-                'num_occupied_orbitals': int(self._count_occupied_orbitals()),
-                'num_virtual_orbitals': int(self._count_virtual_orbitals()),
-                'checkpoint_file': chk_path,
-                'checkpoint_exists': os.path.exists(chk_path),
-                'working_directory': self.working_dir,
-                'optimized_geometry': self._geometry_to_xyz_string(),
-                'mulliken_charges': mulliken_charges
-            })
-            
-            # Add frequency analysis results if available
-            if frequency_results is not None:
-                self.results.update(frequency_results)
-            
-            if self.keep_files:
-                self.file_manager.save_calculation_results(self.working_dir, self.results)
-                self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
-                logger.info(f"Calculation files saved to: {self.working_dir}")
-            
-            return self.results
-            
-        except ConvergenceError:
-            raise
-        except Exception as e:
-            raise CalculationError(f"Calculation failed: {str(e)}")
+            scf_energy_float = float(base_energy)
+        except (ValueError, TypeError) as e:
+            raise CalculationError(f"Failed to convert SCF energy to float: {e}")
+        
+        return {'scf_energy': scf_energy_float}
+    
+    def _create_scf_method(self, mol):
+        """Create DFT method object (RKS/UKS)."""
+        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        
+        if spin == 0:
+            mf = dft.RKS(mol)
+            logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell system")
+        else:
+            mf = dft.UKS(mol)
+            logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell system")
+        
+        # Set XC functional
+        mf.xc = self.xc_functional
+        
+        return mf
+    
+    def _apply_solvent_effects(self, mf):
+        """Apply solvent effects to DFT method."""
+        return setup_solvent_effects(mf, self.solvent_method, self.solvent)
+    
+    def _get_base_method_description(self) -> str:
+        """Get description of base method for logging."""
+        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        return 'UKS' if spin > 0 else 'RKS'
     

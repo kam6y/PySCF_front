@@ -277,45 +277,112 @@ The useCalculationSubscription hook's onUpdate callback receives the new data an
 Once the status is completed or error, the backend WebSocket handler sends the final update and closes the connection. The TanStack Query cache retains the final calculation state for instant access.
 
 File Structure
-src/
-├── api-spec/
-│   └── openapi.yaml          # Single source of truth for the API
-├── assets/                   # Fonts and icons
-├── main.ts                   # Electron main process
-├── preload.ts                # Electron preload script
-├── types/                    # Global TypeScript definitions
-├── web/
-│   ├── apiClient.ts          # Centralized API client for the frontend
-│   ├── App.tsx               # Main React application component
-│   ├── App.css               # Global styles for the React app
-│   ├── components/           # Reusable React components
-│   ├── data/                 # Static data (e.g., atomic radii)
-│   ├── hooks/                # Custom React hooks for state management
-│   │   ├── useCalculationQueries.ts    # TanStack Query hooks for server state
-│   │   └── useCalculationSubscription.ts # Real-time updates via WebSocket
-│   ├── pages/                # Page components (one per view)
-│   ├── store/                # Global state management
-│   │   └── calculationStore.ts         # Zustand store for UI state
-│   └── types/
-│       ├── api-types.ts      # Convenience wrapper for generated types
-│       └── generated-api.ts  # (auto-generated) TypeScript types from OpenAPI spec
-└── python/
-    ├── app.py                # Flask API server main entry point (includes WebSocket handler)
-    ├── pyproject.toml        # Python dependencies (conda environment recommended)
-    ├── generated_models.py   # (auto-generated) Pydantic models from OpenAPI spec
-    ├── pubchem/              # PubChem integration modules
-    ├── SMILES/               # SMILES conversion modules
-    ├── quantum_calc/         # PySCF calculation logic and file management
-    │   ├── base_calculator.py    # Abstract base class for all calculators
-    │   ├── dft_calculator.py     # DFT calculation logic
-    │   ├── hf_calculator.py      # Hartree-Fock calculation logic
-    │   ├── mp2_calculator.py     # MP2 calculation logic
-    │   ├── tddft_calculator.py   # TDDFT calculation logic and NTO analysis
-    │   ├── exceptions.py         # Custom exceptions for calculations
-    │   ├── file_manager.py       # Handles reading/writing calculation files
-    │   ├── process_manager.py    # ProcessPoolExecutor-based parallel calculation manager
-    │   └── solvent_effects.py    # Logic for applying solvent models (PCM, ddCOSMO)
-    └── tests/                # Python unit tests
+├── .github
+    ├── environment.yml
+    └── workflows
+    │   ├── ci.yml
+    │   └── release.yml
+├── .gitignore
+├── .prettierignore
+├── .prettierrc
+├── CLAUDE.md
+├── LICENSE
+├── README.md
+├── package-lock.json
+├── package.json
+├── scripts
+    ├── setup-environment.sh
+    └── verify-environment.py
+├── src
+    ├── api-spec
+    │   └── openapi.yaml
+    ├── assets
+    │   ├── fonts
+    │   │   └── ADLaMDisplay-Regular.ttf
+    │   └── icon
+    │   │   └── mac
+    │   │       └── Pyscf_front.icns
+    ├── main.ts
+    ├── preload.ts
+    ├── python
+    │   ├── SMILES
+    │   │   ├── __init__.py
+    │   │   └── smiles_converter.py
+    │   ├── app.py
+    │   ├── data
+    │   │   ├── __init__.py
+    │   │   └── solvent_properties.py
+    │   ├── generated_models.py
+    │   ├── pubchem
+    │   │   ├── __init__.py
+    │   │   ├── client.py
+    │   │   └── parser.py
+    │   ├── quantum_calc
+    │   │   ├── __init__.py
+    │   │   ├── base_calculator.py
+    │   │   ├── ccsd_calculator.py
+    │   │   ├── dft_calculator.py
+    │   │   ├── exceptions.py
+    │   │   ├── file_manager.py
+    │   │   ├── file_watcher.py
+    │   │   ├── hf_calculator.py
+    │   │   ├── mp2_calculator.py
+    │   │   ├── orbital_generator.py
+    │   │   ├── process_manager.py
+    │   │   ├── solvent_effects.py
+    │   │   └── tddft_calculator.py
+    │   └── tests
+    │   │   ├── __init__.py
+    │   │   ├── test_concurrent_websockets.py
+    │   │   ├── test_error_scenarios.py
+    │   │   ├── test_file_watcher.py
+    │   │   ├── test_flask_api.py
+    │   │   ├── test_pubchem.py
+    │   │   ├── test_quantum_calc.py
+    │   │   └── test_websocket_integration.py
+    ├── types
+    │   ├── 3dmol.d.ts
+    │   └── electron.d.ts
+    └── web
+    │   ├── App.css
+    │   ├── App.tsx
+    │   ├── apiClient.ts
+    │   ├── components
+    │       ├── DropdownMenu.tsx
+    │       ├── Header.tsx
+    │       ├── MolecularOrbitalEnergyDiagram.tsx
+    │       ├── MolecularOrbitalViewer.tsx
+    │       ├── MoleculeViewer.tsx
+    │       ├── MoleculeViewerSection.tsx
+    │       ├── Sidebar.tsx
+    │       ├── StyleControls.tsx
+    │       └── XYZInput.tsx
+    │   ├── data
+    │       └── atomicRadii.ts
+    │   ├── hooks
+    │       ├── index.ts
+    │       ├── useActiveCalculation.ts
+    │       ├── useCalculationOperations.ts
+    │       ├── useCalculationQueries.ts
+    │       ├── useCalculationSubscription.ts
+    │       ├── usePageNavigation.ts
+    │       └── useSidebarState.ts
+    │   ├── index.html
+    │   ├── index.tsx
+    │   ├── pages
+    │       ├── CalculationResultsPage.tsx
+    │       ├── CalculationSettingsPage.tsx
+    │       └── DrawMoleculePage.tsx
+    │   ├── store
+    │       └── calculationStore.ts
+    │   ├── types
+    │       ├── api-types.ts
+    │       └── generated-api.ts
+    │   └── utils
+    │       └── xyzParser.ts
+├── tsconfig.json
+└── webpack.config.ts
+
 Key API Endpoints
 GET /health: Health check endpoint used by the Electron main process during startup.
 

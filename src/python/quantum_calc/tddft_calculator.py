@@ -80,6 +80,15 @@ class TDDFTCalculator(BaseCalculator):
             self.mf.xc = xc
             self.mf.max_cycle = max_cycle
             
+            # Store parameters for template method
+            self.max_cycle = max_cycle
+            self.xc_functional = xc
+            self.solvent_method = solvent_method
+            self.solvent = solvent
+            self.tddft_nstates = nstates
+            self.tddft_method = tddft_method
+            self.analyze_nto = analyze_nto
+            
             # Store parameters
             self.results.update({
                 'basis': basis,
@@ -99,134 +108,132 @@ class TDDFTCalculator(BaseCalculator):
         except Exception as e:
             raise InputError(f"Failed to setup TDDFT calculation: {str(e)}")
     
-    def run_calculation(self) -> Dict[str, Any]:
-        """Run ground state DFT followed by TDDFT calculation."""
-        if self.mol is None or self.mf is None:
-            raise CalculationError("Calculation not properly setup. Call setup_calculation first.")
-        
+    # ===== Template Method Pattern Implementation =====
+    
+    def _perform_specific_calculation(self, base_energy: float) -> Dict[str, Any]:
+        """Perform TDDFT-specific calculation after ground state DFT."""
+        # 安全にベースDFTエネルギーを変換
+        if base_energy is None:
+            raise CalculationError("SCF energy is None - calculation may have failed")
         try:
-            # Step 1: Ground state DFT calculation
-            logger.info("Starting ground state DFT calculation...")
-            scf_energy = self.mf.kernel()
-            
-            # Check SCF convergence
-            if not self.mf.converged:
-                raise ConvergenceError("Ground state SCF calculation failed to converge")
-                
-            logger.info(f"Ground state DFT completed. SCF energy: {scf_energy:.6f} hartree")
-            
-            # Step 2: TDDFT calculation
-            logger.info("Starting TDDFT calculation...")
-            nstates = self.results.get('tddft_nstates', 10)
-            tddft_method = self.results.get('tddft_method', 'TDDFT')
-            
-            if tddft_method == 'TDA':
-                # Tamm-Dancoff approximation
-                self.mytd = tdscf.TDA(self.mf)
-            else:
-                # Full TDDFT
-                self.mytd = tddft.TDDFT(self.mf)
-            
+            scf_energy_float = float(base_energy)
+        except (ValueError, TypeError) as e:
+            raise CalculationError(f"Failed to convert SCF energy to float: {e}")
+        
+        logger.info(f"Ground state DFT completed. SCF energy: {scf_energy_float:.6f} hartree")
+        
+        # TDDFT calculation
+        logger.info("Starting TDDFT calculation...")
+        nstates = getattr(self, 'tddft_nstates', 10)
+        tddft_method = getattr(self, 'tddft_method', 'TDDFT')
+        
+        if tddft_method == 'TDA':
+            # Tamm-Dancoff approximation
+            self.mytd = tdscf.TDA(self.mf)
+        else:
+            # Full TDDFT
+            self.mytd = tddft.TDDFT(self.mf)
+        
+        self.mytd.nstates = nstates
+        
+        # Validate nstates setting
+        if nstates <= 0:
+            raise InputError(f"Invalid number of excited states: {nstates}. Must be positive.")
+        
+        # Check if requested number of states is reasonable for the system
+        n_orb = len(self.mf.mo_energy) if hasattr(self.mf, 'mo_energy') else 0
+        n_occupied = int(np.sum(self.mf.mo_occ > 0)) if hasattr(self.mf, 'mo_occ') else 0
+        n_virtual = n_orb - n_occupied
+        
+        # Calculate a reasonable maximum number of excited states
+        # Use the smaller of: half total orbitals or occupied * virtual / 4
+        max_reasonable_states = min(n_orb // 2, max(1, (n_occupied * n_virtual) // 4))
+        
+        if n_orb < 4:
+            # Very small systems - limit to 1-2 states
+            max_reasonable_states = min(1, max_reasonable_states)
+            logger.warning(f"Very small molecular system detected ({n_orb} orbitals, {n_occupied} occupied). "
+                           f"TDDFT may not be suitable for such small systems.")
+        
+        if nstates > max_reasonable_states:
+            original_nstates = nstates
+            nstates = max(1, max_reasonable_states)
+            logger.warning(f"Requested {original_nstates} excited states, but system has only {n_orb} orbitals "
+                           f"({n_occupied} occupied, {n_virtual} virtual). Automatically reducing to {nstates} states "
+                           f"to avoid convergence issues.")
+            # Update the stored parameter
+            self.results['tddft_nstates'] = nstates
             self.mytd.nstates = nstates
-            
-            # Validate nstates setting
-            if nstates <= 0:
-                raise InputError(f"Invalid number of excited states: {nstates}. Must be positive.")
-            
-            # Check if requested number of states is reasonable for the system
-            n_orb = len(self.mf.mo_energy) if hasattr(self.mf, 'mo_energy') else 0
-            n_occupied = int(np.sum(self.mf.mo_occ > 0)) if hasattr(self.mf, 'mo_occ') else 0
-            n_virtual = n_orb - n_occupied
-            
-            # Calculate a reasonable maximum number of excited states
-            # Use the smaller of: half total orbitals or occupied * virtual / 4
-            max_reasonable_states = min(n_orb // 2, max(1, (n_occupied * n_virtual) // 4))
-            
-            if n_orb < 4:
-                # Very small systems - limit to 1-2 states
-                max_reasonable_states = min(1, max_reasonable_states)
-                logger.warning(f"Very small molecular system detected ({n_orb} orbitals, {n_occupied} occupied). "
-                               f"TDDFT may not be suitable for such small systems.")
-            
-            if nstates > max_reasonable_states:
-                original_nstates = nstates
-                nstates = max(1, max_reasonable_states)
-                logger.warning(f"Requested {original_nstates} excited states, but system has only {n_orb} orbitals "
-                               f"({n_occupied} occupied, {n_virtual} virtual). Automatically reducing to {nstates} states "
-                               f"to avoid convergence issues.")
-                # Update the stored parameter
-                self.results['tddft_nstates'] = nstates
-                self.mytd.nstates = nstates
-            
-            logger.info(f"TDDFT calculation setup: {nstates} excited states for system with "
-                       f"{n_orb} total orbitals ({n_occupied} occupied, {n_virtual} virtual)")
-            
-            # Run TDDFT calculation
-            try:
-                excitation_energies = self.mytd.kernel()
-            except Exception as e:
-                error_msg = str(e).lower()
-                if "singular" in error_msg or "convergence" in error_msg:
-                    raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
-                elif "memory" in error_msg:
-                    raise CalculationError(f"TDDFT calculation failed due to insufficient memory: {str(e)}")
-                else:
-                    raise CalculationError(f"TDDFT calculation failed: {str(e)}")
-            
-            # Validate results
-            if not hasattr(self.mytd, 'e') or self.mytd.e is None:
-                raise CalculationError("TDDFT calculation failed: no excitation energies obtained")
-                
-            if len(self.mytd.e) == 0:
-                raise CalculationError("TDDFT calculation failed: no excited states found")
-                
-            if len(self.mytd.e) < nstates:
-                logger.warning(f"Only {len(self.mytd.e)} excited states found, but {nstates} were requested. "
-                               f"This may indicate convergence issues.")
-            
-            logger.info(f"TDDFT calculation completed. Found {len(self.mytd.e)} excited states.")
-            
-            # Step 3: Analyze results
-            tddft_results = self._analyze_tddft_results()
-            
-            # Step 4: Orbital analysis for ground state
-            homo_idx, lumo_idx = self._analyze_orbitals()
-            
-            # Step 5: Prepare results
-            chk_path = self.get_checkpoint_path()
-            
-            # 安全にエネルギーを変換
-            if scf_energy is None:
-                raise CalculationError("SCF energy is None - calculation may have failed")
-            try:
-                scf_energy_float = float(scf_energy)
-            except (ValueError, TypeError) as e:
-                raise CalculationError(f"Failed to convert SCF energy to float: {e}")
-            
-            self.results.update({
-                'scf_energy': scf_energy_float,
-                'converged': True,
-                'homo_index': homo_idx,
-                'lumo_index': lumo_idx,
-                'num_occupied_orbitals': int(self._count_occupied_orbitals()),
-                'num_virtual_orbitals': int(self._count_virtual_orbitals()),
-                'checkpoint_file': chk_path,
-                'checkpoint_exists': os.path.exists(chk_path),
-                'working_directory': self.working_dir,
-                **tddft_results
-            })
-            
-            if self.keep_files:
-                self.file_manager.save_calculation_results(self.working_dir, self.results)
-                logger.info(f"TDDFT calculation files saved to: {self.working_dir}")
-            
-            return self.results
-            
-        except ConvergenceError:
-            raise
+        
+        logger.info(f"TDDFT calculation setup: {nstates} excited states for system with "
+                   f"{n_orb} total orbitals ({n_occupied} occupied, {n_virtual} virtual)")
+        
+        # Run TDDFT calculation
+        try:
+            excitation_energies = self.mytd.kernel()
         except Exception as e:
-            logger.error(f"TDDFT calculation failed: {str(e)}")
-            raise CalculationError(f"TDDFT calculation failed: {str(e)}")
+            error_msg = str(e).lower()
+            if "singular" in error_msg or "convergence" in error_msg:
+                raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
+            elif "memory" in error_msg:
+                raise CalculationError(f"TDDFT calculation failed due to insufficient memory: {str(e)}")
+            else:
+                raise CalculationError(f"TDDFT calculation failed: {str(e)}")
+        
+        # Validate results
+        if not hasattr(self.mytd, 'e') or self.mytd.e is None:
+            raise CalculationError("TDDFT calculation failed: no excitation energies obtained")
+            
+        if len(self.mytd.e) == 0:
+            raise CalculationError("TDDFT calculation failed: no excited states found")
+            
+        if len(self.mytd.e) < nstates:
+            logger.warning(f"Only {len(self.mytd.e)} excited states found, but {nstates} were requested. "
+                           f"This may indicate convergence issues.")
+        
+        logger.info(f"TDDFT calculation completed. Found {len(self.mytd.e)} excited states.")
+        
+        # Analyze TDDFT results
+        tddft_results = self._analyze_tddft_results()
+        
+        # Combine results
+        results = {'scf_energy': scf_energy_float}
+        results.update(tddft_results)
+        
+        return results
+    
+    def _create_scf_method(self, mol):
+        """Create DFT method object for TDDFT ground state (RKS/UKS)."""
+        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        
+        if spin == 0:
+            mf = dft.RKS(mol)
+            logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell TDDFT ground state")
+        else:
+            mf = dft.UKS(mol)
+            logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell TDDFT ground state")
+        
+        # Set XC functional
+        mf.xc = self.xc_functional
+        
+        return mf
+    
+    def _apply_solvent_effects(self, mf):
+        """Apply solvent effects to DFT method."""
+        return setup_solvent_effects(mf, self.solvent_method, self.solvent)
+    
+    def _get_base_method_description(self) -> str:
+        """Get description of base method for logging."""
+        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        return f"{'UKS' if spin > 0 else 'RKS'} (TDDFT ground state)"
+    
+    def _requires_geometry_optimization(self) -> bool:
+        """TDDFT does not require geometry optimization."""
+        return False
+    
+    def _requires_frequency_analysis(self) -> bool:
+        """TDDFT does not require frequency analysis."""
+        return False
 
     # ===== 修正済みの完全な関数 =====
     def _analyze_tddft_results(self) -> Dict[str, Any]:

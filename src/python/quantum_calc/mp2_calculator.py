@@ -5,7 +5,7 @@ import logging
 import numpy as np
 from typing import Dict, Any, List, Optional
 from pyscf import gto, scf, mp
-from pyscf.geomopt import geometric_solver
+# geometric_solver is now imported in BaseCalculator
 
 from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
@@ -76,6 +76,11 @@ class MP2Calculator(BaseCalculator):
             self.mf.chkfile = self.get_checkpoint_path()
             self.mf.max_cycle = max_cycle
             
+            # Store parameters for template method
+            self.max_cycle = max_cycle
+            self.solvent_method = solvent_method
+            self.solvent = solvent
+            
             # Store parameters
             self.results.update({
                 'basis': basis,
@@ -91,131 +96,78 @@ class MP2Calculator(BaseCalculator):
         except Exception as e:
             raise InputError(f"Failed to setup MP2 calculation: {str(e)}")
     
-    def run_calculation(self) -> Dict[str, Any]:
-        """Run structure optimization and MP2 energy calculation."""
-        if self.mol is None or self.mf is None:
-            raise CalculationError("Calculation not properly setup. Call setup_calculation first.")
+    # ===== Template Method Pattern Implementation =====
+    
+    def _perform_specific_calculation(self, base_energy: float) -> Dict[str, Any]:
+        """Perform MP2-specific calculation after HF."""
+        # 安全にベースHFエネルギーを変換
+        if base_energy is None:
+            raise CalculationError("HF energy is None - calculation may have failed")
+        try:
+            hf_energy_float = float(base_energy)
+        except (ValueError, TypeError) as e:
+            raise CalculationError(f"Failed to convert HF energy to float: {e}")
+        
+        logger.info(f"HF energy: {hf_energy_float} Hartree")
+        
+        # MP2 calculation
+        logger.info("Starting MP2 calculation...")
+        
+        # Create MP2 object based on HF reference
+        self.mp2 = mp.MP2(self.mf)
+        
+        # Run MP2 calculation
+        self.mp2.kernel()
+        
+        # Get MP2 results
+        if not hasattr(self.mp2, 'e_corr') or self.mp2.e_corr is None:
+            raise CalculationError("MP2 calculation failed: correlation energy not available")
+        
+        mp2_corr_energy = self.mp2.e_corr
+        mp2_total_energy = self.mp2.e_tot
+        
+        logger.info("MP2 calculation completed successfully.")
+        logger.info(f"MP2 correlation energy: {mp2_corr_energy} Hartree")
+        logger.info(f"MP2 total energy: {mp2_total_energy} Hartree")
+        
+        # 安全にMP2エネルギーを変換
+        if mp2_corr_energy is None:
+            raise CalculationError("MP2 correlation energy is None - calculation may have failed")
+        if mp2_total_energy is None:
+            raise CalculationError("MP2 total energy is None - calculation may have failed")
         
         try:
-            # Step 1: Structure optimization using HF method
-            logger.info("Starting geometry optimization using HF method...")
-            optimized_mol = geometric_solver.optimize(self.mf)
-            self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
-            
-            # Step 2: HF calculation with optimized geometry
-            logger.info("Running HF calculation with optimized geometry...")
-            
-            # Recreate mf object with optimized geometry while preserving solvent effects
-            solvent_method = self.results.get('solvent_method', 'none')
-            solvent = self.results.get('solvent', '-')
-            spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
-            
-            if spin == 0:
-                self.mf = scf.RHF(optimized_mol)
-            else:
-                self.mf = scf.UHF(optimized_mol)
-            
-            self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
-            
-            self.mf.chkfile = self.get_checkpoint_path()
-            self.mf.max_cycle = self.results['max_cycle']
-            
-            hf_energy = self.mf.kernel()
-            
-            # Check HF convergence
-            if not self.mf.converged:
-                raise ConvergenceError("HF calculation failed to converge")
-            
-            logger.info("HF calculation completed successfully.")
-            logger.info(f"HF energy: {hf_energy} Hartree")
-            
-            # Step 3: MP2 calculation
-            logger.info("Starting MP2 calculation...")
-            
-            # Create MP2 object based on HF reference
-            self.mp2 = mp.MP2(self.mf)
-            
-            # Run MP2 calculation
-            self.mp2.kernel()
-            
-            # Get MP2 results
-            if not hasattr(self.mp2, 'e_corr') or self.mp2.e_corr is None:
-                raise CalculationError("MP2 calculation failed: correlation energy not available")
-            
-            mp2_corr_energy = self.mp2.e_corr
-            mp2_total_energy = self.mp2.e_tot
-            
-            logger.info("MP2 calculation completed successfully.")
-            logger.info(f"MP2 correlation energy: {mp2_corr_energy} Hartree")
-            logger.info(f"MP2 total energy: {mp2_total_energy} Hartree")
-            
-            # Step 4: Orbital analysis using HF orbitals
-            homo_idx, lumo_idx = self._analyze_orbitals()
-            
-            # Step 5: Mulliken population analysis using HF orbitals
-            logger.info("Performing Mulliken population analysis...")
-            mulliken_charges = self._calculate_mulliken_charges()
-            if mulliken_charges is not None:
-                logger.info(f"Calculated Mulliken charges for {len(mulliken_charges)} atoms")
-            else:
-                logger.warning("Mulliken population analysis failed or was skipped")
-            
-            # Step 6: Vibrational frequency analysis using HF orbitals
-            logger.info("Performing vibrational frequency analysis...")
-            frequency_results = self._calculate_frequencies()
-            if frequency_results is not None:
-                logger.info("Vibrational frequency analysis completed successfully")
-            else:
-                logger.warning("Vibrational frequency analysis failed or was skipped")
-            
-            # Step 7: Prepare results
-            chk_path = self.get_checkpoint_path()
-            
-            # 安全にエネルギーを変換
-            if hf_energy is None:
-                raise CalculationError("HF energy is None - calculation may have failed")
-            if mp2_corr_energy is None:
-                raise CalculationError("MP2 correlation energy is None - calculation may have failed")
-            if mp2_total_energy is None:
-                raise CalculationError("MP2 total energy is None - calculation may have failed")
-            
-            try:
-                hf_energy_float = float(hf_energy)
-                mp2_corr_energy_float = float(mp2_corr_energy)
-                mp2_total_energy_float = float(mp2_total_energy)
-            except (ValueError, TypeError) as e:
-                raise CalculationError(f"Failed to convert MP2 energies to float: {e}")
-            
-            self.results.update({
-                'hf_energy': hf_energy_float,
-                'mp2_correlation_energy': mp2_corr_energy_float,
-                'scf_energy': mp2_total_energy_float,  # For consistency with other calculators
-                'mp2_total_energy': mp2_total_energy_float,
-                'converged': True,
-                'homo_index': homo_idx,
-                'lumo_index': lumo_idx,
-                'num_occupied_orbitals': int(self._count_occupied_orbitals()),
-                'num_virtual_orbitals': int(self._count_virtual_orbitals()),
-                'checkpoint_file': chk_path,
-                'checkpoint_exists': os.path.exists(chk_path),
-                'working_directory': self.working_dir,
-                'optimized_geometry': self._geometry_to_xyz_string(),
-                'mulliken_charges': mulliken_charges
-            })
-            
-            # Add frequency analysis results if available
-            if frequency_results is not None:
-                self.results.update(frequency_results)
-            
-            if self.keep_files:
-                self.file_manager.save_calculation_results(self.working_dir, self.results)
-                self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
-                logger.info(f"Calculation files saved to: {self.working_dir}")
-            
-            return self.results
-            
-        except ConvergenceError:
-            raise
-        except Exception as e:
-            raise CalculationError(f"MP2 calculation failed: {str(e)}")
+            mp2_corr_energy_float = float(mp2_corr_energy)
+            mp2_total_energy_float = float(mp2_total_energy)
+        except (ValueError, TypeError) as e:
+            raise CalculationError(f"Failed to convert MP2 energies to float: {e}")
+        
+        return {
+            'hf_energy': hf_energy_float,
+            'mp2_correlation_energy': mp2_corr_energy_float,
+            'scf_energy': mp2_total_energy_float,  # For consistency with other calculators
+            'mp2_total_energy': mp2_total_energy_float
+        }
+    
+    def _create_scf_method(self, mol):
+        """Create HF method object for MP2 reference (RHF/UHF)."""
+        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        
+        if spin == 0:
+            mf = scf.RHF(mol)
+            logger.info("Using Restricted Hartree-Fock (RHF) reference for RMP2")
+        else:
+            mf = scf.UHF(mol)
+            logger.info("Using Unrestricted Hartree-Fock (UHF) reference for UMP2")
+        
+        return mf
+    
+    def _apply_solvent_effects(self, mf):
+        """Apply solvent effects to HF reference method."""
+        return setup_solvent_effects(mf, self.solvent_method, self.solvent)
+    
+    def _get_base_method_description(self) -> str:
+        """Get description of base method for logging."""
+        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        return f"{'UHF' if spin > 0 else 'RHF'} (MP2 reference)"
     

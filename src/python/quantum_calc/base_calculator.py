@@ -97,10 +97,33 @@ class BaseCalculator(ABC):
         """Setup the quantum chemistry calculation."""
         pass
     
-    @abstractmethod
     def run_calculation(self) -> Dict[str, Any]:
-        """Run the quantum chemistry calculation and return results."""
-        pass
+        """Template method for running quantum chemistry calculations."""
+        try:
+            self._pre_calculation_check()
+            
+            if self._requires_geometry_optimization():
+                self._perform_geometry_optimization()
+            
+            self._setup_final_calculation()
+            base_energy = self._run_base_scf_calculation()
+            self._verify_scf_convergence()
+            
+            specific_results = self._perform_specific_calculation(base_energy)
+            
+            if self._requires_orbital_analysis():
+                self._perform_orbital_analysis()
+            
+            if self._requires_frequency_analysis():
+                self._perform_frequency_analysis()
+            
+            return self._prepare_final_results(specific_results)
+            
+        except Exception as e:
+            from .exceptions import CalculationError
+            if isinstance(e, (CalculationError,)):
+                raise
+            raise CalculationError(f"Calculation failed: {str(e)}")
     
     def cleanup(self, keep_files: bool = False) -> None:
         """Clean up temporary files."""
@@ -410,3 +433,185 @@ class BaseCalculator(ABC):
                 logger.info("Returning partial frequency analysis results")
                 return frequency_results
             return None
+    
+    # ===== Template Method Pattern Implementation =====
+    
+    def _pre_calculation_check(self) -> None:
+        """Check prerequisites for calculation."""
+        if not hasattr(self, 'mol') or self.mol is None:
+            raise CalculationError("Molecular object not setup. Call setup_calculation first.")
+        if not hasattr(self, 'mf') or self.mf is None:
+            raise CalculationError("Mean field object not setup. Call setup_calculation first.")
+    
+    def _perform_geometry_optimization(self) -> None:
+        """Perform geometry optimization using geometric_solver."""
+        from pyscf.geomopt import geometric_solver
+        
+        logger.info("Starting geometry optimization...")
+        optimized_mol = geometric_solver.optimize(self.mf)
+        self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
+        logger.info("Geometry optimization completed")
+    
+    def _setup_final_calculation(self) -> None:
+        """Setup calculation with optimized geometry."""
+        if not hasattr(self, 'optimized_geometry') or self.optimized_geometry is None:
+            logger.info("No geometry optimization performed, using original geometry")
+            return
+        
+        # Recreate molecular object with optimized geometry
+        optimized_mol = self._create_optimized_molecule()
+        
+        # Recreate mean field object with optimized geometry
+        self.mf = self._create_scf_method(optimized_mol)
+        self.mf = self._apply_solvent_effects(self.mf)
+        self._apply_calculation_settings()
+        
+        logger.info("Final calculation setup completed with optimized geometry")
+    
+    def _create_optimized_molecule(self):
+        """Create molecular object with optimized geometry."""
+        from pyscf import gto
+        
+        # Get atom symbols from original molecule
+        atom_symbols = [self.mol.atom_symbol(i) for i in range(self.mol.natm)]
+        
+        # Create atom string with optimized coordinates
+        atom_lines = []
+        for symbol, coords in zip(atom_symbols, self.optimized_geometry):
+            atom_lines.append(f"{symbol} {coords[0]:.6f} {coords[1]:.6f} {coords[2]:.6f}")
+        atom_string = "\n".join(atom_lines)
+        
+        # Create new molecular object
+        optimized_mol = gto.M(
+            atom=atom_string,
+            basis=self.mol.basis,
+            charge=self.mol.charge,
+            spin=self.mol.spin,
+            verbose=0
+        )
+        optimized_mol.max_memory = self.mol.max_memory
+        
+        return optimized_mol
+    
+    def _apply_calculation_settings(self) -> None:
+        """Apply common calculation settings."""
+        self.mf.chkfile = self.get_checkpoint_path()
+        if hasattr(self, 'max_cycle'):
+            self.mf.max_cycle = self.max_cycle
+        elif 'max_cycle' in self.results:
+            self.mf.max_cycle = self.results['max_cycle']
+    
+    def _run_base_scf_calculation(self) -> float:
+        """Run base SCF calculation and return energy."""
+        logger.info(f"Running {self._get_base_method_description()} calculation...")
+        energy = self.mf.kernel()
+        logger.info(f"{self._get_base_method_description()} calculation completed")
+        return energy
+    
+    def _verify_scf_convergence(self) -> None:
+        """Verify SCF convergence and orbital data."""
+        from .exceptions import ConvergenceError
+        
+        if not self.mf.converged:
+            raise ConvergenceError(f"{self._get_base_method_description()} calculation failed to converge")
+        
+        if self.mf.mo_occ is None or len(self.mf.mo_occ) == 0:
+            raise CalculationError(f"{self._get_base_method_description()} calculation failed: mo_occ not properly assigned")
+        
+        logger.info(f"Number of occupied orbitals: {self._count_occupied_orbitals()}")
+    
+    def _perform_orbital_analysis(self) -> None:
+        """Perform orbital analysis and store results."""
+        logger.info("Performing orbital analysis...")
+        homo_idx, lumo_idx = self._analyze_orbitals()
+        
+        self.results.update({
+            'homo_index': homo_idx,
+            'lumo_index': lumo_idx,
+            'num_occupied_orbitals': int(self._count_occupied_orbitals()),
+            'num_virtual_orbitals': int(self._count_virtual_orbitals())
+        })
+        logger.info("Orbital analysis completed")
+    
+    def _perform_mulliken_analysis(self) -> None:
+        """Perform Mulliken population analysis."""
+        logger.info("Performing Mulliken population analysis...")
+        mulliken_charges = self._calculate_mulliken_charges()
+        
+        self.results['mulliken_charges'] = mulliken_charges
+        
+        if mulliken_charges is not None:
+            logger.info(f"Calculated Mulliken charges for {len(mulliken_charges)} atoms")
+        else:
+            logger.warning("Mulliken population analysis failed or was skipped")
+    
+    def _perform_frequency_analysis(self) -> None:
+        """Perform vibrational frequency analysis."""
+        logger.info("Performing vibrational frequency analysis...")
+        frequency_results = self._calculate_frequencies()
+        
+        if frequency_results is not None:
+            self.results.update(frequency_results)
+            logger.info("Vibrational frequency analysis completed successfully")
+        else:
+            logger.warning("Vibrational frequency analysis failed or was skipped")
+    
+    def _prepare_final_results(self, specific_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare final results dictionary."""
+        # Update with calculation-specific results
+        self.results.update(specific_results)
+        
+        # Add common final results
+        chk_path = self.get_checkpoint_path()
+        self.results.update({
+            'converged': True,
+            'checkpoint_file': chk_path,
+            'checkpoint_exists': os.path.exists(chk_path),
+            'working_directory': self.working_dir,
+            'optimized_geometry': self._geometry_to_xyz_string()
+        })
+        
+        # Save files if requested
+        if hasattr(self, 'keep_files') and self.keep_files:
+            if hasattr(self, 'file_manager'):
+                self.file_manager.save_calculation_results(self.working_dir, self.results)
+                self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
+                logger.info(f"Calculation files saved to: {self.working_dir}")
+        
+        return self.results
+    
+    # ===== Abstract Methods for Subclasses =====
+    
+    @abstractmethod
+    def _perform_specific_calculation(self, base_energy: float) -> Dict[str, Any]:
+        """Perform calculation-specific computations."""
+        pass
+    
+    @abstractmethod
+    def _create_scf_method(self, mol):
+        """Create appropriate SCF method object (RKS/UKS, RHF/UHF, etc.)."""
+        pass
+    
+    @abstractmethod
+    def _apply_solvent_effects(self, mf):
+        """Apply solvent effects to mean field object."""
+        pass
+    
+    @abstractmethod
+    def _get_base_method_description(self) -> str:
+        """Get description of base method for logging."""
+        pass
+    
+    # ===== Default Implementations for Optional Methods =====
+    
+    def _requires_geometry_optimization(self) -> bool:
+        """Whether this calculation requires geometry optimization."""
+        return True
+    
+    def _requires_orbital_analysis(self) -> bool:
+        """Whether this calculation requires orbital analysis."""
+        return True
+    
+    def _requires_frequency_analysis(self) -> bool:
+        """Whether this calculation requires frequency analysis."""
+        return True
