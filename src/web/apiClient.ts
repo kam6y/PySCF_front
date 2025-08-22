@@ -22,12 +22,6 @@ export const setApiBaseUrl = (port: number) => {
   console.log(`API base URL set to: ${API_BASE_URL}`);
 };
 
-// ===== この関数を追加 =====
-export const getWebSocketUrl = (path: string): string => {
-  // API_BASE_URL (http://127.0.0.1:xxxx) から ws://... を生成
-  const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
-  return `${wsUrl}${path}`;
-};
 
 // Re-export the generated type for backward compatibility
 export type StartCalculationResponse = StartCalculationResponseData;

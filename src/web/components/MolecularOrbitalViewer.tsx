@@ -252,23 +252,76 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
       // CUBEファイルデータを追加
       const cubeContent = (cubeData as any).cube_data;
 
-      // 正の等値面（赤色）
-      viewer.addVolumetricData(cubeContent, 'cube', {
-        isoval: viewerOptions.isovaluePos,
-        color: 'red',
-        opacity: 0.75,
+      // デバッグ情報: CUBEデータの内容確認
+      console.log('CUBE data validation:', {
+        hasContent: !!cubeContent,
+        contentType: typeof cubeContent,
+        contentLength: cubeContent?.length || 0,
+        firstChars: cubeContent?.substring?.(0, 100) || 'N/A',
+        isovaluePos: viewerOptions.isovaluePos,
+        isovalueNeg: viewerOptions.isovalueNeg,
       });
 
-      // 負の等値面（青色）
-      viewer.addVolumetricData(cubeContent, 'cube', {
-        isoval: viewerOptions.isovalueNeg,
-        color: 'blue',
-        opacity: 0.75,
-      });
+      // CUBEデータの詳細検証
+      if (!cubeContent || typeof cubeContent !== 'string') {
+        throw new Error('Invalid CUBE data: content is empty or not a string');
+      }
 
-      // 分子構造も表示（CUBEファイルから分子情報を抽出）
-      viewer.addModel(cubeContent, 'cube');
-      viewer.setStyle({}, { stick: { radius: 0.1 }, sphere: { radius: 0.3 } });
+      if (cubeContent.length < 100) {
+        throw new Error('Invalid CUBE data: content too short');
+      }
+
+      // CUBE形式の基本的な検証（ヘッダー行の存在確認）
+      const lines = cubeContent.split('\n');
+      if (lines.length < 6) {
+        throw new Error('Invalid CUBE data: insufficient header lines');
+      }
+
+      // 等値面設定の範囲チェック
+      if (Math.abs(viewerOptions.isovaluePos) < 0.001 || Math.abs(viewerOptions.isovaluePos) > 1.0) {
+        console.warn('Positive isovalue may be out of optimal range:', viewerOptions.isovaluePos);
+      }
+      if (Math.abs(viewerOptions.isovalueNeg) < 0.001 || Math.abs(viewerOptions.isovalueNeg) > 1.0) {
+        console.warn('Negative isovalue may be out of optimal range:', viewerOptions.isovalueNeg);
+      }
+
+      // 分子構造を先に追加（等値面の前に）
+      try {
+        viewer.addModel(cubeContent, 'cube');
+        viewer.setStyle({}, { stick: { radius: 0.1 }, sphere: { radius: 0.3 } });
+        console.log('Successfully added molecular structure');
+      } catch (modelError) {
+        console.error('Failed to add molecular model:', modelError);
+        throw new Error('Failed to add molecular structure from CUBE data');
+      }
+
+      // 正の等値面（赤色）- 保護された呼び出し
+      try {
+        console.log('Adding positive isosurface with value:', viewerOptions.isovaluePos);
+        viewer.addVolumetricData(cubeContent, 'cube', {
+          isoval: viewerOptions.isovaluePos,
+          color: 'red',
+          opacity: 0.75,
+        });
+        console.log('Successfully added positive isosurface');
+      } catch (posError) {
+        console.error('Error adding positive isosurface:', posError);
+        throw new Error(`Failed to add positive isosurface: ${posError instanceof Error ? posError.message : String(posError)}`);
+      }
+
+      // 負の等値面（青色）- 保護された呼び出し
+      try {
+        console.log('Adding negative isosurface with value:', viewerOptions.isovalueNeg);
+        viewer.addVolumetricData(cubeContent, 'cube', {
+          isoval: viewerOptions.isovalueNeg,
+          color: 'blue',
+          opacity: 0.75,
+        });
+        console.log('Successfully added negative isosurface');
+      } catch (negError) {
+        console.error('Error adding negative isosurface:', negError);
+        throw new Error(`Failed to add negative isosurface: ${negError instanceof Error ? negError.message : String(negError)}`);
+      }
 
       // ビューを最適化（即座に実行）
       viewer.zoomTo();
@@ -281,6 +334,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
             viewer.resize();
             viewer.zoomTo();
             viewer.render();
+            console.log('Completed delayed re-render');
           }
         } catch (delayedRenderError) {
           console.error(
@@ -291,9 +345,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
       }, 200);
 
       setIsLoading(false);
+      console.log('Molecular orbital rendering completed successfully');
     } catch (error) {
       console.error('Failed to render molecular orbital:', error);
-      onError?.('Failed to render molecular orbital visualization');
+      onError?.(`Failed to render molecular orbital visualization: ${error instanceof Error ? error.message : String(error)}`);
       setIsLoading(false);
     }
   }, [viewer, cubeData, viewerOptions, onError]);

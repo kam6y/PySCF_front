@@ -11,8 +11,8 @@ from typing import Dict, Callable, Optional, Set
 from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
-import gevent
-from gevent.queue import Queue
+import queue
+import threading
 
 from .exceptions import FileManagerError, WebSocketError
 
@@ -95,7 +95,7 @@ class WebSocketCalculationWatcher:
     """
     Manages file system watching for WebSocket connections to calculation directories.
     Provides efficient, event-driven monitoring instead of polling.
-    Now with gevent integration to prevent greenlet thread switching errors.
+    Now with threading integration for thread-safe operation.
     """
     
     def __init__(self, base_directory: str):
@@ -112,9 +112,10 @@ class WebSocketCalculationWatcher:
         self._lock = threading.Lock()
         self._started = False
         
-        # gevent queue for thread-safe communication
-        self._event_queue = Queue()
+        # Standard queue for thread-safe communication
+        self._event_queue = queue.Queue()
         self._queue_processor = None
+        self._stop_processing = threading.Event()
         
         # Create event handler that puts events in the queue
         self.event_handler = CalculationFileWatcher(self._queue_file_change)
@@ -124,10 +125,11 @@ class WebSocketCalculationWatcher:
         with self._lock:
             if not self._started:
                 self.observer.start()
-                # Start the gevent queue processor
-                self._queue_processor = gevent.spawn(self._process_file_events)
+                # Start the threading queue processor
+                self._queue_processor = threading.Thread(target=self._process_file_events, daemon=True)
+                self._queue_processor.start()
                 self._started = True
-                logger.info("WebSocket file watcher started with gevent integration")
+                logger.info("WebSocket file watcher started with threading integration")
     
     def stop(self):
         """Stop the file system observer and clean up resources."""
@@ -138,9 +140,10 @@ class WebSocketCalculationWatcher:
                     self.observer.stop()
                     self.observer.join(timeout=5.0)
                     
-                    # Kill the queue processor
+                    # Stop the queue processor
                     if self._queue_processor:
-                        self._queue_processor.kill()
+                        self._stop_processing.set()
+                        self._queue_processor.join(timeout=2.0)
                         self._queue_processor = None
                         
                 except Exception as e:
@@ -226,7 +229,7 @@ class WebSocketCalculationWatcher:
             logger.debug(f"Stopped watching directory: {calc_dir_str}")
     
     def _queue_file_change(self, calculation_id: str, file_data: Dict):
-        """Queue file change events for processing in gevent context."""
+        """Queue file change events for processing in threading context."""
         # This runs in watchdog thread - just put event in queue
         try:
             self._event_queue.put((calculation_id, file_data), block=False)
@@ -234,29 +237,34 @@ class WebSocketCalculationWatcher:
             logger.error(f"Error queuing file change event for {calculation_id}: {e}")
     
     def _process_file_events(self):
-        """Process file events from the queue in gevent context."""
-        logger.debug("Started gevent file event processor")
+        """Process file events from the queue in threading context."""
+        logger.debug("Started threading file event processor")
         try:
-            while True:
+            while not self._stop_processing.is_set():
                 try:
-                    # Get event from queue (this will yield to other gevent tasks)
-                    calculation_id, file_data = self._event_queue.get()
+                    # Get event from queue with timeout to allow checking stop event
+                    try:
+                        calculation_id, file_data = self._event_queue.get(timeout=1.0)
+                    except queue.Empty:
+                        continue  # Check stop event and continue
                     
-                    # Process the file change in gevent context
-                    self._handle_file_change_in_gevent(calculation_id, file_data)
+                    # Process the file change in threading context
+                    self._handle_file_change_in_threading(calculation_id, file_data)
+                    
+                    # Mark task as done
+                    self._event_queue.task_done()
                     
                 except Exception as e:
                     logger.error(f"Error processing file event: {e}")
                     # Continue processing other events
                     continue
-        except gevent.GreenletExit:
-            # Normal shutdown
-            logger.debug("File event processor shutting down")
         except Exception as e:
             logger.error(f"Unexpected error in file event processor: {e}")
+        finally:
+            logger.debug("File event processor shutting down")
     
-    def _handle_file_change_in_gevent(self, calculation_id: str, file_data: Dict):
-        """Handle file change events and notify connected WebSocket clients (gevent context)."""
+    def _handle_file_change_in_threading(self, calculation_id: str, file_data: Dict):
+        """Handle file change events and notify connected WebSocket clients (threading context)."""
         with self._lock:
             if calculation_id not in self.connections:
                 return
@@ -264,7 +272,7 @@ class WebSocketCalculationWatcher:
             # Get current connections for this calculation
             callbacks = self.connections[calculation_id].copy()
         
-        # Notify all connected WebSocket clients (now in gevent context)
+        # Notify all connected WebSocket clients (now in threading context)
         for callback in callbacks:
             try:
                 callback(file_data)

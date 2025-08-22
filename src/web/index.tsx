@@ -13,6 +13,9 @@ const root = createRoot(document.getElementById('root') as Element);
 window.electronAPI.onSetFlaskPort(port => {
   console.log('Received port from main process:', port);
   setApiBaseUrl(port);
+  
+  // Set Flask port for Socket.IO connections
+  window.flaskPort = port;
 
   // Render the app only after the port is set
   root.render(

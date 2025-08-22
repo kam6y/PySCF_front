@@ -249,28 +249,72 @@ const startPythonServer = async (): Promise<void> => {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
     } else {
-      // 開発時：Pythonスクリプトを実行
+      // 開発時：Gunicornを使用してFlask-SocketIOアプリケーションを実行
       const pythonPath = path.join(__dirname, '..', 'src', 'python');
-      const appPath = path.join(pythonPath, 'app.py');
+      
+      // Find available port for Gunicorn
+      let gunicornPort = 5000; // Default fallback
+      try {
+        const net = require('net');
+        const server = net.createServer();
+        await new Promise((resolve, reject) => {
+          server.listen(0, '127.0.0.1', () => {
+            gunicornPort = (server.address() as any).port;
+            server.close(resolve);
+          });
+          server.on('error', reject);
+        });
+      } catch (error) {
+        console.log('Could not detect free port, using default 5000');
+      }
 
-      pythonProcess = spawn(pythonExecutablePath, [appPath], {
+      // Set the port for Electron to use
+      flaskPort = gunicornPort;
+      console.log(`Using Gunicorn port: ${gunicornPort}`);
+
+      // Start Gunicorn with Flask-SocketIO app for long-running quantum calculations
+      pythonProcess = spawn(pythonExecutablePath, [
+        '-m', 'gunicorn',
+        '--workers', '1',
+        '--threads', '4',
+        '--worker-class', 'sync',
+        '--bind', `127.0.0.1:${gunicornPort}`,
+        '--timeout', '0',        // 0 = disable timeout for long quantum calculations
+        '--keep-alive', '30',
+        '--access-logfile', '-',
+        '--log-level', 'info',
+        '--preload',
+        'app:app'  // Flask application (not socketio object)
+      ], {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env, CONDA_DEFAULT_ENV: 'pyscf-env' },
       });
+
+      // For Gunicorn, start health check immediately since port is predetermined
+      setTimeout(() => {
+        if (flaskPort) {
+          console.log(`Starting health check for Gunicorn server on port ${flaskPort}`);
+          checkServerHealth(flaskPort).then(resolve).catch(reject);
+        }
+      }, 2000); // Give Gunicorn a moment to start up
     }
 
     // stdout/stderrのログ出力
     pythonProcess.stdout?.on('data', data => {
       const output = data.toString().trim();
       console.log(`Python server: ${output}`);
-      // Pythonサーバーからポート番号を受け取る
-      const match = output.match(/FLASK_SERVER_PORT:(\d+)/);
-      if (match && match[1]) {
-        flaskPort = parseInt(match[1], 10);
-        console.log(`Detected Flask server port: ${flaskPort}`);
-        // ヘルスチェックを開始してサーバー起動を待つ
-        checkServerHealth(flaskPort).then(resolve).catch(reject);
+      
+      // パッケージ時のみポート検出を実行（Gunicorn使用時は事前に決定済み）
+      if (app.isPackaged) {
+        // Pythonサーバーからポート番号を受け取る
+        const match = output.match(/FLASK_SERVER_PORT:(\d+)/);
+        if (match && match[1]) {
+          flaskPort = parseInt(match[1], 10);
+          console.log(`Detected Flask server port: ${flaskPort}`);
+          // ヘルスチェックを開始してサーバー起動を待つ
+          checkServerHealth(flaskPort).then(resolve).catch(reject);
+        }
       }
     });
 

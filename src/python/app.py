@@ -11,14 +11,11 @@ from datetime import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_pydantic import validate
-from geventwebsocket.handler import WebSocketHandler
 from pydantic import ValidationError
 import socket
 import shutil
 from typing import Dict
-import gevent
-from gevent.pywsgi import WSGIServer
-from geventwebsocket import WebSocketServer
+from flask_socketio import SocketIO, emit, disconnect
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
@@ -43,26 +40,20 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)  # Enable CORS for cross-origin requests
 
+# Initialize SocketIO with threading support (no gevent)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+
 # Initialize PubChem client
 pubchem_client = PubChemClient(timeout=30)
 
-# Global WebSocket connection registry for immediate notifications
-# calculation_id -> set of websocket connections
+# Global WebSocket connection registry for immediate notifications  
+# calculation_id -> set of session IDs
 active_websockets = {}
 websocket_lock = threading.Lock()
 
 
 def send_immediate_websocket_notification(calculation_id: str, status: str, error_message: str = None):
     """Send immediate WebSocket notification to all connected clients for a calculation."""
-    with websocket_lock:
-        if calculation_id not in active_websockets:
-            return
-        
-        connections = active_websockets[calculation_id].copy()
-    
-    if not connections:
-        return
-        
     # Build complete calculation instance
     try:
         from quantum_calc.file_manager import CalculationFileManager
@@ -91,24 +82,9 @@ def send_immediate_websocket_notification(calculation_id: str, status: str, erro
             if error_message:
                 calculation_instance['error'] = error_message
             
-            message = json.dumps(calculation_instance)
-            
-            # Send to all connected WebSocket clients
-            failed_connections = set()
-            for ws in connections:
-                try:
-                    ws.send(message)
-                except Exception as e:
-                    logger.warning(f"Failed to send immediate notification to WebSocket client: {e}")
-                    failed_connections.add(ws)
-            
-            # Clean up failed connections
-            if failed_connections:
-                with websocket_lock:
-                    if calculation_id in active_websockets:
-                        active_websockets[calculation_id] -= failed_connections
-                        if not active_websockets[calculation_id]:
-                            del active_websockets[calculation_id]
+            # Send to all clients in the calculation room
+            socketio.emit('calculation_update', calculation_instance, room=f'calculation_{calculation_id}')
+            logger.debug(f"Sent immediate notification for calculation {calculation_id} with status {status}")
         else:
             logger.warning(f"Calculation directory not found for immediate notification: {calc_dir}")
             
@@ -801,253 +777,166 @@ def delete_cube_files(calculation_id):
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
-@app.route('/ws/calculations/<calculation_id>')
-def calculation_status_socket(calculation_id):
-    """
-    WebSocket endpoint for efficient, event-driven calculation monitoring.
-    Uses file system event watching instead of polling for better performance.
-    """
-    # Check if this is a WebSocket connection
-    ws = request.environ.get('wsgi.websocket')
-    if not ws:
-        # Not a WebSocket request
-        return jsonify({'error': 'WebSocket connection required'}), 400
+# Flask-SocketIO WebSocket handlers for calculation monitoring
+def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationFileManager) -> Dict:
+    """Build a complete calculation instance from file system data."""
+    try:
+        parameters = file_manager.read_calculation_parameters(calc_path) or {}
+        results = file_manager.read_calculation_results(calc_path)
+        status = file_manager.read_calculation_status(calc_path) or 'unknown'
+        display_name = file_manager._get_display_name(calc_id, parameters)
+        
+        # Safe date retrieval
+        try:
+            creation_date = parameters.get('created_at', 
+                datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
+            updated_date = datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat()
+        except OSError:
+            current_time = datetime.now().isoformat()
+            creation_date = current_time
+            updated_date = current_time
+
+        return {
+            'id': calc_id,
+            'name': display_name,
+            'status': status,
+            'createdAt': creation_date,
+            'updatedAt': updated_date,
+            'parameters': parameters,
+            'results': results,
+            'workingDirectory': calc_path,
+        }
+    except Exception as e:
+        logger.error(f"Error building calculation instance for {calc_id}: {e}")
+        raise
+
+
+@socketio.on('join_calculation')
+def on_join_calculation(data):
+    """Join a calculation room to receive real-time updates."""
+    calculation_id = data.get('calculation_id')
+    if not calculation_id:
+        emit('error', {'error': 'calculation_id is required'})
+        return
+    
+    from flask_socketio import join_room
+    from flask import session
     
     # 一時的IDの場合は特別なログメッセージを出力
     if calculation_id.startswith('new-calculation-'):
-        logger.info(f"WebSocket connection attempt for temporary calculation ID: {calculation_id}")
+        logger.info(f"SocketIO connection attempt for temporary calculation ID: {calculation_id}")
     else:
-        logger.info(f"WebSocket connection established for calculation {calculation_id}")
+        logger.info(f"SocketIO connection established for calculation {calculation_id}")
     
     file_manager = CalculationFileManager()
     calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
-    
-    # State management for the connection
-    connection_active = True
     
     # Calculation directory existence check
     if not os.path.isdir(calc_path):
         # 一時的IDの場合は特別なログメッセージを出力
         if calculation_id.startswith('new-calculation-'):
-            logger.info(f"WebSocket connection attempted for temporary calculation ID: {calculation_id}. Closing connection.")
+            logger.info(f"SocketIO connection attempted for temporary calculation ID: {calculation_id}. Sending error.")
             error_message = f'Temporary calculation ID "{calculation_id}" does not exist on server.'
         else:
             logger.warning(f"Calculation directory not found: {calc_path}")
             error_message = f'Calculation "{calculation_id}" not found.'
         
-        try:
-            ws.send(json.dumps({
-                'error': error_message,
-                'id': calculation_id,
-                'is_temporary': calculation_id.startswith('new-calculation-')
-            }))
-        except Exception as send_error:
-            logger.error(f"Failed to send error message: {send_error}")
-        finally:
-            _close_websocket_safely(ws, calculation_id)
+        emit('error', {
+            'error': error_message,
+            'id': calculation_id,
+            'is_temporary': calculation_id.startswith('new-calculation-')
+        })
         return
 
-    def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationFileManager) -> Dict:
-        """Build a complete calculation instance from file system data."""
-        try:
-            parameters = file_manager.read_calculation_parameters(calc_path) or {}
-            results = file_manager.read_calculation_results(calc_path)
-            status = file_manager.read_calculation_status(calc_path) or 'unknown'
-            display_name = file_manager._get_display_name(calc_id, parameters)
-            
-            # Safe date retrieval
-            try:
-                creation_date = parameters.get('created_at', 
-                    datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
-                updated_date = datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat()
-            except OSError:
-                current_time = datetime.now().isoformat()
-                creation_date = current_time
-                updated_date = current_time
-
-            return {
-                'id': calc_id,
-                'name': display_name,
-                'status': status,
-                'createdAt': creation_date,
-                'updatedAt': updated_date,
-                'parameters': parameters,
-                'results': results,
-                'workingDirectory': calc_path,
-            }
-        except Exception as e:
-            logger.error(f"Error building calculation instance for {calc_id}: {e}")
-            raise
-
+    # Join the calculation room
+    room = f'calculation_{calculation_id}'
+    join_room(room)
+    
+    # Store calculation_id in session for cleanup
+    session['calculation_id'] = calculation_id
+    
+    # Define file change callback for this connection
     def on_file_change(file_data: Dict):
-        """Callback for file system events - sends updated data to WebSocket client."""
-        nonlocal connection_active
-        
-        if not connection_active:
-            return
-        
+        """Callback for file system events - sends updated data to SocketIO client."""
         try:
-            # Build complete calculation instance directly (no gevent.spawn needed)
+            # Build complete calculation instance
             calculation_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
             
-            # Send update to WebSocket client
-            try:
-                ws.send(json.dumps(calculation_instance))
-            except Exception as send_error:
-                logger.error(f"Failed to send WebSocket update for {calculation_id}: {send_error}")
-                connection_active = False
-                return
+            # Send update to all clients in the room
+            socketio.emit('calculation_update', calculation_instance, room=room)
             
-            # Close connection if calculation is finished
+            # Disconnect clients if calculation is finished
             if calculation_instance['status'] in ['completed', 'error']:
-                logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'. Closing WebSocket after brief delay.")
-                connection_active = False
-                # Small delay to ensure client receives the final status update
-                try:
-                    gevent.sleep(0.1)
-                    _close_websocket_safely(ws, calculation_id)
-                except Exception as close_error:
-                    logger.debug(f"Error during delayed WebSocket close for {calculation_id}: {close_error}")
+                logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'.")
+                # Note: Don't force disconnect - let client handle completion
                 
         except Exception as e:
             logger.error(f"Error in file change callback for {calculation_id}: {e}")
-            try:
-                ws.send(json.dumps({
-                    'error': 'Failed to read calculation data',
-                    'id': calculation_id
-                }))
-            except:
-                pass  # Ignore send errors in error handler
-            connection_active = False
+            socketio.emit('error', {
+                'error': 'Failed to read calculation data',
+                'id': calculation_id
+            }, room=room)
 
     try:
-        # Register this WebSocket connection for immediate notifications
-        with websocket_lock:
-            if calculation_id not in active_websockets:
-                active_websockets[calculation_id] = set()
-            active_websockets[calculation_id].add(ws)
-        
         # Initialize file watcher and register this connection
         watcher = get_websocket_watcher(file_manager.get_base_directory())
         watcher.add_connection(calculation_id, on_file_change)
         
         # Send initial state immediately
-        try:
-            initial_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
-            ws.send(json.dumps(initial_instance))
-            logger.info(f"Sent initial state for calculation {calculation_id} (status: {initial_instance['status']})")
-            
-            # If calculation is already finished, close after sending initial state
-            if initial_instance['status'] in ['completed', 'error']:
-                logger.info(f"Calculation {calculation_id} already finished. Closing WebSocket after initial state.")
-                connection_active = False
-                _close_websocket_safely(ws, calculation_id)
-                return
-                
-        except Exception as e:
-            logger.error(f"Error sending initial state for {calculation_id}: {e}")
-            ws.send(json.dumps({
-                'error': 'Failed to read initial calculation data',
-                'id': calculation_id
-            }))
-            connection_active = False
-            return
+        initial_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
+        emit('calculation_update', initial_instance)
+        logger.info(f"Sent initial state for calculation {calculation_id} (status: {initial_instance['status']})")
         
-        # Keep connection alive until client disconnects or calculation completes
-        # The file watcher will trigger on_file_change() when files are modified
-        try:
-            while connection_active:
-                # Use gevent timeout for receive operations
-                try:
-                    with gevent.Timeout(30.0, False):  # 30 second timeout, don't raise
-                        message = ws.receive()
-                        if message is None:
-                            # Client disconnected
-                            logger.info(f"Client disconnected from calculation {calculation_id}")
-                            break
-                except gevent.Timeout:
-                    # Expected timeout - continue the loop
-                    continue
-                except Exception as receive_error:
-                    # Handle various disconnection scenarios with more specific error types
-                    error_msg = str(receive_error).lower()
-                    error_type = type(receive_error).__name__
-                    
-                    # Common gevent-websocket disconnection scenarios
-                    if any(keyword in error_msg for keyword in ['connection', 'closed', 'broken', 'reset', 'socket']):
-                        logger.info(f"Client disconnected from calculation {calculation_id} ({error_type}): {receive_error}")
-                    elif 'websocketerror' in error_type.lower():
-                        logger.info(f"WebSocket protocol error for {calculation_id}: {receive_error}")
-                    else:
-                        logger.debug(f"WebSocket receive error for {calculation_id} ({error_type}): {receive_error}")
-                    break
-                    
-        except Exception as e:
-            logger.error(f"Error in WebSocket receive loop for {calculation_id}: {e}")
-            
-    except WebSocketError as e:
-        logger.error(f"WebSocket communication error for {calculation_id}: {e}")
-    except FileManagerError as e:
-        logger.error(f"File access error in WebSocket for {calculation_id}: {e}")
-    except OSError as e:
-        logger.error(f"System error in WebSocket for {calculation_id}: {e}")
+        # Store callback reference for cleanup
+        session['file_change_callback'] = on_file_change
+        
     except Exception as e:
-        logger.error(f"Unexpected WebSocket error for {calculation_id}: {e}", exc_info=True)
-    finally:
-        # Always clean up the connection
-        connection_active = False
+        logger.error(f"Error setting up SocketIO monitoring for {calculation_id}: {e}")
+        emit('error', {
+            'error': 'Failed to set up calculation monitoring',
+            'id': calculation_id
+        })
+
+
+@socketio.on('leave_calculation') 
+def on_leave_calculation(data):
+    """Leave a calculation room."""
+    calculation_id = data.get('calculation_id')
+    if not calculation_id:
+        return
         
-        # Remove from immediate notification registry
+    from flask_socketio import leave_room
+    from flask import session
+    
+    room = f'calculation_{calculation_id}'
+    leave_room(room)
+    
+    # Clean up file watcher connection
+    if 'file_change_callback' in session:
         try:
-            with websocket_lock:
-                if calculation_id in active_websockets:
-                    active_websockets[calculation_id].discard(ws)
-                    if not active_websockets[calculation_id]:
-                        del active_websockets[calculation_id]
-        except Exception as registry_error:
-            logger.debug(f"Error removing WebSocket from registry for {calculation_id}: {registry_error}")
-        
-        # Remove from file watcher
-        try:
+            file_manager = CalculationFileManager()
             watcher = get_websocket_watcher(file_manager.get_base_directory())
-            watcher.remove_connection(calculation_id, on_file_change)
-        except (AttributeError, RuntimeError) as cleanup_error:
-            # These are expected errors during shutdown or when observer is not available
-            logger.debug(f"Observer cleanup issue for {calculation_id}: {cleanup_error}")
-        except Exception as cleanup_error:
-            logger.error(f"Unexpected error cleaning up file watcher for {calculation_id}: {cleanup_error}")
-        
-        _close_websocket_safely(ws, calculation_id)
+            watcher.remove_connection(calculation_id, session['file_change_callback'])
+        except Exception as e:
+            logger.debug(f"Error cleaning up file watcher for {calculation_id}: {e}")
+    
+    logger.info(f"Client left calculation {calculation_id}")
 
 
-def _close_websocket_safely(ws, calculation_id: str):
-    """Safely close a WebSocket connection with proper logging."""
-    try:
-        # Check various WebSocket state attributes that might exist
-        is_open = True
-        if hasattr(ws, 'closed'):
-            is_open = not ws.closed
-        elif hasattr(ws, 'stream') and hasattr(ws.stream, 'closed'):
-            is_open = not ws.stream.closed
-        elif hasattr(ws, '_closed'):
-            is_open = not ws._closed
-            
-        if is_open:
-            ws.close()  # gevent-websocket doesn't support close codes
-        
-        logger.info(f"WebSocket connection closed for calculation {calculation_id}")
-        
-    except Exception as close_error:
-        # Log different types of close errors appropriately
-        error_msg = str(close_error).lower()
-        error_type = type(close_error).__name__
-        
-        if any(keyword in error_msg for keyword in ['closed', 'broken', 'connection', 'socket']):
-            logger.debug(f"WebSocket already closed for {calculation_id} ({error_type}): {close_error}")
-        elif 'websocketerror' in error_type.lower():
-            logger.debug(f"WebSocket protocol error during close for {calculation_id}: {close_error}")
-        else:
-            logger.warning(f"Error closing WebSocket for {calculation_id} ({error_type}): {close_error}")
+@socketio.on('disconnect')
+def on_disconnect():
+    """Handle client disconnection.""" 
+    from flask import session
+    
+    calculation_id = session.get('calculation_id')
+    if calculation_id and 'file_change_callback' in session:
+        try:
+            file_manager = CalculationFileManager()
+            watcher = get_websocket_watcher(file_manager.get_base_directory())
+            watcher.remove_connection(calculation_id, session['file_change_callback'])
+            logger.info(f"Cleaned up file watcher for disconnected client (calculation {calculation_id})")
+        except Exception as e:
+            logger.debug(f"Error cleaning up file watcher on disconnect for {calculation_id}: {e}")
 
 
 @app.errorhandler(ValidationError)
@@ -1151,12 +1040,20 @@ def not_found(error):
 def method_not_allowed(error):
     return jsonify({'success': False, 'error': 'Method not allowed for this endpoint.'}), 405
 
+def create_app():
+    """Application factory for Gunicorn compatibility."""
+    return app
+
+def create_socketio():
+    """SocketIO factory for Gunicorn compatibility."""
+    return socketio
+
 if __name__ == '__main__':
     host = os.environ.get('FLASK_RUN_HOST', '127.0.0.1')
     port_arg = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     debug = os.environ.get('FLASK_ENV') == 'development'
 
-    # GeventのWSGIServerはポート0を自動割り当てしないため、手動で空きポートを探す
+    # Find available port if not specified
     if port_arg == 0:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind((host, 0))
@@ -1167,15 +1064,13 @@ if __name__ == '__main__':
     # Electronプロセスにポート番号を通知
     print(f"FLASK_SERVER_PORT:{actual_port}", file=sys.stdout, flush=True)
     
-    logger.info(f"Starting API server with gevent-websocket on http://{host}:{actual_port} (Debug: {debug})")
+    logger.info(f"Starting API server with Flask-SocketIO (threading) on http://{host}:{actual_port} (Debug: {debug})")
     
-    # Use WebSocketServer for WebSocket support
-    http_server = WebSocketServer((host, actual_port), app)
+    # Use Flask-SocketIO server with allow_unsafe_werkzeug for development
     try:
-        http_server.serve_forever()
+        socketio.run(app, host=host, port=actual_port, debug=debug, use_reloader=False, allow_unsafe_werkzeug=True)
     except KeyboardInterrupt:
         logger.info("Server stopped by user.")
     finally:
         logger.info("Shutting down server...")
-        http_server.stop()
         cleanup_resources()

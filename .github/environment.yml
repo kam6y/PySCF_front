@@ -12,8 +12,8 @@ dependencies:
   - requests
   - flask-cors
   - pydantic
-  - gevent
   - threadpoolctl
+  - gunicorn
   # Development and testing dependencies
   - pytest
   - pip
@@ -22,11 +22,10 @@ dependencies:
   - pip:
     # Flask extensions
     - flask-pydantic
+    - flask-socketio
     # Code generation and build tools
     - datamodel-code-generator
     - pyinstaller
-    # WebSocket support (unified on gevent-websocket)
-    - gevent-websocket
     # File system monitoring
     - watchdog
     # Security and certificates

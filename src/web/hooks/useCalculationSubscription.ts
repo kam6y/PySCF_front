@@ -1,8 +1,8 @@
 // src/web/hooks/useCalculationSubscription.ts
 
 import { useEffect, useRef, useCallback } from 'react';
+import { io, Socket } from 'socket.io-client';
 import { CalculationInstance } from '../types/api-types';
-import { getWebSocketUrl } from '../apiClient';
 
 export interface UseCalculationSubscriptionOptions {
   calculationId: string | null;
@@ -17,7 +17,7 @@ export const useCalculationSubscription = ({
   onUpdate,
   onError,
 }: UseCalculationSubscriptionOptions) => {
-  const wsRef = useRef<WebSocket | null>(null);
+  const socketRef = useRef<Socket | null>(null);
   const onUpdateRef = useRef(onUpdate);
   const onErrorRef = useRef(onError);
   const currentCalculationIdRef = useRef<string | null>(null);
@@ -39,17 +39,22 @@ export const useCalculationSubscription = ({
 
   const disconnect = useCallback(() => {
     clearDisconnectTimer();
-    if (wsRef.current) {
-      const ws = wsRef.current;
+    if (socketRef.current) {
+      const socket = socketRef.current;
       try {
-        // WebSocketの状態に関係なく、強制的に接続を閉じる
-        if (ws.readyState !== WebSocket.CLOSED) {
-          ws.close();
+        // Leave calculation room if we have an active calculation
+        if (currentCalculationIdRef.current) {
+          socket.emit('leave_calculation', { 
+            calculation_id: currentCalculationIdRef.current 
+          });
         }
+        
+        // Disconnect from Socket.IO server
+        socket.disconnect();
       } catch (error) {
-        console.error('Error closing WebSocket:', error);
+        console.error('Error disconnecting Socket.IO:', error);
       }
-      wsRef.current = null;
+      socketRef.current = null;
     }
     currentCalculationIdRef.current = null;
   }, [clearDisconnectTimer]);
@@ -64,9 +69,8 @@ export const useCalculationSubscription = ({
       // 既に同じIDで接続中の場合は何もしない
       if (
         currentCalculationIdRef.current === calcId &&
-        wsRef.current &&
-        (wsRef.current.readyState === WebSocket.CONNECTING ||
-          wsRef.current.readyState === WebSocket.OPEN)
+        socketRef.current &&
+        socketRef.current.connected
       ) {
         return;
       }
@@ -75,21 +79,26 @@ export const useCalculationSubscription = ({
       disconnect();
 
       try {
-        const wsUrl = getWebSocketUrl(`/ws/calculations/${calcId}`);
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
+        // Get the Flask-SocketIO server URL (always HTTP in Electron)
+        const serverUrl = `http://127.0.0.1:${window.flaskPort}`;
+        
+        // Create Socket.IO connection
+        const socket = io(serverUrl, {
+          transports: ['websocket', 'polling'],
+          timeout: 5000,
+        });
+        
+        socketRef.current = socket;
         currentCalculationIdRef.current = calcId;
 
-        ws.onopen = () => {
-          // WebSocket接続確立
-        };
+        socket.on('connect', () => {
+          console.log('Socket.IO connected, joining calculation room');
+          // Join the calculation room to receive updates
+          socket.emit('join_calculation', { calculation_id: calcId });
+        });
 
-        ws.onmessage = event => {
+        socket.on('calculation_update', (updatedCalculation: CalculationInstance) => {
           try {
-            const updatedCalculation = JSON.parse(
-              event.data
-            ) as CalculationInstance;
-            
             if (onUpdateRef.current) {
               onUpdateRef.current(updatedCalculation);
             }
@@ -105,65 +114,66 @@ export const useCalculationSubscription = ({
               }, 3000);
             }
           } catch (e) {
-            console.error('Failed to parse WebSocket message:', e);
+            console.error('Failed to process calculation update:', e);
             if (onErrorRef.current) {
               onErrorRef.current(
                 'サーバーからの応答が解析できませんでした。計算状況の更新が一時的に停止する可能性があります。'
               );
             }
           }
-        };
+        });
 
-        ws.onerror = event => {
-          console.error('WebSocket error:', event);
+        socket.on('error', (errorData: any) => {
+          console.error('Socket.IO error:', errorData);
           if (onErrorRef.current) {
-            // WebSocketの状態に基づいてより具体的なエラーメッセージを提供
-            let errorMessage = '計算状況の監視に問題が発生しました。';
+            const errorMessage = errorData?.error || '計算状況の監視に問題が発生しました。';
+            onErrorRef.current(errorMessage);
+          }
+        });
 
-            if (ws.readyState === WebSocket.CONNECTING) {
-              errorMessage =
-                'サーバーへの接続に失敗しました。ネットワーク接続を確認してください。';
-            } else if (ws.readyState === WebSocket.OPEN) {
-              errorMessage =
-                'サーバーとの通信が中断されました。計算は継続中ですが、状況の更新が停止しています。';
-            } else if (ws.readyState === WebSocket.CLOSED) {
-              errorMessage =
-                'サーバーとの接続が切断されました。ページを更新して状況を確認してください。';
+        socket.on('connect_error', (error: Error) => {
+          console.error('Socket.IO connection error:', error);
+          if (onErrorRef.current) {
+            let errorMessage = 'サーバーへの接続に失敗しました。ネットワーク接続を確認してください。';
+            
+            if (error.message.includes('timeout')) {
+              errorMessage = '接続がタイムアウトしました。サーバーが起動していない可能性があります。';
+            } else if (error.message.includes('xhr poll error')) {
+              errorMessage = 'サーバーとの通信が中断されました。計算は継続中ですが、状況の更新が停止しています。';
             }
 
             onErrorRef.current(errorMessage);
           }
-        };
+        });
 
-        ws.onclose = event => {
-          console.log(
-            `WebSocket disconnected for calculation ${calcId}`,
-            event.code,
-            event.reason
-          );
-          if (wsRef.current === ws) {
-            wsRef.current = null;
+        socket.on('disconnect', (reason: string) => {
+          console.log(`Socket.IO disconnected for calculation ${calcId}, reason:`, reason);
+          if (socketRef.current === socket) {
+            socketRef.current = null;
           }
           if (currentCalculationIdRef.current === calcId) {
             currentCalculationIdRef.current = null;
           }
-        };
+          
+          // Auto-reconnect for certain disconnect reasons
+          if (reason === 'io server disconnect') {
+            // Server initiated disconnect, likely planned shutdown
+            if (onErrorRef.current) {
+              onErrorRef.current('サーバーとの接続が切断されました。ページを更新して状況を確認してください。');
+            }
+          }
+        });
+
       } catch (error) {
-        console.error('Failed to create WebSocket connection:', error);
+        console.error('Failed to create Socket.IO connection:', error);
         if (onErrorRef.current) {
           let errorMessage = 'リアルタイム監視の開始に失敗しました。';
 
           if (error instanceof Error) {
-            // 特定のエラータイプに基づいてメッセージを調整
-            if (error.name === 'SecurityError') {
-              errorMessage =
-                'セキュリティ設定により接続できませんでした。HTTPSが必要な可能性があります。';
-            } else if (error.name === 'SyntaxError') {
-              errorMessage =
-                'WebSocketのURL形式が無効です。設定を確認してください。';
-            } else if (error.message.includes('network')) {
-              errorMessage =
-                'ネットワークエラーによりサーバーに接続できませんでした。';
+            if (error.message.includes('network')) {
+              errorMessage = 'ネットワークエラーによりサーバーに接続できませんでした。';
+            } else if (error.message.includes('security')) {
+              errorMessage = 'セキュリティ設定により接続できませんでした。HTTPSが必要な可能性があります。';
             }
           }
 
@@ -171,7 +181,7 @@ export const useCalculationSubscription = ({
         }
       }
     },
-    [disconnect]
+    [disconnect, clearDisconnectTimer]
   );
 
   useEffect(() => {
@@ -187,8 +197,8 @@ export const useCalculationSubscription = ({
         connect(calculationId);
       } else if (status === 'completed' || status === 'error') {
         // completed/error状態でも、まだ接続していない場合は接続する
-        // （既に接続している場合は、onmessageハンドラで自動切断タイマーが設定される）
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        // （既に接続している場合は、イベントハンドラで自動切断タイマーが設定される）
+        if (!socketRef.current || !socketRef.current.connected) {
           connect(calculationId);
         }
       } else {
