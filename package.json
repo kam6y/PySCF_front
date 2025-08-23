@@ -16,7 +16,7 @@
     "codegen:python": "cd src/python && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description'",
     "python-exec": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && \"$@\"' --",
     "setup-env": "./scripts/setup-environment.sh",
-    "verify-env": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && python scripts/verify-environment.py'",
+    "verify-env": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/verify-environment.py'",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",

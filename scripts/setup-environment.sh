@@ -105,7 +105,8 @@ conda activate "$ENV_NAME"
 
 # 環境の検証
 log_info "環境の検証を実行中..."
-python -c "
+# conda環境のPythonを直接使用してpyenvの干渉を回避
+$(conda info --base)/envs/$ENV_NAME/bin/python -c "
 import sys
 print(f'Python version: {sys.version}')
 

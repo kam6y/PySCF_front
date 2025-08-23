@@ -174,28 +174,42 @@ def check_conda_environment() -> bool:
     log_info("conda 環境をチェック中...")
     
     try:
-        # conda 環境名の確認
-        conda_env = subprocess.run(
-            ['conda', 'info', '--json'],
-            capture_output=True,
-            text=True,
-            check=True
-        )
+        import os
+        # 環境変数からconda環境名を確認
+        conda_default_env = os.environ.get('CONDA_DEFAULT_ENV')
+        conda_prefix = os.environ.get('CONDA_PREFIX', '')
         
-        import json
-        env_info = json.loads(conda_env.stdout)
-        active_env = env_info.get('active_prefix_name', 'base')
-        
-        if active_env == 'pyscf-env':
-            log_success(f"適切なconda環境がアクティブです: {active_env} ✓")
+        if conda_default_env == 'pyscf-env':
+            log_success(f"適切なconda環境がアクティブです: {conda_default_env} ✓")
+            return True
+        elif 'pyscf-env' in conda_prefix:
+            log_success(f"pyscf-env環境が検出されました: {conda_prefix} ✓")
             return True
         else:
-            log_warning(f"現在のconda環境: {active_env} (pyscf-env が推奨)")
-            return False
+            # condaコマンドを試行（パスが利用可能な場合）
+            try:
+                conda_env = subprocess.run(
+                    ['conda', 'info', '--json'],
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                
+                import json
+                env_info = json.loads(conda_env.stdout)
+                active_env = env_info.get('active_prefix_name', 'base')
+                
+                if active_env == 'pyscf-env':
+                    log_success(f"適切なconda環境がアクティブです: {active_env} ✓")
+                    return True
+                else:
+                    log_warning(f"現在のconda環境: {active_env} (pyscf-env が推奨)")
+                    return False
+                    
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                log_warning(f"conda環境: {conda_default_env or 'unknown'} (環境変数から取得)")
+                return False
             
-    except subprocess.CalledProcessError:
-        log_warning("conda コマンドが利用できません")
-        return False
     except Exception as e:
         log_error(f"conda 環境チェック失敗: {e}")
         return False

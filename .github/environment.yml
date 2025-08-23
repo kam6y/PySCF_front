@@ -15,6 +15,7 @@ dependencies:
   - pydantic
   - threadpoolctl
   - gunicorn
+  - gevent
   # Development and testing dependencies
   - pytest
   - pip
@@ -24,6 +25,7 @@ dependencies:
     # Flask extensions
     - flask-pydantic
     - flask-socketio
+    - flask-sock
     # Code generation and build tools
     - datamodel-code-generator
     - pyinstaller
