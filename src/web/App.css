@@ -23,6 +23,8 @@ body {
   background-color: #ffffff;
 }
 
+/* Old header styles removed - using new macOS-style header */
+
 /* Independent Sidebar Toggle */
 .independent-sidebar-toggle {
   position: fixed;

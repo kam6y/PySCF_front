@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { CalculationInstance } from '../types/api-types';
 import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
 import { MolecularOrbitalEnergyDiagram } from '../components/MolecularOrbitalEnergyDiagram';
-import styles from './CalculationResultsPage.module.css';
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -23,13 +22,23 @@ export const CalculationResultsPage = ({
   useEffect(() => {
     setError(detailsError);
   }, [detailsError]);
-  
+
+  // このuseEffectは不要になったので削除します
+  // useEffect(() => {
+  //   if (activeCalculation && activeCalculation.status === 'running') {
+  //     startPolling();
+  //   } else {
+  //     stopPolling();
+  //   }
+  // }, [activeCalculation, startPolling, stopPolling]);
+
+  // Show loading state
   if (isLoadingDetails) {
     return (
-      <div className={styles.pageContainer}>
-        <div className={styles.pageContent}>
+      <div className="page-container">
+        <div className="page-content">
           <h1>Calculation Results</h1>
-          <div className={styles.loadingContainer}>
+          <div style={{ textAlign: 'center', padding: '20px' }}>
             ⚛️ Loading calculation details...
           </div>
         </div>
@@ -40,10 +49,12 @@ export const CalculationResultsPage = ({
   // Show error state
   if (error) {
     return (
-      <div className={styles.pageContainer}>
-        <div className={styles.pageContent}>
+      <div className="page-container">
+        <div className="page-content">
           <h1>Calculation Results</h1>
-          <div className={styles.errorContainer}>
+          <div
+            style={{ color: '#e74c3c', padding: '20px', textAlign: 'center' }}
+          >
             ❌ {error}
           </div>
         </div>
@@ -54,10 +65,10 @@ export const CalculationResultsPage = ({
   // Show message when no calculation is selected
   if (!activeCalculation) {
     return (
-      <div className={styles.pageContainer}>
-        <div className={styles.pageContent}>
+      <div className="page-container">
+        <div className="page-content">
           <h1>Calculation Results</h1>
-          <div className={styles.noCalculationContainer}>
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
             📊 No calculation selected. Please select a calculation from the
             sidebar to view its results.
           </div>
@@ -78,19 +89,19 @@ export const CalculationResultsPage = ({
     };
 
     return (
-      <div className={styles.pageContainer}>
-        <div className={styles.pageContent}>
+      <div className="page-container">
+        <div className="page-content">
           <h1>Calculation Results</h1>
-          <div className={styles.incompleteCalculationContainer}>
+          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
             {statusMessages[
               activeCalculation.status as keyof typeof statusMessages
             ] || '❓ Calculation results are not available.'}
           </div>
-          <div className={styles.statusInfo}>
+          <div style={{ textAlign: 'center', marginTop: '20px' }}>
             <strong>Calculation:</strong> {activeCalculation.name}
             <br />
             <strong>Status:</strong>{' '}
-            <span className={`${styles.statusBadge} ${activeCalculation.status}`}>
+            <span className={`status-badge ${activeCalculation.status}`}>
               {activeCalculation.status}
             </span>
           </div>
@@ -109,9 +120,22 @@ export const CalculationResultsPage = ({
         <h1>Quantum Chemistry Calculation Results</h1>
 
         {/* Calculation Summary */}
-        <section className={styles.summarySection}>
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#f8f9fa',
+            borderRadius: '8px',
+          }}
+        >
           <h2>Calculation Summary</h2>
-          <div className={styles.gridContainer}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '15px',
+            }}
+          >
             <div>
               <strong>Molecule:</strong> {(parameters as any).name || 'Unknown'}
             </div>
@@ -142,9 +166,16 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Energy Results */}
-        <section className={styles.energySection}>
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#e8f6f3',
+            borderRadius: '8px',
+          }}
+        >
           <h2>Energy Results</h2>
-          <div className={styles.energyResultsText}>
+          <div style={{ fontSize: '18px' }}>
             <strong>SCF Energy:</strong>{' '}
             <code>{results.scf_energy?.toFixed(8) || 'N/A'} hartree</code>
           </div>
@@ -152,18 +183,25 @@ export const CalculationResultsPage = ({
 
         {/* Vibrational Frequency Analysis */}
         {results.frequency_analysis_performed && (
-          <section className={styles.frequencySection}>
+          <section
+            style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#f0f8ff',
+              borderRadius: '8px',
+            }}
+          >
             <h2>Vibrational Frequency Analysis</h2>
             
             {/* Optimization Quality Assessment */}
-            <div className={styles.optimizationStatus}>
+            <div style={{ marginBottom: '15px' }}>
               <strong>Geometry Optimization Status:</strong>{' '}
               {results.imaginary_frequencies_count === 0 ? (
-                <span className={styles.statusSuccess}>✅ Successful (no imaginary frequencies)</span>
+                <span style={{ color: '#059669' }}>✅ Successful (no imaginary frequencies)</span>
               ) : results.imaginary_frequencies_count === 1 ? (
-                <span className={styles.statusWarning}>⚠️ Possible transition state (1 imaginary frequency)</span>
+                <span style={{ color: '#d97706' }}>⚠️ Possible transition state (1 imaginary frequency)</span>
               ) : (
-                <span className={styles.statusError}>❌ Poor optimization ({results.imaginary_frequencies_count} imaginary frequencies)</span>
+                <span style={{ color: '#dc2626' }}>❌ Poor optimization ({results.imaginary_frequencies_count} imaginary frequencies)</span>
               )}
             </div>
             
@@ -171,21 +209,37 @@ export const CalculationResultsPage = ({
             {results.vibrational_frequencies && results.vibrational_frequencies.length > 0 && (
               <div style={{ marginBottom: '15px' }}>
                 <strong>Vibrational Frequencies (cm⁻¹):</strong>
-                <div className={styles.frequenciesDisplay}>
+                <div 
+                  style={{ 
+                    marginTop: '8px',
+                    padding: '10px',
+                    backgroundColor: '#f8fafc',
+                    borderRadius: '4px',
+                    maxHeight: '150px',
+                    overflowY: 'auto',
+                    fontFamily: 'monospace',
+                    fontSize: '14px'
+                  }}
+                >
                   {results.vibrational_frequencies.map((freq, index) => (
-                    <span key={index} className={styles.frequencySpan}>
+                    <span key={index} style={{ marginRight: '12px' }}>
                       {freq.toFixed(1)}
                     </span>
                   ))}
                 </div>
-                <div className={styles.frequenciesNote}>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '5px' }}>
                   Total: {results.vibrational_frequencies.length} normal modes (≥80 cm⁻¹)
                 </div>
               </div>
             )}
             
             {/* Thermochemical Properties */}
-            <div className={styles.thermochemicalGrid}>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+              gap: '15px',
+              fontSize: '14px'
+            }}>
               {results.zero_point_energy !== undefined && results.zero_point_energy !== null && (
                 <div>
                   <strong>Zero-Point Energy:</strong><br />
@@ -221,9 +275,22 @@ export const CalculationResultsPage = ({
         )}
 
         {/* Orbital Information */}
-        <section className={styles.orbitalSection}>
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#fef9e7',
+            borderRadius: '8px',
+          }}
+        >
           <h2>Molecular Orbitals</h2>
-          <div className={styles.orbitalGrid}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+              gap: '15px',
+            }}
+          >
             <div>
               <strong>HOMO Index:</strong> <code>{results.homo_index}</code>
             </div>
@@ -242,9 +309,18 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Molecular Orbital Energy Diagram */}
-        <section className={styles.energyDiagramSection}>
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#fff9e6',
+            borderRadius: '8px',
+          }}
+        >
           <h2>分子軌道エネルギー準位図</h2>
-          <div className={styles.sectionDescription}>
+          <div
+            style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}
+          >
             分子軌道のエネルギー準位を図示します。軌道をクリックすると3D可視化で詳細を確認できます。
           </div>
           <MolecularOrbitalEnergyDiagram
@@ -257,9 +333,18 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Molecular Orbital Visualization */}
-        <section className={styles.orbitalVisualizationSection}>
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#f0f8ff',
+            borderRadius: '8px',
+          }}
+        >
           <h2>分子軌道可視化</h2>
-          <div className={styles.sectionDescription}>
+          <div
+            style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}
+          >
             量子化学計算で得られた分子軌道を3D可視化します。軌道を選択して形状や分布を確認できます。
           </div>
           <MolecularOrbitalViewer
@@ -274,9 +359,22 @@ export const CalculationResultsPage = ({
           results.excitation_energies && (
             <>
               {/* Excited States Summary */}
-              <section className={styles.tddftSummarySection}>
+              <section
+                style={{
+                  marginBottom: '30px',
+                  padding: '20px',
+                  backgroundColor: '#e8f0ff',
+                  borderRadius: '8px',
+                }}
+              >
                 <h2>Excited States Summary</h2>
-                <div className={styles.tddftGrid}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                    gap: '15px',
+                  }}
+                >
                   <div>
                     <strong>Number of States:</strong>{' '}
                     <code>{results.excitation_energies.length}</code>
@@ -301,13 +399,34 @@ export const CalculationResultsPage = ({
               </section>
 
               {/* Excitation Energies Table */}
-              <section className={styles.excitationTableSection}>
+              <section
+                style={{
+                  marginBottom: '30px',
+                  padding: '20px',
+                  backgroundColor: '#fff8dc',
+                  borderRadius: '8px',
+                }}
+              >
                 <h2>Excitation Energies and Transitions</h2>
-                <div className={styles.tableWrapper}>
-                  <table className={styles.dataTable}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table
+                    style={{
+                      width: '100%',
+                      borderCollapse: 'collapse',
+                      backgroundColor: 'white',
+                      borderRadius: '4px',
+                      overflow: 'hidden',
+                    }}
+                  >
                     <thead>
-                      <tr className={styles.tableHeader}>
-                        <th className={styles.tableHeaderCell}>
+                      <tr style={{ backgroundColor: '#f0f8ff' }}>
+                        <th
+                          style={{
+                            padding: '12px',
+                            border: '1px solid #ddd',
+                            textAlign: 'left',
+                          }}
+                        >
                           State
                         </th>
                         <th
@@ -423,14 +542,30 @@ export const CalculationResultsPage = ({
               </section>
 
               {/* UV-Vis Spectrum Visualization */}
-              <section className={styles.spectrumSection}>
+              <section
+                style={{
+                  marginBottom: '30px',
+                  padding: '20px',
+                  backgroundColor: '#f0fff0',
+                  borderRadius: '8px',
+                }}
+              >
                 <h2>UV-Vis Spectrum (Simulated)</h2>
-                <div className={styles.spectrumChart}>
+                <div
+                  style={{
+                    height: '300px',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    backgroundColor: 'white',
+                    position: 'relative',
+                    overflow: 'hidden',
+                  }}
+                >
                   <svg
                     width="100%"
                     height="100%"
                     viewBox="0 0 800 300"
-                    className={styles.svgChart}
+                    style={{ display: 'block' }}
                   >
                     {/* Background Grid */}
                     <defs>
@@ -514,7 +649,14 @@ export const CalculationResultsPage = ({
                     </text>
                   </svg>
                 </div>
-                <div className={styles.spectrumDescription}>
+                <div
+                  style={{
+                    marginTop: '10px',
+                    fontSize: '14px',
+                    color: '#666',
+                    textAlign: 'center',
+                  }}
+                >
                   UV-Vis absorption spectrum showing calculated transitions.
                   Colors represent approximate wavelength regions.
                 </div>
@@ -523,7 +665,14 @@ export const CalculationResultsPage = ({
               {/* Transition Dipole Moments */}
               {results.transition_dipoles &&
                 results.transition_dipoles.length > 0 && (
-                  <section className={styles.dipoleMomentsSection}>
+                  <section
+                    style={{
+                      marginBottom: '30px',
+                      padding: '20px',
+                      backgroundColor: '#fff0f5',
+                      borderRadius: '8px',
+                    }}
+                  >
                     <h2>Transition Dipole Moments</h2>
                     <div style={{ overflowX: 'auto' }}>
                       <table
@@ -943,9 +1092,22 @@ export const CalculationResultsPage = ({
 
         {/* CCSD Results Section */}
         {(parameters.calculation_method === 'CCSD' || parameters.calculation_method === 'CCSD_T') && (
-          <section className={styles.ccsdResultsSection}>
+          <section
+            style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#fff0e8',
+              borderRadius: '8px',
+            }}
+          >
             <h2>CCSD Results</h2>
-            <div className={styles.ccsdGrid}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+                gap: '15px',
+              }}
+            >
               <div>
                 <strong>HF Energy:</strong>{' '}
                 <code>{((results as any).hf_energy || results.scf_energy)?.toFixed(6)} Hartree</code>
@@ -980,7 +1142,7 @@ export const CalculationResultsPage = ({
               )}
             </div>
             {(results as any).frozen_core && (
-              <div className={styles.ccsdNote}>
+              <div style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
                 ℹ️ Frozen core approximation was used in this calculation
               </div>
             )}
@@ -988,7 +1150,14 @@ export const CalculationResultsPage = ({
         )}
 
         {/* Checkpoint File Information */}
-        <section className={styles.checkpointSection}>
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#f0f3ff',
+            borderRadius: '8px',
+          }}
+        >
           <h2>Checkpoint File Information</h2>
           <div>
             <div style={{ marginBottom: '10px' }}>
@@ -1048,9 +1217,22 @@ export const CalculationResultsPage = ({
 
         {/* Mulliken Charges */}
         {results.mulliken_charges && results.mulliken_charges.length > 0 && (
-          <section className={styles.mullikenSection}>
+          <section
+            style={{
+              marginBottom: '30px',
+              padding: '20px',
+              backgroundColor: '#f0fff8',
+              borderRadius: '8px',
+            }}
+          >
             <h2>Mulliken電荷解析</h2>
-            <div className={styles.mullikenDescription}>
+            <div
+              style={{
+                marginBottom: '15px',
+                fontSize: '14px',
+                color: '#666',
+              }}
+            >
               Mulliken人口解析による各原子の部分電荷。正の値は電子不足（正電荷）、負の値は電子過剰（負電荷）を示します。
             </div>
             <div style={{ overflowX: 'auto' }}>
@@ -1168,7 +1350,15 @@ export const CalculationResultsPage = ({
                 </tbody>
               </table>
             </div>
-            <div className={styles.mullikenTotal}>
+            <div
+              style={{
+                marginTop: '15px',
+                padding: '10px',
+                backgroundColor: '#e8f5e8',
+                borderRadius: '4px',
+                fontSize: '14px',
+              }}
+            >
               <strong>合計電荷:</strong>{' '}
               <code>
                 {results.mulliken_charges
@@ -1181,21 +1371,28 @@ export const CalculationResultsPage = ({
         )}
 
         {/* Molecular Structure */}
-        <section className={styles.structureSection}>
+        <section
+          style={{
+            marginBottom: '30px',
+            padding: '20px',
+            backgroundColor: '#fff5f5',
+            borderRadius: '8px',
+          }}
+        >
           {(parameters.calculation_method === 'HF' || 
             parameters.calculation_method === 'MP2' || 
             parameters.calculation_method === 'CCSD' || 
             parameters.calculation_method === 'CCSD_T') ? (
             <>
               <h2>HF-Optimized Geometry</h2>
-              <div className={styles.structureDescription}>
+              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
                 ℹ️ Geometry optimized using Hartree-Fock method
               </div>
             </>
           ) : (
             <>
               <h2>DFT-Optimized Geometry</h2>
-              <div className={styles.structureDescription}>
+              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
                 ℹ️ Geometry optimized using DFT method
               </div>
             </>
@@ -1205,16 +1402,39 @@ export const CalculationResultsPage = ({
           </div>
           <div style={{ marginTop: '15px' }}>
             <strong>XYZ Coordinates:</strong>
-            <pre className={styles.structureCoordinates}>
+            <pre
+              style={{
+                backgroundColor: '#f8f8f8',
+                padding: '15px',
+                borderRadius: '4px',
+                overflow: 'auto',
+                fontSize: '14px',
+                fontFamily: 'monospace',
+                border: '1px solid #ddd',
+                marginTop: '10px',
+              }}
+            >
               {results.optimized_geometry}
             </pre>
           </div>
         </section>
 
         {/* Calculation Parameters */}
-        <section className={styles.parametersSection}>
+        <section
+          style={{
+            padding: '20px',
+            backgroundColor: '#f5f5f5',
+            borderRadius: '8px',
+          }}
+        >
           <h2>Calculation Parameters</h2>
-          <div className={styles.parametersGrid}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '15px',
+            }}
+          >
             <div>
               <strong>Max SCF Cycles:</strong> {results.max_cycle}
             </div>
