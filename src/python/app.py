@@ -45,10 +45,10 @@ def load_server_config():
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
         
-        logger.info(f"Loaded server configuration from: {config_path}")
+        print(f"Loaded server configuration from: {config_path}")
         return config
     except Exception as e:
-        logger.warning(f"Failed to load server configuration: {e}. Using defaults.")
+        print(f"WARNING: Failed to load server configuration: {e}. Using defaults.")
         # Return default configuration
         return {
             "server": {"host": "127.0.0.1", "port": {"default": 5000, "auto_detect": True}},
