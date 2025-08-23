@@ -25,7 +25,7 @@ Development Commands
 ## Initial Setup
 
 ### Conda Environment (Required)
-This project requires conda environment for development. The application now features automated environment setup and verification tools.
+This project requires conda environment for development. The application features automated environment setup and verification tools, and uses a unified server configuration system for consistent behavior across development and production environments.
 
 #### Quick Setup (Recommended)
 ```bash
@@ -37,6 +37,9 @@ npm run setup-env
 
 # Verify environment health
 npm run verify-env
+
+# Check server configuration
+npm run debug:config
 ```
 
 #### Manual Setup
@@ -86,6 +89,9 @@ npm run setup-env
 
 # Verify environment health and dependencies
 npm run verify-env
+
+# Debug server configuration
+npm run debug:config
 ```
 
 ### Build Commands
@@ -105,24 +111,40 @@ npm run dev:electron
 # Package conda environment for distribution
 npm run build:conda-pack
 
-# --- Python Backend Development (in a separate terminal) ---
-cd src/python
-
-# Activate conda environment (if using conda)
-conda activate pyscf-env
-
-# Start Flask API server
-python app.py
-
-# Run Python backend tests
-pytest tests/
-
 # Build Python executable only (uses PyInstaller)
 npm run build:python
 
 # Code formatting (using Prettier)
 npm run format      # Format all source code
 npm run format:check # Check if code is properly formatted
+```
+
+### Testing and Validation Commands
+```bash
+# Complete build test (frontend + backend)
+npm run test:build
+
+# Test Python imports and dependencies
+npm run test:python-build
+
+# Test Gunicorn server locally with unified configuration
+npm run test:gunicorn-local
+
+# Full packaging test (build + package)
+npm run test:run-packaged
+
+# --- Manual Python Backend Testing (in a separate terminal) ---
+cd src/python
+
+# Activate conda environment (if using conda)
+conda activate pyscf-env
+
+# Start Flask API server directly
+python app.py
+
+# Run Python backend tests
+pytest tests/
+```
 
 Development Workflow
 The npm run dev script is the primary command for development. It automatically:
@@ -133,9 +155,22 @@ Cleans: Cleans the dist/ directory.
 
 Builds Frontend: Builds the frontend code (main process, preload script, and renderer) using Webpack in watch mode.
 
-Starts Backend: Starts the Python Flask server as a subprocess from within the Electron main process.
+Starts Backend: Starts the Python Flask server as a subprocess from within the Electron main process using the unified Gunicorn-based execution system.
 
 Starts Electron: Starts the Electron application using electronmon, which watches the dist/ directory for changes and automatically restarts the app.
+
+## Unified Server Configuration System
+
+The application uses a configuration-driven approach with `config/server-config.json` to ensure consistent behavior across development and production environments:
+
+**Configuration File Structure:**
+- Server settings (host, port, auto-detection)
+- Gunicorn configuration (workers, threads, timeout settings)
+- SocketIO settings (CORS, async mode, timeouts)
+- Environment-specific settings (development/production flags)
+- Logging configuration
+
+**Unified Execution Environment:** Both development and production environments now use Gunicorn as the WSGI server, eliminating the "works in dev but not in production" problem. The main process (src/main.ts) reads the same configuration file and applies identical server settings.
 
 The Electron main process (src/main.ts) launches the Python Flask server using an enhanced environment detection system. The `detectPythonEnvironmentPath` function implements a hierarchical detection strategy:
 
@@ -146,7 +181,7 @@ The Electron main process (src/main.ts) launches the Python Flask server using a
 
 **Health Check System:** The main process includes a robust health check mechanism that continuously pings the `/health` endpoint with detailed diagnostic information. If the server fails to start, it provides context-specific error messages with troubleshooting guidance.
 
-**Dynamic Port Management:** The Flask server automatically finds a free port and reports it to the main process via stdout, ensuring no port conflicts.
+**Unified Port Management:** Both development and production use the same port detection logic based on the configuration file, with automatic port finding within specified ranges.
 
 Architecture Overview
 API-First Development with OpenAPI
@@ -198,20 +233,28 @@ Exclusions: Auto-generated files (like generated-api.ts and generated_models.py)
 Build System
 Frontend: Uses Webpack with ts-loader to compile TypeScript and React code into three separate bundles: main.js, preload.js, and the renderer's app.js.
 
-Backend: Implements a dual-packaging strategy for maximum compatibility:
-1. **conda-pack Integration**: Packages the complete conda environment (including PySCF, RDKit, and all dependencies) into a portable format using `npm run build:conda-pack`. This creates a `conda_env/` directory that can be bundled with the application.
-2. **PyInstaller Executable**: Bundles the Flask application into a standalone executable as a fallback option.
+Backend: Implements a dual-packaging strategy with unified Gunicorn-based execution:
+1. **conda-pack Integration**: Packages the complete conda environment (including PySCF, RDKit, Gunicorn, and all dependencies) into a portable format using `npm run build:conda-pack`. This creates a `conda_env/` directory that can be bundled with the application.
+2. **PyInstaller Executable**: Bundles the Flask application and Gunicorn into a standalone executable with enhanced dependency inclusion.
 
-Packaging: electron-builder packages the Electron app with both Python environments (included as extraResources):
+**Unified Server Configuration**: Both packaging methods include the `config/server-config.json` file to ensure identical server behavior across environments.
+
+Packaging: electron-builder packages the Electron app with both Python environments and configuration (included as extraResources):
 - `conda_env/` - Complete portable conda environment (primary)
-- `python_dist/` - PyInstaller executable (fallback)
+- `python_dist/` - PyInstaller executable with Gunicorn support (fallback)
+- `config/` - Server configuration files
 - Distributable formats: DMG for macOS, NSIS for Windows, AppImage for Linux
 
-**Build Process Flow:**
-1. `npm run build:conda-pack` - Packages conda environment
-2. `npm run build:python` - Creates PyInstaller executable  
+**Enhanced Build Process Flow:**
+1. `npm run build:conda-pack` - Packages conda environment with Gunicorn
+2. `npm run build:python` - Creates PyInstaller executable with enhanced dependencies
 3. `npm run build:webpack` - Builds frontend
-4. `electron-builder` - Creates final distributable with both environments
+4. `electron-builder` - Creates final distributable with unified execution environment
+
+**Testing and Validation:**
+- `npm run test:build` - Complete build verification
+- `npm run test:gunicorn-local` - Local Gunicorn testing
+- `npm run test:run-packaged` - Full packaging validation
 
 Core Components & State Management
 
@@ -290,6 +333,8 @@ File Structure
 ├── README.md
 ├── package-lock.json
 ├── package.json
+├── config
+    └── server-config.json
 ├── scripts
     ├── setup-environment.sh
     └── verify-environment.py
@@ -309,10 +354,13 @@ File Structure
     │   │   ├── __init__.py
     │   │   └── smiles_converter.py
     │   ├── app.py
+    │   ├── config
+    │   │   └── server-config.json
     │   ├── data
     │   │   ├── __init__.py
     │   │   └── solvent_properties.py
     │   ├── generated_models.py
+    │   ├── pyscf_front_api.spec
     │   ├── pubchem
     │   │   ├── __init__.py
     │   │   ├── client.py
@@ -446,33 +494,45 @@ This command provides comprehensive diagnostic information and specific troubles
 
 ## Development Server Issues
 
-**Backend Server Fails to Start:** The enhanced error system now provides detailed diagnostic information:
-- **Development mode**: Check conda environment and dependencies
-- **Packaged mode**: Verify bundled environment integrity
-- The Flask server automatically finds free ports, but firewall settings may interfere
+**Backend Server Fails to Start:** The unified execution environment provides consistent error reporting:
+- **All environments**: Unified Gunicorn-based server reduces environment-specific issues
+- **Configuration-driven**: Server behavior controlled by `config/server-config.json`
+- **Enhanced diagnostics**: Detailed error messages with configuration context
+- The server automatically finds free ports based on configuration settings
 
 **Environment Health Check Failures:** The application performs extensive health checks:
 - Python version compatibility (3.10+)
-- Required packages (PySCF, RDKit, Flask, etc.)
+- Required packages (PySCF, RDKit, Flask, Gunicorn, etc.)
 - Functional tests for critical dependencies
 - Port availability and network configuration
+- Server configuration validation
+
+**Environment Consistency Issues:** The unified server configuration system eliminates common deployment problems:
+- **Development vs. Production consistency**: Both environments use identical Gunicorn configuration
+- **"Works in dev but not in production" issue**: Resolved through unified execution environment
+- **Configuration validation**: Use `npm run debug:config` to verify server settings
 
 ## Build and Packaging Issues
 
-**Build Failures:** The dual-packaging system requires:
-1. Working conda environment for conda-pack
-2. All dependencies installed for PyInstaller
-3. Check `build/pyinstaller/` directory for detailed logs
+**Build Failures:** The enhanced dual-packaging system requires:
+1. Working conda environment with all dependencies (including Gunicorn)
+2. All dependencies properly configured for PyInstaller
+3. Valid server configuration file at `config/server-config.json`
+4. Check `build/pyinstaller/` directory for detailed logs
 
 **PyInstaller Specific Issues:** 
+- Enhanced dependency inclusion for Gunicorn and related WSGI components
 - Sensitive to Python environment changes
 - Requires all dependencies to be importable
 - Check for missing hidden imports in `pyscf_front_api.spec`
+- Verify Gunicorn-related modules are properly bundled
 
 **Packaging Verification:** After packaging, verify both environments:
-- Test bundled conda environment path
-- Confirm PyInstaller executable functionality
-- Check extraResources in electron-builder output
+- Test bundled conda environment path and Gunicorn availability
+- Confirm PyInstaller executable functionality with unified server
+- Validate server configuration inclusion
+- Use `npm run test:run-packaged` for comprehensive testing
+- Check extraResources in electron-builder output include config files
 
 ## Runtime Issues
 
@@ -488,11 +548,21 @@ This command provides comprehensive diagnostic information and specific troubles
 **Environment Validation Tools:**
 - `npm run verify-env` - Comprehensive environment testing
 - `npm run setup-env` - Automated environment creation and repair
+- `npm run debug:config` - Server configuration validation
 - Console output provides detailed diagnostic information
 - Health check system reports specific failure points
 
+**Build and Testing Tools:**
+- `npm run test:build` - Complete build verification
+- `npm run test:python-build` - Python dependency testing
+- `npm run test:gunicorn-local` - Local server testing with unified configuration
+- `npm run test:run-packaged` - Full packaging validation
+
 **Debugging Tips:**
+- Use unified configuration testing commands to verify server settings
 - Enable verbose logging in development mode
 - Check both stdout and stderr from Python processes
 - Monitor resource usage during conda-pack operations
 - Verify file permissions for packaged environments
+- Test Gunicorn functionality locally before packaging
+- Validate server configuration file syntax and completeness

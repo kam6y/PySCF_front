@@ -19,7 +19,12 @@
     "verify-env": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && python scripts/verify-environment.py'",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
+    "test:build": "npm run build && echo 'Build completed successfully. Testing packaged app...'",
+    "test:python-build": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && cd src/python && echo \"Testing Python build...\" && python -c \"import app; print(\\\"Python app imports successfully\\\")\"'",
+    "test:run-packaged": "npm run build && npm run package && echo 'Package created. Check dist/ directory for distributable files.'",
+    "test:gunicorn-local": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && cd src/python && echo \"Testing Gunicorn locally...\" && gunicorn --bind 127.0.0.1:5000 --workers 1 --threads 4 --timeout 0 --log-level info --preload app:app'",
+    "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\""
   },
   "repository": {
     "type": "git",
@@ -90,6 +95,13 @@
       {
         "from": "conda_env",
         "to": "conda_env",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "config",
+        "to": "config",
         "filter": [
           "**/*"
         ]

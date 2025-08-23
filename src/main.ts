@@ -12,8 +12,50 @@ let mainWindow: BrowserWindow;
 let pythonProcess: ChildProcess | null = null;
 let flaskPort: number | null = null;
 let isQuitting = false;
+let serverConfig: any = null;
 
 const execFilePromise = promisify(execFile);
+
+/**
+ * サーバー設定を読み込む
+ */
+const loadServerConfig = (): any => {
+  try {
+    // 開発環境では config/ ディレクトリから読み込み
+    let configPath = path.join(__dirname, '..', 'config', 'server-config.json');
+    
+    // パッケージ環境では同梱された設定ファイルを使用
+    if (app.isPackaged) {
+      configPath = path.join(process.resourcesPath, 'config', 'server-config.json');
+      // フォールバック: python_distディレクトリ内の設定
+      if (!fs.existsSync(configPath)) {
+        configPath = path.join(process.resourcesPath, 'python_dist', 'pyscf_front_api', 'config', 'server-config.json');
+      }
+    }
+    
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      const config = JSON.parse(configContent);
+      console.log(`Loaded server configuration from: ${configPath}`);
+      return config;
+    } else {
+      console.log(`Configuration file not found at: ${configPath}. Using defaults.`);
+    }
+  } catch (error) {
+    console.log(`Failed to load server configuration: ${error}. Using defaults.`);
+  }
+  
+  // デフォルト設定を返す
+  return {
+    server: { host: '127.0.0.1', port: { default: 5000, auto_detect: true, range: { start: 5000, end: 5100 } } },
+    gunicorn: { workers: 1, threads: 4, timeout: 0, worker_class: 'sync', keep_alive: 30, log_level: 'info' },
+    production: { use_gunicorn: true },
+    development: { debug: false }
+  };
+};
+
+// グローバル設定を読み込み
+serverConfig = loadServerConfig();
 
 /**
  * condaコマンドを実行し、成功すれば出力を返す
@@ -216,13 +258,41 @@ const checkServerHealth = (
 };
 
 /**
- * Python/Flaskサーバーを起動する関数
- * app.isPackaged の値に応じて、開発モードとパッケージ後で起動方法を切り替える
+ * ポート検出を行う統一関数
+ */
+const findAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
+  const net = require('net');
+  
+  for (let port = startPort; port <= endPort; port++) {
+    try {
+      await new Promise((resolve, reject) => {
+        const server = net.createServer();
+        server.listen(port, '127.0.0.1', () => {
+          server.close(resolve);
+        });
+        server.on('error', reject);
+      });
+      return port;
+    } catch (error) {
+      // Port is in use, try next
+      continue;
+    }
+  }
+  throw new Error(`No available port found in range ${startPort}-${endPort}`);
+};
+
+/**
+ * Python/Flaskサーバーを起動する統一関数
+ * 設定ファイルに基づいて開発・本番環境で同一の起動方法を使用
  */
 const startPythonServer = async (): Promise<void> => {
   return new Promise(async (resolve, reject) => {
     console.log('Starting Python Flask server...');
-
+    
+    const serverSettings = serverConfig.server;
+    const gunicornSettings = serverConfig.gunicorn;
+    const productionSettings = serverConfig.production;
+    
     // 統一されたPython環境検出
     const pythonExecutablePath = await detectPythonEnvironmentPath();
     if (!pythonExecutablePath) {
@@ -243,61 +313,71 @@ const startPythonServer = async (): Promise<void> => {
 
     console.log(`Using Python environment: ${pythonExecutablePath}`);
 
-    // パッケージ時：実行ファイルを直接実行
-    if (app.isPackaged) {
-      pythonProcess = spawn(pythonExecutablePath, [], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-    } else {
-      // 開発時：Gunicornを使用してFlask-SocketIOアプリケーションを実行
-      const pythonPath = path.join(__dirname, '..', 'src', 'python');
-      
-      // Find available port for Gunicorn
-      let gunicornPort = 5000; // Default fallback
+    // 統一されたポート決定ロジック
+    let serverPort: number;
+    if (serverSettings.port.auto_detect) {
       try {
-        const net = require('net');
-        const server = net.createServer();
-        await new Promise((resolve, reject) => {
-          server.listen(0, '127.0.0.1', () => {
-            gunicornPort = (server.address() as any).port;
-            server.close(resolve);
-          });
-          server.on('error', reject);
-        });
+        serverPort = await findAvailablePort(
+          serverSettings.port.default,
+          serverSettings.port.range.end
+        );
       } catch (error) {
-        console.log('Could not detect free port, using default 5000');
+        console.log(`Failed to find available port: ${error}. Using default: ${serverSettings.port.default}`);
+        serverPort = serverSettings.port.default;
       }
+    } else {
+      serverPort = serverSettings.port.default;
+    }
+    
+    flaskPort = serverPort;
+    console.log(`Using server port: ${serverPort}`);
 
-      // Set the port for Electron to use
-      flaskPort = gunicornPort;
-      console.log(`Using Gunicorn port: ${gunicornPort}`);
-
-      // Start Gunicorn with Flask-SocketIO app for long-running quantum calculations
-      pythonProcess = spawn(pythonExecutablePath, [
+    // Python作業ディレクトリの決定
+    const pythonPath = app.isPackaged 
+      ? path.dirname(pythonExecutablePath)  // パッケージ時はPython実行ファイルと同じディレクトリ
+      : path.join(__dirname, '..', 'src', 'python');  // 開発時
+    
+    // 本番環境でもGunicornを使用する統一ロジック
+    if (productionSettings.use_gunicorn) {
+      console.log('Starting server with Gunicorn (unified mode)');
+      
+      const gunicornArgs = [
         '-m', 'gunicorn',
-        '--workers', '1',
-        '--threads', '4',
-        '--worker-class', 'sync',
-        '--bind', `127.0.0.1:${gunicornPort}`,
-        '--timeout', '0',        // 0 = disable timeout for long quantum calculations
-        '--keep-alive', '30',
+        '--workers', String(gunicornSettings.workers),
+        '--threads', String(gunicornSettings.threads),
+        '--worker-class', gunicornSettings.worker_class,
+        '--bind', `${serverSettings.host}:${serverPort}`,
+        '--timeout', String(gunicornSettings.timeout),
+        '--keep-alive', String(gunicornSettings.keep_alive),
         '--access-logfile', '-',
-        '--log-level', 'info',
+        '--log-level', gunicornSettings.log_level,
         '--preload',
         'app:app'  // Flask application (not socketio object)
-      ], {
+      ];
+      
+      console.log(`Gunicorn command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`);
+      
+      pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env, CONDA_DEFAULT_ENV: 'pyscf-env' },
       });
-
-      // For Gunicorn, start health check immediately since port is predetermined
+      
+      // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
       setTimeout(() => {
-        if (flaskPort) {
-          console.log(`Starting health check for Gunicorn server on port ${flaskPort}`);
-          checkServerHealth(flaskPort).then(resolve).catch(reject);
-        }
-      }, 2000); // Give Gunicorn a moment to start up
+        console.log(`Starting health check for Gunicorn server on port ${flaskPort}`);
+        checkServerHealth(flaskPort!).then(resolve).catch(reject);
+      }, 2000);
+      
+    } else {
+      // フォールバック: 直接実行（設定でGunicorn無効時のみ）
+      console.log('Starting server with direct execution (fallback mode)');
+      pythonProcess = spawn(pythonExecutablePath, [], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      
+      // 直接実行時は実行時ポート検出を使用
+      // （startPythonServer関数の残りの部分で処理）
     }
 
     // stdout/stderrのログ出力
@@ -305,13 +385,12 @@ const startPythonServer = async (): Promise<void> => {
       const output = data.toString().trim();
       console.log(`Python server: ${output}`);
       
-      // パッケージ時のみポート検出を実行（Gunicorn使用時は事前に決定済み）
-      if (app.isPackaged) {
-        // Pythonサーバーからポート番号を受け取る
+      // 直接実行モード（フォールバック）でのポート検出
+      if (!productionSettings.use_gunicorn) {
         const match = output.match(/FLASK_SERVER_PORT:(\d+)/);
         if (match && match[1]) {
           flaskPort = parseInt(match[1], 10);
-          console.log(`Detected Flask server port: ${flaskPort}`);
+          console.log(`Detected Flask server port from direct execution: ${flaskPort}`);
           // ヘルスチェックを開始してサーバー起動を待つ
           checkServerHealth(flaskPort).then(resolve).catch(reject);
         }
