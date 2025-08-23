@@ -38,10 +38,24 @@ const common: Configuration = {
         loader: "ts-loader",
       },
       {
-        // 拡張子 ".css" （正規表現）のファイル
+        // CSS modules用（.module.css）
+        test: /\.module\.css$/,
+        use: [
+          MiniCssExtractPlugin.loader,
+          {
+            loader: "css-loader",
+            options: {
+              modules: {
+                localIdentName: "[name]__[local]___[hash:base64:5]",
+              },
+            },
+          },
+        ],
+      },
+      {
+        // 通常のCSS用（.css）
         test: /\.css$/,
-        // use 配列に指定したローダーは *最後尾から* 順に適用される
-        // セキュリティ対策のため style-loader は使用しない
+        exclude: /\.module\.css$/,
         use: [MiniCssExtractPlugin.loader, "css-loader"],
       },
       {
