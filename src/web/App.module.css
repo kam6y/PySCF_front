@@ -1,0 +1,49 @@
+/* App Container */
+.appContainer {
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  background-color: #ffffff;
+}
+
+/* Independent Sidebar Toggle */
+.independentSidebarToggle {
+  position: fixed;
+  top: 6px;
+  left: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: white;
+  border: none;
+  border-radius: 16px;
+  color: #50D4F5;
+  cursor: pointer;
+  transition: all 0.3s ease-out;
+  z-index: 1002;
+}
+
+.independentSidebarToggle:hover {
+  transform: scale(1.05);
+}
+
+.independentSidebarToggle.sidebarOpen {
+  background: #50D4F5;
+  color: white;
+}
+
+.independentSidebarToggle.sidebarOpen:hover {
+  background: #45c1e8;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.4);
+}
+
+/* Main Content with Sidebar */
+.appContent {
+  max-width: calc(100vw - 104px);
+  margin: auto;
+  width: 100%;
+  transition: margin-left 0.3s ease-out;
+}

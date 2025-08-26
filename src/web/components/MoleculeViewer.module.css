@@ -1,0 +1,15 @@
+/* MoleculeViewer Component Styles */
+
+.moleculeViewer {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.moleculeViewer:hover {
+  border-color: #50D4F5;
+  box-shadow: 0 2px 8px rgba(80, 212, 245, 0.1);
+}

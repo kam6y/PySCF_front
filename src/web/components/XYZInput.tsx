@@ -4,6 +4,7 @@ import {
   getSampleXYZData,
   XYZValidationResult,
 } from '../utils/xyzParser';
+import styles from './XYZInput.module.css';
 
 export interface XYZInputProps {
   onXYZChange: (xyzData: string, isValid: boolean) => void;
@@ -74,7 +75,7 @@ export const XYZInput: React.FC<XYZInputProps> = ({
   };
 
   return (
-    <div className={`xyz-input-container ${className}`}>
+    <div className={`${styles.xyzInputContainer} ${className}`}>
       <textarea
         id="xyz-textarea"
         value={xyzInput}
@@ -85,24 +86,24 @@ O   0.000000   0.000000   0.119262
 H   0.000000   0.763239  -0.477047
 H   0.000000  -0.763239  -0.477047
 `}
-        className="xyz-textarea"
+        className={styles.xyzTextarea}
       />
 
       {/* Validation Status */}
-      <div className="xyz-validation-status">
+      <div className={styles.xyzValidationStatus}>
         {isValidating && (
-          <div className="validation-message validating">⏳ Validating...</div>
+          <div className={`${styles.validationMessage} ${styles.validating}`}>⏳ Validating...</div>
         )}
 
         {validationResult && !isValidating && (
           <>
             {validationResult.isValid ? (
-              <div className="validation-message valid">
+              <div className={`${styles.validationMessage} ${styles.valid}`}>
                 ✅ Valid XYZ data - {validationResult.data?.numAtoms} atoms
                 detected
               </div>
             ) : (
-              <div className="validation-message invalid">
+              <div className={`${styles.validationMessage} ${styles.invalid}`}>
                 ❌ {validationResult.error}
               </div>
             )}
@@ -111,10 +112,10 @@ H   0.000000  -0.763239  -0.477047
       </div>
 
       {/* Format Help Link */}
-      <div className="xyz-format-help">
+      <div className={styles.xyzFormatHelp}>
         <a
           href="#"
-          className="format-help-link"
+          className={styles.formatHelpLink}
           onClick={e => {
             e.preventDefault();
             const details =
@@ -127,9 +128,9 @@ H   0.000000  -0.763239  -0.477047
           ▶ XYZ Format Help
         </a>
 
-        <details className="format-help-details">
-          <summary className="format-help-summary"></summary>
-          <div className="format-help-content">
+        <details className={styles.formatHelpDetails}>
+          <summary className={styles.formatHelpSummary}></summary>
+          <div className={styles.formatHelpContent}>
             <p>
               <strong>XYZ format structure:</strong>
             </p>
@@ -143,7 +144,7 @@ H   0.000000  -0.763239  -0.477047
             <p>
               <strong>Example:</strong>
             </p>
-            <pre className="format-example">
+            <pre className={styles.formatExample}>
               {`3
 Water molecule
 O   0.000000   0.000000   0.119262

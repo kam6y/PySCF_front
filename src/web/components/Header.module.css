@@ -1,0 +1,115 @@
+/* Header Styles */
+.appHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.headerContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 40px;
+  background: #50D4F5;
+  color: #333;
+  padding: 0 16px;
+  padding-left: env(titlebar-area-x, 16px);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 1000;
+  -webkit-app-region: drag;
+  transition: all 0.3s ease-out;
+}
+
+.headerContainer.sidebarOpen {
+  margin-left: 25dvw;
+  padding: 16px;
+}
+
+/* Header Left Section */
+.headerLeft {
+  display: flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.appTitle {
+  margin-left: 56px;
+  font-size: 24px;
+  font-family: 'ADLaM', sans-serif;
+  font-weight: 600;
+  color: white;
+  transition: margin-left 0.3s ease-out;
+}
+
+/* Reduce title margin when sidebar is open */
+.headerContainer.sidebarOpen .appTitle {
+  margin-left: 0px;
+}
+
+/* Header Right Section */
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.dropdownButton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: white;
+  border: none;
+  border-radius: 6px;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.dropdownButton:hover,
+.dropdownButton.active {
+  background: rgba(255,255,255,0.9);
+  transform: scale(1.02);
+}
+
+.active {
+  background: rgba(255,255,255,0.9);
+  transform: scale(1.02);
+}
+
+.dropdownArrow {
+  transition: transform 0.2s ease;
+}
+
+.dropdownArrow.open {
+  transform: rotate(180deg);
+}
+
+.open {
+  transform: rotate(180deg);
+}
+
+.plusButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: none;
+  border-radius: 6px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.plusButton:hover {
+  background: rgba(255,255,255,0.9);
+  transform: scale(1.05);
+}

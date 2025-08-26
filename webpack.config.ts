@@ -38,8 +38,26 @@ const common: Configuration = {
         loader: "ts-loader",
       },
       {
-        // 拡張子 ".css" （正規表現）のファイル
+        // CSS Module files (.module.css)
+        test: /\.module\.css$/,
+        use: [
+          MiniCssExtractPlugin.loader,
+          {
+            loader: "css-loader",
+            options: {
+              modules: {
+                localIdentName: '[name]__[local]___[hash:base64:5]',
+                exportLocalsConvention: 'camelCase',
+                namedExport: false
+              },
+            },
+          },
+        ],
+      },
+      {
+        // 通常の拡張子 ".css" （正規表現）のファイル（.module.cssは除外）
         test: /\.css$/,
+        exclude: /\.module\.css$/,
         // use 配列に指定したローダーは *最後尾から* 順に適用される
         // セキュリティ対策のため style-loader は使用しない
         use: [MiniCssExtractPlugin.loader, "css-loader"],

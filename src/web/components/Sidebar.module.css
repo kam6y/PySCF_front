@@ -1,0 +1,215 @@
+/* Sidebar Styles */
+
+/* Backdrop */
+.sidebarBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.3);
+  z-index: 998;
+  animation: backdropFadeIn 0.3s ease-out;
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Sidebar Panel */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 25dvw;
+  background: white;
+  transform: translateX(-100%);
+  transition: transform 0.3s ease-out;
+  z-index: 1001;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+  box-shadow: 2px 0 8px rgba(0,0,0,0.4);
+}
+
+/* Sidebar Content */
+.sidebarContent {
+  padding: 20px;
+  padding-top: 60px; /* Account for header height (40px) + extra spacing */
+  height: 100%;
+  overflow-y: auto;
+}
+
+.sidebarHeader {
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.sidebarHeader h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Calculations Section */
+.sidebarCalculations {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Loading/Error/Empty States */
+.sidebarLoading,
+.sidebarError,
+.sidebarEmpty {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+.sidebarError {
+  color: #e74c3c;
+}
+
+.sidebarEmpty p {
+  margin: 5px 0;
+  font-size: 14px;
+}
+
+/* Calculation Items */
+.sidebarCalculationItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebarCalculationItem:hover {
+  background: #f8f9fa;
+  border-color: #50D4F5;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.sidebarCalculationItem.active {
+  background: #e3f2fd;
+  border-color: #50D4F5;
+  box-shadow: 0 2px 8px rgba(80, 212, 245, 0.2);
+}
+
+/* Calculation Info */
+.calculationInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.calculationName {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calculationMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.calculationDate {
+  font-size: 12px;
+  color: #666;
+}
+
+.calculationStatus {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Status Badge */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.statusIcon {
+  font-size: 8px;
+}
+
+.statusLabel {
+  font-size: 10px;
+}
+
+/* Status Colors */
+.statusPending {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.statusRunning {
+  background: #cce5ff;
+  color: #0066cc;
+}
+
+.statusCompleted {
+  background: #d4edda;
+  color: #155724;
+}
+
+.statusError {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.statusUnknown {
+  background: #f8f9fa;
+  color: #666;
+}
+
+/* Calculation Actions */
+.calculationActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.deleteBtn:hover {
+  background: rgba(220, 53, 69, 0.1);
+  transform: scale(1.1);
+}

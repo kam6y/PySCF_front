@@ -5,6 +5,7 @@
   "main": "dist/main.js",
   "scripts": {
     "dev": "rimraf dist && npm run codegen && run-p dev:webpack dev:electron",
+    "dev:clean": "rimraf dist node_modules/.cache && npm run codegen && run-p dev:webpack dev:electron",
     "dev:webpack": "cross-env NODE_ENV=\"development\" webpack --progress",
     "dev:electron": "wait-on ./dist/index.html ./dist/main.js && electronmon .",
     "build": "npm run codegen && npm run build:webpack && npm run build:conda-pack && npm run build:python",

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSpec } from '../../types/3dmol';
 import { VAN_DER_WAALS_RADII } from '../data/atomicRadii';
+import styles from './StyleControls.module.css';
 
 export interface StyleControlsProps {
   onStyleChange: (style: StyleSpec) => void;
@@ -117,16 +118,16 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   }, [selectedStyle, atomRadius, bondRadius, onStyleChange, useAtomicRadii]);
 
   return (
-    <div className={`style-controls ${className}`}>
-      <div className="style-controls-header">
-        <h3 className="section-title">Visualization Style</h3>
+    <div className={`${styles.styleControls} ${className}`}>
+      <div className={styles.styleControlsHeader}>
+        <h3 className={styles.sectionTitle}>Visualization Style</h3>
       </div>
 
-      <div className="style-options">
+      <div className={styles.styleOptions}>
         {styleOptions.map(option => (
           <label
             key={option.id}
-            className={`style-option ${selectedStyle === option.id ? 'selected' : ''}`}
+            className={`${styles.styleOption} ${selectedStyle === option.id ? styles.selected : ''}`}
           >
             <input
               type="radio"
@@ -134,30 +135,30 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               value={option.id}
               checked={selectedStyle === option.id}
               onChange={() => setSelectedStyle(option.id)}
-              className="style-radio"
+              className={styles.styleRadio}
             />
-            <div className="option-content">
-              <div className="option-label">{option.label}</div>
+            <div className={styles.optionContent}>
+              <div className={styles.optionLabel}>{option.label}</div>
             </div>
           </label>
         ))}
       </div>
 
       {(selectedStyle === 'sphere' || selectedStyle === 'ball-and-stick') && (
-        <div className="size-control-section">
-          <div className="toggle-switch" style={{ marginBottom: '16px' }}>
-            <span className="toggle-label">Use Atomic Radii</span>
-            <label className="switch">
+        <div className={styles.sizeControlSection}>
+          <div className={styles.toggleSwitch} style={{ marginBottom: '16px' }}>
+            <span className={styles.toggleLabel}>Use Atomic Radii</span>
+            <label className={styles.switch}>
               <input
                 type="checkbox"
                 checked={useAtomicRadii}
                 onChange={e => onUseAtomicRadiiChange?.(e.target.checked)}
               />
-              <span className="slider"></span>
+              <span className={styles.slider}></span>
             </label>
           </div>
-          <div className="slider-control">
-            <label className="slider-label">
+          <div className={styles.sliderControl}>
+            <label className={styles.sliderLabel}>
               {useAtomicRadii ? 'Base Size: ' : 'Atom Size: '}
               {atomRadius.toFixed(2)}
             </label>
@@ -168,11 +169,11 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               step="0.05"
               value={atomRadius}
               onChange={e => setAtomRadius(parseFloat(e.target.value))}
-              className="size-slider"
+              className={styles.sizeSlider}
             />
             {useAtomicRadii && (
               <p
-                className="size-help-text"
+                className={styles.sizeHelpText}
                 style={{ fontSize: '0.8em', color: '#666', marginTop: '4px' }}
               >
                 Atoms will be sized proportionally to their van der Waals radii
@@ -183,9 +184,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       )}
 
       {(selectedStyle === 'stick' || selectedStyle === 'ball-and-stick') && (
-        <div className="size-control-section">
-          <div className="slider-control">
-            <label className="slider-label">
+        <div className={styles.sizeControlSection}>
+          <div className={styles.sliderControl}>
+            <label className={styles.sliderLabel}>
               Bond Size: {bondRadius.toFixed(2)}
             </label>
             <input
@@ -195,22 +196,22 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               step="0.05"
               value={bondRadius}
               onChange={e => setBondRadius(parseFloat(e.target.value))}
-              className="size-slider"
+              className={styles.sizeSlider}
             />
           </div>
         </div>
       )}
 
-      <div className="quick-actions">
-        <h4 className="quick-actions-title">Quick Actions</h4>
-        <div className="quick-action-buttons">
+      <div className={styles.quickActions}>
+        <h4 className={styles.quickActionsTitle}>Quick Actions</h4>
+        <div className={styles.quickActionButtons}>
           <button
             onClick={() => {
               setSelectedStyle('ball-and-stick');
               setAtomRadius(0.3);
               setBondRadius(0.15);
             }}
-            className="quick-action-btn"
+            className={styles.quickActionBtn}
           >
             Default
           </button>
@@ -219,7 +220,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               setAtomRadius(0.6);
               setBondRadius(0.4);
             }}
-            className="quick-action-btn"
+            className={styles.quickActionBtn}
           >
             Large
           </button>
@@ -228,16 +229,16 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               setAtomRadius(0.2);
               setBondRadius(0.1);
             }}
-            className="quick-action-btn"
+            className={styles.quickActionBtn}
           >
             Small
           </button>
         </div>
       </div>
 
-      <div className="toggle-switch-section">
-        <div className="toggle-switch">
-          <span className="toggle-label">Show XYZ Axes</span>
+      <div className={styles.toggleSwitchSection}>
+        <div className={styles.toggleSwitch}>
+          <span className={styles.toggleLabel}>Show XYZ Axes</span>
           <label className="switch">
             <input
               type="checkbox"
@@ -247,8 +248,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
             <span className="slider"></span>
           </label>
         </div>
-        <div className="toggle-switch" style={{ marginTop: '12px' }}>
-          <span className="toggle-label">Show Atom Coordinates</span>
+        <div className={styles.toggleSwitch} style={{ marginTop: '12px' }}>
+          <span className={styles.toggleLabel}>Show Atom Coordinates</span>
           <label className="switch">
             <input
               type="checkbox"

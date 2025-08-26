@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import styles from './CalculationResultsPage.module.css';
 import { CalculationInstance } from '../types/api-types';
 import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
 import { MolecularOrbitalEnergyDiagram } from '../components/MolecularOrbitalEnergyDiagram';
@@ -35,8 +36,8 @@ export const CalculationResultsPage = ({
   // Show loading state
   if (isLoadingDetails) {
     return (
-      <div className="page-container">
-        <div className="page-content">
+      <div className={styles.pageContainer}>
+        <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
           <div style={{ textAlign: 'center', padding: '20px' }}>
             ⚛️ Loading calculation details...
@@ -49,8 +50,8 @@ export const CalculationResultsPage = ({
   // Show error state
   if (error) {
     return (
-      <div className="page-container">
-        <div className="page-content">
+      <div className={styles.pageContainer}>
+        <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
           <div
             style={{ color: '#e74c3c', padding: '20px', textAlign: 'center' }}
@@ -65,8 +66,8 @@ export const CalculationResultsPage = ({
   // Show message when no calculation is selected
   if (!activeCalculation) {
     return (
-      <div className="page-container">
-        <div className="page-content">
+      <div className={styles.pageContainer}>
+        <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
           <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
             📊 No calculation selected. Please select a calculation from the
@@ -89,8 +90,8 @@ export const CalculationResultsPage = ({
     };
 
     return (
-      <div className="page-container">
-        <div className="page-content">
+      <div className={styles.pageContainer}>
+        <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
           <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
             {statusMessages[
@@ -101,7 +102,7 @@ export const CalculationResultsPage = ({
             <strong>Calculation:</strong> {activeCalculation.name}
             <br />
             <strong>Status:</strong>{' '}
-            <span className={`status-badge ${activeCalculation.status}`}>
+            <span className={`${styles.statusBadge} ${styles[activeCalculation.status]}`}>
               {activeCalculation.status}
             </span>
           </div>

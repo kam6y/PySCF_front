@@ -1,30 +1,31 @@
 import React from 'react';
 import { CalculationInstance } from '../types/api-types';
+import styles from './Sidebar.module.css';
 
 // Status display configuration
 const STATUS_CONFIG = {
   pending: {
     icon: '⏳',
     label: 'Pending',
-    className: 'status-pending',
+    className: styles.statusPending,
     color: '#ffa500',
   },
   running: {
     icon: '⚛️',
     label: 'Running',
-    className: 'status-running',
+    className: styles.statusRunning,
     color: '#2196f3',
   },
   completed: {
     icon: '✅',
     label: 'Completed',
-    className: 'status-completed',
+    className: styles.statusCompleted,
     color: '#4caf50',
   },
   error: {
     icon: '❌',
     label: 'Error',
-    className: 'status-error',
+    className: styles.statusError,
     color: '#f44336',
   },
 } as const;
@@ -57,30 +58,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Backdrop/Overlay */}
       {isOpen && (
         <div
-          className="sidebar-backdrop"
+          className={styles.sidebarBackdrop}
           onClick={onClose}
           aria-label="Close sidebar"
         />
       )}
 
       {/* Sidebar Panel */}
-      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-        <div className="sidebar-content">
-          <div className="sidebar-header">
+      <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''}`}>
+        <div className={styles.sidebarContent}>
+          <div className={styles.sidebarHeader}>
             <h3>Calculations</h3>
           </div>
 
-          <div className="sidebar-calculations">
+          <div className={styles.sidebarCalculations}>
             {calculationsLoading ? (
-              <div className="sidebar-loading">
+              <div className={styles.sidebarLoading}>
                 <p>Loading calculations...</p>
               </div>
             ) : calculationsError ? (
-              <div className="sidebar-error">
+              <div className={styles.sidebarError}>
                 <p>Error: {calculationsError}</p>
               </div>
             ) : calculations.length === 0 ? (
-              <div className="sidebar-empty">
+              <div className={styles.sidebarEmpty}>
                 <p>No calculations yet</p>
                 <p>Click the + button to create one</p>
               </div>
@@ -88,20 +89,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               calculations.map(calculation => (
                 <div
                   key={calculation.id}
-                  className={`sidebar-calculation-item ${
-                    calculation.id === activeCalculationId ? 'active' : ''
+                  className={`${styles.sidebarCalculationItem} ${
+                    calculation.id === activeCalculationId ? styles.active : ''
                   }`}
                   onClick={() => onCalculationSelect(calculation.id)}
                 >
-                  <div className="calculation-info">
-                    <div className="calculation-name">{calculation.name}</div>
-                    <div className="calculation-meta">
-                      <div className="calculation-date">
+                  <div className={styles.calculationInfo}>
+                    <div className={styles.calculationName}>{calculation.name}</div>
+                    <div className={styles.calculationMeta}>
+                      <div className={styles.calculationDate}>
                         {new Date(calculation.updatedAt).toLocaleDateString()}
                       </div>
-                      <div className="calculation-status">
+                      <div className={styles.calculationStatus}>
                         <span
-                          className={`status-badge ${STATUS_CONFIG[calculation.status as StatusType]?.className || 'status-unknown'}`}
+                          className={`${styles.statusBadge} ${STATUS_CONFIG[calculation.status as StatusType]?.className || styles.statusUnknown}`}
                           style={{
                             color:
                               STATUS_CONFIG[calculation.status as StatusType]
@@ -112,11 +113,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 : 'none',
                           }}
                         >
-                          <span className="status-icon">
+                          <span className={styles.statusIcon}>
                             {STATUS_CONFIG[calculation.status as StatusType]
                               ?.icon || '❓'}
                           </span>
-                          <span className="status-label">
+                          <span className={styles.statusLabel}>
                             {STATUS_CONFIG[calculation.status as StatusType]
                               ?.label || calculation.status}
                           </span>
@@ -124,9 +125,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       </div>
                     </div>
                   </div>
-                  <div className="calculation-actions">
+                  <div className={styles.calculationActions}>
                     <button
-                      className="delete-btn"
+                      className={styles.deleteBtn}
                       onClick={e => {
                         e.stopPropagation();
                         if (

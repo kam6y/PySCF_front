@@ -1,6 +1,8 @@
 // src/web/pages/CalculationSettingsPage.tsx
 
 import { useRef, useState, useEffect, useCallback } from 'react';
+
+import styles from './CalculationSettingsPage.module.css';
 import { MoleculeViewerRef } from '../components/MoleculeViewer';
 import { XYZInput } from '../components/XYZInput';
 import { MoleculeViewerSection } from '../components/MoleculeViewerSection';
@@ -385,7 +387,7 @@ export const CalculationSettingsPage = ({
 
   if (!activeCalculation || !activeCalculation.parameters) {
     return (
-      <div className="calculation-settings-containers">
+      <div className={styles.calculationSettingsContainers}>
         <div
           style={{
             textAlign: 'center',
@@ -496,9 +498,6 @@ export const CalculationSettingsPage = ({
     }
   };
 
-  const getCalculationButtonClass = () => {
-    return `start-calculation-btn ${calculationStatus || 'pending'}`;
-  };
 
   const isCustomDielectricConstant = (
     solventValue: string | undefined
@@ -543,11 +542,11 @@ export const CalculationSettingsPage = ({
   };
 
   return (
-    <div className="calculation-settings-containers">
-      <div className="calculation-settings-container">
-        <div className="calculation-header">
-          <div className="header-title-bar">
-            <div className="molecule-name-section">
+    <div className={styles.calculationSettingsContainers}>
+      <div className={styles.calculationSettingsContainer}>
+        <div className={styles.calculationHeader}>
+          <div className={styles.headerTitleBar}>
+            <div className={styles.moleculeNameSection}>
               <input
                 type="text"
                 placeholder="Molecule name..."
@@ -555,13 +554,13 @@ export const CalculationSettingsPage = ({
                 onBlur={handleNameBlur}
                 onKeyDown={handleNameKeyDown}
                 onChange={handleNameChange}
-                className="molecule-name-input"
+                className={styles.moleculeNameInput}
                 disabled={calculationStatus === 'running'}
               />
               {localName && (
                 <button
                   onClick={() => setLocalName('')}
-                  className="clear-molecule-name"
+                  className={styles.clearMoleculeName}
                   aria-label="Clear molecule name"
                 >
                   {' '}
@@ -569,10 +568,10 @@ export const CalculationSettingsPage = ({
                 </button>
               )}
             </div>
-            <div className="computation-settings">
-              <div className="setting-group cpu-setting">
+            <div className={styles.computationSettings}>
+              <div className={styles.cpuSetting}>
                 <label>CPU Cores</label>
-                <div className="cpu-input-container">
+                <div className={styles.cpuInputContainer}>
                   <input
                     type="number"
                     value={params.cpu_cores || 1}
@@ -584,13 +583,13 @@ export const CalculationSettingsPage = ({
                     }
                     min="1"
                     max="32"
-                    className="cpu-cores-input"
+                    className={styles.cpuCoresInput}
                     disabled={calculationStatus === 'running'}
                   />
-                  <div className="spinner-arrows">
+                  <div className={styles.spinnerArrows}>
                     <button
                       type="button"
-                      className="spinner-btn up"
+                      className={`${styles.spinnerBtn} ${styles.up}`}
                       onClick={() =>
                         handleParamChange(
                           'cpu_cores',
@@ -603,7 +602,7 @@ export const CalculationSettingsPage = ({
                     </button>
                     <button
                       type="button"
-                      className="spinner-btn down"
+                      className={`${styles.spinnerBtn} ${styles.down}`}
                       onClick={() =>
                         handleParamChange(
                           'cpu_cores',
@@ -617,9 +616,9 @@ export const CalculationSettingsPage = ({
                   </div>
                 </div>
               </div>
-              <div className="setting-group memory-setting">
+              <div className={styles.memorySetting}>
                 <label>Memory Usage</label>
-                <div className="memory-input-container">
+                <div className={styles.memoryInputContainer}>
                   <input
                     type="number"
                     value={params.memory_mb || 2000}
@@ -630,14 +629,14 @@ export const CalculationSettingsPage = ({
                       )
                     }
                     min="128"
-                    className="memory-value-input"
+                    className={styles.memoryValueInput}
                     disabled={calculationStatus === 'running'}
                   />
-                  <span className="memory-unit">MB</span>
+                  <span className={styles.memoryUnit}>MB</span>
                 </div>
               </div>
               <button
-                className={getCalculationButtonClass()}
+                className={`${styles.startCalculationBtn} ${calculationStatus || 'pending'}`}
                 onClick={handleStartCalculation}
                 disabled={
                   !hasValidMolecule ||
@@ -649,7 +648,7 @@ export const CalculationSettingsPage = ({
               </button>
               {calculationError && (
                 <div
-                  className="calculation-error"
+                  className={styles.calculationError}
                   style={{
                     marginTop: '10px',
                     color: '#e74c3c',
@@ -661,9 +660,9 @@ export const CalculationSettingsPage = ({
               )}
             </div>
           </div>
-          <div className="calculation-column">
-            <section className="calculation-settings-section">
-              <div className="setting-row">
+          <div className={styles.calculationColumn}>
+            <section className={styles.calculationSettingsSection}>
+              <div className={styles.settingRow}>
                 <label>Calculation Method</label>
                 <select
                   value={params.calculation_method || 'DFT'}
@@ -680,7 +679,7 @@ export const CalculationSettingsPage = ({
                   <option value="TDDFT">TDDFT</option>
                 </select>
               </div>
-              <div className="setting-row">
+              <div className={styles.settingRow}>
                 <label>Basis Function</label>
                 <select
                   value={params.basis_function || '6-31G(d)'}
@@ -713,7 +712,7 @@ export const CalculationSettingsPage = ({
                   </optgroup>
                 </select>
               </div>
-              <div className="setting-row">
+              <div className={styles.settingRow}>
                 <label>Exchange-Correlation Functional</label>
                 <select
                   value={params.exchange_correlation || 'B3LYP'}
@@ -747,7 +746,7 @@ export const CalculationSettingsPage = ({
                   </optgroup>
                 </select>
               </div>
-              <div className="setting-row">
+              <div className={styles.settingRow}>
                 <label>Charge</label>
                 <input
                   type="number"
@@ -755,11 +754,11 @@ export const CalculationSettingsPage = ({
                   onChange={e =>
                     handleParamChange('charges', Number(e.target.value))
                   }
-                  className="number-input with-spinner"
+                  className={`${styles.numberInput} ${styles.withSpinner}`}
                   disabled={calculationStatus === 'running'}
                 />
               </div>
-              <div className="setting-row">
+              <div className={styles.settingRow}>
                 <label>Spin Multiplicity (2S+1)</label>
                 <input
                   type="number"
@@ -772,14 +771,14 @@ export const CalculationSettingsPage = ({
                   }
                   min={1}
                   step={1}
-                  className="number-input with-spinner"
+                  className={`${styles.numberInput} ${styles.withSpinner}`}
                   disabled={calculationStatus === 'running'}
                 />
               </div>
             </section>
             {params.calculation_method === 'TDDFT' && (
-              <section className="calculation-settings-section">
-                <div className="setting-row">
+              <section className={styles.calculationSettingsSection}>
+                <div className={styles.settingRow}>
                   <label>Number of Excited States</label>
                   <input
                     type="number"
@@ -793,11 +792,11 @@ export const CalculationSettingsPage = ({
                     min={1}
                     max={50}
                     step={1}
-                    className="number-input with-spinner"
+                    className={`${styles.numberInput} ${styles.withSpinner}`}
                     disabled={calculationStatus === 'running'}
                   />
                 </div>
-                <div className="setting-row">
+                <div className={styles.settingRow}>
                   <label>TDDFT Method</label>
                   <select
                     value={(params as any).tddft_method || 'TDDFT'}
@@ -812,7 +811,7 @@ export const CalculationSettingsPage = ({
                     </option>
                   </select>
                 </div>
-                <div className="setting-row">
+                <div className={styles.settingRow}>
                   <label>
                     <input
                       type="checkbox"
@@ -831,8 +830,8 @@ export const CalculationSettingsPage = ({
               </section>
             )}
             {(params.calculation_method === 'CCSD' || params.calculation_method === 'CCSD_T') && (
-              <section className="calculation-settings-section">
-                <div className="setting-row">
+              <section className={styles.calculationSettingsSection}>
+                <div className={styles.settingRow}>
                   <label>
                     <input
                       type="checkbox"
@@ -853,8 +852,8 @@ export const CalculationSettingsPage = ({
                 </div>
               </section>
             )}
-            <section className="calculation-settings-section">
-              <div className="setting-row">
+            <section className={styles.calculationSettingsSection}>
+              <div className={styles.settingRow}>
                 <label>Solvent Effect Method</label>
                 <select
                   value={params.solvent_method || 'none'}
@@ -875,7 +874,7 @@ export const CalculationSettingsPage = ({
                   </optgroup>
                 </select>
               </div>
-              <div className="setting-row">
+              <div className={styles.settingRow}>
                 <label>Solvent(dielectric constant)</label>
                 <select
                   value={getSolventDisplayValue()}
@@ -930,7 +929,7 @@ export const CalculationSettingsPage = ({
               {(params.solvent === 'custom' ||
                 isCustomDielectricConstant(params.solvent)) &&
                 params.solvent_method !== 'none' && (
-                  <div className="setting-row">
+                  <div className={styles.settingRow}>
                     <label>Custom Dielectric Constant</label>
                     <input
                       type="number"
@@ -939,7 +938,7 @@ export const CalculationSettingsPage = ({
                       onChange={e =>
                         handleParamChange('solvent', e.target.value || '78.36')
                       }
-                      className="number-input"
+                      className={styles.numberInput}
                       disabled={calculationStatus === 'running'}
                     />
                   </div>
@@ -959,11 +958,11 @@ export const CalculationSettingsPage = ({
           onUseAtomicRadiiChange={setUseAtomicRadii}
         />
       </div>
-      <section className="molecular-input-section">
+      <section className={styles.molecularInputSection}>
         <h3>Molecular Structure Input</h3>
-        <div className="input-method-selection">
-          <div className="radio-options">
-            <label className="radio-option">
+        <div className={styles.inputMethodSelection}>
+          <div className={styles.radioOptions}>
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="inputMethod"
@@ -972,9 +971,9 @@ export const CalculationSettingsPage = ({
                 onChange={e => setInputMethod(e.target.value)}
                 disabled={calculationStatus === 'running'}
               />
-              <span className="radio-text">Get from PubChem Name/CID</span>
+              <span className={styles.radioText}>Get from PubChem Name/CID</span>
             </label>
-            <label className="radio-option">
+            <label className={styles.radioOption}>
               <input
                 type="radio"
                 name="inputMethod"
@@ -983,12 +982,12 @@ export const CalculationSettingsPage = ({
                 onChange={e => setInputMethod(e.target.value)}
                 disabled={calculationStatus === 'running'}
               />
-              <span className="radio-text">Get from SMILES</span>
+              <span className={styles.radioText}>Get from SMILES</span>
             </label>
           </div>
         </div>
-        <div className="pubchem-input-section">
-          <div className="input-with-button">
+        <div className={styles.pubchemInputSection}>
+          <div className={styles.inputWithButton}>
             <input
               type="text"
               value={pubchemInput}
@@ -997,12 +996,12 @@ export const CalculationSettingsPage = ({
                 setPubchemInput(e.target.value);
                 if (convertError) setConvertError(null);
               }}
-              className="pubchem-input"
+              className={styles.pubchemInput}
               disabled={calculationStatus === 'running'}
             />
             <button
               onClick={handleXYZConvert}
-              className="convert-button"
+              className={styles.convertButton}
               disabled={
                 isConverting ||
                 !pubchemInput.trim() ||
@@ -1014,7 +1013,7 @@ export const CalculationSettingsPage = ({
           </div>
           {isConverting && (
             <div
-              className="validation-message validating"
+              className={`${styles.validationMessage} ${styles.validating}`}
               style={{ marginTop: '8px' }}
             >
               Converting...
@@ -1022,15 +1021,15 @@ export const CalculationSettingsPage = ({
           )}
           {convertError && (
             <div
-              className="validation-message invalid"
+              className={`${styles.validationMessage} ${styles.invalid}`}
               style={{ marginTop: '8px' }}
             >
               ❌ {convertError}
             </div>
           )}
         </div>
-        <div className="xyz-direct-input">
-          <h4 className="subsection-title">Direct XYZ Input/Edit</h4>
+        <div className={styles.xyzDirectInput}>
+          <h4 className={styles.subsectionTitle}>Direct XYZ Input/Edit</h4>
           <XYZInput onXYZChange={handleXYZChange} value={xyzInputValue} />
         </div>
       </section>

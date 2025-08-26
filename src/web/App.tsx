@@ -2,6 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import './App.css';
+import styles from './App.module.css';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
@@ -114,9 +115,9 @@ export const App = () => {
   };
 
   return (
-    <div className="app-container">
+    <div className={styles.appContainer}>
       <button
-        className={`independent-sidebar-toggle ${sidebarState.isSidebarOpen ? 'sidebar-open' : ''}`}
+        className={`${styles.independentSidebarToggle} ${sidebarState.isSidebarOpen ? styles.sidebarOpen : ''}`}
         onClick={sidebarState.handleSidebarToggle}
         aria-label="Toggle sidebar"
       >
@@ -189,7 +190,7 @@ export const App = () => {
       />
 
       <main
-        className={`app-content ${sidebarState.isSidebarOpen ? 'sidebar-open' : ''}`}
+        className={`${styles.appContent} ${sidebarState.isSidebarOpen ? 'sidebar-open' : ''}`}
       >
         {renderCurrentPage()}
       </main>

@@ -13,6 +13,7 @@ import {
   AtomSpec,
 } from '../../types/3dmol';
 import { getAtomicRadius, VAN_DER_WAALS_RADII } from '../data/atomicRadii';
+import styles from './MoleculeViewer.module.css';
 
 export interface MoleculeViewerProps {
   width?: number | string;
@@ -303,14 +304,10 @@ export const MoleculeViewer = forwardRef<
 
     return (
       <div
-        className={`molecule-viewer ${className}`}
+        className={`${styles.moleculeViewer} ${className}`}
         style={{
           width,
           height,
-          border: '1px solid #ccc',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          position: 'relative',
         }}
       >
         <div
