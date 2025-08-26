@@ -10,7 +10,7 @@
     "build": "npm run codegen && npm run build:webpack && npm run build:conda-pack && npm run build:python",
     "build:webpack": "cross-env NODE_ENV=\"production\" webpack --progress",
     "build:conda-pack": "rimraf conda_env && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && conda-pack -o conda_env.tar.gz && mkdir -p conda_env && tar -xzf conda_env.tar.gz -C conda_env && rm conda_env.tar.gz'",
-    "build:python": "rimraf python_dist && cd src/python && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec'",
+    "build:python": "rimraf python_dist && cd src/python && bash -c 'export PATH=\"$HOME/miniforge3/envs/pyscf-env/bin:$PATH\" && export CONDA_DEFAULT_ENV=pyscf-env && echo \"=== Python Environment Verification ===\" && which python && python --version && echo \"=== Checking critical dependencies ===\" && python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && python -c \"import watchdog; print(\\\"Watchdog: Available\\\")\" && python -c \"import flask; print(f\\\"Flask: {flask.__version__}\\\")\" && python -c \"import pyscf; print(f\\\"PySCF: {pyscf.__version__}\\\")\" && echo \"=== Dependencies verified, starting PyInstaller ===\" && pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec'",
     "package": "npm run build && electron-builder",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
     "codegen:python": "cd src/python && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description'",
@@ -24,7 +24,9 @@
     "test:python-build": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && cd src/python && echo \"Testing Python build...\" && python -c \"import app; print(\\\"Python app imports successfully\\\")\"'",
     "test:run-packaged": "npm run build && npm run package && echo 'Package created. Check dist/ directory for distributable files.'",
     "test:gunicorn-local": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && cd src/python && echo \"Testing Gunicorn locally...\" && gunicorn --bind 127.0.0.1:5000 --workers 1 --threads 4 --timeout 0 --log-level info --preload app:app'",
-    "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\""
+    "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\"",
+    "test:python-standalone": "node scripts/test-python-standalone.js",
+    "test:conda-env": "export PATH=\"$HOME/miniforge3/envs/pyscf-env/bin:$PATH\" && cd dist/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin && echo \"Testing conda environment...\" && ./python --version && ./python -c \"import gunicorn; print('Gunicorn:', gunicorn.__version__)\" && ./python -c \"import flask; print('Flask: Available')\" && echo \"Conda environment test completed.\""
   },
   "repository": {
     "type": "git",
@@ -102,6 +104,13 @@
       {
         "from": "config",
         "to": "config",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "src/python",
+        "to": "src/python",
         "filter": [
           "**/*"
         ]

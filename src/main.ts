@@ -159,13 +159,16 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
 
 /**
  * Python環境のパスを階層的に検出する統合関数
- * 1. 同梱conda環境 (パッケージ時優先)
+ * 1. 同梱conda環境 (パッケージ時優先) - より厳密な検証
  * 2. 開発時conda環境検出
- * 3. PyInstaller実行可能ファイル (フォールバック)
+ * 3. PyInstaller実行可能ファイル (制限付きフォールバック)
  * @returns Python環境のパス、見つからなければnull
  */
 const detectPythonEnvironmentPath = async (): Promise<string | null> => {
-  // 1. パッケージ時：同梱conda環境を優先チェック
+  console.log('=== Python Environment Detection ===');
+  console.log(`Running in packaged mode: ${app.isPackaged}`);
+  
+  // 1. パッケージ時：同梱conda環境を優先チェック（厳密な検証）
   if (app.isPackaged) {
     const bundledCondaPath = path.join(
       process.resourcesPath,
@@ -173,25 +176,38 @@ const detectPythonEnvironmentPath = async (): Promise<string | null> => {
       'bin',
       'python'
     );
-    if (fs.existsSync(bundledCondaPath)) {
-      console.log(`Using bundled conda environment: ${bundledCondaPath}`);
+    const bundledGunicornPath = path.join(
+      process.resourcesPath,
+      'conda_env',
+      'bin',
+      'gunicorn'
+    );
+    
+    console.log(`Checking bundled conda environment: ${bundledCondaPath}`);
+    console.log(`Checking gunicorn in conda environment: ${bundledGunicornPath}`);
+    
+    if (fs.existsSync(bundledCondaPath) && fs.existsSync(bundledGunicornPath)) {
+      console.log(`✓ Using bundled conda environment with complete dependencies: ${bundledCondaPath}`);
       return bundledCondaPath;
     } else {
-      console.log(
-        `Bundled conda environment not found at: ${bundledCondaPath}`
-      );
+      console.log(`✗ Bundled conda environment incomplete:`);
+      console.log(`  - Python exists: ${fs.existsSync(bundledCondaPath)}`);
+      console.log(`  - Gunicorn exists: ${fs.existsSync(bundledGunicornPath)}`);
     }
   }
 
   // 2. 開発時またはパッケージ時フォールバック：conda環境検出
-  console.log('Attempting to detect conda environment...');
+  console.log('Attempting to detect development conda environment...');
   const condaPath = await detectCondaEnvironmentPath();
   if (condaPath) {
+    console.log(`✓ Using conda environment: ${condaPath}`);
     return condaPath;
   }
 
-  // 3. パッケージ時のフォールバック：PyInstaller実行可能ファイル
+  // 3. パッケージ時の制限付きフォールバック：PyInstaller実行可能ファイル
   if (app.isPackaged) {
+    console.log('WARNING: conda-pack environment not available, checking PyInstaller executable...');
+    
     const executableName =
       process.platform === 'win32'
         ? 'pyscf_front_api.exe'
@@ -202,15 +218,21 @@ const detectPythonEnvironmentPath = async (): Promise<string | null> => {
       'pyscf_front_api',
       executableName
     );
+    
     if (fs.existsSync(pythonExecutablePath)) {
       console.log(
-        `Using PyInstaller executable as fallback: ${pythonExecutablePath}`
+        `⚠️  Using PyInstaller executable as last resort (may have incomplete dependencies): ${pythonExecutablePath}`
+      );
+      console.log(
+        `   This fallback may cause server startup failures if gunicorn is not properly bundled.`
       );
       return pythonExecutablePath;
+    } else {
+      console.log(`✗ PyInstaller executable not found: ${pythonExecutablePath}`);
     }
   }
 
-  console.log('No Python environment found in any expected locations');
+  console.log('✗ No Python environment found in any expected locations');
   return null;
 };
 
@@ -334,7 +356,7 @@ const startPythonServer = async (): Promise<void> => {
 
     // Python作業ディレクトリの決定
     const pythonPath = app.isPackaged 
-      ? path.dirname(pythonExecutablePath)  // パッケージ時はPython実行ファイルと同じディレクトリ
+      ? path.join(process.resourcesPath, 'src', 'python')  // パッケージ時は同梱されたPythonソースコード
       : path.join(__dirname, '..', 'src', 'python');  // 開発時
     
     // 本番環境でもGunicornを使用する統一ロジック
@@ -355,7 +377,22 @@ const startPythonServer = async (): Promise<void> => {
         'app:app'  // Flask application (not socketio object)
       ];
       
+      console.log(`=== Starting Gunicorn Server ===`);
+      console.log(`Python executable: ${pythonExecutablePath}`);
+      console.log(`Working directory: ${pythonPath}`);
       console.log(`Gunicorn command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`);
+      console.log(`Environment variables:`, {
+        'CONDA_DEFAULT_ENV': 'pyscf-env',
+        'PATH': process.env.PATH?.split(':').filter(p => p.includes('conda')).slice(0, 3),
+      });
+      
+      // Verify files exist before starting
+      console.log(`File checks:`);
+      console.log(`• Python executable exists: ${fs.existsSync(pythonExecutablePath)}`);
+      console.log(`• Working directory exists: ${fs.existsSync(pythonPath)}`);
+      
+      const appPyPath = path.join(pythonPath, 'app.py');
+      console.log(`• app.py exists: ${fs.existsSync(appPyPath)}`);
       
       pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
@@ -383,38 +420,95 @@ const startPythonServer = async (): Promise<void> => {
     // stdout/stderrのログ出力
     pythonProcess.stdout?.on('data', data => {
       const output = data.toString().trim();
-      console.log(`Python server: ${output}`);
+      console.log(`[PYTHON STDOUT] ${output}`);
       
       // 直接実行モード（フォールバック）でのポート検出
       if (!productionSettings.use_gunicorn) {
         const match = output.match(/FLASK_SERVER_PORT:(\d+)/);
         if (match && match[1]) {
           flaskPort = parseInt(match[1], 10);
-          console.log(`Detected Flask server port from direct execution: ${flaskPort}`);
+          console.log(`✓ Detected Flask server port from direct execution: ${flaskPort}`);
           // ヘルスチェックを開始してサーバー起動を待つ
           checkServerHealth(flaskPort).then(resolve).catch(reject);
         }
       }
+      
+      // Look for important startup messages
+      if (output.includes('Starting gunicorn')) {
+        console.log('✓ Gunicorn is starting up...');
+      }
+      if (output.includes('Listening at:')) {
+        console.log('✓ Server is listening for connections');
+      }
+      if (output.includes('Booting worker')) {
+        console.log('✓ Gunicorn worker is starting...');
+      }
+      if (output.includes('Application object must be callable')) {
+        console.log('✗ CRITICAL: Flask application object error detected');
+      }
+      if (output.includes('ModuleNotFoundError') || output.includes('ImportError')) {
+        console.log(`✗ CRITICAL: Python import error detected - ${output}`);
+      }
     });
 
     pythonProcess.stderr?.on('data', data => {
-      console.log(`Python server: ${data.toString().trim()}`);
+      const errorOutput = data.toString().trim();
+      console.log(`[PYTHON STDERR] ${errorOutput}`);
+      
+      // Analyze stderr for specific error patterns
+      if (errorOutput.includes('ModuleNotFoundError')) {
+        console.log(`✗ CRITICAL: Missing Python module - ${errorOutput}`);
+      }
+      if (errorOutput.includes('ImportError')) {
+        console.log(`✗ CRITICAL: Python import error - ${errorOutput}`);
+      }
+      if (errorOutput.includes('gunicorn')) {
+        console.log(`⚠️  Gunicorn-related error - ${errorOutput}`);
+      }
+      if (errorOutput.includes('flask')) {
+        console.log(`⚠️  Flask-related error - ${errorOutput}`);
+      }
+      if (errorOutput.includes('Address already in use')) {
+        console.log(`✗ CRITICAL: Port ${serverPort} is already in use`);
+      }
+      if (errorOutput.includes('[CRITICAL]') || errorOutput.includes('CRITICAL')) {
+        console.log(`✗ CRITICAL ERROR FROM PYTHON: ${errorOutput}`);
+      }
     });
 
     pythonProcess.on('error', error => {
-      console.error(`Failed to start Python server process: ${error.message}`);
+      console.error(`✗ CRITICAL: Failed to start Python server process`);
+      console.error(`Error details: ${error.message}`);
+      console.error(`Error code: ${(error as any).code || 'N/A'}`);
+      console.error(`Error errno: ${(error as any).errno || 'N/A'}`);
+      console.error(`Error syscall: ${(error as any).syscall || 'N/A'}`);
+      console.error(`Python executable path: ${pythonExecutablePath}`);
+      console.error(`Working directory: ${pythonPath}`);
+      console.error(`Environment variables:`, {
+        'CONDA_DEFAULT_ENV': process.env.CONDA_DEFAULT_ENV,
+        'PATH': process.env.PATH?.split(':').filter(p => p.includes('conda')).slice(0, 3),
+        'PYTHONPATH': process.env.PYTHONPATH || 'Not set'
+      });
       reject(error);
     });
 
-    pythonProcess.on('close', code => {
-      console.log(`Python server exited with code ${code}`);
+    pythonProcess.on('close', (code, signal) => {
+      console.log(`=== Python Server Process Terminated ===`);
+      console.log(`Exit code: ${code}`);
+      console.log(`Signal: ${signal || 'None'}`);
+      console.log(`Was quitting: ${isQuitting}`);
+      console.log(`Server port: ${serverPort}`);
+      console.log(`Python executable: ${pythonExecutablePath}`);
+      console.log(`Working directory: ${pythonPath}`);
+      
       pythonProcess = null;
+      
       // ユーザーがアプリを終了しようとしている場合以外での終了は異常とみなす
       if (!isQuitting) {
-        dialog.showErrorBox(
-          'Backend Process Error',
-          `The Python backend process has unexpectedly stopped (exit code: ${code}). Please restart the application.`
-        );
+        const errorMessage = `The Python backend process has unexpectedly stopped (exit code: ${code})${signal ? `, signal: ${signal}` : ''}.\n\nDebugging Information:\n• Python executable: ${pythonExecutablePath}\n• Working directory: ${pythonPath}\n• Server port: ${serverPort}\n• Packaged mode: ${app.isPackaged}\n\nPlease check the console output for detailed error messages and restart the application.`;
+        
+        console.log(`✗ CRITICAL: Showing error dialog to user`);
+        dialog.showErrorBox('Backend Process Error', errorMessage);
         app.quit();
       }
     });
