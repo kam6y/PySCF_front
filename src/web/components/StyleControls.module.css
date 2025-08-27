@@ -3,12 +3,13 @@
 .styleControls {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 8px;
   width: 100%;
   background: white;
-  padding: 16px;
+  padding: 8px 16px;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
+  height: 100%;
 }
 
 .styleControlsHeader {
@@ -57,7 +58,6 @@
 
 .styleRadio {
   margin-right: 12px;
-  accent-color: #50D4F5;
 }
 
 .optionContent {
@@ -74,8 +74,7 @@
 .sizeControlSection {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  padding: 8px 16px;
   background: #f8f9fa;
   border-radius: 6px;
   border: 1px solid #e0e0e0;
@@ -86,7 +85,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
 }
 
 .toggleLabel {
@@ -155,6 +153,7 @@
 }
 
 .sizeSlider {
+  appearance: none;
   -webkit-appearance: none;
   width: 100%;
   height: 6px;
@@ -198,49 +197,10 @@
   margin-top: 4px;
 }
 
-/* Quick Actions */
-.quickActions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-top: 16px;
-  border-top: 1px solid #e0e0e0;
-}
 
-.quickActionsTitle {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-}
-
-.quickActionButtons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.quickActionBtn {
-  padding: 8px 12px;
-  background: #f8f9fa;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  color: #333;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex: 1;
-  min-width: 80px;
-}
-
-.quickActionBtn:hover {
-  background: #e9ecef;
-  border-color: #50D4F5;
-  color: #50D4F5;
-}
-
-.quickActionBtn:active {
-  transform: translateY(1px);
+/* Toggle Switch with Margin */
+.toggleSwitchWithMargin {
+  margin-bottom: 16px;
 }
 
 /* Toggle Switch Section */

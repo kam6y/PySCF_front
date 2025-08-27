@@ -416,3 +416,28 @@
   align-items: center;
   gap: 6px;
 }
+
+/* Loading state */
+.loadingContainer {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  width: 100%;
+}
+
+/* Frozen core help text */
+.frozenCoreHelp {
+  font-size: 12px;
+  color: #666;
+  margin-left: 20px;
+  margin-top: 4px;
+}
+
+/* Converting and validation messages */
+.convertingMessage {
+  margin-top: 8px;
+}
+
+.errorMessage {
+  margin-top: 8px;
+}

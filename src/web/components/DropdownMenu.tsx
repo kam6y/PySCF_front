@@ -1,4 +1,5 @@
 import React from 'react';
+import styles from './DropdownMenu.module.css';
 
 export type DropdownOption =
   | 'calculation-settings'
@@ -28,11 +29,11 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
   return (
     <>
       {/* Backdrop to close dropdown when clicking outside */}
-      <div className="dropdown-backdrop" onClick={onClose} />
+      <div className={styles.dropdownBackdrop} onClick={onClose} />
 
-      <div className="dropdown-menu">
+      <div className={styles.dropdownMenu}>
         <div
-          className={`dropdown-item ${selectedOption === 'calculation-settings' ? 'selected' : ''}`}
+          className={`${styles.dropdownItem} ${selectedOption === 'calculation-settings' ? styles.selected : ''}`}
           onClick={() => handleOptionClick('calculation-settings')}
         >
           <svg
@@ -41,7 +42,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
             viewBox="0 0 16 16"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="dropdown-icon"
+            className={styles.dropdownIcon}
           >
             <path
               d="M8 1.5C8 1.22386 7.77614 1 7.5 1H6.5C6.22386 1 6 1.22386 6 1.5V2.5C6 2.77614 6.22386 3 6.5 3H7.5C7.77614 3 8 2.77614 8 2.5V1.5Z"
@@ -80,7 +81,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
         </div>
 
         <div
-          className={`dropdown-item ${selectedOption === 'calculation-results' ? 'selected' : ''}`}
+          className={`${styles.dropdownItem} ${selectedOption === 'calculation-results' ? styles.selected : ''}`}
           onClick={() => handleOptionClick('calculation-results')}
         >
           <svg
@@ -89,7 +90,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
             viewBox="0 0 16 16"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="dropdown-icon"
+            className={styles.dropdownIcon}
           >
             <path
               d="M3 2C2.44772 2 2 2.44772 2 3V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V5.41421C14 5.01639 13.842 4.63486 13.5607 4.35355L10.6464 1.43934C10.3651 1.15803 9.98361 1 9.58579 1H3Z"
@@ -110,7 +111,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
         </div>
 
         <div
-          className={`dropdown-item ${selectedOption === 'draw-molecule' ? 'selected' : ''}`}
+          className={`${styles.dropdownItem} ${selectedOption === 'draw-molecule' ? styles.selected : ''}`}
           onClick={() => handleOptionClick('draw-molecule')}
         >
           <svg
@@ -119,7 +120,7 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
             viewBox="0 0 16 16"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
-            className="dropdown-icon"
+            className={styles.dropdownIcon}
           >
             <path
               d="M12.854 1.854a.5.5 0 0 0-.708-.708L10.5 2.793 8.354.646a.5.5 0 1 0-.708.708L9.293 3 1.146 11.146a.5.5 0 0 0-.146.354V14a.5.5 0 0 0 .5.5h2.5a.5.5 0 0 0 .354-.146L12.5 6.207l1.647 1.647a.5.5 0 0 0 .708-.708L12.707 5l1.647-1.647a.5.5 0 0 0 0-.708L12.854 1.854zM11.207 4L4 11.207V13h1.793L13 5.793 11.207 4z"

@@ -146,7 +146,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
       {(selectedStyle === 'sphere' || selectedStyle === 'ball-and-stick') && (
         <div className={styles.sizeControlSection}>
-          <div className={styles.toggleSwitch} style={{ marginBottom: '16px' }}>
+          <div className={`${styles.toggleSwitch} ${styles.toggleSwitchWithMargin}`}>
             <span className={styles.toggleLabel}>Use Atomic Radii</span>
             <label className={styles.switch}>
               <input
@@ -202,39 +202,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         </div>
       )}
 
-      <div className={styles.quickActions}>
-        <h4 className={styles.quickActionsTitle}>Quick Actions</h4>
-        <div className={styles.quickActionButtons}>
-          <button
-            onClick={() => {
-              setSelectedStyle('ball-and-stick');
-              setAtomRadius(0.3);
-              setBondRadius(0.15);
-            }}
-            className={styles.quickActionBtn}
-          >
-            Default
-          </button>
-          <button
-            onClick={() => {
-              setAtomRadius(0.6);
-              setBondRadius(0.4);
-            }}
-            className={styles.quickActionBtn}
-          >
-            Large
-          </button>
-          <button
-            onClick={() => {
-              setAtomRadius(0.2);
-              setBondRadius(0.1);
-            }}
-            className={styles.quickActionBtn}
-          >
-            Small
-          </button>
-        </div>
-      </div>
 
       <div className={styles.toggleSwitchSection}>
         <div className={styles.toggleSwitch}>

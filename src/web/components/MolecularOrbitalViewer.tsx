@@ -7,6 +7,7 @@ import {
   useGetOrbitalCube,
 } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
+import styles from './MolecularOrbitalViewer.module.css';
 
 // 3dmolライブラリをインポート
 import * as $3Dmol from '3dmol';
@@ -381,7 +382,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
   if (orbitalsLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px' }}>
+      <div className={styles.loadingContainer}>
         <div>⚛️ Loading orbital information...</div>
       </div>
     );
@@ -393,7 +394,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
     orbitalsData.orbitals.length === 0
   ) {
     return (
-      <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+      <div className={styles.noDataContainer}>
         <div>📊 No orbital data available for this calculation.</div>
       </div>
     );
@@ -404,38 +405,15 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   );
 
   return (
-    <div
-      style={{
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        overflow: 'hidden',
-      }}
-    >
+    <div className={styles.viewerContainer}>
       {/* コントロールパネル */}
-      <div
-        style={{
-          padding: '16px',
-          backgroundColor: '#f8f9fa',
-          borderBottom: '1px solid #ddd',
-        }}
-      >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-            alignItems: 'center',
-          }}
-        >
+      <div className={styles.controlPanel}>
+        <div className={styles.controlGrid}>
           {/* 軌道選択 */}
           <div>
             <label
               htmlFor="orbital-select"
-              style={{
-                display: 'block',
-                marginBottom: '4px',
-                fontWeight: 'bold',
-              }}
+              className={styles.controlLabel}
             >
               分子軌道:
             </label>
@@ -443,12 +421,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               id="orbital-select"
               value={selectedOrbitalIndex || ''}
               onChange={handleOrbitalChange}
-              style={{
-                width: '100%',
-                padding: '6px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-              }}
+              className={styles.controlSelect}
             >
               {orbitalsData.orbitals.map((orbital: OrbitalInfo) => (
                 <option key={orbital.index} value={orbital.index}>
@@ -485,14 +458,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
           </div>
 
           {/* 正の等値面 */}
-          <div>
+          <div className={styles.controlGroup}>
             <label
               htmlFor="isovalue-pos"
-              style={{
-                display: 'block',
-                marginBottom: '4px',
-                fontWeight: 'bold',
-              }}
+              className={`${styles.rangeLabel} ${styles.controlLabel}`}
             >
               正等値面: {viewerOptions.isovaluePos.toFixed(3)}
             </label>
@@ -506,19 +475,15 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               onChange={e =>
                 handleOptionsChange({ isovaluePos: parseFloat(e.target.value) })
               }
-              style={{ width: '100%' }}
+              className={styles.rangeInput}
             />
           </div>
 
           {/* 負の等値面 */}
-          <div>
+          <div className={styles.controlGroup}>
             <label
               htmlFor="isovalue-neg"
-              style={{
-                display: 'block',
-                marginBottom: '4px',
-                fontWeight: 'bold',
-              }}
+              className={`${styles.rangeLabel} ${styles.controlLabel}`}
             >
               負等値面: {viewerOptions.isovalueNeg.toFixed(3)}
             </label>
@@ -532,23 +497,15 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               onChange={e =>
                 handleOptionsChange({ isovalueNeg: parseFloat(e.target.value) })
               }
-              style={{ width: '100%' }}
+              className={styles.rangeInput}
             />
           </div>
         </div>
 
         {/* 選択された軌道の情報 */}
         {selectedOrbital && (
-          <div
-            style={{
-              marginTop: '12px',
-              padding: '12px',
-              backgroundColor: 'white',
-              borderRadius: '4px',
-              border: '1px solid #e0e0e0',
-            }}
-          >
-            <div style={{ fontSize: '14px', color: '#333' }}>
+          <div className={styles.selectedOrbitalInfo}>
+            <div>
               <strong>{selectedOrbital.label}</strong> (軌道 #
               {selectedOrbital.index})
               <br />
@@ -564,12 +521,12 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
       </div>
 
       {/* 3Dmol.jsビューアー */}
-      <div style={{ position: 'relative' }}>
+      <div className={styles.viewer3D}>
         <div
           ref={setViewerRef}
           style={{
             width: '100%',
-            height: '500px',
+            height: '100%',
             backgroundColor: 'white',
           }}
         />
@@ -577,18 +534,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         {/* ローディングオーバーレイ */}
         {(isLoading || cubeLoading) && (
           <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-              fontSize: '16px',
-            }}
+            className={styles.loadingOverlay}
           >
             ⚛️ 軌道データを生成中...
           </div>

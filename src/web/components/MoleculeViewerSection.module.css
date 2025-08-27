@@ -3,13 +3,9 @@
 .mainContent {
   display: flex;
   gap: 16px;
-  height: 500px;
   width: 100%;
+  height: 100%;
   background: white;
-  border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  border: 1px solid #e0e0e0;
 }
 
 .leftColumn {
@@ -27,13 +23,6 @@
   min-width: 280px;
 }
 
-.visualizationSection {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid #e0e0e0;
-  height: 100%;
-}
 
 /* Viewer placeholder styles */
 .viewerPlaceholder {

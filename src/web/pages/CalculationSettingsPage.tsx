@@ -388,14 +388,7 @@ export const CalculationSettingsPage = ({
   if (!activeCalculation || !activeCalculation.parameters) {
     return (
       <div className={styles.calculationSettingsContainers}>
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '40px',
-            color: '#666',
-            width: '100%',
-          }}
-        >
+        <div className={styles.loadingContainer}>
           <h2>Loading Calculation...</h2>
           <p>Please wait or select a calculation from the sidebar.</p>
         </div>
@@ -846,7 +839,7 @@ export const CalculationSettingsPage = ({
                     />
                     Use Frozen Core Approximation
                   </label>
-                  <div style={{ fontSize: '12px', color: '#666', marginLeft: '20px', marginTop: '4px' }}>
+                  <div className={styles.frozenCoreHelp}>
                     Freeze core orbitals to reduce computational cost (recommended)
                   </div>
                 </div>
@@ -1013,16 +1006,14 @@ export const CalculationSettingsPage = ({
           </div>
           {isConverting && (
             <div
-              className={`${styles.validationMessage} ${styles.validating}`}
-              style={{ marginTop: '8px' }}
+              className={`${styles.validationMessage} ${styles.validating} ${styles.convertingMessage}`}
             >
               Converting...
             </div>
           )}
           {convertError && (
             <div
-              className={`${styles.validationMessage} ${styles.invalid}`}
-              style={{ marginTop: '8px' }}
+              className={`${styles.validationMessage} ${styles.invalid} ${styles.errorMessage}`}
             >
               ❌ {convertError}
             </div>

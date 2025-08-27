@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { useGetOrbitals } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
+import styles from './MolecularOrbitalEnergyDiagram.module.css';
 
 interface MolecularOrbitalEnergyDiagramProps {
   calculationId: string;
@@ -110,14 +111,8 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
 
   if (orbitalsLoading) {
     return (
-      <div style={{ 
-        textAlign: 'center', 
-        padding: '40px',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        backgroundColor: '#f8f9fa'
-      }}>
-        <div style={{ fontSize: '16px', color: '#666' }}>
+      <div className={styles.loadingContainer}>
+        <div className={styles.loadingText}>
           ⚛️ エネルギー準位データを読み込み中...
         </div>
       </div>
@@ -126,16 +121,9 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
 
   if (orbitalsError) {
     return (
-      <div style={{ 
-        textAlign: 'center', 
-        padding: '40px', 
-        color: '#e74c3c',
-        border: '1px solid #e74c3c',
-        borderRadius: '8px',
-        backgroundColor: '#fdf2f2'
-      }}>
+      <div className={styles.errorContainer}>
         <div>❌ エネルギー準位データの読み込みに失敗しました</div>
-        <div style={{ fontSize: '14px', marginTop: '8px' }}>
+        <div className={styles.errorMessage}>
           {orbitalsError.message || '不明なエラーが発生しました'}
         </div>
       </div>
@@ -144,16 +132,9 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
 
   if (processedOrbitals.length === 0) {
     return (
-      <div style={{ 
-        textAlign: 'center', 
-        padding: '40px', 
-        color: '#666',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        backgroundColor: '#f8f9fa'
-      }}>
+      <div className={styles.noDataContainer}>
         <div>📊 軌道エネルギー情報がありません。</div>
-        <div style={{ fontSize: '14px', marginTop: '8px' }}>
+        <div className={styles.noDataMessage}>
           計算が完了していないか、軌道データが生成されていません。
         </div>
       </div>
@@ -163,23 +144,16 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
   const chartWidth = DIAGRAM_CONFIG.width - DIAGRAM_CONFIG.margin.left - DIAGRAM_CONFIG.margin.right;
 
   return (
-    <div
-      style={{
-        border: '1px solid #ddd',
-        borderRadius: '8px',
-        padding: '20px',
-        backgroundColor: 'white',
-      }}
-    >
+    <div className={styles.diagramContainer}>
       {/* ヘッダー情報 */}
-      <div style={{ marginBottom: '20px' }}>
-        <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>
+      <div className={styles.diagramHeader}>
+        <h3 className={styles.diagramTitle}>
           分子軌道エネルギー準位図
         </h3>
         {orbitalSummary.homoLumoGap && (
-          <div style={{ fontSize: '14px', color: '#666' }}>
+          <div className={styles.homoLumoGap}>
             <strong>HOMO-LUMOギャップ:</strong>{' '}
-            <span style={{ fontFamily: 'monospace', color: '#e74c3c' }}>
+            <span className={styles.gapValue}>
               {orbitalSummary.homoLumoGap.toFixed(4)} eV
             </span>
           </div>
@@ -187,16 +161,11 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       </div>
 
       {/* SVGエネルギー準位図 */}
-      <div style={{ overflowX: 'auto', overflowY: 'hidden' }}>
+      <div className={styles.svgContainer}>
         <svg
           width={DIAGRAM_CONFIG.width}
           height={DIAGRAM_CONFIG.height}
-          style={{ 
-            border: '1px solid #eee', 
-            borderRadius: '4px',
-            backgroundColor: '#fafafa',
-            minWidth: '600px'
-          }}
+          className={styles.diagramSvg}
         >
           {/* 背景グリッド */}
           <defs>
@@ -373,81 +342,41 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
 
       {/* 凡例 */}
       <div style={{ marginTop: '20px', display: 'flex', gap: '20px', fontSize: '14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '20px',
-              height: '4px',
-              backgroundColor: '#e74c3c',
-            }}
-          />
+        <div className={styles.legendItem}>
+          <div className={`${styles.legendColorBox} ${styles.legendHomo}`} />
           <span>HOMO</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '20px',
-              height: '4px',
-              backgroundColor: '#3498db',
-            }}
-          />
+        <div className={styles.legendItem}>
+          <div className={`${styles.legendColorBox} ${styles.legendLumo}`} />
           <span>LUMO</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '20px',
-              height: '4px',
-              backgroundColor: '#2ecc71',
-            }}
-          />
+        <div className={styles.legendItem}>
+          <div className={`${styles.legendColorBox} ${styles.legendOccupied}`} />
           <span>占有軌道</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '20px',
-              height: '4px',
-              backgroundColor: '#95a5a6',
-            }}
-          />
+        <div className={styles.legendItem}>
+          <div className={`${styles.legendColorBox} ${styles.legendVirtual}`} />
           <span>仮想軌道</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: '#34495e',
-            }}
-          />
+        <div className={styles.legendItem}>
+          <div className={styles.legendElectron} />
           <span>電子</span>
         </div>
       </div>
 
       {/* 選択された軌道の詳細情報 */}
       {selectedOrbitalIndex !== null && (
-        <div
-          style={{
-            marginTop: '20px',
-            padding: '15px',
-            backgroundColor: '#fff3cd',
-            border: '1px solid #ffeaa7',
-            borderRadius: '6px',
-            fontSize: '14px',
-          }}
-        >
+        <div className={styles.selectedOrbitalDetails}>
           {(() => {
             const selectedOrbital = processedOrbitals.find(o => o.index === selectedOrbitalIndex);
             if (!selectedOrbital) return null;
             
             return (
               <div>
-                <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#856404' }}>
+                <div className={styles.selectedOrbitalTitle}>
                   選択された軌道: {selectedOrbital.label || `Orbital ${selectedOrbital.index}`}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px' }}>
+                <div className={styles.selectedOrbitalGrid}>
                   <div>
                     <strong>エネルギー:</strong> {selectedOrbital.energy_ev.toFixed(4)} eV
                   </div>
@@ -468,16 +397,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       )}
 
       {/* 操作説明 */}
-      <div
-        style={{
-          marginTop: '15px',
-          padding: '10px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '4px',
-          fontSize: '12px',
-          color: '#666',
-        }}
-      >
+      <div className={styles.helpSection}>
         💡 軌道をクリックすると詳細を確認できます。黄色のギャップ領域はHOMO-LUMOギャップを示します。
       </div>
     </div>

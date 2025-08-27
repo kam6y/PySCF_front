@@ -103,15 +103,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <div className={styles.calculationStatus}>
                         <span
                           className={`${styles.statusBadge} ${STATUS_CONFIG[calculation.status as StatusType]?.className || styles.statusUnknown}`}
-                          style={{
-                            color:
-                              STATUS_CONFIG[calculation.status as StatusType]
-                                ?.color || '#666',
-                            animation:
-                              calculation.status === 'running'
-                                ? 'pulse 2s infinite'
-                                : 'none',
-                          }}
                         >
                           <span className={styles.statusIcon}>
                             {STATUS_CONFIG[calculation.status as StatusType]

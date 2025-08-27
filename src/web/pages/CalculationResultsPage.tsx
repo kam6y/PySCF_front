@@ -39,8 +39,8 @@ export const CalculationResultsPage = ({
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            ⚛️ Loading calculation details...
+          <div className={styles.loadingContainer}>
+            <div className={styles.loadingText}>⚛️ Loading calculation details...</div>
           </div>
         </div>
       </div>
@@ -53,9 +53,7 @@ export const CalculationResultsPage = ({
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
-          <div
-            style={{ color: '#e74c3c', padding: '20px', textAlign: 'center' }}
-          >
+          <div className={styles.errorContainer}>
             ❌ {error}
           </div>
         </div>
@@ -69,7 +67,7 @@ export const CalculationResultsPage = ({
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
-          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+          <div className={styles.noCalculationContainer}>
             📊 No calculation selected. Please select a calculation from the
             sidebar to view its results.
           </div>
@@ -93,12 +91,12 @@ export const CalculationResultsPage = ({
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
-          <div style={{ textAlign: 'center', padding: '20px', color: '#666' }}>
+          <div className={styles.statusMessageContainer}>
             {statusMessages[
               activeCalculation.status as keyof typeof statusMessages
             ] || '❓ Calculation results are not available.'}
           </div>
-          <div style={{ textAlign: 'center', marginTop: '20px' }}>
+          <div className={styles.statusMessageMeta}>
             <strong>Calculation:</strong> {activeCalculation.name}
             <br />
             <strong>Status:</strong>{' '}
@@ -121,22 +119,9 @@ export const CalculationResultsPage = ({
         <h1>Quantum Chemistry Calculation Results</h1>
 
         {/* Calculation Summary */}
-        <section
-          style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#f8f9fa',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={`${styles.calculationSection} ${styles.summarySection}`}>
           <h2>Calculation Summary</h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '15px',
-            }}
-          >
+          <div className={styles.summaryGrid}>
             <div>
               <strong>Molecule:</strong> {(parameters as any).name || 'Unknown'}
             </div>
@@ -167,16 +152,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Energy Results */}
-        <section
-          style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#e8f6f3',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={`${styles.calculationSection} ${styles.energySection}`}>
           <h2>Energy Results</h2>
-          <div style={{ fontSize: '18px' }}>
+          <div className={styles.energyResult}>
             <strong>SCF Energy:</strong>{' '}
             <code>{results.scf_energy?.toFixed(8) || 'N/A'} hartree</code>
           </div>
@@ -184,63 +162,40 @@ export const CalculationResultsPage = ({
 
         {/* Vibrational Frequency Analysis */}
         {results.frequency_analysis_performed && (
-          <section
-            style={{
-              marginBottom: '30px',
-              padding: '20px',
-              backgroundColor: '#f0f8ff',
-              borderRadius: '8px',
-            }}
-          >
+          <section className={`${styles.calculationSection} ${styles.frequencySection}`}>
             <h2>Vibrational Frequency Analysis</h2>
             
             {/* Optimization Quality Assessment */}
-            <div style={{ marginBottom: '15px' }}>
+            <div className={styles.frequencyStatus}>
               <strong>Geometry Optimization Status:</strong>{' '}
               {results.imaginary_frequencies_count === 0 ? (
-                <span style={{ color: '#059669' }}>✅ Successful (no imaginary frequencies)</span>
+                <span className={styles.successStatus}>✅ Successful (no imaginary frequencies)</span>
               ) : results.imaginary_frequencies_count === 1 ? (
-                <span style={{ color: '#d97706' }}>⚠️ Possible transition state (1 imaginary frequency)</span>
+                <span className={styles.warningStatus}>⚠️ Possible transition state (1 imaginary frequency)</span>
               ) : (
-                <span style={{ color: '#dc2626' }}>❌ Poor optimization ({results.imaginary_frequencies_count} imaginary frequencies)</span>
+                <span className={styles.errorStatus}>❌ Poor optimization ({results.imaginary_frequencies_count} imaginary frequencies)</span>
               )}
             </div>
             
             {/* Vibrational Frequencies */}
             {results.vibrational_frequencies && results.vibrational_frequencies.length > 0 && (
-              <div style={{ marginBottom: '15px' }}>
+              <div className={styles.frequencyStatus}>
                 <strong>Vibrational Frequencies (cm⁻¹):</strong>
-                <div 
-                  style={{ 
-                    marginTop: '8px',
-                    padding: '10px',
-                    backgroundColor: '#f8fafc',
-                    borderRadius: '4px',
-                    maxHeight: '150px',
-                    overflowY: 'auto',
-                    fontFamily: 'monospace',
-                    fontSize: '14px'
-                  }}
-                >
+                <div className={styles.frequencyList}>
                   {results.vibrational_frequencies.map((freq, index) => (
-                    <span key={index} style={{ marginRight: '12px' }}>
+                    <span key={index} className={styles.frequencyItem}>
                       {freq.toFixed(1)}
                     </span>
                   ))}
                 </div>
-                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '5px' }}>
+                <div className={styles.frequencyCount}>
                   Total: {results.vibrational_frequencies.length} normal modes (≥80 cm⁻¹)
                 </div>
               </div>
             )}
             
             {/* Thermochemical Properties */}
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-              gap: '15px',
-              fontSize: '14px'
-            }}>
+            <div className={styles.thermochemicalGrid}>
               {results.zero_point_energy !== undefined && results.zero_point_energy !== null && (
                 <div>
                   <strong>Zero-Point Energy:</strong><br />
@@ -276,22 +231,9 @@ export const CalculationResultsPage = ({
         )}
 
         {/* Orbital Information */}
-        <section
-          style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#fef9e7',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={`${styles.calculationSection} ${styles.orbitalSection}`}>
           <h2>Molecular Orbitals</h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: '15px',
-            }}
-          >
+          <div className={styles.orbitalInfoGrid}>
             <div>
               <strong>HOMO Index:</strong> <code>{results.homo_index}</code>
             </div>
@@ -310,18 +252,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Molecular Orbital Energy Diagram */}
-        <section
-          style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#fff9e6',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={`${styles.calculationSection} ${styles.energyDiagramSection}`}>
           <h2>分子軌道エネルギー準位図</h2>
-          <div
-            style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}
-          >
+          <div className={styles.sectionDescription}>
             分子軌道のエネルギー準位を図示します。軌道をクリックすると3D可視化で詳細を確認できます。
           </div>
           <MolecularOrbitalEnergyDiagram
@@ -334,18 +267,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Molecular Orbital Visualization */}
-        <section
-          style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#f0f8ff',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={`${styles.calculationSection} ${styles.orbitalViewerSection}`}>
           <h2>分子軌道可視化</h2>
-          <div
-            style={{ marginBottom: '15px', fontSize: '14px', color: '#666' }}
-          >
+          <div className={styles.sectionDescription}>
             量子化学計算で得られた分子軌道を3D可視化します。軌道を選択して形状や分布を確認できます。
           </div>
           <MolecularOrbitalViewer
@@ -360,22 +284,9 @@ export const CalculationResultsPage = ({
           results.excitation_energies && (
             <>
               {/* Excited States Summary */}
-              <section
-                style={{
-                  marginBottom: '30px',
-                  padding: '20px',
-                  backgroundColor: '#e8f0ff',
-                  borderRadius: '8px',
-                }}
-              >
+              <section className={`${styles.calculationSection} ${styles.excitedStatesSection}`}>
                 <h2>Excited States Summary</h2>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                    gap: '15px',
-                  }}
-                >
+                <div className={styles.excitedStatesGrid}>
                   <div>
                     <strong>Number of States:</strong>{' '}
                     <code>{results.excitation_energies.length}</code>
@@ -400,72 +311,17 @@ export const CalculationResultsPage = ({
               </section>
 
               {/* Excitation Energies Table */}
-              <section
-                style={{
-                  marginBottom: '30px',
-                  padding: '20px',
-                  backgroundColor: '#fff8dc',
-                  borderRadius: '8px',
-                }}
-              >
+              <section className={`${styles.calculationSection} ${styles.excitationTableSection}`}>
                 <h2>Excitation Energies and Transitions</h2>
-                <div style={{ overflowX: 'auto' }}>
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      backgroundColor: 'white',
-                      borderRadius: '4px',
-                      overflow: 'hidden',
-                    }}
-                  >
+                <div className={styles.tableContainer}>
+                  <table className={styles.dataTable}>
                     <thead>
-                      <tr style={{ backgroundColor: '#f0f8ff' }}>
-                        <th
-                          style={{
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            textAlign: 'left',
-                          }}
-                        >
-                          State
-                        </th>
-                        <th
-                          style={{
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            textAlign: 'right',
-                          }}
-                        >
-                          Energy (eV)
-                        </th>
-                        <th
-                          style={{
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            textAlign: 'right',
-                          }}
-                        >
-                          Wavelength (nm)
-                        </th>
-                        <th
-                          style={{
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            textAlign: 'right',
-                          }}
-                        >
-                          Osc. Strength
-                        </th>
-                        <th
-                          style={{
-                            padding: '12px',
-                            border: '1px solid #ddd',
-                            textAlign: 'left',
-                          }}
-                        >
-                          Transition Type (estimation)
-                        </th>
+                      <tr>
+                        <th>State</th>
+                        <th className={styles.rightAlign}>Energy (eV)</th>
+                        <th className={styles.rightAlign}>Wavelength (nm)</th>
+                        <th className={styles.rightAlign}>Osc. Strength</th>
+                        <th>Transition Type (estimation)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -478,61 +334,20 @@ export const CalculationResultsPage = ({
                           const transition = results.major_transitions?.[index];
 
                           return (
-                            <tr
-                              key={index}
-                              style={{
-                                backgroundColor:
-                                  index % 2 === 0 ? '#fafafa' : 'white',
-                              }}
-                            >
-                              <td
-                                style={{
-                                  padding: '10px',
-                                  border: '1px solid #ddd',
-                                }}
-                              >
-                                S{index + 1}
-                              </td>
-                              <td
-                                style={{
-                                  padding: '10px',
-                                  border: '1px solid #ddd',
-                                  textAlign: 'right',
-                                  fontFamily: 'monospace',
-                                }}
-                              >
+                            <tr key={index}>
+                              <td>S{index + 1}</td>
+                              <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                 {energy.toFixed(4)}
                               </td>
-                              <td
-                                style={{
-                                  padding: '10px',
-                                  border: '1px solid #ddd',
-                                  textAlign: 'right',
-                                  fontFamily: 'monospace',
-                                }}
-                              >
+                              <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                 {wavelength ? wavelength.toFixed(1) : 'N/A'}
                               </td>
-                              <td
-                                style={{
-                                  padding: '10px',
-                                  border: '1px solid #ddd',
-                                  textAlign: 'right',
-                                  fontFamily: 'monospace',
-                                }}
-                              >
+                              <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                 {oscStrength !== undefined
                                   ? oscStrength.toFixed(6)
                                   : 'N/A'}
                               </td>
-                              <td
-                                style={{
-                                  padding: '10px',
-                                  border: '1px solid #ddd',
-                                }}
-                              >
-                                {transition?.dominant_transition || 'Unknown'}
-                              </td>
+                              <td>{transition?.dominant_transition || 'Unknown'}</td>
                             </tr>
                           );
                         }
@@ -543,30 +358,13 @@ export const CalculationResultsPage = ({
               </section>
 
               {/* UV-Vis Spectrum Visualization */}
-              <section
-                style={{
-                  marginBottom: '30px',
-                  padding: '20px',
-                  backgroundColor: '#f0fff0',
-                  borderRadius: '8px',
-                }}
-              >
+              <section className={`${styles.calculationSection} ${styles.uvVisSection}`}>
                 <h2>UV-Vis Spectrum (Simulated)</h2>
-                <div
-                  style={{
-                    height: '300px',
-                    border: '1px solid #ddd',
-                    borderRadius: '4px',
-                    backgroundColor: 'white',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
+                <div className={styles.uvVisChart}>
                   <svg
                     width="100%"
                     height="100%"
                     viewBox="0 0 800 300"
-                    style={{ display: 'block' }}
                   >
                     {/* Background Grid */}
                     <defs>
@@ -650,14 +448,7 @@ export const CalculationResultsPage = ({
                     </text>
                   </svg>
                 </div>
-                <div
-                  style={{
-                    marginTop: '10px',
-                    fontSize: '14px',
-                    color: '#666',
-                    textAlign: 'center',
-                  }}
-                >
+                <div className={styles.uvVisDescription}>
                   UV-Vis absorption spectrum showing calculated transitions.
                   Colors represent approximate wavelength regions.
                 </div>
@@ -666,72 +457,17 @@ export const CalculationResultsPage = ({
               {/* Transition Dipole Moments */}
               {results.transition_dipoles &&
                 results.transition_dipoles.length > 0 && (
-                  <section
-                    style={{
-                      marginBottom: '30px',
-                      padding: '20px',
-                      backgroundColor: '#fff0f5',
-                      borderRadius: '8px',
-                    }}
-                  >
+                  <section className={`${styles.calculationSection} ${styles.transitionDipoleSection}`}>
                     <h2>Transition Dipole Moments</h2>
-                    <div style={{ overflowX: 'auto' }}>
-                      <table
-                        style={{
-                          width: '100%',
-                          borderCollapse: 'collapse',
-                          backgroundColor: 'white',
-                          borderRadius: '4px',
-                          overflow: 'hidden',
-                        }}
-                      >
+                    <div className={styles.tableContainer}>
+                      <table className={styles.dataTable}>
                         <thead>
-                          <tr style={{ backgroundColor: '#f0f8ff' }}>
-                            <th
-                              style={{
-                                padding: '12px',
-                                border: '1px solid #ddd',
-                                textAlign: 'left',
-                              }}
-                            >
-                              State
-                            </th>
-                            <th
-                              style={{
-                                padding: '12px',
-                                border: '1px solid #ddd',
-                                textAlign: 'right',
-                              }}
-                            >
-                              μx (a.u.)
-                            </th>
-                            <th
-                              style={{
-                                padding: '12px',
-                                border: '1px solid #ddd',
-                                textAlign: 'right',
-                              }}
-                            >
-                              μy (a.u.)
-                            </th>
-                            <th
-                              style={{
-                                padding: '12px',
-                                border: '1px solid #ddd',
-                                textAlign: 'right',
-                              }}
-                            >
-                              μz (a.u.)
-                            </th>
-                            <th
-                              style={{
-                                padding: '12px',
-                                border: '1px solid #ddd',
-                                textAlign: 'right',
-                              }}
-                            >
-                              |μ| (a.u.)
-                            </th>
+                          <tr>
+                            <th>State</th>
+                            <th className={styles.rightAlign}>μx (a.u.)</th>
+                            <th className={styles.rightAlign}>μy (a.u.)</th>
+                            <th className={styles.rightAlign}>μz (a.u.)</th>
+                            <th className={styles.rightAlign}>|μ| (a.u.)</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -744,59 +480,18 @@ export const CalculationResultsPage = ({
                               );
 
                               return (
-                                <tr
-                                  key={index}
-                                  style={{
-                                    backgroundColor:
-                                      index % 2 === 0 ? '#fafafa' : 'white',
-                                  }}
-                                >
-                                  <td
-                                    style={{
-                                      padding: '10px',
-                                      border: '1px solid #ddd',
-                                    }}
-                                  >
-                                    S{index + 1}
-                                  </td>
-                                  <td
-                                    style={{
-                                      padding: '10px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'right',
-                                      fontFamily: 'monospace',
-                                    }}
-                                  >
+                                <tr key={index}>
+                                  <td>S{index + 1}</td>
+                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                     {dipole.x.toFixed(6)}
                                   </td>
-                                  <td
-                                    style={{
-                                      padding: '10px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'right',
-                                      fontFamily: 'monospace',
-                                    }}
-                                  >
+                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                     {dipole.y.toFixed(6)}
                                   </td>
-                                  <td
-                                    style={{
-                                      padding: '10px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'right',
-                                      fontFamily: 'monospace',
-                                    }}
-                                  >
+                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                     {dipole.z.toFixed(6)}
                                   </td>
-                                  <td
-                                    style={{
-                                      padding: '10px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'right',
-                                      fontFamily: 'monospace',
-                                    }}
-                                  >
+                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                     <strong>{magnitude.toFixed(6)}</strong>
                                   </td>
                                 </tr>
@@ -811,205 +506,76 @@ export const CalculationResultsPage = ({
 
               {/* Natural Transition Orbital Analysis */}
               {results.nto_analysis && results.nto_analysis.length > 0 && (
-                <section
-                  style={{
-                    marginBottom: '30px',
-                    padding: '20px',
-                    backgroundColor: '#f0f8ff',
-                    borderRadius: '8px',
-                  }}
-                >
+                <section className={`${styles.calculationSection} ${styles.ntoSection}`}>
                   <h2>Natural Transition Orbital (NTO) Analysis</h2>
-                  <div
-                    style={{
-                      marginBottom: '15px',
-                      fontSize: '14px',
-                      color: '#666',
-                    }}
-                  >
+                  <div className={styles.sectionDescription}>
                     NTO analysis provides a more intuitive description of
                     electronic excitations by decomposing the transition density
                     matrix into dominant hole-particle orbital pairs.
                   </div>
                   {results.nto_analysis.map(
                     (stateData: any, stateIndex: number) => (
-                      <div key={stateIndex} style={{ marginBottom: '30px' }}>
-                        <h3 style={{ color: '#2c5aa0', marginBottom: '15px' }}>
+                      <div key={stateIndex} className={styles.ntoState}>
+                        <h3 className={styles.ntoStateTitle}>
                           Excited State S{stateData.state} (
                           {stateData.energy?.toFixed(4)} eV)
                         </h3>
                         {stateData.nto_pairs &&
                         stateData.nto_pairs.length > 0 ? (
-                          <div style={{ overflowX: 'auto' }}>
-                            <table
-                              style={{
-                                width: '100%',
-                                borderCollapse: 'collapse',
-                                backgroundColor: 'white',
-                                borderRadius: '4px',
-                                overflow: 'hidden',
-                              }}
-                            >
+                          <div className={styles.tableContainer}>
+                            <table className={`${styles.dataTable} ${styles.ntoTable}`}>
                               <thead>
-                                <tr style={{ backgroundColor: '#e6f3ff' }}>
-                                  <th
-                                    style={{
-                                      padding: '12px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'left',
-                                    }}
-                                  >
-                                    NTO Pair
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: '12px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'left',
-                                    }}
-                                  >
-                                    Transition
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: '12px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'right',
-                                    }}
-                                  >
-                                    Weight
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: '12px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'right',
-                                    }}
-                                  >
-                                    Contribution (%)
-                                  </th>
-                                  <th
-                                    style={{
-                                      padding: '12px',
-                                      border: '1px solid #ddd',
-                                      textAlign: 'center',
-                                    }}
-                                  >
-                                    Orbital Indices
-                                  </th>
+                                <tr>
+                                  <th>NTO Pair</th>
+                                  <th>Transition</th>
+                                  <th className={styles.rightAlign}>Weight</th>
+                                  <th className={styles.rightAlign}>Contribution (%)</th>
+                                  <th className={styles.centerAlign}>Orbital Indices</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {stateData.nto_pairs.map(
                                   (pair: any, pairIndex: number) => (
-                                    <tr
-                                      key={pairIndex}
-                                      style={{
-                                        backgroundColor:
-                                          pairIndex % 2 === 0
-                                            ? '#fafafa'
-                                            : 'white',
-                                      }}
-                                    >
-                                      <td
-                                        style={{
-                                          padding: '10px',
-                                          border: '1px solid #ddd',
-                                        }}
-                                      >
+                                    <tr key={pairIndex}>
+                                      <td>
                                         <strong>#{pairIndex + 1}</strong>
                                       </td>
-                                      <td
-                                        style={{
-                                          padding: '10px',
-                                          border: '1px solid #ddd',
-                                        }}
-                                      >
-                                        <span
-                                          style={{
-                                            color: '#d32f2f',
-                                            fontWeight: 'bold',
-                                          }}
-                                        >
+                                      <td className={styles.ntoTransition}>
+                                        <span className={styles.holeOrbital}>
                                           {pair.hole_orbital}
                                         </span>
-                                        <span
-                                          style={{
-                                            margin: '0 8px',
-                                            color: '#666',
-                                          }}
-                                        >
+                                        <span className={styles.transitionArrow}>
                                           →
                                         </span>
-                                        <span
-                                          style={{
-                                            color: '#1976d2',
-                                            fontWeight: 'bold',
-                                          }}
-                                        >
+                                        <span className={styles.particleOrbital}>
                                           {pair.particle_orbital}
                                         </span>
                                       </td>
-                                      <td
-                                        style={{
-                                          padding: '10px',
-                                          border: '1px solid #ddd',
-                                          textAlign: 'right',
-                                          fontFamily: 'monospace',
-                                        }}
-                                      >
+                                      <td className={`${styles.rightAlign} ${styles.monoFont}`}>
                                         {pair.weight?.toFixed(6) || 'N/A'}
                                       </td>
-                                      <td
-                                        style={{
-                                          padding: '10px',
-                                          border: '1px solid #ddd',
-                                          textAlign: 'right',
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'flex-end',
-                                            gap: '8px',
-                                          }}
-                                        >
+                                      <td className={styles.rightAlign}>
+                                        <div className={styles.ntoContribution}>
                                           <div
+                                            className={`${styles.contributionBar} ${
+                                              pair.contribution >= 50
+                                                ? styles.contributionBarHigh
+                                                : pair.contribution >= 25
+                                                ? styles.contributionBarMedium
+                                                : styles.contributionBarLow
+                                            }`}
                                             style={{
-                                              width: `${Math.min(pair.contribution || 0, 100)}%`,
-                                              height: '12px',
-                                              backgroundColor:
-                                                pair.contribution >= 50
-                                                  ? '#4caf50'
-                                                  : pair.contribution >= 25
-                                                    ? '#ff9800'
-                                                    : '#f44336',
-                                              borderRadius: '6px',
-                                              minWidth: '2px',
+                                              width: `${Math.min(pair.contribution || 0, 100)}%`
                                             }}
                                           />
-                                          <span
-                                            style={{
-                                              fontWeight: 'bold',
-                                              minWidth: '50px',
-                                            }}
-                                          >
+                                          <span className={styles.contributionValue}>
                                             {pair.contribution?.toFixed(1) ||
                                               'N/A'}
                                             %
                                           </span>
                                         </div>
                                       </td>
-                                      <td
-                                        style={{
-                                          padding: '10px',
-                                          border: '1px solid #ddd',
-                                          textAlign: 'center',
-                                          fontSize: '12px',
-                                          color: '#666',
-                                        }}
-                                      >
+                                      <td className={`${styles.centerAlign} ${styles.ntoIndices}`}>
                                         {pair.hole_orbital_index} →{' '}
                                         {pair.particle_orbital_index}
                                       </td>
@@ -1093,22 +659,9 @@ export const CalculationResultsPage = ({
 
         {/* CCSD Results Section */}
         {(parameters.calculation_method === 'CCSD' || parameters.calculation_method === 'CCSD_T') && (
-          <section
-            style={{
-              marginBottom: '30px',
-              padding: '20px',
-              backgroundColor: '#fff0e8',
-              borderRadius: '8px',
-            }}
-          >
+          <section className={`${styles.calculationSection} ${styles.ccsdSection}`}>
             <h2>CCSD Results</h2>
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '15px',
-              }}
-            >
+            <div className={styles.thermochemicalGrid}>
               <div>
                 <strong>HF Energy:</strong>{' '}
                 <code>{((results as any).hf_energy || results.scf_energy)?.toFixed(6)} Hartree</code>
@@ -1143,7 +696,7 @@ export const CalculationResultsPage = ({
               )}
             </div>
             {(results as any).frozen_core && (
-              <div style={{ marginTop: '15px', fontSize: '14px', color: '#666' }}>
+              <div className={styles.sectionDescription} style={{ marginTop: '15px' }}>
                 ℹ️ Frozen core approximation was used in this calculation
               </div>
             )}
@@ -1151,25 +704,18 @@ export const CalculationResultsPage = ({
         )}
 
         {/* Checkpoint File Information */}
-        <section
-          style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#f0f3ff',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={`${styles.calculationSection} ${styles.checkpointSection}`}>
           <h2>Checkpoint File Information</h2>
           <div>
-            <div style={{ marginBottom: '10px' }}>
+            <div className={styles.checkpointInfo}>
               <strong>Working Directory:</strong>{' '}
               <code>{results.working_directory}</code>
             </div>
-            <div style={{ marginBottom: '10px' }}>
+            <div className={styles.checkpointInfo}>
               <strong>Checkpoint File:</strong>{' '}
               <code>{results.checkpoint_file}</code>
             </div>
-            <div style={{ marginBottom: '15px' }}>
+            <div className={styles.checkpointStatus}>
               <strong>File Status:</strong>{' '}
               {results.checkpoint_exists
                 ? '✅ File exists'
@@ -1421,21 +967,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Calculation Parameters */}
-        <section
-          style={{
-            padding: '20px',
-            backgroundColor: '#f5f5f5',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={`${styles.calculationSection} ${styles.parametersSection}`}>
           <h2>Calculation Parameters</h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '15px',
-            }}
-          >
+          <div className={styles.parametersGrid}>
             <div>
               <strong>Max SCF Cycles:</strong> {results.max_cycle}
             </div>
