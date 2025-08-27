@@ -192,6 +192,8 @@
   background: #45c1e8;
   color: white;
   border: none;
+  width: 10vw;
+  min-width: 160px;
   padding: 12px 16px;
   border-radius: 6px;
   font-size: 20px;

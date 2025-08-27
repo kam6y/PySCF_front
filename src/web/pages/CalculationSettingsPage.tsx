@@ -487,7 +487,7 @@ export const CalculationSettingsPage = ({
       case 'error':
         return 'Error';
       default:
-        return '+ Start';
+        return '+ Start Calc';
     }
   };
 
