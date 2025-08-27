@@ -483,7 +483,7 @@ export const CalculationSettingsPage = ({
       case 'running':
         return 'Running...';
       case 'completed':
-        return 'Completed';
+        return 'Completed!';
       case 'error':
         return 'Error';
       default:
@@ -629,7 +629,12 @@ export const CalculationSettingsPage = ({
                 </div>
               </div>
               <button
-                className={`${styles.startCalculationBtn} ${calculationStatus || 'pending'}`}
+                className={`${styles.startCalculationBtn} ${
+                  calculationStatus === 'completed' ? styles.completed :
+                  calculationStatus === 'running' ? styles.running :
+                  calculationStatus === 'error' ? styles.error :
+                  styles.pending
+                }`}
                 onClick={handleStartCalculation}
                 disabled={
                   !hasValidMolecule ||
