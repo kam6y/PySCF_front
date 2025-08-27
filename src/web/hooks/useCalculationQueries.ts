@@ -178,3 +178,15 @@ export const useDeleteCubeFiles = () => {
     },
   });
 };
+
+// サポートされているパラメータを取得するQuery
+export const useSupportedParameters = () => {
+  return useQuery({
+    queryKey: ['supported-parameters'],
+    queryFn: apiClient.getSupportedParameters,
+    staleTime: 24 * 60 * 60 * 1000, // 24時間キャッシュを保持（パラメータは頻繁に変更されない）
+    gcTime: 24 * 60 * 60 * 1000, // 24時間メモリに保持
+    refetchOnWindowFocus: false, // ウィンドウフォーカス時の再取得を無効化
+    refetchOnMount: false, // マウント時の再取得を無効化（キャッシュを優先）
+  });
+};

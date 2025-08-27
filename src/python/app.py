@@ -23,7 +23,7 @@ from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator, MolecularOrbitalGenerator, CalculationError, ConvergenceError, InputError, GeometryError
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
-from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher
+from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher, get_all_supported_parameters
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
     QuantumCalculationRequest, CalculationUpdateRequest
@@ -271,6 +271,29 @@ def validate_xyz_endpoint(body: XYZValidateRequest):
     except Exception as e:
         logger.error(f"Unexpected error during XYZ validation: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/quantum/supported-parameters', methods=['GET'])
+def get_supported_parameters():
+    """Get supported quantum chemistry parameters including basis functions, exchange-correlation functionals, and solvents."""
+    try:
+        logger.info("Getting supported quantum chemistry parameters")
+        
+        # Get all supported parameters from our quantum_calc module
+        parameters = get_all_supported_parameters()
+        
+        logger.info("Successfully retrieved supported parameters")
+        return jsonify({
+            'success': True,
+            'data': parameters
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting supported parameters: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to retrieve supported parameters: {str(e)}'
+        }), 500
 
 
 @app.route('/api/quantum/calculate', methods=['POST'])

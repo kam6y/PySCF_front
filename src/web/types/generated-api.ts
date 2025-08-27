@@ -95,7 +95,7 @@ export interface paths {
         put?: never;
         /**
          * Start quantum chemistry calculation
-         * @description Start a DFT calculation in the background
+         * @description Start a calculation in the background
          */
         post: operations["startCalculation"];
         delete?: never;
@@ -211,6 +211,26 @@ export interface paths {
          * @description Delete CUBE files for specific orbital or all orbitals in a calculation
          */
         delete: operations["deleteCubeFiles"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/supported-parameters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get supported quantum chemistry parameters
+         * @description Get lists of supported calculation methods, basis functions, exchange-correlation functionals, and solvents
+         */
+        get: operations["getSupportedParameters"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -712,6 +732,39 @@ export interface components {
                 /** @description Human-readable message about the deletion */
                 message: string;
             };
+        };
+        SolventOption: {
+            /** @description Solvent identifier value */
+            value: string;
+            /** @description Human-readable display name */
+            display: string;
+            /** @description Dielectric constant of the solvent */
+            dielectric_constant: number;
+        };
+        SupportedParametersData: {
+            /** @description Supported quantum calculation methods */
+            calculation_methods: string[];
+            /** @description Supported basis functions grouped by category (e.g., Minimal, Pople Style, etc.) */
+            basis_functions: {
+                [key: string]: string[];
+            };
+            /** @description Supported exchange-correlation functionals grouped by category (e.g., Hybrid, GGA, etc.) */
+            exchange_correlation: {
+                [key: string]: string[];
+            };
+            /** @description Supported solvent effect methods */
+            solvent_methods: string[];
+            /** @description Supported solvents grouped by category (e.g., Highly Polar, Protic, etc.) */
+            solvents: {
+                [key: string]: components["schemas"]["SolventOption"][];
+            };
+            /** @description Supported TDDFT calculation methods */
+            tddft_methods: string[];
+        };
+        SupportedParametersResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["SupportedParametersData"];
         };
         ErrorResponse: {
             /** @example false */
@@ -1247,6 +1300,35 @@ export interface operations {
                 };
             };
             /** @description Failed to delete CUBE files */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSupportedParameters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Supported parameters retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupportedParametersResponse"];
+                };
+            };
+            /** @description Failed to retrieve supported parameters */
             500: {
                 headers: {
                     [name: string]: unknown;

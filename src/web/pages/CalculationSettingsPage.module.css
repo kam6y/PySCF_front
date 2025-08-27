@@ -222,13 +222,12 @@
 
 .running {
   background: #45c1e8;
-  color: #212529;
 }
 
 .running:hover {
   background: #22b9e7;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
 }
 
 .error {

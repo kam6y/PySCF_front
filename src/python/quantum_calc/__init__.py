@@ -10,6 +10,7 @@ from .orbital_generator import MolecularOrbitalGenerator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError, FileManagerError, ProcessManagerError, WebSocketError, XYZValidationError
 from .process_manager import CalculationProcessManager, get_process_manager, shutdown_process_manager
 from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
+from .supported_parameters import get_all_supported_parameters
 
 __all__ = [
     'BaseCalculator',
@@ -32,5 +33,6 @@ __all__ = [
     'shutdown_process_manager',
     'WebSocketCalculationWatcher',
     'get_websocket_watcher',
-    'shutdown_websocket_watcher'
+    'shutdown_websocket_watcher',
+    'get_all_supported_parameters'
 ]

@@ -14,6 +14,7 @@ import {
   SMILESConvertResponseData,
 } from '../types/api-types';
 import { searchPubChem, convertSmilesToXyz } from '../apiClient';
+import { useSupportedParameters } from '../hooks/useCalculationQueries';
 
 interface CalculationSettingsPageProps {
   activeCalculation?: CalculationInstance;
@@ -48,6 +49,13 @@ export const CalculationSettingsPage = ({
   const [showAxes, setShowAxes] = useState(false);
   const [showCoordinates, setShowCoordinates] = useState(false);
   const [useAtomicRadii, setUseAtomicRadii] = useState(false);
+
+  // サポートされているパラメータを取得
+  const {
+    data: supportedParams,
+    isLoading: isLoadingParams,
+    error: paramsError,
+  } = useSupportedParameters();
 
   useEffect(() => {
     const currentCalculationId = activeCalculation?.id || null;
@@ -669,12 +677,17 @@ export const CalculationSettingsPage = ({
                   }
                   disabled={calculationStatus === 'running'}
                 >
-                  <option value="DFT">DFT</option>
-                  <option value="HF">HF</option>
-                  <option value="MP2">MP2</option>
-                  <option value="CCSD">CCSD</option>
-                  <option value="CCSD_T">CCSD(T)</option>
-                  <option value="TDDFT">TDDFT</option>
+                  {isLoadingParams ? (
+                    <option value="">Loading...</option>
+                  ) : paramsError ? (
+                    <option value="">Error loading methods</option>
+                  ) : (
+                    supportedParams?.calculation_methods?.map((method) => (
+                      <option key={method} value={method}>
+                        {method === 'CCSD_T' ? 'CCSD(T)' : method}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
               <div className={styles.settingRow}>
@@ -686,28 +699,22 @@ export const CalculationSettingsPage = ({
                   }
                   disabled={calculationStatus === 'running'}
                 >
-                  <optgroup label="Minimal">
-                    <option value="STO-3G">STO-3G</option>
-                    <option value="3-21G">3-21G</option>
-                  </optgroup>
-                  <optgroup label="Pople Style">
-                    <option value="6-31G">6-31G</option>
-                    <option value="6-31G(d)">6-31G(d)</option>
-                    <option value="6-31+G(d,p)">6-31+G(d,p)</option>
-                    <option value="6-311G(d,p)">6-311G(d,p)</option>
-                    <option value="6-311++G(d,p)">6-311++G(d,p)</option>
-                  </optgroup>
-                  <optgroup label="Correlation Consistent">
-                    <option value="cc-pVDZ">cc-pVDZ</option>
-                    <option value="cc-pVTZ">cc-pVTZ</option>
-                    <option value="cc-pVQZ">cc-pVQZ</option>
-                    <option value="aug-cc-pVDZ">aug-cc-pVDZ</option>
-                    <option value="aug-cc-pVTZ">aug-cc-pVTZ</option>
-                  </optgroup>
-                  <optgroup label="def2">
-                    <option value="def2-SVP">def2-SVP</option>
-                    <option value="def2-TZVP">def2-TZVP</option>
-                  </optgroup>
+                  {isLoadingParams ? (
+                    <option value="">Loading...</option>
+                  ) : paramsError ? (
+                    <option value="">Error loading basis functions</option>
+                  ) : (
+                    supportedParams?.basis_functions &&
+                    Object.entries(supportedParams.basis_functions).map(([group, functions]) => (
+                      <optgroup key={group} label={group}>
+                        {functions.map((func) => (
+                          <option key={func} value={func}>
+                            {func}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  )}
                 </select>
               </div>
               <div className={styles.settingRow}>
@@ -724,24 +731,22 @@ export const CalculationSettingsPage = ({
                     ) || calculationStatus === 'running'
                   }
                 >
-                  <optgroup label="Hybrid">
-                    <option value="B3LYP">B3LYP</option>
-                    <option value="PBE0">PBE0</option>
-                    <option value="M06-2X">M06-2X</option>
-                    <option value="CAM-B3LYP">CAM-B3LYP</option>
-                    <option value="wB97XD">ωB97X-D</option>
-                  </optgroup>
-                  <optgroup label="GGA">
-                    <option value="PBE">PBE</option>
-                    <option value="BLYP">BLYP</option>
-                    <option value="BP86">BP86</option>
-                    <option value="PW91">PW91</option>
-                  </optgroup>
-                  <optgroup label="Meta-GGA">
-                    <option value="M06">M06</option>
-                    <option value="M06-L">M06-L</option>
-                    <option value="TPSS">TPSS</option>
-                  </optgroup>
+                  {isLoadingParams ? (
+                    <option value="">Loading...</option>
+                  ) : paramsError ? (
+                    <option value="">Error loading functionals</option>
+                  ) : (
+                    supportedParams?.exchange_correlation &&
+                    Object.entries(supportedParams.exchange_correlation).map(([group, functionals]) => (
+                      <optgroup key={group} label={group}>
+                        {functionals.map((functional) => (
+                          <option key={functional} value={functional}>
+                            {functional === 'wB97XD' ? 'ωB97X-D' : functional}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  )}
                 </select>
               </div>
               <div className={styles.settingRow}>
@@ -803,10 +808,19 @@ export const CalculationSettingsPage = ({
                     }
                     disabled={calculationStatus === 'running'}
                   >
-                    <option value="TDDFT">Full TDDFT</option>
-                    <option value="TDA">
-                      Tamm-Dancoff Approximation (TDA)
-                    </option>
+                    {isLoadingParams ? (
+                      <option value="">Loading...</option>
+                    ) : paramsError ? (
+                      <option value="">Error loading TDDFT methods</option>
+                    ) : (
+                      supportedParams?.tddft_methods?.map((method) => (
+                        <option key={method} value={method}>
+                          {method === 'TDDFT' ? 'Full TDDFT' : 
+                           method === 'TDA' ? 'Tamm-Dancoff Approximation (TDA)' : 
+                           method}
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div className={styles.settingRow}>
@@ -860,16 +874,44 @@ export const CalculationSettingsPage = ({
                   }
                   disabled={calculationStatus === 'running'}
                 >
-                  <option value="none">None</option>
-                  <optgroup label="PCM Methods">
-                    <option value="ief-pcm">IEF-PCM</option>
-                    <option value="c-pcm">C-PCM</option>
-                    <option value="cosmo">COSMO</option>
-                    <option value="ssvpe">SS(V)PE</option>
-                  </optgroup>
-                  <optgroup label="ddCOSMO Method">
-                    <option value="ddcosmo">ddCOSMO</option>
-                  </optgroup>
+                  {isLoadingParams ? (
+                    <option value="">Loading...</option>
+                  ) : paramsError ? (
+                    <option value="">Error loading solvent methods</option>
+                  ) : (
+                    supportedParams?.solvent_methods?.map((method) => {
+                      // Organize methods by category
+                      if (method === 'none') {
+                        return <option key={method} value={method}>None</option>;
+                      } else if (['ief-pcm', 'c-pcm', 'cosmo', 'ssvpe'].includes(method)) {
+                        return null; // Handle in PCM optgroup below
+                      } else if (method === 'ddcosmo') {
+                        return null; // Handle in ddCOSMO optgroup below
+                      }
+                      return <option key={method} value={method}>{method}</option>;
+                    }).filter(Boolean)
+                  )}
+                  {!isLoadingParams && !paramsError && supportedParams?.solvent_methods && (
+                    <>
+                      <optgroup label="PCM Methods">
+                        {['ief-pcm', 'c-pcm', 'cosmo', 'ssvpe'].map((method) =>
+                          supportedParams.solvent_methods.includes(method) && (
+                            <option key={method} value={method}>
+                              {method === 'ief-pcm' ? 'IEF-PCM' :
+                               method === 'c-pcm' ? 'C-PCM' :
+                               method === 'cosmo' ? 'COSMO' :
+                               method === 'ssvpe' ? 'SS(V)PE' : method}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      {supportedParams.solvent_methods.includes('ddcosmo') && (
+                        <optgroup label="ddCOSMO Method">
+                          <option value="ddcosmo">ddCOSMO</option>
+                        </optgroup>
+                      )}
+                    </>
+                  )}
                 </select>
               </div>
               <div className={styles.settingRow}>
@@ -882,46 +924,27 @@ export const CalculationSettingsPage = ({
                     calculationStatus === 'running'
                   }
                 >
-                  <optgroup label="Highly Polar">
-                    <option value="water">Water (78.36)</option>
-                    <option value="dimethylsulfoxide">
-                      Dimethylsulfoxide (46.83)
+                  {isLoadingParams ? (
+                    <option value="">Loading...</option>
+                  ) : paramsError ? (
+                    <option value="">Error loading solvents</option>
+                  ) : (
+                    supportedParams?.solvents &&
+                    Object.entries(supportedParams.solvents).map(([group, solvents]) => (
+                      <optgroup key={group} label={group}>
+                        {solvents.map((solvent) => (
+                          <option key={solvent.value} value={solvent.value}>
+                            {solvent.display}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))
+                  )}
+                  {!isLoadingParams && !paramsError && (
+                    <option value="custom">
+                      Custom (Enter dielectric constant below)
                     </option>
-                    <option value="n,n-dimethylformamide">
-                      N,N-Dimethylformamide (37.22)
-                    </option>
-                    <option value="nitromethane">Nitromethane (36.56)</option>
-                  </optgroup>
-                  <optgroup label="Protic Solvents">
-                    <option value="methanol">Methanol (32.61)</option>
-                    <option value="ethanol">Ethanol (24.85)</option>
-                  </optgroup>
-                  <optgroup label="Polar Aprotic">
-                    <option value="acetone">Acetone (20.49)</option>
-                    <option value="dichloroethane">
-                      Dichloroethane (10.13)
-                    </option>
-                    <option value="dichloromethane">
-                      Dichloromethane (8.93)
-                    </option>
-                    <option value="tetrahydrofuran">
-                      Tetrahydrofuran (7.43)
-                    </option>
-                    <option value="chlorobenzene">Chlorobenzene (5.70)</option>
-                  </optgroup>
-                  <optgroup label="Moderately Polar">
-                    <option value="chloroform">Chloroform (4.71)</option>
-                    <option value="diethylether">Diethylether (4.24)</option>
-                  </optgroup>
-                  <optgroup label="Nonpolar">
-                    <option value="toluene">Toluene (2.37)</option>
-                    <option value="benzene">Benzene (2.27)</option>
-                    <option value="1,4-dioxane">1,4-Dioxane (2.21)</option>
-                    <option value="cyclohexane">Cyclohexane (2.02)</option>
-                  </optgroup>
-                  <option value="custom">
-                    Custom (Enter dielectric constant below)
-                  </option>
+                  )}
                 </select>
               </div>
               {(params.solvent === 'custom' ||

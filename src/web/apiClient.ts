@@ -13,6 +13,7 @@ import {
   OrbitalCubeResponseData,
   CubeFilesListResponseData,
   CubeFilesDeleteResponseData,
+  SupportedParametersResponseData,
 } from './types/api-types';
 
 let API_BASE_URL = 'http://127.0.0.1:5000'; // Default, will be updated
@@ -410,4 +411,14 @@ export const deleteCubeFiles = (
   }`;
 
   return request<CubeFilesDeleteResponseData>(endpoint, { method: 'DELETE' });
+};
+
+/**
+ * Get supported quantum chemistry parameters
+ */
+export const getSupportedParameters = (): Promise<SupportedParametersResponseData> => {
+  return request<SupportedParametersResponseData>(
+    '/api/quantum/supported-parameters',
+    { method: 'GET' }
+  );
 };

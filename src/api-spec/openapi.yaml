@@ -121,7 +121,7 @@ paths:
   /api/quantum/calculate:
     post:
       summary: Start quantum chemistry calculation
-      description: Start a DFT calculation in the background
+      description: Start a calculation in the background
       operationId: startCalculation
       requestBody:
         required: true
@@ -436,6 +436,25 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Failed to delete CUBE files
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/supported-parameters:
+    get:
+      summary: Get supported quantum chemistry parameters
+      description: Get lists of supported calculation methods, basis functions, exchange-correlation functionals, and solvents
+      operationId: getSupportedParameters
+      responses:
+        '200':
+          description: Supported parameters retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportedParametersResponse'
+        '500':
+          description: Failed to retrieve supported parameters
           content:
             application/json:
               schema:
@@ -1265,6 +1284,71 @@ components:
             message:
               type: string
               description: Human-readable message about the deletion
+
+    SolventOption:
+      type: object
+      required: [value, display, dielectric_constant]
+      properties:
+        value:
+          type: string
+          description: Solvent identifier value
+        display:
+          type: string
+          description: Human-readable display name
+        dielectric_constant:
+          type: number
+          description: Dielectric constant of the solvent
+
+    SupportedParametersData:
+      type: object
+      required: [calculation_methods, basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods]
+      properties:
+        calculation_methods:
+          type: array
+          items:
+            type: string
+          description: Supported quantum calculation methods
+        basis_functions:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Supported basis functions grouped by category (e.g., Minimal, Pople Style, etc.)
+        exchange_correlation:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Supported exchange-correlation functionals grouped by category (e.g., Hybrid, GGA, etc.)
+        solvent_methods:
+          type: array
+          items:
+            type: string
+          description: Supported solvent effect methods
+        solvents:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/SolventOption'
+          description: Supported solvents grouped by category (e.g., Highly Polar, Protic, etc.)
+        tddft_methods:
+          type: array
+          items:
+            type: string
+          description: Supported TDDFT calculation methods
+
+    SupportedParametersResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/SupportedParametersData'
 
     ErrorResponse:
       type: object

@@ -47,6 +47,8 @@ export type CubeFilesListResponse =
   components['schemas']['CubeFilesListResponse'];
 export type CubeFilesDeleteResponse =
   components['schemas']['CubeFilesDeleteResponse'];
+export type SupportedParametersResponse =
+  components['schemas']['SupportedParametersResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Data models
@@ -72,6 +74,7 @@ export type Operations = {
   getOrbitalCube: operations['getOrbitalCube'];
   listCubeFiles: operations['listCubeFiles'];
   deleteCubeFiles: operations['deleteCubeFiles'];
+  getSupportedParameters: operations['getSupportedParameters'];
 };
 
 // Response wrapper for API responses
@@ -93,6 +96,7 @@ export type OrbitalsResponseData = OrbitalsResponse['data'];
 export type OrbitalCubeResponseData = OrbitalCubeResponse['data'];
 export type CubeFilesListResponseData = CubeFilesListResponse['data'];
 export type CubeFilesDeleteResponseData = CubeFilesDeleteResponse['data'];
+export type SupportedParametersResponseData = SupportedParametersResponse['data'];
 
 // Error handling
 export { ApiError };
