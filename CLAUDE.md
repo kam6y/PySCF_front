@@ -38,6 +38,9 @@ npm run setup-env
 # Verify environment health
 npm run verify-env
 
+# Verify build tools
+npm run verify-build-env
+
 # Check server configuration
 npm run debug:config
 ```
@@ -90,6 +93,9 @@ npm run setup-env
 # Verify environment health and dependencies
 npm run verify-env
 
+# Verify build tools (conda-pack, PyInstaller, Gunicorn)
+npm run verify-build-env
+
 # Debug server configuration
 npm run debug:config
 ```
@@ -114,7 +120,10 @@ npm run build:conda-pack
 # Build Python executable only (uses PyInstaller)
 npm run build:python
 
-# Code formatting (using Prettier)
+# Validate build completeness (after build)
+npm run validate-build
+
+# Code formatting (using Prettier)  
 npm run format      # Format all source code
 npm run format:check # Check if code is properly formatted
 ```
@@ -246,12 +255,17 @@ Packaging: electron-builder packages the Electron app with both Python environme
 - Distributable formats: DMG for macOS, NSIS for Windows, AppImage for Linux
 
 **Enhanced Build Process Flow:**
-1. `npm run build:conda-pack` - Packages conda environment with Gunicorn
-2. `npm run build:python` - Creates PyInstaller executable with enhanced dependencies
-3. `npm run build:webpack` - Builds frontend
-4. `electron-builder` - Creates final distributable with unified execution environment
+1. `npm run verify-env` - Pre-build environment verification
+2. `npm run codegen` - Generate TypeScript types and Python models
+3. `npm run build:webpack` - Build frontend
+4. `npm run verify-build-env` + `npm run build:conda-pack` - Verify tools and package conda environment with Gunicorn
+5. `npm run verify-build-env` + `npm run build:python` - Verify tools and create PyInstaller executable
+6. `npm run validate-build` - Post-build completeness verification
+7. `electron-builder` - Create final distributable with verified components
 
 **Testing and Validation:**
+- `npm run verify-build-env` - Build tools verification
+- `npm run validate-build` - Build completeness verification
 - `npm run test:build` - Complete build verification
 - `npm run test:gunicorn-local` - Local Gunicorn testing
 - `npm run test:run-packaged` - Full packaging validation
@@ -481,16 +495,22 @@ npm run verify-env
 ```
 This command provides comprehensive diagnostic information and specific troubleshooting recommendations.
 
-**Environment Detection Failures:** If the application reports "Python environment not found", check the detection hierarchy:
-1. Verify conda is installed and accessible: `conda --version`
-2. Check if pyscf-env exists: `conda env list`
-3. Try automated setup: `npm run setup-env`
-4. Set custom path if needed: `export CONDA_ENV_PATH=/path/to/your/pyscf-env`
+**Environment Detection Failures (Simplified):** Python environment detection now uses a simplified 2-layer approach:
 
-**conda-pack Build Issues:** If `npm run build:conda-pack` fails:
-- Ensure conda-pack is installed: `conda install conda-pack`
+**Development Environment Issues:**
+1. Verify environment exists: `npm run verify-env`
+2. Try automated setup: `npm run setup-env`
+3. Set custom path if needed: `export CONDA_ENV_PATH=/path/to/your/pyscf-env`
+
+**Packaged Environment Issues:**
+- Application uses **conda environment only** (no PyInstaller fallback)
+- Bundled environment must be complete at: `conda_env/bin/python`
+- Use `npm run validate-build` to verify packaged environment completeness
+
+**Build Tool Issues:** If `npm run verify-build-env` fails:
+- Ensure build tools are installed: conda-pack, PyInstaller, Gunicorn
 - Verify environment is active: `conda activate pyscf-env`
-- Check for disk space and permissions
+- Reinstall missing tools: `conda install conda-pack pyinstaller gunicorn`
 
 ## Development Server Issues
 
@@ -514,25 +534,28 @@ This command provides comprehensive diagnostic information and specific troubles
 
 ## Build and Packaging Issues
 
-**Build Failures:** The enhanced dual-packaging system requires:
-1. Working conda environment with all dependencies (including Gunicorn)
-2. All dependencies properly configured for PyInstaller
+**Build Failures:** The enhanced build system with verification requires:
+1. Pre-build verification: `npm run verify-env` and `npm run verify-build-env`
+2. Working conda environment with all dependencies (including Gunicorn)
 3. Valid server configuration file at `config/server-config.json`
-4. Check `build/pyinstaller/` directory for detailed logs
+4. Post-build verification: `npm run validate-build`
 
-**PyInstaller Specific Issues:** 
-- Enhanced dependency inclusion for Gunicorn and related WSGI components
-- Sensitive to Python environment changes
-- Requires all dependencies to be importable
-- Check for missing hidden imports in `pyscf_front_api.spec`
-- Verify Gunicorn-related modules are properly bundled
+**Build Verification Failures:** If `npm run validate-build` fails:
+- Check `conda_env/` directory exists and contains python, gunicorn
+- Verify `python_dist/` contains PyInstaller executable
+- Confirm `config/server-config.json` is present
+- Test conda environment functionality: `conda_env/bin/python -c "import pyscf, rdkit, gunicorn"`
 
-**Packaging Verification:** After packaging, verify both environments:
-- Test bundled conda environment path and Gunicorn availability
-- Confirm PyInstaller executable functionality with unified server
-- Validate server configuration inclusion
+**PyInstaller Issues (Development Only):** 
+- **Note**: Packaged applications now use **conda environment only**
+- PyInstaller is maintained for development/testing purposes
+- Check `build/pyinstaller/` directory for detailed logs if needed
+
+**Packaging Verification:** After packaging, verify simplified environment:
+- **Primary**: Test bundled conda environment path and completeness
+- Validate server configuration inclusion  
 - Use `npm run test:run-packaged` for comprehensive testing
-- Check extraResources in electron-builder output include config files
+- Check `validate-build` output for detailed component verification
 
 ## Runtime Issues
 
@@ -546,13 +569,15 @@ This command provides comprehensive diagnostic information and specific troubles
 ## Development Tools
 
 **Environment Validation Tools:**
-- `npm run verify-env` - Comprehensive environment testing
+- `npm run verify-env` - Comprehensive development environment testing
+- `npm run verify-build-env` - Build tools verification (conda-pack, PyInstaller, Gunicorn)
 - `npm run setup-env` - Automated environment creation and repair
 - `npm run debug:config` - Server configuration validation
 - Console output provides detailed diagnostic information
 - Health check system reports specific failure points
 
 **Build and Testing Tools:**
+- `npm run validate-build` - Post-build completeness verification
 - `npm run test:build` - Complete build verification
 - `npm run test:python-build` - Python dependency testing
 - `npm run test:gunicorn-local` - Local server testing with unified configuration

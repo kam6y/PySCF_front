@@ -58,117 +58,53 @@ const loadServerConfig = (): any => {
 serverConfig = loadServerConfig();
 
 /**
- * condaコマンドを実行し、成功すれば出力を返す
- * @param command condaコマンドの引数配列
- * @returns 成功時は出力文字列、失敗時はnull
- */
-const tryCondaCommand = async (command: string[]): Promise<string | null> => {
-  try {
-    const { stdout } = await execFilePromise('conda', command, {
-      timeout: 5000,
-      encoding: 'utf8',
-    });
-    return stdout.trim();
-  } catch (error) {
-    console.log(`conda command failed: conda ${command.join(' ')}`);
-    return null;
-  }
-};
-
-/**
- * conda環境のPythonパスを段階的に検出する
- * 1. 環境変数 CONDA_ENV_PATH をチェック
- * 2. conda info --base でベースパスを取得
- * 3. conda info --envs で pyscf-env 環境のパスを取得
- * 4. fallback候補パスを試行
+ * 開発時conda環境のPythonパスを簡素化して検出する
  * @returns conda環境のPythonパス、見つからなければnull
  */
 const detectCondaEnvironmentPath = async (): Promise<string | null> => {
   const envName = 'pyscf-env';
 
-  // 1. 環境変数でのパス指定をチェック
+  // 1. 環境変数での指定をチェック
   const envPath = process.env.CONDA_ENV_PATH;
   if (envPath) {
     const pythonPath = path.join(envPath, 'bin', 'python');
     if (fs.existsSync(pythonPath)) {
       console.log(`Using conda environment from CONDA_ENV_PATH: ${pythonPath}`);
       return pythonPath;
-    } else {
-      console.log(
-        `CONDA_ENV_PATH specified but python not found at: ${pythonPath}`
-      );
     }
   }
 
-  // 2. conda info --base でベースパスを取得
-  const baseOutput = await tryCondaCommand(['info', '--base']);
-  if (baseOutput) {
-    const basePath = baseOutput.trim();
+  // 2. conda info --base で環境パスを取得（1回のみ試行）
+  try {
+    const { stdout } = await execFilePromise('conda', ['info', '--base'], {
+      timeout: 3000,
+      encoding: 'utf8',
+    });
+    const basePath = stdout.trim();
     const pythonPath = path.join(basePath, 'envs', envName, 'bin', 'python');
     if (fs.existsSync(pythonPath)) {
-      console.log(`Found conda environment using base path: ${pythonPath}`);
+      console.log(`Found conda environment: ${pythonPath}`);
       return pythonPath;
     }
+  } catch (error) {
+    console.log('conda command unavailable or failed');
   }
 
-  // 3. conda info --envs で環境一覧から pyscf-env を検索
-  const envsOutput = await tryCondaCommand(['info', '--envs']);
-  if (envsOutput) {
-    const lines = envsOutput.split('\n');
-    for (const line of lines) {
-      if (line.includes(envName)) {
-        const parts = line.split(/\s+/);
-        if (parts.length >= 2) {
-          const envPath = parts[parts.length - 1];
-          const pythonPath = path.join(envPath, 'bin', 'python');
-          if (fs.existsSync(pythonPath)) {
-            console.log(
-              `Found conda environment from envs list: ${pythonPath}`
-            );
-            return pythonPath;
-          }
-        }
-      }
-    }
-  }
-
-  // 4. fallback: 一般的なcondaインストール場所を試行
-  const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-  const fallbackPaths = ['miniforge3', 'miniconda3', 'anaconda3', 'mambaforge'];
-
-  for (const condaDir of fallbackPaths) {
-    const pythonPath = path.join(
-      homeDir,
-      condaDir,
-      'envs',
-      envName,
-      'bin',
-      'python'
-    );
-    if (fs.existsSync(pythonPath)) {
-      console.log(`Found conda environment using fallback path: ${pythonPath}`);
-      return pythonPath;
-    }
-  }
-
-  console.log(
-    `conda environment '${envName}' not found in any expected locations`
-  );
+  console.log(`conda environment '${envName}' not found`);
   return null;
 };
 
 /**
- * Python環境のパスを階層的に検出する統合関数
- * 1. 同梱conda環境 (パッケージ時優先) - より厳密な検証
- * 2. 開発時conda環境検出
- * 3. PyInstaller実行可能ファイル (制限付きフォールバック)
+ * Python環境のパスを簡素化して検出する統合関数
+ * 1. パッケージ時: 同梱conda環境のみ
+ * 2. 開発時: pyscf-env環境のみ
  * @returns Python環境のパス、見つからなければnull
  */
 const detectPythonEnvironmentPath = async (): Promise<string | null> => {
-  console.log('=== Python Environment Detection ===');
+  console.log('=== Python Environment Detection (Simplified) ===');
   console.log(`Running in packaged mode: ${app.isPackaged}`);
   
-  // 1. パッケージ時：同梱conda環境を優先チェック（厳密な検証）
+  // 1. パッケージ時：同梱conda環境のみ
   if (app.isPackaged) {
     const bundledCondaPath = path.join(
       process.resourcesPath,
@@ -184,55 +120,27 @@ const detectPythonEnvironmentPath = async (): Promise<string | null> => {
     );
     
     console.log(`Checking bundled conda environment: ${bundledCondaPath}`);
-    console.log(`Checking gunicorn in conda environment: ${bundledGunicornPath}`);
     
     if (fs.existsSync(bundledCondaPath) && fs.existsSync(bundledGunicornPath)) {
-      console.log(`✓ Using bundled conda environment with complete dependencies: ${bundledCondaPath}`);
+      console.log(`✓ Using bundled conda environment: ${bundledCondaPath}`);
       return bundledCondaPath;
     } else {
-      console.log(`✗ Bundled conda environment incomplete:`);
+      console.log(`✗ Bundled conda environment incomplete or missing`);
       console.log(`  - Python exists: ${fs.existsSync(bundledCondaPath)}`);
       console.log(`  - Gunicorn exists: ${fs.existsSync(bundledGunicornPath)}`);
+      return null;
     }
   }
 
-  // 2. 開発時またはパッケージ時フォールバック：conda環境検出
-  console.log('Attempting to detect development conda environment...');
+  // 2. 開発時：pyscf-env環境のみ
+  console.log('Detecting development conda environment...');
   const condaPath = await detectCondaEnvironmentPath();
   if (condaPath) {
     console.log(`✓ Using conda environment: ${condaPath}`);
     return condaPath;
   }
 
-  // 3. パッケージ時の制限付きフォールバック：PyInstaller実行可能ファイル
-  if (app.isPackaged) {
-    console.log('WARNING: conda-pack environment not available, checking PyInstaller executable...');
-    
-    const executableName =
-      process.platform === 'win32'
-        ? 'pyscf_front_api.exe'
-        : 'pyscf_front_api';
-    const pythonExecutablePath = path.join(
-      process.resourcesPath,
-      'python_dist',
-      'pyscf_front_api',
-      executableName
-    );
-    
-    if (fs.existsSync(pythonExecutablePath)) {
-      console.log(
-        `⚠️  Using PyInstaller executable as last resort (may have incomplete dependencies): ${pythonExecutablePath}`
-      );
-      console.log(
-        `   This fallback may cause server startup failures if gunicorn is not properly bundled.`
-      );
-      return pythonExecutablePath;
-    } else {
-      console.log(`✗ PyInstaller executable not found: ${pythonExecutablePath}`);
-    }
-  }
-
-  console.log('✗ No Python environment found in any expected locations');
+  console.log('✗ No Python environment found');
   return null;
 };
 
@@ -319,15 +227,11 @@ const startPythonServer = async (): Promise<void> => {
     const pythonExecutablePath = await detectPythonEnvironmentPath();
     if (!pythonExecutablePath) {
       const errorMessage = app.isPackaged
-        ? `Python environment not found.\n\nThis appears to be a packaging issue. Please report this as a bug.\nThe application requires both:\n1. Bundled conda environment at: ${path.join(
+        ? `Python environment not found.\n\nThe bundled conda environment is missing or incomplete.\nThis appears to be a packaging issue. Please report this as a bug.\n\nRequired location: ${path.join(
             process.resourcesPath,
             'conda_env'
-          )}\n2. PyInstaller executable at: ${path.join(
-            process.resourcesPath,
-            'python_dist',
-            'pyscf_front_api'
-          )}`
-        : `Python environment not found.\n\nSetup options:\n1. Set environment variable: export CONDA_ENV_PATH=/path/to/your/pyscf-env\n2. Or ensure conda is available and run:\n   conda env create -f .github/environment.yml\n   conda activate pyscf-env\n\nFor more details, see CLAUDE.md`;
+          )}\nRequired components: python, gunicorn, and all dependencies`
+        : `Python environment not found.\n\nSetup instructions:\n1. Run automated setup: npm run setup-env\n2. Or set environment variable: export CONDA_ENV_PATH=/path/to/your/pyscf-env\n3. Verify setup: npm run verify-env\n\nFor detailed setup instructions, see CLAUDE.md`;
       console.error(errorMessage);
       reject(new Error(errorMessage));
       return;
