@@ -481,13 +481,13 @@ export const CalculationSettingsPage = ({
   const getCalculationButtonText = () => {
     switch (calculationStatus) {
       case 'running':
-        return '⚛️ Running...';
+        return 'Running...';
       case 'completed':
-        return '✅ Completed';
+        return 'Completed';
       case 'error':
-        return '❌ Error';
+        return 'Error';
       default:
-        return '+ Start Calculation';
+        return '+ Start';
     }
   };
 

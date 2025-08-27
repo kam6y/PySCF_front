@@ -42,8 +42,10 @@
 
 /* Main Content with Sidebar */
 .appContent {
-  max-width: calc(100vw - 104px);
+  max-width: calc(100vw);
+  padding: 12px;
   margin: auto;
   width: 100%;
+  height: calc(100vh - 40px);
   transition: margin-left 0.3s ease-out;
 }
