@@ -48,8 +48,8 @@ export const MoleculeViewerSection = ({
           </div>
         )}
       </div>
-      <div className={styles.rightColumn}>
-        <section className={styles.visualizationSection}>
+      <div>
+        <section className={styles.rightColumn}>
           <StyleControls
             onStyleChange={onStyleChange}
             showAxes={showAxes}

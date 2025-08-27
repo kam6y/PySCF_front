@@ -171,14 +171,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               onChange={e => setAtomRadius(parseFloat(e.target.value))}
               className={styles.sizeSlider}
             />
-            {useAtomicRadii && (
-              <p
-                className={styles.sizeHelpText}
-                style={{ fontSize: '0.8em', color: '#666', marginTop: '4px' }}
-              >
-                Atoms will be sized proportionally to their van der Waals radii
-              </p>
-            )}
           </div>
         </div>
       )}
