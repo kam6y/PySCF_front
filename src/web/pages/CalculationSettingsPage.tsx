@@ -411,8 +411,8 @@ export const CalculationSettingsPage = ({
     return (
       <div className={styles.calculationSettingsContainers}>
         <div className={styles.loadingContainer}>
-          <h2>Loading Calculation...</h2>
-          <p>Please wait or select a calculation from the sidebar.</p>
+          <h2>Welcome PySCF_front</h2>
+          <p>Please start a new calculation or select a calculation from the sidebar.</p>
         </div>
       </div>
     );

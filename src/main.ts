@@ -522,7 +522,7 @@ const createWindow = async () => {
     titleBarOverlay: {
       color: 'rgba(0, 0, 0, 0)',
       symbolColor: '#000000',
-      height: 40,
+      height: 36,
     },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

@@ -117,7 +117,22 @@ const CalculationCard: React.FC<CalculationCardProps> = ({
             }
           }}
         >
-          🗑️
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <polyline points="3,6 5,6 21,6"></polyline>
+            <path d="m5,6 1,14 c0,1 1,2 2,2 h8 c1,0 2,-1 2,-2 l1,-14"></path>
+            <path d="m10,11 v6"></path>
+            <path d="m14,11 v6"></path>
+            <path d="m7,6 V4 c0,-1 1,-2 2,-2 h6 c1,0 2,1 2,2 v2"></path>
+          </svg>
         </button>
       </div>
     </div>
@@ -175,6 +190,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               + Make a instance
             </button>
             <div className={styles.searchContainer}>
+              <svg
+                className={styles.searchIcon}
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
               <input
                 type="text"
                 placeholder="Value"
@@ -198,13 +227,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Main Content Area */}
           <div className={styles.sidebarMainContent}>
             <div className={styles.sidebarHeader}>
-              <h3>Calculations</h3>
+              <h3>Instances</h3>
             </div>
 
             <div className={styles.sidebarCalculations}>
               {calculationsLoading ? (
                 <div className={styles.sidebarLoading}>
-                  <p>Loading calculations...</p>
+                  <p>Loading instances...</p>
                 </div>
               ) : calculationsError ? (
                 <div className={styles.sidebarError}>
@@ -212,7 +241,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               ) : calculations.length === 0 ? (
                 <div className={styles.sidebarEmpty}>
-                  <p>No calculations yet</p>
+                  <p>No instances yet</p>
                   <p>Click the + button to create one</p>
                 </div>
               ) : (
@@ -235,6 +264,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className={`${styles.userInfoSection} ${isUserMenuOpen ? styles.userMenuOpen : ''}`}
               onClick={onUserMenuToggle}
             >
+              {isUserMenuOpen && (
+                <div className={styles.userMenu}>
+                  <button className={styles.userMenuItem}>Settings</button>
+                  <button className={styles.userMenuItem}>Profile</button>
+                  <button className={styles.userMenuItem}>About</button>
+                </div>
+              )}
               <div className={styles.userInfoMain}>
                 <span className={styles.userName}>User name</span>
                 <span
@@ -243,13 +279,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   ⌄
                 </span>
               </div>
-              {isUserMenuOpen && (
-                <div className={styles.userMenu}>
-                  <button className={styles.userMenuItem}>Settings</button>
-                  <button className={styles.userMenuItem}>Profile</button>
-                  <button className={styles.userMenuItem}>About</button>
-                </div>
-              )}
             </div>
           </div>
         </div>
