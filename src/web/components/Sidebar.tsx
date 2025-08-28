@@ -37,7 +37,27 @@ const STATUS_CONFIG = {
   },
 } as const;
 
-type StatusType = keyof typeof STATUS_CONFIG;
+// Status order for grouping
+const STATUS_ORDER: (keyof typeof STATUS_CONFIG)[] = ['error', 'pending', 'waiting', 'running', 'completed'];
+
+// Group calculations by status
+const groupCalculationsByStatus = (calculations: CalculationSummary[]) => {
+  const grouped = calculations.reduce((acc, calculation) => {
+    const status = calculation.status as keyof typeof STATUS_CONFIG;
+    if (!acc[status]) {
+      acc[status] = [];
+    }
+    acc[status].push(calculation);
+    return acc;
+  }, {} as Record<keyof typeof STATUS_CONFIG, CalculationSummary[]>);
+
+  // Return groups in the specified order
+  return STATUS_ORDER.map(status => ({
+    status,
+    config: STATUS_CONFIG[status],
+    calculations: grouped[status] || [],
+  })).filter(group => group.calculations.length > 0);
+};
 
 // Individual calculation card component
 interface CalculationCardProps {
@@ -73,20 +93,14 @@ const CalculationCard: React.FC<CalculationCardProps> = ({
         <div className={styles.calculationName}>{calculation.name}</div>
         <div className={styles.calculationMeta}>
           <div className={styles.calculationDate}>
-            {new Date(calculation.date).toLocaleDateString()}
-          </div>
-          <div className={styles.calculationStatus}>
-            <span
-              className={`${styles.statusBadge} ${STATUS_CONFIG[calculation.status as StatusType]?.className || styles.statusUnknown}`}
-            >
-              <span className={styles.statusIcon}>
-                {STATUS_CONFIG[calculation.status as StatusType]?.icon || '❓'}
-              </span>
-              <span className={styles.statusLabel}>
-                {STATUS_CONFIG[calculation.status as StatusType]?.label ||
-                  calculation.status}
-              </span>
-            </span>
+            {new Date(calculation.date).toLocaleString('ja-JP', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })}
           </div>
         </div>
 
@@ -178,6 +192,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isUserMenuOpen,
   onSettingsOpen,
 }) => {
+  // Bulk delete handler for error instances
+  const handleBulkDeleteError = async (errorCalculations: CalculationSummary[]) => {
+    if (errorCalculations.length === 0) return;
+    
+    const count = errorCalculations.length;
+    const confirmed = confirm(
+      `${count}件のエラーインスタンスを削除しますか？この操作は取り消せません。`
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+      // Delete all error calculations in parallel
+      await Promise.all(
+        errorCalculations.map(calculation => onCalculationDelete(calculation.id))
+      );
+    } catch (error) {
+      console.error('一括削除中にエラーが発生しました:', error);
+      alert('一部のインスタンスの削除に失敗しました。');
+    }
+  };
+
   return (
     <>
       {/* Backdrop/Overlay */}
@@ -253,14 +289,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <p>Click the + button to create one</p>
                 </div>
               ) : (
-                calculations.map(calculation => (
-                  <CalculationCard
-                    key={calculation.id}
-                    calculation={calculation}
-                    isActive={calculation.id === activeCalculationId}
-                    onSelect={onCalculationSelect}
-                    onDelete={onCalculationDelete}
-                  />
+                groupCalculationsByStatus(calculations).map(group => (
+                  <div key={group.status} className={styles.statusSection}>
+                    <div className={styles.statusSectionHeader}>
+                      <div className={styles.statusSectionInfo}>
+                        <span className={styles.statusSectionIcon}>{group.config.icon}</span>
+                        <h4 className={styles.statusSectionTitle}>{group.config.label}</h4>
+                      </div>
+                      {group.status === 'error' && group.calculations.length > 0 && (
+                        <button
+                          className={styles.bulkDeleteButton}
+                          onClick={e => {
+                            e.stopPropagation();
+                            handleBulkDeleteError(group.calculations);
+                          }}
+                          title={`${group.calculations.length}件のエラーインスタンスを一括削除`}
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polyline points="3,6 5,6 21,6"></polyline>
+                            <path d="m5,6 1,14 c0,1 1,2 2,2 h8 c1,0 2,-1 2,-2 l1,-14"></path>
+                            <path d="m10,11 v6"></path>
+                            <path d="m14,11 v6"></path>
+                            <path d="m7,6 V4 c0,-1 1,-2 2,-2 h6 c1,0 2,1 2,2 v2"></path>
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <div className={styles.statusSectionCalculations}>
+                      {group.calculations.map(calculation => (
+                        <CalculationCard
+                          key={calculation.id}
+                          calculation={calculation}
+                          isActive={calculation.id === activeCalculationId}
+                          onSelect={onCalculationSelect}
+                          onDelete={onCalculationDelete}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))
               )}
             </div>

@@ -67,8 +67,8 @@ export const showSuccessNotification = (title: string, message?: string) => {
     type: 'success',
     title,
     message,
-    autoClose: true,
-    duration: 4000,
+    autoClose: false,
+    duration: 0,
   });
 };
 

@@ -398,8 +398,8 @@ def quantum_calculate(body: QuantumCalculationRequest):
             file_manager.save_calculation_status(calc_dir, 'error')
             file_manager.save_calculation_results(calc_dir, {'error': 'Failed to submit calculation to process pool.'})
             logger.error(f"Failed to submit calculation {calculation_id} to process pool")
-            return jsonify({'success': False, 'error': 'Failed to queue calculation.'}), 500
-        
+            return jsonify({'success': False, 'error': False}), 500  # ここではエラーメッセージを返さない
+
         # Set initial status based on submission result
         file_manager.save_calculation_status(calc_dir, initial_status)
         
