@@ -1,5 +1,166 @@
 # PySCF_front
 
+This is a quantum chemistry application built with **Electron**, **React (TypeScript)**, and **Python (Flask)**. It leverages PySCF and RDKit on the backend, providing a desktop application for molecular structure visualization, data retrieval from PubChem, and the execution of quantum chemistry calculations such as Density Functional Theory (DFT).
+
+---
+
+## Key Features
+
+-   **3D Molecular Visualization**: Interactively display and manipulate molecular structures using 3Dmol.js.
+-   **Structure Retrieval**:
+    -   Fetch 3D structures from the PubChem database by compound name or CID.
+    -   Convert SMILES strings into 3D structures.
+-   **Quantum Chemistry Calculations**:
+    -   Execute various calculation methods via PySCF, including DFT, HF, MP2, CCSD, and TDDFT.
+    -   Perform **geometry optimization** and **vibrational frequency analysis**.
+    -   Analyze results, including SCF energy, molecular orbitals (HOMO/LUMO), and more.
+-   **Calculation History**: View, rename, and delete past calculation results.
+-   **Automated Environment Setup**: Set up the complete development environment with a single command (`npm run setup-env`).
+-   **Environment Validation**: Automatically verify Python dependencies and environment health (`npm run verify-env`).
+-   **Unified Execution Environment**: Uses a Gunicorn-based server for both development and production to eliminate environment-specific issues.
+-   **Centralized Configuration**: Manages server behavior through a single JSON configuration file.
+
+---
+
+## Tech Stack
+
+-   **Frontend**: React, TypeScript, TanStack Query, Zustand
+-   **Backend**: Python, Flask, Gunicorn, PySCF, RDKit
+-   **Desktop Framework**: Electron
+-   **Build Tools**: Webpack, Electron Builder, conda-pack
+-   **Package Management**: npm (Node.js), conda (Python)
+-   **API Specification**: OpenAPI (Swagger)
+
+---
+
+## Application Screenshot
+
+![PySCF Front Application Screen](PySCF_front_view.png)
+
+---
+
+## Getting Started
+
+### Quick Start (Recommended)
+
+Follow these steps to set up the development environment easily:
+
+1.  **Clone the repository:**
+    ```bash
+    git clone [https://github.com/kam6y/Pyscf_front.git](https://github.com/kam6y/Pyscf_front.git)
+    cd Pyscf_front
+    ```
+
+2.  **Install Node.js dependencies:**
+    ```bash
+    npm install
+    ```
+
+3.  **Run the automated environment setup script:**
+    This command will check for a conda environment, create one if necessary, install all dependencies, and verify the setup.
+    ```bash
+    npm run setup-env
+    ```
+
+4.  **Verify the environment (optional but recommended):**
+    ```bash
+    # Check environment health
+    npm run verify-env
+    ```
+
+5.  **Launch the application in development mode:**
+    ```bash
+    conda activate pyscf-env
+    npm run dev
+    ```
+
+### Manual Setup
+
+If you prefer to manage the conda environment manually:
+
+1.  **Clone and install Node.js dependencies** as shown above.
+
+2.  **Set up the Python environment (conda is required):**
+    ```bash
+    # Example for installing Miniforge on macOS ARM
+    curl -L -O "[https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh](https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
+    bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
+    
+    # Create the conda environment from the environment.yml file
+    source $HOME/miniforge3/etc/profile.d/conda.sh
+    conda env create -f .github/environment.yml
+    
+    # Activate the environment
+    conda activate pyscf-env
+    ```
+    > **Important**: This project requires a conda environment. The application will display an error dialog if the environment is not configured correctly.
+
+#### Custom Conda Environment Path
+
+The application automatically detects the conda environment. If your environment is in a non-standard location, you can specify the path using the `CONDA_ENV_PATH` environment variable:
+```bash
+export CONDA_ENV_PATH="/path/to/your/pyscf-env"
+```
+
+---
+
+## Application Packaging
+
+To build a distributable version of the application for your platform, run the following commands:
+
+```bash
+# Verify the build environment (recommended)
+npm run verify-build-env
+
+# Run the complete build process with validations
+npm run build
+
+# Validate the completeness of the build artifacts
+npm run validate-build
+
+# Create the distributable package
+npm run package
+```
+
+### Distribution Features
+
+-   **No conda installation required**: The complete environment is bundled.
+-   **Ready to run**: Usable immediately after installation.
+-   **Isolated Environment**: Does not interfere with the system's Python environment.
+
+### Generated Files
+
+The packaging process creates platform-specific installers in the `dist/` directory:
+-   `PySCF_front-darwin-arm64.dmg` (For macOS)
+-   `PySCF_front-win32-x64.exe` (For Windows)
+-   `PySCF_front-linux-x86_64.AppImage` (For Linux)
+
+---
+
+## Troubleshooting
+
+Always start by running the verification commands to identify the problem:
+
+```bash
+conda activate pyscf-env
+
+# Comprehensive environment check
+npm run verify-env
+
+# Check build tools
+npm run verify-build-env
+
+# Check server configuration
+npm run debug:config
+```
+
+These commands provide detailed diagnostic information and troubleshooting steps if any issues are detected.
+
+---
+---
+
+# PySCF_front (日本語)
+
 これは、**Electron**、**React (TypeScript)**、**Python (Flask)** を使用して構築された、量子化学計算アプリケーションです。
 
 PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubChemからの分子データ取得、そしてDFT（密度汎関数理論）、HF（ハートリー・フォック法）、MP2、CCSD、TDDFT計算などを実行できるデスクトップアプリケーションを目指して開発しています。
