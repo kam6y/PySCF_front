@@ -94,7 +94,7 @@ class TDDFTCalculator(BaseCalculator):
                 'basis': basis,
                 'xc_functional': xc,
                 'charge': charge,
-                'spin_multiplicity': 2 * spin + 1,
+                'spin_multiplicity': 2 * spin,
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,

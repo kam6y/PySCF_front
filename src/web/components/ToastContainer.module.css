@@ -6,7 +6,7 @@
   right: 20px;
   z-index: 9999;
   pointer-events: none;
-  max-width: calc(50vw - 40px);
+  max-width: calc(40vw - 40px);
 }
 
 .toastContainer > * {
