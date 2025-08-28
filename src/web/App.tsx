@@ -165,7 +165,7 @@ export const App = () => {
       />
 
       <main
-        className={`${styles.appContent} ${sidebarState.isSidebarOpen ? 'sidebar-open' : ''}`}
+        className={`${styles.appContent} ${sidebarState.isSidebarOpen ? styles.sidebarOpen : ''}`}
       >
         {renderCurrentPage()}
       </main>
