@@ -5,10 +5,13 @@ export interface ElectronAPI {
   isWindowMaximized: () => Promise<boolean>;
   onWindowStateChange: (callback: (isMaximized: boolean) => void) => void;
   removeAllListeners: (channel: string) => void;
+  onSetFlaskPort: (callback: (port: number) => void) => () => void;
+  getFlaskPort: () => Promise<number | null>;
 }
 
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
+    flaskPort?: number;
   }
 }

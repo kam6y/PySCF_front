@@ -44,56 +44,90 @@ export interface ViewerSpec {
   backgroundColor?: string;
 }
 
+export interface LabelSpec {
+  position?: { x: number; y: number; z: number };
+  fontColor?: string;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  fontSize?: number;
+  inFront?: boolean;
+  bold?: boolean;
+}
+
+export interface Label {
+  setText(text: string): void;
+  remove(): void;
+}
+
 export interface GLViewer {
   addModel(data: string, format?: string, options?: any): GLModel;
   removeModel(model: GLModel): void;
   removeAllModels(): void;
   createModelFrom(sel: AtomSpec, extract?: boolean): GLModel;
-  
+
   setStyle(sel: AtomSpec, style: StyleSpec): GLViewer;
   addStyle(sel: AtomSpec, style: StyleSpec): GLViewer;
-  
-  zoomTo(sel?: AtomSpec, animationDuration?: number, fixedPath?: boolean): GLViewer;
+
+  zoomTo(
+    sel?: AtomSpec,
+    animationDuration?: number,
+    fixedPath?: boolean
+  ): GLViewer;
   zoom(factor?: number, animationDuration?: number): GLViewer;
   translate(x: number, y: number, animationDuration?: number): GLViewer;
   rotate(angle: number, axis?: string, animationDuration?: number): GLViewer;
-  
+
   render(callback?: () => void): GLViewer;
   clear(): GLViewer;
-  
+
   setBackgroundColor(color: string, alpha?: number): GLViewer;
   setWidth(width: number): GLViewer;
   setHeight(height: number): GLViewer;
   resize(): GLViewer;
-  
+
   getView(): number[];
   setView(view: number[]): GLViewer;
-  
-  addSurface(type: string, style: any, sel?: AtomSpec, allsel?: AtomSpec): number;
+
+  addSurface(
+    type: string,
+    style: any,
+    sel?: AtomSpec,
+    allsel?: AtomSpec
+  ): number;
   removeSurface(surfid: number): GLViewer;
   removeAllSurfaces(): GLViewer;
-  
+
   spin(axis?: string, speed?: number): GLViewer;
   stopAnimate(): GLViewer;
-  
+
   screenshot(width?: number, height?: number, format?: string): string;
   getModel(id?: number): GLModel;
+
+  addArrow(spec: any): void;
+  removeAllShapes(): GLViewer;
+  addLabel(text: string, options: LabelSpec): Label;
+  removeAllLabels(): GLViewer;
 }
 
 export interface GLModel {
   setStyle(sel: AtomSpec, style: StyleSpec, add?: boolean): GLModel;
   addStyle(sel: AtomSpec, style: StyleSpec): GLModel;
   removeStyle(sel: AtomSpec, style: StyleSpec): GLModel;
-  
+
   selectedAtoms(sel: AtomSpec): AtomSpec[];
   atoms: AtomSpec[];
-  
+
   setColorByElement(sel: AtomSpec, colors?: any): GLModel;
   setColorByProperty(sel: AtomSpec, prop: string, scheme?: any): GLModel;
-  
-  addSurface(type: string, style: any, sel?: AtomSpec, allsel?: AtomSpec): number;
+
+  addSurface(
+    type: string,
+    style: any,
+    sel?: AtomSpec,
+    allsel?: AtomSpec
+  ): number;
   removeSurface(surf: number): GLModel;
-  
+
   addLine(spec: any): GLModel;
   addArrow(spec: any): GLModel;
   addSphere(spec: any): GLModel;
@@ -102,22 +136,23 @@ export interface GLModel {
 }
 
 declare module '3dmol' {
-  export function createViewer(element: HTMLElement | string, config?: ViewerSpec): GLViewer;
+  export function createViewer(
+    element: HTMLElement | string,
+    config?: ViewerSpec
+  ): GLViewer;
   export function createViewerGrid(
-    element: HTMLElement | string, 
+    element: HTMLElement | string,
     config?: ViewerSpec,
     rows?: number,
     cols?: number
   ): GLViewer[];
-  
+
   export function download(
     query: string,
     viewer: GLViewer,
     options?: any,
     callback?: () => void
   ): void;
-  
-  export const ElementColors: { [element: string]: number };
-  export const CC: { [color: string]: number };
-}
 
+  export const ElementColors: { [element: string]: number };
+}

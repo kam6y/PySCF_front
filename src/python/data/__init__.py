@@ -1,0 +1,1 @@
+"""Data module for storing common constants and lookup tables."""

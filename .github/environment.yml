@@ -1,0 +1,37 @@
+name: pyscf-env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  # Core scientific computing libraries
+  - pyscf
+  - rdkit
+  - geometric
+  - ase
+  # Web framework and networking
+  - flask
+  - requests
+  - flask-cors
+  - pydantic
+  - threadpoolctl
+  - gunicorn
+  - gevent
+  # Development and testing dependencies
+  - pytest
+  - pip
+  # Environment packaging for distribution
+  - conda-pack
+  - pip:
+    # Flask extensions
+    - flask-pydantic
+    - flask-socketio
+    - flask-sock
+    # Code generation and build tools
+    - datamodel-code-generator
+    - pyinstaller
+    # File system monitoring
+    - watchdog
+    # Security and certificates
+    - certifi
+    # Testing framework for Flask
+    - pytest-flask

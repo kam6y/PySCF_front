@@ -1,0 +1,14 @@
+/* Toast Container Component Styles */
+
+.toastContainer {
+  position: fixed;
+  top: 80px; /* Below the header to avoid overlap */
+  right: 20px;
+  z-index: 9999;
+  pointer-events: none;
+  max-width: calc(40vw - 40px);
+}
+
+.toastContainer > * {
+  pointer-events: auto;
+}

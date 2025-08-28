@@ -1,5 +1,6 @@
-import React from "react";
-import { DropdownMenu, DropdownOption } from "./DropdownMenu";
+import React from 'react';
+import { DropdownMenu, DropdownOption } from './DropdownMenu';
+import styles from './Header.module.css';
 
 interface HeaderProps {
   onDropdownToggle: () => void;
@@ -94,16 +95,18 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="app-header">
-      <div className={`header-container ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+    <header className={styles.appHeader}>
+      <div
+        className={`${styles.headerContainer} ${isSidebarOpen ? styles.sidebarOpen : ''}`}
+      >
         {/* Left Section */}
-        <div className="header-left">
-          <h1 className="app-title">PySCF_front</h1>
+        <div className={styles.headerLeft}>
+          <h1 className={styles.appTitle}>PySCF_front</h1>
         </div>
         {/* Right Section */}
-        <div className="header-right">
+        <div className={styles.headerRight}>
           <button
-            className={`dropdown-button ${isDropdownOpen ? 'active' : ''}`}
+            className={`${styles.dropdownButton} ${isDropdownOpen ? styles.active : ''}`}
             onClick={onDropdownToggle}
           >
             <svg
@@ -122,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
               viewBox="0 0 12 12"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
-              className={`dropdown-arrow ${isDropdownOpen ? 'open' : ''}`}
+              className={`${styles.dropdownArrow} ${isDropdownOpen ? styles.open : ''}`}
             >
               <path
                 d="M3 4.5L6 7.5L9 4.5"
@@ -134,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
             </svg>
           </button>
           <button
-            className="plus-button"
+            className={styles.plusButton}
             onClick={onPlusClick}
             aria-label="Add new calculation"
           >
@@ -156,7 +159,7 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
       </div>
-      
+
       {/* Dropdown Menu */}
       <DropdownMenu
         isOpen={isDropdownOpen}

@@ -1,78 +1,99 @@
-import { useState } from "react";
-import "./App.css";
-import { Header } from "./components/Header";
-import { Sidebar } from "./components/Sidebar";
-import { DropdownOption } from "./components/DropdownMenu";
-import { CalculationSettingsPage } from "./pages/CalculationSettingsPage";
-import { CalculationResultsPage } from "./pages/CalculationResultsPage";
-import { DrawMoleculePage } from "./pages/DrawMoleculePage";
+// src/web/App.tsx
+
+import './App.css';
+import styles from './App.module.css';
+import { Header } from './components/Header';
+import { Sidebar } from './components/Sidebar';
+import { ToastContainer } from './components/ToastContainer';
+import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
+import { CalculationResultsPage } from './pages/CalculationResultsPage';
+import { DrawMoleculePage } from './pages/DrawMoleculePage';
+import {
+  useSidebarState,
+  usePageNavigation,
+  useActiveCalculation,
+  useCalculationActions,
+  useStagedCalculation,
+  useCalculationWebSocket,
+} from './hooks';
+import { CalculationInstance } from './types/api-types';
 
 export const App = () => {
-  // UI state
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<DropdownOption>('calculation-settings');
 
-  // Get page title based on current page
-  const getPageTitle = (page: DropdownOption): string => {
-    switch (page) {
-      case 'calculation-settings':
-        return 'Calculation settings';
-      case 'calculation-results':
-        return 'Calculation results';
-      case 'draw-molecule':
-        return 'Draw molecule';
-      default:
-        return 'Calculation settings';
-    }
-  };
+  // 統一された状態管理フック
+  const sidebarState = useSidebarState();
+  const pageNavigation = usePageNavigation();
+  const calculationActions = useCalculationActions();
+  const stagedCalculation = useStagedCalculation();
+  
+  // 統一されたアクティブ計算状態（複雑な導出ロジックが内部で処理される）
+  const {
+    activeCalculation,
+    activeCalculationId,
+    isStagedCalculation,
+    selectCalculation,
+    isLoading: calculationLoading,
+    detailsLoading,
+    calculationsLoading,
+    calculationsError,
+    sidebarCalculations,
+  } = useActiveCalculation();
 
-  // Event handlers for UI components
-  const handleSidebarToggle = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+  // WebSocketによるリアルタイム更新（簡素化されたインターフェース）
+  useCalculationWebSocket(
+    activeCalculation?.id || null, 
+    activeCalculation?.status
+  );
 
-  const handleSidebarClose = () => {
-    setIsSidebarOpen(false);
-  };
-
-  const handleDropdownToggle = () => {
-    setIsDropdownOpen(!isDropdownOpen);
-  };
-
-  const handleDropdownClose = () => {
-    setIsDropdownOpen(false);
-  };
-
-  const handleDropdownOptionSelect = (option: DropdownOption) => {
-    setCurrentPage(option);
-  };
-
-  const handlePlusClick = () => {
-    // TODO: Implement add new calculation functionality
-    console.log('Add new calculation');
-  };
-
-  // Render current page component
   const renderCurrentPage = () => {
-    switch (currentPage) {
+    switch (pageNavigation.currentPage) {
       case 'calculation-settings':
-        return <CalculationSettingsPage />;
+        return (
+          <CalculationSettingsPage
+            activeCalculation={activeCalculation || undefined}
+            onCalculationUpdate={
+              isStagedCalculation
+                ? stagedCalculation.updateStagedCalculation
+                : calculationActions.handleCalculationUpdate
+            }
+            onStartCalculation={calculationActions.handleStartCalculation}
+            onCalculationRename={calculationActions.handleCalculationRename}
+            createNewCalculationFromExisting={stagedCalculation.createNewFromExisting}
+          />
+        );
       case 'calculation-results':
-        return <CalculationResultsPage />;
+        return (
+          <CalculationResultsPage
+            activeCalculation={activeCalculation || undefined}
+            isLoadingDetails={detailsLoading}
+            detailsError={null}
+            onCalculationUpdate={calculationActions.handleCalculationUpdate}
+          />
+        );
       case 'draw-molecule':
         return <DrawMoleculePage />;
       default:
-        return <CalculationSettingsPage />;
+        return (
+          <CalculationSettingsPage
+            activeCalculation={activeCalculation || undefined}
+            onCalculationUpdate={
+              isStagedCalculation
+                ? stagedCalculation.updateStagedCalculation
+                : calculationActions.handleCalculationUpdate
+            }
+            onStartCalculation={calculationActions.handleStartCalculation}
+            onCalculationRename={calculationActions.handleCalculationRename}
+            createNewCalculationFromExisting={stagedCalculation.createNewFromExisting}
+          />
+        );
     }
   };
 
   return (
-    <div className="app-container">
-      {/* Independent Sidebar Toggle */}
+    <div className={styles.appContainer}>
       <button
-        className={`independent-sidebar-toggle ${isSidebarOpen ? 'sidebar-open' : ''}`}
-        onClick={handleSidebarToggle}
+        className={`${styles.independentSidebarToggle} ${sidebarState.isSidebarOpen ? styles.sidebarOpen : ''}`}
+        onClick={sidebarState.handleSidebarToggle}
         aria-label="Toggle sidebar"
       >
         <svg
@@ -82,8 +103,7 @@ export const App = () => {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {isSidebarOpen ? (
-            // Arrow pointing left (close sidebar)
+          {sidebarState.isSidebarOpen ? (
             <path
               d="M10 4L6 8L10 12"
               stroke="currentColor"
@@ -92,7 +112,6 @@ export const App = () => {
               strokeLinejoin="round"
             />
           ) : (
-            // Arrow pointing right (open sidebar)
             <path
               d="M6 4L10 8L6 12"
               stroke="currentColor"
@@ -104,30 +123,54 @@ export const App = () => {
         </svg>
       </button>
 
-      {/* Header */}
       <Header
-        onDropdownToggle={handleDropdownToggle}
-        onPlusClick={handlePlusClick}
-        isDropdownOpen={isDropdownOpen}
-        isSidebarOpen={isSidebarOpen}
-        currentPageTitle={getPageTitle(currentPage)}
-        currentPage={currentPage}
-        onDropdownOptionSelect={handleDropdownOptionSelect}
-        onDropdownClose={handleDropdownClose}
+        onDropdownToggle={sidebarState.handleDropdownToggle}
+        onPlusClick={() => stagedCalculation.createNewCalculation(
+          pageNavigation.handleDropdownOptionSelect,
+          sidebarState.handleSidebarClose
+        )}
+        isDropdownOpen={sidebarState.isDropdownOpen}
+        isSidebarOpen={sidebarState.isSidebarOpen}
+        currentPageTitle={pageNavigation.currentPageTitle}
+        currentPage={pageNavigation.currentPage}
+        onDropdownOptionSelect={pageNavigation.handleDropdownOptionSelect}
+        onDropdownClose={sidebarState.handleDropdownClose}
       />
 
-
-      {/* Sidebar */}
       <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={handleSidebarClose}
+        isOpen={sidebarState.isSidebarOpen}
+        onClose={sidebarState.handleSidebarClose}
+        calculations={sidebarCalculations}
+        activeCalculationId={activeCalculation?.id || null}
+        calculationsLoading={calculationsLoading}
+        calculationsError={
+          calculationsError
+            ? calculationsError.message
+            : null
+        }
+        onCalculationSelect={(calculationId: string) => {
+          selectCalculation(calculationId);
+          stagedCalculation.clearStaged();
+          sidebarState.handleSidebarClose();
+        }}
+        onCalculationDelete={async (calculationId: string) => {
+          await calculationActions.handleCalculationDelete(calculationId);
+          // 削除された計算がアクティブだった場合はクリア
+          if (activeCalculationId === calculationId) {
+            selectCalculation(null);
+            stagedCalculation.clearStaged();
+            pageNavigation.handleDropdownOptionSelect('calculation-settings');
+          }
+        }}
       />
 
-      {/* Main Content */}
-      <div className={`app-content ${isSidebarOpen ? 'sidebar-open' : ''}`}>
+      <main
+        className={`${styles.appContent} ${sidebarState.isSidebarOpen ? 'sidebar-open' : ''}`}
+      >
         {renderCurrentPage()}
-      </div>
+      </main>
 
+      <ToastContainer />
     </div>
   );
 };

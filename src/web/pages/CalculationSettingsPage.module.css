@@ -1,0 +1,485 @@
+/* Calculation Settings Page Styles */
+
+.calculationSettingsContainers {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  width: 100%;
+  height: 100%;
+}
+
+.calculationSettingsContainer {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  padding-right:16px;
+  gap: 16px;
+}
+
+/* Header Section */
+.calculationHeader {
+  background: white;
+}
+
+.headerTitleBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.moleculeNameSection {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.moleculeNameInput {
+  width: 30dvw;
+  max-width: 512px;
+  padding: 12px 40px 12px 20px;
+  border: 2px solid #50D4F5;
+  border-radius: 8px;
+  font-size: 16px;
+  outline: none;
+  background: white;
+  color: #333;
+}
+
+.moleculeNameInput::placeholder {
+  color: #999;
+  font-style: normal;
+}
+
+.moleculeNameInput:focus {
+  border-color: #45c1e8;
+  box-shadow: 0 0 0 3px rgba(80, 212, 245, 0.15);
+}
+
+.clearMoleculeName {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clearMoleculeName:hover {
+  background: rgba(0,0,0,0.05);
+  color: #666;
+}
+
+.computationSettings {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* CPU/Memory Setting Styles */
+.cpuSetting,
+.memorySetting {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border: 2px solid #50D4F5;
+  border-radius: 12px;
+  padding: 4px 16px;
+  background: white;
+  position: relative;
+}
+
+.cpuSetting label,
+.memorySetting label {
+  position: absolute;
+  top: -12px;
+  left: 16px;
+  background: white;
+  padding: 4px 8px;
+  font-size: 14px;
+  color: #50D4F5;
+  font-weight: 500;
+}
+
+.cpuInputContainer {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.cpuCoresInput {
+  width: 56px;
+  height: 32px;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  text-align: center;
+  color: #333;
+  background: transparent;
+}
+
+.cpuCoresInput::-webkit-outer-spin-button,
+.cpuCoresInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.spinnerArrows {
+  display: flex;
+  flex-direction: column;
+  margin-left: 8px;
+}
+
+.spinnerBtn {
+  background: none;
+  border: none;
+  font-size: 8px;
+  color: #666;
+  cursor: pointer;
+  padding: 2px 6px;
+  transition: color 0.2s ease;
+}
+
+.spinnerBtn:hover {
+  color: #50D4F5;
+}
+
+.spinnerBtn.up {
+  margin-bottom: -2px;
+}
+
+.spinnerBtn.down {
+  margin-top: -2px;
+}
+
+/* Memory Setting Styles */
+.memoryInputContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.memoryValueInput {
+  width: 80px;
+  height: 32px;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  text-align: center;
+  color: #333;
+  background: transparent;
+}
+
+.memoryValueInput::-webkit-outer-spin-button,
+.memoryValueInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.memoryUnit {
+  font-size: 12px;
+  color: #333;
+}
+
+.startCalculationBtn {
+  background: #45c1e8;
+  color: white;
+  border: none;
+  width: 10vw;
+  min-width: 160px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 20px;
+  font-family: 'ADLaM', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.startCalculationBtn:hover {
+  background: #22b9e7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
+}
+
+.completed {
+  background: #48c78e;
+}
+
+.completed:hover {
+  background: #3fb373;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(72, 199, 142, 0.3);
+}
+
+.running {
+  background: #45c1e8;
+}
+
+.running:hover {
+  background: #22b9e7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
+}
+
+.error {
+  background: #dc3545;
+}
+
+.error:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+}
+
+.pending {
+  background: #45c1e8;
+}
+
+.pending:hover {
+  background: #22b9e7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
+}
+
+/* Calculation Column - Calculation Settings */
+.calculationColumn {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #e0e0e0;
+  background-color:#f8f9fa;
+}
+
+.calculationSettingsSection {
+  display: flex;
+  padding: 0 8px;
+  gap: 16px;
+}
+
+.settingRow {
+  display: flex;
+  flex-direction: column;
+  margin: 8px 0;
+}
+
+.settingRow label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #444;
+  text-align: left;
+  margin-bottom: 8px;
+}
+
+.settingRow select,
+.settingRow .numberInput {
+  width: 100px;
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  text-align: start;
+  background: white;
+  color: #333;
+}
+
+.settingRow select:focus,
+.settingRow .numberInput:focus {
+  border-color: #50D4F5;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.1);
+}
+
+.settingRow select:disabled {
+  background-color: #f5f5f5;
+  color: #999;
+}
+
+.numberInput {
+  text-align: center;
+}
+
+/* Chrome, Safari, Edge のスピンボタンを表示 */
+.numberInput.withSpinner::-webkit-outer-spin-button,
+.numberInput.withSpinner::-webkit-inner-spin-button {
+  -webkit-appearance: auto;
+  margin: 0;
+}
+
+/* Firefox のスピンボタンを表示 */
+.numberInput.withSpinner {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Molecular Input Section */
+.molecularInputSection {
+  background-color: #f8f9fa;
+  background: white;
+  border-radius: 8px;
+  padding: 8px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid #e0e0e0;
+  height: 100%;
+}
+
+.molecularInputSection h3 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.subsectionTitle {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.inputMethodSelection {
+  margin-bottom: 20px;
+}
+
+.radioOptions {
+  margin-top: 8px;
+}
+
+.radioOption {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.radioOption input[type="radio"] {
+  margin-right: 8px;
+  accent-color: #ff4444;
+  transform: scale(1.1);
+}
+
+.radioText {
+  color: #333;
+  font-weight: 400;
+}
+
+.pubchemInputSection {
+  margin-bottom: 24px;
+}
+
+.inputWithButton {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.pubchemInput {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+}
+
+.pubchemInput::placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.pubchemInput:focus {
+  border-color: #50D4F5;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.1);
+}
+
+.convertButton {
+  background: #50D4F5;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.convertButton:hover {
+  background: #45c1e8;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(80, 212, 245, 0.3);
+}
+
+.validationMessage {
+  font-size: 10px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.validationMessage.valid {
+  color: #28a745;
+}
+
+.validationMessage.invalid {
+  color: #dc3545;
+}
+
+.validationMessage.validating {
+  color: #ffa500;
+}
+
+.xyzDirectInput {
+  border-top: 1px solid #eee;
+}
+
+/* Error Messages */
+.calculationError {
+  margin-top: 10px;
+  color: #e74c3c;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Loading state */
+.loadingContainer {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  width: 100%;
+}
+
+/* Frozen core help text */
+.frozenCoreHelp {
+  font-size: 12px;
+  color: #666;
+  margin-left: 20px;
+  margin-top: 4px;
+}
+
+/* Converting and validation messages */
+.convertingMessage {
+  margin-top: 8px;
+}
+
+.errorMessage {
+  margin-top: 8px;
+}

@@ -1,205 +1,461 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude when working with code in this repository.Your owner is Japanese, so you must use Japanese when reporting your plans.
 
 ## Project Overview
 
-This is a PySCF Native App - an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem database, and visualizing 3D molecular structures using 3Dmol.js.
+This is a PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
+
+The application supports various quantum chemistry calculation methods, including **DFT**, **Hartree-Fock (HF)**, **MP2**, **CCSD**, and **TDDFT**, with options for **geometry optimization**, **vibrational frequency analysis**, solvent effects, and advanced analysis like **Natural Transition Orbitals (NTO)** for TDDFT. It also features dynamic loading of supported parameters (basis sets, functionals, etc.) from the backend.
+
+A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend. The application uses WebSockets for real-time status updates of running calculations, providing a more efficient and responsive user experience than a polling-based system.
+
+## Development Philosophy
+
+This is a development-stage application. Backward compatibility is not a concern, and breaking changes should be made freely in favor of better design and simpler code. When refactoring or improving the codebase:
+
+-   **Prioritize simplicity over compatibility** - Remove deprecated patterns and complex fallback logic
+-   **Make breaking changes confidently** - Don't hesitate to change APIs, data structures, or file formats
+-   **Clean up legacy code** - Remove old implementations when better alternatives are available
+-   **Focus on the best solution** - Don't compromise design quality for compatibility with older versions
+
+This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
+
+---
 
 ## Development Commands
 
+### Initial Setup
+
+#### Conda Environment (Required)
+This project requires a conda environment for development. The application features automated environment setup and verification tools, and uses a unified server configuration system for consistent behavior across development and production environments.
+
+##### Quick Setup (Recommended)
 ```bash
-# Development mode (builds and runs Electron with hot reload + Python backend)
-npm run dev
+# Install Node.js dependencies
+npm install
 
-# Production build
-npm run build
+# Automated environment setup (handles all conda setup)
+npm run setup-env
 
-# Clean build directory (automatically done before dev)
-rimraf dist
+# Verify environment health
+npm run verify-env
 
-# Individual build commands
-npm run dev:webpack    # Build with webpack in development mode
-npm run dev:electron   # Start Electron (requires dist files to exist)
+# Verify build tools
+npm run verify-build-env
 
-# Python backend development (separate terminal)
-cd src/python
-uv run python app.py   # Start Flask API server for PubChem integration
-uv run pytest tests/   # Run Python backend tests
+# Check server configuration
+npm run debug:config
 ```
 
-**Development Workflow:**
-- `npm run dev` automatically cleans dist/, builds with webpack in watch mode, starts Electron AND Python Flask server
-- Webpack compiles 3 separate bundles: main process, preload script, and renderer (React app)
-- `electronmon` watches `dist/**/*` and restarts Electron automatically on changes
-- `wait-on` ensures build artifacts exist before starting Electron to prevent startup errors
-- Development mode includes source maps and opens DevTools in detached mode
-- Python Flask server (port 5000) starts automatically and provides PubChem API integration
-- SSL verification is disabled in development for PubChem HTTPS requests
+##### Manual Setup
+```bash
+# Install Node.js dependencies
+npm install
+
+# Install Miniforge (if not already installed)
+# Example for macOS ARM:
+curl -L -O "[https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh](https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
+bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
+
+# Create conda environment from environment.yml (includes all dependencies)
+source $HOME/miniforge3/etc/profile.d/conda.sh
+conda env create -f .github/environment.yml
+
+# Activate the environment
+conda activate pyscf-env
+
+# Verify the setup
+npm run verify-env
+```
+
+**Note**: The conda environment setup is mandatory. The application will show an error dialog if the conda environment is not properly configured.
+
+### Development Commands
+
+```bash
+# Activate conda environment
+conda activate pyscf-env
+
+# Development mode (generates code, builds, and runs Electron with hot reload + Python backend)
+npm run dev
+
+# Production build (generates code, builds frontend and creates Python executable)
+npm run build
+
+# Package application for distribution (includes production build)
+npm run package
+```
+
+### Individual Commands
+
+#### Environment Management
+```bash
+# Automated environment setup (conda + dependencies)
+npm run setup-env
+
+# Verify environment health and dependencies
+npm run verify-env
+
+# Verify build tools (conda-pack, PyInstaller, Gunicorn)
+npm run verify-build-env
+
+# Debug server configuration
+npm run debug:config
+```
+
+#### Build Commands
+```bash
+# Clean build directory
+npm run clean
+
+# Generate TypeScript types and Python models from OpenAPI spec
+npm run codegen
+
+# Build frontend with webpack in development mode
+npm run dev:webpack
+
+# Start Electron (requires dist files to exist)
+npm run dev:electron
+
+# Package conda environment for distribution
+npm run build:conda-pack
+
+# Build Python executable only (uses PyInstaller)
+npm run build:python
+
+# Validate build completeness (after build)
+npm run validate-build
+
+# Code formatting (using Prettier)
+npm run format      # Format all source code
+npm run format:check # Check if code is properly formatted
+```
+
+### Testing and Validation Commands
+```bash
+# Complete build test (frontend + backend)
+npm run test:build
+
+# Test Python imports and dependencies
+npm run test:python-build
+
+# Test Gunicorn server locally with unified configuration
+npm run test:gunicorn-local
+
+# Full packaging test (build + package)
+npm run test:run-packaged
+
+# --- Manual Python Backend Testing (in a separate terminal) ---
+cd src/python
+
+# Activate conda environment
+conda activate pyscf-env
+
+# Start Flask API server directly
+python app.py
+
+# Run Python backend tests
+pytest tests/
+```
+
+---
+
+## Development Workflow
+
+The `npm run dev` script is the primary command for development. It automatically:
+
+1.  **Generates Code**: Runs `npm run codegen` to generate TypeScript types and Python Pydantic models from `src/api-spec/openapi.yaml`. This ensures the frontend and backend are always in sync with the API specification.
+2.  **Cleans**: Cleans the `dist/` directory.
+3.  **Builds Frontend**: Builds the frontend code (main process, preload script, and renderer) using Webpack in watch mode.
+4.  **Starts Backend**: Starts the Python Flask server as a subprocess from within the Electron main process using the unified Gunicorn-based execution system.
+5.  **Starts Electron**: Starts the Electron application using `electronmon`, which watches the `dist/` directory for changes and automatically restarts the app.
+
+## Unified Server Configuration System
+
+The application uses a configuration-driven approach with `config/server-config.json` to ensure consistent behavior across development and production environments.
+
+-   **Server settings**: Host, port, and auto-detection.
+-   **Gunicorn configuration**: Workers, threads, and timeout settings.
+-   **SocketIO settings**: CORS, async mode, and timeouts.
+-   **Logging configuration**.
+
+**Unified Execution Environment**: Both development and production environments now use Gunicorn as the WSGI server, eliminating "works in dev but not in production" problems.
+
+The Electron main process (`src/main.ts`) launches the Python Flask server using a simplified environment detection strategy:
+
+1.  **Bundled conda environment** (packaged apps): Uses the `conda-pack` packaged environment at `process.resourcesPath/conda_env/bin/python`.
+2.  **Development conda environment**: Detects the `pyscf-env` using environment variables or conda commands.
+
+A robust **health check** system pings the `/health` endpoint. If the server fails to start, it provides context-specific error messages.
+
+---
 
 ## Architecture Overview
 
+### API-First Development with OpenAPI
+
+The single source of truth for the API is `src/api-spec/openapi.yaml`. The `npm run codegen` command uses this file to generate:
+
+-   **Python Pydantic Models** (`src/python/generated_models.py`) for type-safe request/response handling in the Flask backend.
+-   **TypeScript Type Definitions** (`src/web/types/generated-api.ts`) to keep the frontend API client synchronized with the backend.
+
 ### Electron Structure
-- **Main Process** (`src/main.ts`): Creates BrowserWindow with custom titlebar styling, manages Python Flask subprocess, loads the React app
-- **Preload Script** (`src/preload.ts`): Currently minimal, handles secure communication between main and renderer
-- **Renderer Process** (`src/web/`): React application for the UI
-- **Python Backend** (`src/python/`): Flask API server providing PubChem integration and molecular data processing
 
-### Build System
-- Uses Webpack with TypeScript compilation
-- Three separate build targets: main process, preload script, and renderer (React app)
-- Development mode includes source maps and file watching
-- Security-focused configuration (no style-loader, electron-renderer target avoided)
-- Uses `electronmon` for automatic Electron restart during development
-- CSS is extracted to separate files using `MiniCssExtractPlugin` for security
-- Assets (fonts, images) are processed as resources and placed in `dist/assets/`
+-   **Main Process (`src/main.ts`)**: Creates the `BrowserWindow`, manages the Python Flask subprocess, and handles application lifecycle events.
+-   **Preload Script (`src/preload.ts`)**: Securely exposes specific Electron APIs to the renderer process.
+-   **Renderer Process (`src/web/`)**: The React (TypeScript) application that provides the user interface.
 
-### Core Components
-- **App.tsx**: Main application component with page routing, sidebar/dropdown state management
-- **Pages**: Three main app sections (CalculationSettingsPage, CalculationResultsPage, DrawMoleculePage)
-- **MoleculeViewer**: React component wrapping 3Dmol.js for 3D molecular visualization (in DrawMoleculePage)
-- **XYZInput**: Component for inputting and validating XYZ coordinate data
-- **StyleControls**: Controls for adjusting molecular visualization styles
-- **Header/Sidebar/DropdownMenu**: Navigation components with page switching functionality
+### Python Backend (`src/python/`)
 
-### Key Libraries
-- **3Dmol.js**: For 3D molecular visualization and rendering
-- **React 19**: UI framework
-- **TypeScript**: Type safety throughout the codebase
-- **Flask**: Python web framework for backend API
-- **pubchempy**: Python library for PubChem database integration
-- **uv**: Modern Python package manager for dependency management
+A Flask API server with REST endpoints and a WebSocket interface for:
 
-### Application Flow
-1. **Page Management**: App.tsx manages state for sidebar, dropdown navigation, and current page routing
-2. **Navigation**: Independent sidebar toggle button and header dropdown provide access to three main pages
-3. **Molecular Visualization Workflow** (CalculationSettingsPage):
-   - **PubChem Integration**: User searches molecular compounds by name or CID
-   - **Direct API Access**: Flask backend queries PubChem REST API directly (bypassing SSL issues)
-   - **Data Retrieval**: Obtains molecular properties (IUPAC name, formula, weight, synonyms) and 3D coordinates
-   - **XYZ Conversion**: Backend converts SDF data to compact XYZ format with proper chemical names
-   - **UI Display**: Retrieved XYZ data automatically populates Direct XYZ Input/Edit field
-   - **Manual Input**: User can directly input XYZ coordinates via XYZInput component with validation
-   - **Real-time Validation**: Data is parsed and validated using `xyzParser.ts` utilities
-   - **3D Visualization**: Valid coordinates are passed to MoleculeViewer component
-   - **Interactive Viewer**: MoleculeViewer creates a 3Dmol.js viewer instance and loads molecular structure
-   - **Style Controls**: StyleControls allow real-time adjustment of visualization appearance (atoms, bonds, surfaces)
-   - **Screenshots**: Screenshots can be taken directly from the 3D viewer
-4. **State Management**: All UI state (sidebar, dropdown, current page, XYZ data) managed in React hooks with centralized control
+-   **PubChem & SMILES Integration**: Searching and converting molecular structures.
+-   **Quantum Chemistry Calculations**: Running various calculations (DFT, HF, MP2, CCSD, TDDFT) via PySCF. This now includes **geometry optimization** and **vibrational frequency analysis**. Calculations are executed in parallel using a `ProcessPoolExecutor`.
+-   **Molecular Orbital Analysis**: Generating data for visualizing molecular orbitals, including CUBE files and energy level diagrams.
+-   **Dynamic Parameter Loading**: Providing lists of supported basis sets, functionals, and solvents via the `/api/quantum/supported-parameters` endpoint.
+-   **Real-time Status Updates**: A WebSocket endpoint pushes status updates to the frontend.
+-   **File Management**: Listing, renaming, and deleting calculation data.
+-   **Health Check**: An endpoint (`/health`) for startup coordination.
 
-### File Structure
+---
+
+## Core Components & State Management
+
+The application uses a modern, hook-based state management architecture with a clear separation of concerns, moving complex logic out of `App.tsx` and into reusable hooks.
+
+### State Management Architecture
+
+-   **TanStack Query**: Manages all server-side state, including API data fetching, caching, and synchronization.
+-   **Zustand**: Manages global UI state.
+    -   `calculationStore.ts`: Manages `activeCalculationId` and `stagedCalculation` (for new calculation workflows).
+    -   `notificationStore.ts`: Manages global toast notifications for user feedback.
+
+### Key Hooks (`src/web/hooks/`)
+
+This architecture relies on a collection of custom hooks to encapsulate logic:
+
+-   **`useActiveCalculation`**: A central hook that derives the currently active calculation state. It intelligently selects between a staged (new) calculation, detailed data fetched from the server, or a fallback, providing a unified `activeCalculation` object to the UI.
+-   **`useCalculationActions`**: Encapsulates all mutation actions like starting, renaming, and deleting calculations. It handles API calls and onSuccess/onError logic, including notifications.
+-   **`useStagedCalculation`**: Manages the lifecycle of temporary "staged" calculations, used when creating a new calculation or editing a completed one.
+-   **`usePageNavigation`**: Manages the current active page (`CalculationSettingsPage`, `CalculationResultsPage`, etc.).
+-   **`useSidebarState`**: Manages the open/closed state of the sidebar and header dropdown.
+-   **`useCalculationWebSocket`**: A dedicated hook that wraps the `useCalculationSubscription` logic. It automatically establishes a WebSocket connection for the active calculation and updates the TanStack Query cache in real-time.
+-   **`useCalculationQueries`**: Contains all TanStack Query definitions (`useQuery`, `useMutation`) for interacting with the backend API, including new queries for **molecular orbitals** and **supported parameters**.
+
+### State Flow Example (Starting a Calculation)
+
+1.  User clicks the "Start Calculation" button.
+2.  The `handleStartCalculation` function from the **`useCalculationActions`** hook is called. It uses the `useStartCalculation` mutation.
+3.  The Flask backend (`POST /api/quantum/calculate`) receives the request, creates a directory, saves initial parameters, sets the status to `running`, and submits the job to a `ProcessPoolExecutor`. It returns a `202Accepted` response with the new `CalculationInstance` data.
+4.  The `useStartCalculation` mutation's `onSuccess` callback invalidates the `calculations` query cache, triggering a refetch.
+5.  The **`useStagedCalculation`** hook clears any staged data, and the **`useActiveCalculation`** hook updates the `activeCalculationId`.
+6.  The **`useCalculationWebSocket`** hook detects the `running` status of the new active calculation and opens a WebSocket connection.
+7.  The Flask backend's WebSocket handler monitors `status.json`. As the worker process updates the file (e.g., to `completed` or `error`), the handler pushes the complete, updated `CalculationInstance` data to the client.
+8.  The `onUpdate` callback in **`useCalculationWebSocket`** receives the new data and directly updates the TanStack Query cache using `queryClient.setQueryData()`, triggering re-renders in all components using that data.
+
+---
+
+## File Structure
+
 ```
-src/
-├── main.ts              # Electron main process with Python subprocess management
-├── preload.ts           # Electron preload script  
-├── types/               # TypeScript definitions for 3Dmol.js and Electron
-├── web/
-│   ├── App.tsx          # Main React application with page routing
-│   ├── components/      # React components (Header, Sidebar, MoleculeViewer, XYZInput, etc.)
-│   ├── pages/           # Page components (CalculationSettings, Results, DrawMolecule)
-│   ├── utils/           # Utility functions (XYZ parsing)
-│   └── index.html       # HTML template with CSP allowing localhost:5000
-└── python/              # Python Flask backend
-    ├── app.py           # Flask API server main entry point
-    ├── pyproject.toml   # uv project configuration with dependencies
-    ├── pubchem/         # PubChem integration modules
-    │   ├── __init__.py
-    │   ├── client.py    # PubChem API client with SSL bypassing
-    │   └── parser.py    # XYZ format parsing and conversion utilities
-    └── tests/           # Python unit tests and API tests
-        ├── __init__.py
-        ├── test_pubchem.py      # PubChem client tests
-        └── test_flask_api.py    # Flask API endpoint tests
+├── .github
+    ├── environment.yml
+    └── workflows
+    │   ├── ci.yml
+    │   └── release.yml
+├── .gitignore
+├── .prettierignore
+├── .prettierrc
+├── CLAUDE.md
+├── LICENSE
+├── PySCF_front_view.png
+├── README.md
+├── config
+    └── server-config.json
+├── package-lock.json
+├── package.json
+├── scripts
+    ├── setup-environment.sh
+    ├── test-python-standalone.js
+    ├── validate-build-completeness.py
+    └── verify-environment.py
+├── src
+    ├── api-spec
+    │   └── openapi.yaml
+    ├── assets
+    │   ├── fonts
+    │   │   └── ADLaMDisplay-Regular.ttf
+    │   └── icon
+    │   │   └── mac
+    │   │       └── Pyscf_front.icns
+    ├── main.ts
+    ├── preload.ts
+    ├── python
+    │   ├── SMILES
+    │   │   ├── __init__.py
+    │   │   └── smiles_converter.py
+    │   ├── app.py
+    │   ├── config
+    │   │   └── server-config.json
+    │   ├── data
+    │   │   ├── __init__.py
+    │   │   └── solvent_properties.py
+    │   ├── generated_models.py
+    │   ├── pubchem
+    │   │   ├── __init__.py
+    │   │   ├── client.py
+    │   │   └── parser.py
+    │   ├── quantum_calc
+    │   │   ├── __init__.py
+    │   │   ├── base_calculator.py
+    │   │   ├── ccsd_calculator.py
+    │   │   ├── dft_calculator.py
+    │   │   ├── exceptions.py
+    │   │   ├── file_manager.py
+    │   │   ├── file_watcher.py
+    │   │   ├── hf_calculator.py
+    │   │   ├── mp2_calculator.py
+    │   │   ├── orbital_generator.py
+    │   │   ├── process_manager.py
+    │   │   ├── solvent_effects.py
+    │   │   ├── supported_parameters.py
+    │   │   └── tddft_calculator.py
+    │   ├── run_geometry_tests.py
+    │   └── tests
+    │   │   ├── __init__.py
+    │   │   ├── test_concurrent_websockets.py
+    │   │   ├── test_error_scenarios.py
+    │   │   ├── test_file_watcher.py
+    │   │   ├── test_flask_api.py
+    │   │   ├── test_geometry_optimization.py
+    │   │   ├── test_pubchem.py
+    │   │   ├── test_quantum_calc.py
+    │   │   └── test_websocket_integration.py
+    ├── types
+    │   ├── 3dmol.d.ts
+    │   ├── css-modules.d.ts
+    │   └── electron.d.ts
+    └── web
+    │   ├── App.css
+    │   ├── App.module.css
+    │   ├── App.tsx
+    │   ├── apiClient.ts
+    │   ├── components
+    │       ├── DropdownMenu.module.css
+    │       ├── DropdownMenu.tsx
+    │       ├── Header.module.css
+    │       ├── Header.tsx
+    │       ├── MolecularOrbitalEnergyDiagram.module.css
+    │       ├── MolecularOrbitalEnergyDiagram.tsx
+    │       ├── MolecularOrbitalViewer.module.css
+    │       ├── MolecularOrbitalViewer.tsx
+    │       ├── MoleculeViewer.module.css
+    │       ├── MoleculeViewer.tsx
+    │       ├── MoleculeViewerSection.module.css
+    │       ├── MoleculeViewerSection.tsx
+    │       ├── Sidebar.module.css
+    │       ├── Sidebar.tsx
+    │       ├── StyleControls.module.css
+    │       ├── StyleControls.tsx
+    │       ├── ToastContainer.module.css
+    │       ├── ToastContainer.tsx
+    │       ├── ToastNotification.module.css
+    │       ├── ToastNotification.tsx
+    │       ├── XYZInput.module.css
+    │       └── XYZInput.tsx
+    │   ├── data
+    │       └── atomicRadii.ts
+    │   ├── hooks
+    │       ├── index.ts
+    │       ├── useActiveCalculation.ts
+    │       ├── useActiveCalculationId.ts
+    │       ├── useCalculationActions.ts
+    │       ├── useCalculationOperations.ts
+    │       ├── useCalculationQueries.ts
+    │       ├── useCalculationSubscription.ts
+    │       ├── useCalculationWebSocket.ts
+    │       ├── usePageNavigation.ts
+    │       ├── useSidebarState.ts
+    │       └── useStagedCalculation.ts
+    │   ├── index.html
+    │   ├── index.tsx
+    │   ├── pages
+    │       ├── CalculationResultsPage.module.css
+    │       ├── CalculationResultsPage.tsx
+    │       ├── CalculationSettingsPage.module.css
+    │       ├── CalculationSettingsPage.tsx
+    │       ├── DrawMoleculePage.module.css
+    │       └── DrawMoleculePage.tsx
+    │   ├── store
+    │       ├── calculationStore.ts
+    │       └── notificationStore.ts
+    │   ├── types
+    │       ├── api-types.ts
+    │       └── generated-api.ts
+    │   └── utils
+    │       └── xyzParser.ts
+├── test_alignment.py
+├── tsconfig.json
+└── webpack.config.ts
 ```
 
-### Type Definitions
-Custom TypeScript definitions are provided for:
-- 3Dmol.js library (`3dmol.d.ts`, `3dmol-build.d.ts`)
-- Electron APIs (`electron.d.ts`)
+---
 
-## Development Notes
+## Key API Endpoints
 
-### Electron Security & Configuration
-- Custom titlebar with `titleBarStyle: 'hidden'` and transparent `titleBarOverlay` (40px height)
-- Security best practices: `nodeIntegration: false`, `contextIsolation: true`
-- DevTools automatically opens in detached mode during development
-- Content Security Policy (CSP) configured to allow connections to localhost:5000 for Flask API
-- Python Flask subprocess automatically managed by Electron main process
+-   `GET /health`: Health check endpoint.
+-   `POST /api/pubchem/search`: Search PubChem.
+-   `POST /api/smiles/convert`: Convert a SMILES string to XYZ.
+-   `POST /api/pubchem/validate`: Validate an XYZ format string.
+-   `GET /api/quantum/supported-parameters`: Get lists of supported calculation methods, basis sets, functionals, etc.
+-   `POST /api/quantum/calculate`: Asynchronously starts a quantum chemistry calculation.
+-   `GET /api/quantum/calculations`: Lists all saved calculations.
+-   `GET /api/quantum/calculations/<id>`: Gets detailed results for a specific calculation.
+-   `PUT /api/quantum/calculations/<id>`: Updates a calculation's metadata (e.g., renames it).
+-   `DELETE /api/quantum/calculations/<id>`: Deletes a calculation.
+-   `POST /api/quantum/calculations/<id>/cancel`: Cancels a running calculation.
+-   `GET /api/quantum/status`: Gets status of the calculation process pool.
+-   `GET /api/quantum/calculations/<id>/orbitals`: Get molecular orbital information (energies, indices).
+-   `GET /api/quantum/calculations/<id>/orbitals/{orbitalIndex}/cube`: Generate and retrieve a CUBE file for a specific orbital.
+-   `GET /api/quantum/calculations/<id>/orbitals/cube-files`: List all generated CUBE files for a calculation.
+-   `DELETE /api/quantum/calculations/<id>/orbitals/cube-files`: Delete generated CUBE files.
+-   `WS /ws/calculations/<id>`: WebSocket endpoint for real-time status updates.
 
-### Code Organization & Standards
-- TypeScript strict mode enabled with comprehensive type definitions in `src/types/`
-- Custom TypeScript definitions for 3Dmol.js library and Electron APIs
-- XYZ parser supports standard molecular coordinate format with validation
-- Sample molecules available for testing: water, methane, benzene
-- Python backend follows modern practices with uv package management
-- Flask API uses REST conventions with JSON responses and proper error handling
-- SSL certificate verification disabled in development for PubChem API access
-- Comprehensive test coverage for both Python backend and TypeScript frontend
+## Parallel Processing Architecture
 
-### Build System Details
-- Webpack configuration includes Japanese comments and prioritizes security
-- Three separate build targets prevent security vulnerabilities
-- CSS extracted to separate files (no style-loader for security)
-- Assets processed as resources and placed in `dist/assets/`
-- `fsevents` externalized for macOS compatibility
+The application uses a `ProcessPoolExecutor`-based system for quantum chemistry calculations to achieve true multiprocessing parallelism.
 
-### UI Architecture
-- Independent sidebar toggle button with custom SVG icons
-- Dropdown navigation between three main app sections
-- Responsive layout that adapts when sidebar is open/closed
-- Footer displays technology credits (3Dmol.js, React, TypeScript)
+-   **Process Pool Management**: The `CalculationProcessManager` class manages a pool of worker processes, allowing multiple calculations to run simultaneously across different CPU cores.
+-   **Worker Process Isolation**: Each calculation runs in a separate Python process, eliminating the Global Interpreter Lock (GIL) limitation. This includes computationally intensive tasks like **geometry optimization** and **frequency analysis**.
+-   **Resource Management**: The process pool starts on demand and shuts down cleanly when the Flask server terminates.
+-   **Cancellation Support**: Running calculations can be cancelled via the API.
+
+---
 
 ## Troubleshooting
 
-- If build fails on macOS, the `fsevents` external in webpack config provides a workaround
-- Electron requires both `dist/index.html` and `dist/main.js` to exist before starting
-- Source maps are essential for development mode to avoid "Uncaught EvalError" in DevTools
-- If PubChem API fails with SSL errors, check that SSL verification is disabled in `pubchem/client.py`
-- If Flask server fails to start, ensure port 5000 is not occupied (disable AirPlay Receiver on macOS)
-- Python dependencies managed by uv - use `uv sync` in `src/python/` to install/update packages
-- If XYZ data doesn't display properly, check that the coordinate format uses compact spacing (8.4f format)
+### Environment Setup Issues
 
-## Common Tasks
-
-### Frontend Development
-- **New molecular visualization features**: Work with the MoleculeViewer component and 3Dmol.js APIs
-- **New input formats**: Extend the parsing utilities in `src/web/utils/`
-- **UI changes**: Follow the existing component patterns in `src/web/components/`
-- **XYZ input modifications**: Update XYZInput component with external value control support
-
-### Backend Development
-- **PubChem API enhancements**: Modify `src/python/pubchem/client.py` for new compound properties
-- **New data formats**: Extend `src/python/pubchem/parser.py` for different molecular formats
-- **API endpoints**: Add new routes to `src/python/app.py` following REST conventions
-- **Testing**: Add tests to `src/python/tests/` for new functionality
-
-### Full-Stack Integration
-- **New molecular databases**: Implement similar to PubChem integration pattern
-- **Data flow**: Ensure proper state management between React frontend and Flask backend
-- **Error handling**: Implement consistent error reporting across both frontend and backend
-- **Security**: Maintain CSP policies when adding new external API connections
-
-## PubChem Integration Usage
-
-### Basic Usage
-1. Start the application with `npm run dev` (automatically starts both Electron and Flask server)
-2. Navigate to Calculation Settings page
-3. Select "Get from PubChem name/ID" option
-4. Enter molecular name (e.g., "water", "caffeine", "aspirin") or CID number
-5. Click "Convert to XYZ" button
-6. Molecular structure appears in both XYZ text field and 3D viewer
-
-### API Endpoints
-- **POST** `/api/pubchem/search`: Search compounds and retrieve XYZ coordinates
-- **POST** `/api/pubchem/validate`: Validate XYZ format strings
-- **GET** `/health`: Health check for Flask server
-
-### Data Format
-Retrieved XYZ data uses compact formatting:
+**Automated Diagnosis**: Always start with environment verification:
+```bash
+npm run verify-env
 ```
-3
-oxidane (H2O) - CID:962
-O  0.000   0.000   0.000
-H  0.277   0.893   0.254
-H  0.607  -0.238  -0.717
-```
+This command provides comprehensive diagnostic information and specific troubleshooting recommendations.
+
+**Environment Detection Failures**: The application uses a simplified 2-layer detection approach:
+1.  **Packaged Environment**: The application uses the **bundled conda environment only**. The path must be `conda_env/bin/python`. Use `npm run validate-build` to verify.
+2.  **Development Environment**: Verify `pyscf-env` exists with `npm run verify-env`. If detection fails, use `npm run setup-env` or set the `CONDA_ENV_PATH` environment variable.
+
+**Build Tool Issues**: If `npm run verify-build-env` fails, ensure `conda-pack`, `pyinstaller`, and `gunicorn` are installed in the active `pyscf-env` environment.
+
+### Development Server Issues
+
+The unified Gunicorn-based server reduces environment-specific issues. Most behavior is controlled by `config/server-config.json`. Use `npm run debug:config` to verify server settings. The server automatically finds free ports based on the configuration.
+
+### Build and Packaging Issues
+
+The build system includes pre- and post-build verification steps (`verify-env`, `verify-build-env`, `validate-build`). A failure in these steps indicates an issue with the conda environment or the server configuration.
+
+### Runtime Issues
+
+-   **Process Pool Problems**: Check `/api/quantum/status` for pool health. The process manager handles cleanup automatically.
+-   **SSL/HTTPS Issues**: PubChem integration uses standard HTTPS. Corporate firewalls or proxies might interfere with these requests.

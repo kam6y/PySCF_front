@@ -32,7 +32,7 @@ def atoms_to_xyz(atoms: List[Dict[str, Any]], title: str = "Molecule") -> str:
     # Build XYZ string
     lines = [str(len(atoms)), title]
     for atom in atoms:
-        lines.append(f"{atom['element']:<3} {atom['x']:>10.4f} {atom['y']:>10.4f} {atom['z']:>10.4f}")
+        lines.append(f"{atom['element']:<3} {atom['x']:>7.4f} {atom['y']:>7.4f} {atom['z']:>7.4f}")
 
     return '\n'.join(lines)
 
