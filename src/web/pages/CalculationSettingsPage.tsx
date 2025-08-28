@@ -185,7 +185,7 @@ export const CalculationSettingsPage = ({
         basis_function: adjustedParams.basis_function || '6-31G(d)',
         exchange_correlation: adjustedParams.exchange_correlation || 'B3LYP',
         charges: adjustedParams.charges || 0,
-        spin_multiplicity: adjustedParams.spin_multiplicity || 1,
+        spin_multiplicity: adjustedParams.spin_multiplicity || 0,
         solvent_method: adjustedParams.solvent_method || 'none',
         solvent: adjustedParams.solvent || '-',
         name:
@@ -248,7 +248,7 @@ export const CalculationSettingsPage = ({
           basis_function: currentParams.basis_function || '6-31G(d)',
           exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
           charges: currentParams.charges || 0,
-          spin_multiplicity: currentParams.spin_multiplicity || 1,
+          spin_multiplicity: currentParams.spin_multiplicity || 0,
           solvent_method: currentParams.solvent_method || 'none',
           solvent: currentParams.solvent || '-',
           name:
@@ -364,7 +364,7 @@ export const CalculationSettingsPage = ({
       basis_function: currentParams.basis_function || '6-31G(d)',
       exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
       charges: currentParams.charges || 0,
-      spin_multiplicity: currentParams.spin_multiplicity || 1,
+      spin_multiplicity: currentParams.spin_multiplicity || 0,
       solvent_method: currentParams.solvent_method || 'none',
       solvent: currentParams.solvent || '-',
       name: moleculeName,
@@ -439,7 +439,7 @@ export const CalculationSettingsPage = ({
         basis_function: params.basis_function || '6-31G(d)',
         exchange_correlation: params.exchange_correlation || 'B3LYP',
         charges: params.charges || 0,
-        spin_multiplicity: params.spin_multiplicity || 1,
+        spin_multiplicity: params.spin_multiplicity || 0,
         solvent_method: params.solvent_method || 'none',
         solvent: params.solvent || '-',
         name: moleculeName,
@@ -762,17 +762,17 @@ export const CalculationSettingsPage = ({
                 />
               </div>
               <div className={styles.settingRow}>
-                <label>Spin Multiplicity (2S+1)</label>
+                <label>Spin Multiplicity (2S)</label>
                 <input
                   type="number"
-                  value={params.spin_multiplicity || 1}
+                  value={params.spin_multiplicity || 0}
                   onChange={e =>
                     handleParamChange(
                       'spin_multiplicity',
                       Number(e.target.value)
                     )
                   }
-                  min={1}
+                  min={0}
                   step={1}
                   className={`${styles.numberInput} ${styles.withSpinner}`}
                   disabled={calculationStatus === 'running'}

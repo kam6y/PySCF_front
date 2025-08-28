@@ -18,7 +18,7 @@ export const useStagedCalculation = () => {
       basis_function: '6-31G(d)',
       exchange_correlation: 'B3LYP',
       charges: 0,
-      spin_multiplicity: 1,
+      spin_multiplicity: 0,
       solvent_method: 'none',
       solvent: '-',
       xyz: '',

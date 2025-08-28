@@ -542,10 +542,10 @@ components:
           description: Molecular charge
         spin_multiplicity:
           type: integer
-          minimum: 1
+          minimum: 0
           maximum: 10
-          default: 1
-          description: Spin multiplicity
+          default: 0
+          description: Spin multiplicity (2S)
         solvent_method:
           $ref: '#/components/schemas/SolventMethod'
           default: none

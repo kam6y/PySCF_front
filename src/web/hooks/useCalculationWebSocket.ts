@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCalculationSubscription } from './useCalculationSubscription';
 import { CalculationInstance } from '../types/api-types';
+import { showErrorNotification } from '../store/notificationStore';
 
 /**
  * WebSocket経由の計算更新を処理する専用フック
@@ -46,7 +47,12 @@ export const useCalculationWebSocket = (
   // エラーハンドリング
   const handleWebSocketError = (error: string) => {
     console.error('WebSocket error:', error);
-    // 必要に応じて、エラー状態を管理するストアに通知することも可能
+    
+    // WebSocketエラーをトースト通知で表示
+    showErrorNotification(
+      'リアルタイム監視エラー',
+      error
+    );
   };
 
   // WebSocket接続の管理

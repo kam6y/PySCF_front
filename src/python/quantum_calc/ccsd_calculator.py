@@ -196,7 +196,7 @@ class CCSDCalculator(BaseCalculator):
     
     def _create_scf_method(self, mol):
         """Create HF method object for CCSD reference (RHF/UHF)."""
-        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        spin = self.results.get('spin_multiplicity', 0) // 2
         
         if spin == 0:
             mf = scf.RHF(mol)
@@ -213,5 +213,5 @@ class CCSDCalculator(BaseCalculator):
     
     def _get_base_method_description(self) -> str:
         """Get description of base method for logging."""
-        spin = (self.results.get('spin_multiplicity', 1) - 1) // 2
+        spin = self.results.get('spin_multiplicity', 0) // 2
         return f"{'UHF' if spin > 0 else 'RHF'} (CCSD reference)"

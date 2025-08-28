@@ -1,0 +1,120 @@
+/* Toast Notification Component Styles */
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  background: #2c2c2c;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  margin-bottom: 12px;
+  padding: 16px;
+  border-left: 4px solid;
+  min-width: 300px;
+  max-width: 600px;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toastVisible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toastExiting {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+/* Toast type variants - using existing project colors */
+.toastError {
+  border-left-color: #e74c3c;
+  background: linear-gradient(135deg, #2c2c2c 0%, #322828 100%);
+}
+
+.toastSuccess {
+  border-left-color: #2ecc71;
+  background: linear-gradient(135deg, #2c2c2c 0%, #282c28 100%);
+}
+
+.toastInfo {
+  border-left-color: #3498db;
+  background: linear-gradient(135deg, #2c2c2c 0%, #282a2c 100%);
+}
+
+/* Toast layout */
+.toastIcon {
+  margin-right: 12px;
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.toastContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.toastTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.toastMessage {
+  font-size: 12px;
+  color: #cccccc;
+  line-height: 1.3;
+  word-wrap: break-word;
+}
+
+.toastCloseButton {
+  background: none;
+  border: none;
+  color: #999999;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  margin-left: 12px;
+  padding: 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toastCloseButton:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.toastCloseButton:focus {
+  outline: 2px solid #3498db;
+  outline-offset: 1px;
+}
+
+/* Hover effect */
+.toast:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+  transform: translateY(-1px);
+}
+
+.toastVisible:hover {
+  transform: translateY(-1px) translateX(0);
+}
+
+/* Animation for progress bar (if we want to add auto-close indicator) */
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}

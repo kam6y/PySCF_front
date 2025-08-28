@@ -121,9 +121,10 @@ def send_immediate_websocket_notification(calculation_id: str, status: str, erro
                 'workingDirectory': calc_dir,
             }
             
-            # Add error if provided
+            # Add error if provided (両方のフィールドに設定してフロントエンドとの整合性を確保)
             if error_message:
                 calculation_instance['error'] = error_message
+                calculation_instance['errorMessage'] = error_message
             
             # Send to all clients in the calculation room
             socketio.emit('calculation_update', calculation_instance, room=f'calculation_{calculation_id}')

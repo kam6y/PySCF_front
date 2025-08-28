@@ -6,6 +6,7 @@ import {
 } from './useCalculationQueries';
 import { CalculationInstance, QuantumCalculationRequest, ApiError } from '../types/api-types';
 import { useCalculationStore } from '../store/calculationStore';
+import { showErrorNotification } from '../store/notificationStore';
 
 export const useCalculationActions = () => {
   const queryClient = useQueryClient();
@@ -18,11 +19,11 @@ export const useCalculationActions = () => {
     console.error(defaultMessage, error);
 
     if (error instanceof ApiError) {
-      alert(error.getUserMessage());
+      showErrorNotification(defaultMessage, error.getUserMessage());
     } else if (error instanceof Error) {
-      alert(`${defaultMessage}: ${error.message}`);
+      showErrorNotification(defaultMessage, error.message);
     } else {
-      alert(`${defaultMessage}: 不明なエラーが発生しました。`);
+      showErrorNotification(defaultMessage, '不明なエラーが発生しました。');
     }
   };
 

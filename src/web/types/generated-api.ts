@@ -295,8 +295,8 @@ export interface components {
              */
             charges: number;
             /**
-             * @description Spin multiplicity
-             * @default 1
+             * @description Spin multiplicity (2S)
+             * @default 0
              */
             spin_multiplicity: number;
             /** @default none */

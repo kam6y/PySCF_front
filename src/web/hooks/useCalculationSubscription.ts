@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { CalculationInstance } from '../types/api-types';
+import { showErrorNotification } from '../store/notificationStore';
 
 export interface UseCalculationSubscriptionOptions {
   calculationId: string | null;
@@ -101,6 +102,22 @@ export const useCalculationSubscription = ({
           try {
             if (onUpdateRef.current) {
               onUpdateRef.current(updatedCalculation);
+            }
+            
+            // 計算が失敗した場合、詳細エラーをトースト通知で表示
+            if (updatedCalculation.status === 'error') {
+              const calculationName = updatedCalculation.name || updatedCalculation.id;
+              
+              // 複数のエラー情報ソースを確認（バックエンドとの不整合に対応）
+              const errorMessage = updatedCalculation.errorMessage || 
+                                 (updatedCalculation as any).error || // バックエンドが設定するフィールド
+                                 updatedCalculation.results?.error ||
+                                 '詳細なエラー情報が利用できません。';
+              
+              showErrorNotification(
+                `計算「${calculationName}」が失敗しました`,
+                errorMessage
+              );
             }
             
             // 計算が完了または失敗した場合、少し待ってから接続を切断

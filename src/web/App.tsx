@@ -4,6 +4,7 @@ import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { ToastContainer } from './components/ToastContainer';
 import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
 import { CalculationResultsPage } from './pages/CalculationResultsPage';
 import { DrawMoleculePage } from './pages/DrawMoleculePage';
@@ -168,6 +169,8 @@ export const App = () => {
       >
         {renderCurrentPage()}
       </main>
+
+      <ToastContainer />
     </div>
   );
 };
