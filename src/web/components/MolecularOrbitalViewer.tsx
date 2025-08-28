@@ -30,7 +30,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   const queryClient = useQueryClient();
   const viewerRef = useRef<HTMLDivElement>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  
+
   // State declarations
   const [viewer, setViewer] = useState<any>(null);
   const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
@@ -44,19 +44,22 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isDomReady, setIsDomReady] = useState(false);
-  
+
   // Callback ref to properly track when DOM element becomes available
-  const setViewerRef = useCallback((node: HTMLDivElement | null) => {
-    if (viewerRef.current !== node) {
-      viewerRef.current = node;
-      
-      // Update DOM ready state when ref changes
-      const isReady = !!node;
-      if (isReady !== isDomReady) {
-        setIsDomReady(isReady);
+  const setViewerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (viewerRef.current !== node) {
+        viewerRef.current = node;
+
+        // Update DOM ready state when ref changes
+        const isReady = !!node;
+        if (isReady !== isDomReady) {
+          setIsDomReady(isReady);
+        }
       }
-    }
-  }, [isDomReady]);
+    },
+    [isDomReady]
+  );
   const previousCalculationIdRef = useRef<string | null>(null);
 
   // 軌道情報を取得
@@ -193,14 +196,14 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
   // calculationIdが変更されたときに状態をリセットとキャッシュ無効化
   useEffect(() => {
     const previousCalculationId = previousCalculationIdRef.current;
-    
+
     // 実際にcalculationIdが変更された場合のみ処理を実行
     if (previousCalculationId !== calculationId) {
       // 状態をリセット
       setSelectedOrbitalIndex(null);
       setIsLoading(false);
       setIsDomReady(false);
-      
+
       // 3Dmol.jsビューアーをクリア
       if (viewer) {
         try {
@@ -210,17 +213,17 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         }
       }
       setViewer(null);
-      
+
       // 軌道関連のクエリキャッシュを無効化（新しいcalculationIdが有効な場合のみ）
       if (calculationId && !calculationId.startsWith('new-calculation-')) {
         queryClient.invalidateQueries({
-          queryKey: ['orbitals', calculationId]
+          queryKey: ['orbitals', calculationId],
         });
         queryClient.invalidateQueries({
-          queryKey: ['orbital-cube', calculationId]
+          queryKey: ['orbital-cube', calculationId],
         });
       }
-      
+
       // 現在のcalculationIdを記録
       previousCalculationIdRef.current = calculationId;
     }
@@ -279,17 +282,32 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
       }
 
       // 等値面設定の範囲チェック
-      if (Math.abs(viewerOptions.isovaluePos) < 0.001 || Math.abs(viewerOptions.isovaluePos) > 1.0) {
-        console.warn('Positive isovalue may be out of optimal range:', viewerOptions.isovaluePos);
+      if (
+        Math.abs(viewerOptions.isovaluePos) < 0.001 ||
+        Math.abs(viewerOptions.isovaluePos) > 1.0
+      ) {
+        console.warn(
+          'Positive isovalue may be out of optimal range:',
+          viewerOptions.isovaluePos
+        );
       }
-      if (Math.abs(viewerOptions.isovalueNeg) < 0.001 || Math.abs(viewerOptions.isovalueNeg) > 1.0) {
-        console.warn('Negative isovalue may be out of optimal range:', viewerOptions.isovalueNeg);
+      if (
+        Math.abs(viewerOptions.isovalueNeg) < 0.001 ||
+        Math.abs(viewerOptions.isovalueNeg) > 1.0
+      ) {
+        console.warn(
+          'Negative isovalue may be out of optimal range:',
+          viewerOptions.isovalueNeg
+        );
       }
 
       // 分子構造を先に追加（等値面の前に）
       try {
         viewer.addModel(cubeContent, 'cube');
-        viewer.setStyle({}, { stick: { radius: 0.1 }, sphere: { radius: 0.3 } });
+        viewer.setStyle(
+          {},
+          { stick: { radius: 0.1 }, sphere: { radius: 0.3 } }
+        );
         console.log('Successfully added molecular structure');
       } catch (modelError) {
         console.error('Failed to add molecular model:', modelError);
@@ -298,7 +316,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
       // 正の等値面（赤色）- 保護された呼び出し
       try {
-        console.log('Adding positive isosurface with value:', viewerOptions.isovaluePos);
+        console.log(
+          'Adding positive isosurface with value:',
+          viewerOptions.isovaluePos
+        );
         viewer.addVolumetricData(cubeContent, 'cube', {
           isoval: viewerOptions.isovaluePos,
           color: 'red',
@@ -307,12 +328,17 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         console.log('Successfully added positive isosurface');
       } catch (posError) {
         console.error('Error adding positive isosurface:', posError);
-        throw new Error(`Failed to add positive isosurface: ${posError instanceof Error ? posError.message : String(posError)}`);
+        throw new Error(
+          `Failed to add positive isosurface: ${posError instanceof Error ? posError.message : String(posError)}`
+        );
       }
 
       // 負の等値面（青色）- 保護された呼び出し
       try {
-        console.log('Adding negative isosurface with value:', viewerOptions.isovalueNeg);
+        console.log(
+          'Adding negative isosurface with value:',
+          viewerOptions.isovalueNeg
+        );
         viewer.addVolumetricData(cubeContent, 'cube', {
           isoval: viewerOptions.isovalueNeg,
           color: 'blue',
@@ -321,7 +347,9 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         console.log('Successfully added negative isosurface');
       } catch (negError) {
         console.error('Error adding negative isosurface:', negError);
-        throw new Error(`Failed to add negative isosurface: ${negError instanceof Error ? negError.message : String(negError)}`);
+        throw new Error(
+          `Failed to add negative isosurface: ${negError instanceof Error ? negError.message : String(negError)}`
+        );
       }
 
       // ビューを最適化（即座に実行）
@@ -349,7 +377,9 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
       console.log('Molecular orbital rendering completed successfully');
     } catch (error) {
       console.error('Failed to render molecular orbital:', error);
-      onError?.(`Failed to render molecular orbital visualization: ${error instanceof Error ? error.message : String(error)}`);
+      onError?.(
+        `Failed to render molecular orbital visualization: ${error instanceof Error ? error.message : String(error)}`
+      );
       setIsLoading(false);
     }
   }, [viewer, cubeData, viewerOptions, onError]);
@@ -411,10 +441,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         <div className={styles.controlGrid}>
           {/* 軌道選択 */}
           <div>
-            <label
-              htmlFor="orbital-select"
-              className={styles.controlLabel}
-            >
+            <label htmlFor="orbital-select" className={styles.controlLabel}>
               分子軌道:
             </label>
             <select
@@ -533,11 +560,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
         {/* ローディングオーバーレイ */}
         {(isLoading || cubeLoading) && (
-          <div
-            className={styles.loadingOverlay}
-          >
-            ⚛️ 軌道データを生成中...
-          </div>
+          <div className={styles.loadingOverlay}>⚛️ 軌道データを生成中...</div>
         )}
       </div>
     </div>

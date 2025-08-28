@@ -19,14 +19,14 @@ interface NotificationState {
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
 
-  addNotification: (notificationData) => {
+  addNotification: notificationData => {
     const id = `notification-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     const notification: Notification = {
       id,
       ...notificationData,
     };
 
-    set((state) => ({
+    set(state => ({
       notifications: [...state.notifications, notification],
     }));
 
@@ -40,9 +40,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     return id;
   },
 
-  removeNotification: (id) => {
-    set((state) => ({
-      notifications: state.notifications.filter((n) => n.id !== id),
+  removeNotification: id => {
+    set(state => ({
+      notifications: state.notifications.filter(n => n.id !== id),
     }));
   },
 

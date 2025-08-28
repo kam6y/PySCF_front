@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CalculationSummary } from '../types/api-types';
+import { useGetCalculationDetails } from '../hooks/useCalculationQueries';
 import styles from './Sidebar.module.css';
 
 // Status display configuration
@@ -32,6 +33,97 @@ const STATUS_CONFIG = {
 
 type StatusType = keyof typeof STATUS_CONFIG;
 
+// Individual calculation card component
+interface CalculationCardProps {
+  calculation: CalculationSummary;
+  isActive: boolean;
+  onSelect: (calculationId: string) => void;
+  onDelete: (calculationId: string) => Promise<void>;
+}
+
+const CalculationCard: React.FC<CalculationCardProps> = ({
+  calculation,
+  isActive,
+  onSelect,
+  onDelete,
+}) => {
+  const { data: detailsData, isLoading: detailsLoading } =
+    useGetCalculationDetails(calculation.id);
+
+  const handleCardClick = () => {
+    onSelect(calculation.id);
+  };
+
+  const calculation_details = detailsData?.calculation?.parameters;
+
+  return (
+    <div
+      className={`${styles.sidebarCalculationItem} ${
+        isActive ? styles.active : ''
+      }`}
+      onClick={handleCardClick}
+    >
+      <div className={styles.calculationInfo}>
+        <div className={styles.calculationName}>{calculation.name}</div>
+        <div className={styles.calculationMeta}>
+          <div className={styles.calculationDate}>
+            {new Date(calculation.date).toLocaleDateString()}
+          </div>
+          <div className={styles.calculationStatus}>
+            <span
+              className={`${styles.statusBadge} ${STATUS_CONFIG[calculation.status as StatusType]?.className || styles.statusUnknown}`}
+            >
+              <span className={styles.statusIcon}>
+                {STATUS_CONFIG[calculation.status as StatusType]?.icon || '❓'}
+              </span>
+              <span className={styles.statusLabel}>
+                {STATUS_CONFIG[calculation.status as StatusType]?.label ||
+                  calculation.status}
+              </span>
+            </span>
+          </div>
+        </div>
+
+        {/* Calculation Details - Always visible */}
+        {calculation_details && !detailsLoading ? (
+          <div className={styles.calculationTags}>
+            <span className={`${styles.calculationTag} ${styles.tagMethod}`}>
+              {calculation_details.calculation_method}
+            </span>
+            <span className={`${styles.calculationTag} ${styles.tagBasis}`}>
+              {calculation_details.basis_function}
+            </span>
+            {calculation_details.exchange_correlation && (
+              <span className={`${styles.calculationTag} ${styles.tagXC}`}>
+                {calculation_details.exchange_correlation}
+              </span>
+            )}
+          </div>
+        ) : detailsLoading ? (
+          <div className={styles.calculationTagsLoading}>
+            <div className={styles.tagSkeleton}></div>
+            <div className={styles.tagSkeleton}></div>
+            <div className={styles.tagSkeleton}></div>
+          </div>
+        ) : null}
+      </div>
+      <div className={styles.calculationActions}>
+        <button
+          className={styles.deleteBtn}
+          onClick={e => {
+            e.stopPropagation();
+            if (confirm(`Delete calculation "${calculation.name}"?`)) {
+              onDelete(calculation.id);
+            }
+          }}
+        >
+          🗑️
+        </button>
+      </div>
+    </div>
+  );
+};
+
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -41,6 +133,11 @@ interface SidebarProps {
   calculationsError: string | null;
   onCalculationSelect: (calculationId: string) => void;
   onCalculationDelete: (calculationId: string) => Promise<void>;
+  onCreateNew: () => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  onUserMenuToggle: () => void;
+  isUserMenuOpen: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -52,6 +149,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   calculationsError,
   onCalculationSelect,
   onCalculationDelete,
+  onCreateNew,
+  searchQuery,
+  onSearchChange,
+  onUserMenuToggle,
+  isUserMenuOpen,
 }) => {
   return (
     <>
@@ -67,73 +169,88 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Sidebar Panel */}
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''}`}>
         <div className={styles.sidebarContent}>
-          <div className={styles.sidebarHeader}>
-            <h3>Calculations</h3>
+          {/* Top Section - Create button and Search */}
+          <div className={styles.sidebarTopSection}>
+            <button className={styles.createNewButton} onClick={onCreateNew}>
+              + Make a instance
+            </button>
+            <div className={styles.searchContainer}>
+              <input
+                type="text"
+                placeholder="Value"
+                value={searchQuery}
+                onChange={e => onSearchChange(e.target.value)}
+                className={styles.searchInput}
+              />
+              <button
+                className={styles.searchClearButton}
+                onClick={e => {
+                  e.preventDefault();
+                  onSearchChange('');
+                }}
+                style={{ display: searchQuery ? 'block' : 'none' }}
+              >
+                ×
+              </button>
+            </div>
           </div>
 
-          <div className={styles.sidebarCalculations}>
-            {calculationsLoading ? (
-              <div className={styles.sidebarLoading}>
-                <p>Loading calculations...</p>
-              </div>
-            ) : calculationsError ? (
-              <div className={styles.sidebarError}>
-                <p>Error: {calculationsError}</p>
-              </div>
-            ) : calculations.length === 0 ? (
-              <div className={styles.sidebarEmpty}>
-                <p>No calculations yet</p>
-                <p>Click the + button to create one</p>
-              </div>
-            ) : (
-              calculations.map(calculation => (
-                <div
-                  key={calculation.id}
-                  className={`${styles.sidebarCalculationItem} ${
-                    calculation.id === activeCalculationId ? styles.active : ''
-                  }`}
-                  onClick={() => onCalculationSelect(calculation.id)}
-                >
-                  <div className={styles.calculationInfo}>
-                    <div className={styles.calculationName}>{calculation.name}</div>
-                    <div className={styles.calculationMeta}>
-                      <div className={styles.calculationDate}>
-                        {new Date(calculation.date).toLocaleDateString()}
-                      </div>
-                      <div className={styles.calculationStatus}>
-                        <span
-                          className={`${styles.statusBadge} ${STATUS_CONFIG[calculation.status as StatusType]?.className || styles.statusUnknown}`}
-                        >
-                          <span className={styles.statusIcon}>
-                            {STATUS_CONFIG[calculation.status as StatusType]
-                              ?.icon || '❓'}
-                          </span>
-                          <span className={styles.statusLabel}>
-                            {STATUS_CONFIG[calculation.status as StatusType]
-                              ?.label || calculation.status}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={styles.calculationActions}>
-                    <button
-                      className={styles.deleteBtn}
-                      onClick={e => {
-                        e.stopPropagation();
-                        if (
-                          confirm(`Delete calculation "${calculation.name}"?`)
-                        ) {
-                          onCalculationDelete(calculation.id);
-                        }
-                      }}
-                    >
-                      🗑️
-                    </button>
-                  </div>
+          {/* Main Content Area */}
+          <div className={styles.sidebarMainContent}>
+            <div className={styles.sidebarHeader}>
+              <h3>Calculations</h3>
+            </div>
+
+            <div className={styles.sidebarCalculations}>
+              {calculationsLoading ? (
+                <div className={styles.sidebarLoading}>
+                  <p>Loading calculations...</p>
                 </div>
-              ))
-            )}
+              ) : calculationsError ? (
+                <div className={styles.sidebarError}>
+                  <p>Error: {calculationsError}</p>
+                </div>
+              ) : calculations.length === 0 ? (
+                <div className={styles.sidebarEmpty}>
+                  <p>No calculations yet</p>
+                  <p>Click the + button to create one</p>
+                </div>
+              ) : (
+                calculations.map(calculation => (
+                  <CalculationCard
+                    key={calculation.id}
+                    calculation={calculation}
+                    isActive={calculation.id === activeCalculationId}
+                    onSelect={onCalculationSelect}
+                    onDelete={onCalculationDelete}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Section - User Info */}
+          <div className={styles.sidebarBottomSection}>
+            <div
+              className={`${styles.userInfoSection} ${isUserMenuOpen ? styles.userMenuOpen : ''}`}
+              onClick={onUserMenuToggle}
+            >
+              <div className={styles.userInfoMain}>
+                <span className={styles.userName}>User name</span>
+                <span
+                  className={`${styles.userMenuToggle} ${isUserMenuOpen ? styles.rotated : ''}`}
+                >
+                  ⌄
+                </span>
+              </div>
+              {isUserMenuOpen && (
+                <div className={styles.userMenu}>
+                  <button className={styles.userMenuItem}>Settings</button>
+                  <button className={styles.userMenuItem}>Profile</button>
+                  <button className={styles.userMenuItem}>About</button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </aside>

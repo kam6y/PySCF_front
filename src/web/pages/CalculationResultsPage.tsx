@@ -18,7 +18,9 @@ export const CalculationResultsPage = ({
   onCalculationUpdate,
 }: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<number | null>(null);
+  const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     setError(detailsError);
@@ -40,7 +42,9 @@ export const CalculationResultsPage = ({
         <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
           <div className={styles.loadingContainer}>
-            <div className={styles.loadingText}>⚛️ Loading calculation details...</div>
+            <div className={styles.loadingText}>
+              ⚛️ Loading calculation details...
+            </div>
           </div>
         </div>
       </div>
@@ -53,9 +57,7 @@ export const CalculationResultsPage = ({
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
           <h1>Calculation Results</h1>
-          <div className={styles.errorContainer}>
-            ❌ {error}
-          </div>
+          <div className={styles.errorContainer}>❌ {error}</div>
         </div>
       </div>
     );
@@ -100,7 +102,9 @@ export const CalculationResultsPage = ({
             <strong>Calculation:</strong> {activeCalculation.name}
             <br />
             <strong>Status:</strong>{' '}
-            <span className={`${styles.statusBadge} ${styles[activeCalculation.status]}`}>
+            <span
+              className={`${styles.statusBadge} ${styles[activeCalculation.status]}`}
+            >
               {activeCalculation.status}
             </span>
           </div>
@@ -119,7 +123,9 @@ export const CalculationResultsPage = ({
         <h1>Quantum Chemistry Calculation Results</h1>
 
         {/* Calculation Summary */}
-        <section className={`${styles.calculationSection} ${styles.summarySection}`}>
+        <section
+          className={`${styles.calculationSection} ${styles.summarySection}`}
+        >
           <h2>Calculation Summary</h2>
           <div className={styles.summaryGrid}>
             <div>
@@ -152,7 +158,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Energy Results */}
-        <section className={`${styles.calculationSection} ${styles.energySection}`}>
+        <section
+          className={`${styles.calculationSection} ${styles.energySection}`}
+        >
           <h2>Energy Results</h2>
           <div className={styles.energyResult}>
             <strong>SCF Energy:</strong>{' '}
@@ -162,76 +170,105 @@ export const CalculationResultsPage = ({
 
         {/* Vibrational Frequency Analysis */}
         {results.frequency_analysis_performed && (
-          <section className={`${styles.calculationSection} ${styles.frequencySection}`}>
+          <section
+            className={`${styles.calculationSection} ${styles.frequencySection}`}
+          >
             <h2>Vibrational Frequency Analysis</h2>
-            
+
             {/* Optimization Quality Assessment */}
             <div className={styles.frequencyStatus}>
               <strong>Geometry Optimization Status:</strong>{' '}
               {results.imaginary_frequencies_count === 0 ? (
-                <span className={styles.successStatus}>✅ Successful (no imaginary frequencies)</span>
+                <span className={styles.successStatus}>
+                  ✅ Successful (no imaginary frequencies)
+                </span>
               ) : results.imaginary_frequencies_count === 1 ? (
-                <span className={styles.warningStatus}>⚠️ Possible transition state (1 imaginary frequency)</span>
+                <span className={styles.warningStatus}>
+                  ⚠️ Possible transition state (1 imaginary frequency)
+                </span>
               ) : (
-                <span className={styles.errorStatus}>❌ Poor optimization ({results.imaginary_frequencies_count} imaginary frequencies)</span>
+                <span className={styles.errorStatus}>
+                  ❌ Poor optimization ({results.imaginary_frequencies_count}{' '}
+                  imaginary frequencies)
+                </span>
               )}
             </div>
-            
+
             {/* Vibrational Frequencies */}
-            {results.vibrational_frequencies && results.vibrational_frequencies.length > 0 && (
-              <div className={styles.frequencyStatus}>
-                <strong>Vibrational Frequencies (cm⁻¹):</strong>
-                <div className={styles.frequencyList}>
-                  {results.vibrational_frequencies.map((freq, index) => (
-                    <span key={index} className={styles.frequencyItem}>
-                      {freq.toFixed(1)}
-                    </span>
-                  ))}
+            {results.vibrational_frequencies &&
+              results.vibrational_frequencies.length > 0 && (
+                <div className={styles.frequencyStatus}>
+                  <strong>Vibrational Frequencies (cm⁻¹):</strong>
+                  <div className={styles.frequencyList}>
+                    {results.vibrational_frequencies.map((freq, index) => (
+                      <span key={index} className={styles.frequencyItem}>
+                        {freq.toFixed(1)}
+                      </span>
+                    ))}
+                  </div>
+                  <div className={styles.frequencyCount}>
+                    Total: {results.vibrational_frequencies.length} normal modes
+                    (≥80 cm⁻¹)
+                  </div>
                 </div>
-                <div className={styles.frequencyCount}>
-                  Total: {results.vibrational_frequencies.length} normal modes (≥80 cm⁻¹)
-                </div>
-              </div>
-            )}
-            
+              )}
+
             {/* Thermochemical Properties */}
             <div className={styles.thermochemicalGrid}>
-              {results.zero_point_energy !== undefined && results.zero_point_energy !== null && (
-                <div>
-                  <strong>Zero-Point Energy:</strong><br />
-                  <code>{results.zero_point_energy.toFixed(8)} hartree</code>
-                </div>
-              )}
-              {results.thermal_energy_298K !== undefined && results.thermal_energy_298K !== null && (
-                <div>
-                  <strong>Thermal Energy (298.15 K):</strong><br />
-                  <code>{results.thermal_energy_298K.toFixed(8)} hartree</code>
-                </div>
-              )}
-              {results.entropy_298K !== undefined && results.entropy_298K !== null && (
-                <div>
-                  <strong>Entropy (298.15 K):</strong><br />
-                  <code>{results.entropy_298K.toFixed(8)} hartree/K</code>
-                </div>
-              )}
-              {results.gibbs_free_energy_298K !== undefined && results.gibbs_free_energy_298K !== null && (
-                <div>
-                  <strong>Gibbs Free Energy (298.15 K):</strong><br />
-                  <code>{results.gibbs_free_energy_298K.toFixed(8)} hartree</code>
-                </div>
-              )}
-              {results.heat_capacity_298K !== undefined && results.heat_capacity_298K !== null && (
-                <div>
-                  <strong>Heat Capacity (298.15 K):</strong><br />
-                  <code>{results.heat_capacity_298K.toFixed(8)} hartree/K</code>
-                </div>
-              )}
+              {results.zero_point_energy !== undefined &&
+                results.zero_point_energy !== null && (
+                  <div>
+                    <strong>Zero-Point Energy:</strong>
+                    <br />
+                    <code>{results.zero_point_energy.toFixed(8)} hartree</code>
+                  </div>
+                )}
+              {results.thermal_energy_298K !== undefined &&
+                results.thermal_energy_298K !== null && (
+                  <div>
+                    <strong>Thermal Energy (298.15 K):</strong>
+                    <br />
+                    <code>
+                      {results.thermal_energy_298K.toFixed(8)} hartree
+                    </code>
+                  </div>
+                )}
+              {results.entropy_298K !== undefined &&
+                results.entropy_298K !== null && (
+                  <div>
+                    <strong>Entropy (298.15 K):</strong>
+                    <br />
+                    <code>{results.entropy_298K.toFixed(8)} hartree/K</code>
+                  </div>
+                )}
+              {results.gibbs_free_energy_298K !== undefined &&
+                results.gibbs_free_energy_298K !== null && (
+                  <div>
+                    <strong>Gibbs Free Energy (298.15 K):</strong>
+                    <br />
+                    <code>
+                      {results.gibbs_free_energy_298K.toFixed(8)} hartree
+                    </code>
+                  </div>
+                )}
+              {results.heat_capacity_298K !== undefined &&
+                results.heat_capacity_298K !== null && (
+                  <div>
+                    <strong>Heat Capacity (298.15 K):</strong>
+                    <br />
+                    <code>
+                      {results.heat_capacity_298K.toFixed(8)} hartree/K
+                    </code>
+                  </div>
+                )}
             </div>
           </section>
         )}
 
         {/* Orbital Information */}
-        <section className={`${styles.calculationSection} ${styles.orbitalSection}`}>
+        <section
+          className={`${styles.calculationSection} ${styles.orbitalSection}`}
+        >
           <h2>Molecular Orbitals</h2>
           <div className={styles.orbitalInfoGrid}>
             <div>
@@ -252,7 +289,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Molecular Orbital Energy Diagram */}
-        <section className={`${styles.calculationSection} ${styles.energyDiagramSection}`}>
+        <section
+          className={`${styles.calculationSection} ${styles.energyDiagramSection}`}
+        >
           <h2>分子軌道エネルギー準位図</h2>
           <div className={styles.sectionDescription}>
             分子軌道のエネルギー準位を図示します。軌道をクリックすると3D可視化で詳細を確認できます。
@@ -267,7 +306,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Molecular Orbital Visualization */}
-        <section className={`${styles.calculationSection} ${styles.orbitalViewerSection}`}>
+        <section
+          className={`${styles.calculationSection} ${styles.orbitalViewerSection}`}
+        >
           <h2>分子軌道可視化</h2>
           <div className={styles.sectionDescription}>
             量子化学計算で得られた分子軌道を3D可視化します。軌道を選択して形状や分布を確認できます。
@@ -284,7 +325,9 @@ export const CalculationResultsPage = ({
           results.excitation_energies && (
             <>
               {/* Excited States Summary */}
-              <section className={`${styles.calculationSection} ${styles.excitedStatesSection}`}>
+              <section
+                className={`${styles.calculationSection} ${styles.excitedStatesSection}`}
+              >
                 <h2>Excited States Summary</h2>
                 <div className={styles.excitedStatesGrid}>
                   <div>
@@ -311,7 +354,9 @@ export const CalculationResultsPage = ({
               </section>
 
               {/* Excitation Energies Table */}
-              <section className={`${styles.calculationSection} ${styles.excitationTableSection}`}>
+              <section
+                className={`${styles.calculationSection} ${styles.excitationTableSection}`}
+              >
                 <h2>Excitation Energies and Transitions</h2>
                 <div className={styles.tableContainer}>
                   <table className={styles.dataTable}>
@@ -336,18 +381,26 @@ export const CalculationResultsPage = ({
                           return (
                             <tr key={index}>
                               <td>S{index + 1}</td>
-                              <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                              <td
+                                className={`${styles.rightAlign} ${styles.monoFont}`}
+                              >
                                 {energy.toFixed(4)}
                               </td>
-                              <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                              <td
+                                className={`${styles.rightAlign} ${styles.monoFont}`}
+                              >
                                 {wavelength ? wavelength.toFixed(1) : 'N/A'}
                               </td>
-                              <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                              <td
+                                className={`${styles.rightAlign} ${styles.monoFont}`}
+                              >
                                 {oscStrength !== undefined
                                   ? oscStrength.toFixed(6)
                                   : 'N/A'}
                               </td>
-                              <td>{transition?.dominant_transition || 'Unknown'}</td>
+                              <td>
+                                {transition?.dominant_transition || 'Unknown'}
+                              </td>
                             </tr>
                           );
                         }
@@ -358,14 +411,12 @@ export const CalculationResultsPage = ({
               </section>
 
               {/* UV-Vis Spectrum Visualization */}
-              <section className={`${styles.calculationSection} ${styles.uvVisSection}`}>
+              <section
+                className={`${styles.calculationSection} ${styles.uvVisSection}`}
+              >
                 <h2>UV-Vis Spectrum (Simulated)</h2>
                 <div className={styles.uvVisChart}>
-                  <svg
-                    width="100%"
-                    height="100%"
-                    viewBox="0 0 800 300"
-                  >
+                  <svg width="100%" height="100%" viewBox="0 0 800 300">
                     {/* Background Grid */}
                     <defs>
                       <pattern
@@ -457,7 +508,9 @@ export const CalculationResultsPage = ({
               {/* Transition Dipole Moments */}
               {results.transition_dipoles &&
                 results.transition_dipoles.length > 0 && (
-                  <section className={`${styles.calculationSection} ${styles.transitionDipoleSection}`}>
+                  <section
+                    className={`${styles.calculationSection} ${styles.transitionDipoleSection}`}
+                  >
                     <h2>Transition Dipole Moments</h2>
                     <div className={styles.tableContainer}>
                       <table className={styles.dataTable}>
@@ -482,16 +535,24 @@ export const CalculationResultsPage = ({
                               return (
                                 <tr key={index}>
                                   <td>S{index + 1}</td>
-                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                                  <td
+                                    className={`${styles.rightAlign} ${styles.monoFont}`}
+                                  >
                                     {dipole.x.toFixed(6)}
                                   </td>
-                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                                  <td
+                                    className={`${styles.rightAlign} ${styles.monoFont}`}
+                                  >
                                     {dipole.y.toFixed(6)}
                                   </td>
-                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                                  <td
+                                    className={`${styles.rightAlign} ${styles.monoFont}`}
+                                  >
                                     {dipole.z.toFixed(6)}
                                   </td>
-                                  <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                                  <td
+                                    className={`${styles.rightAlign} ${styles.monoFont}`}
+                                  >
                                     <strong>{magnitude.toFixed(6)}</strong>
                                   </td>
                                 </tr>
@@ -506,7 +567,9 @@ export const CalculationResultsPage = ({
 
               {/* Natural Transition Orbital Analysis */}
               {results.nto_analysis && results.nto_analysis.length > 0 && (
-                <section className={`${styles.calculationSection} ${styles.ntoSection}`}>
+                <section
+                  className={`${styles.calculationSection} ${styles.ntoSection}`}
+                >
                   <h2>Natural Transition Orbital (NTO) Analysis</h2>
                   <div className={styles.sectionDescription}>
                     NTO analysis provides a more intuitive description of
@@ -523,14 +586,20 @@ export const CalculationResultsPage = ({
                         {stateData.nto_pairs &&
                         stateData.nto_pairs.length > 0 ? (
                           <div className={styles.tableContainer}>
-                            <table className={`${styles.dataTable} ${styles.ntoTable}`}>
+                            <table
+                              className={`${styles.dataTable} ${styles.ntoTable}`}
+                            >
                               <thead>
                                 <tr>
                                   <th>NTO Pair</th>
                                   <th>Transition</th>
                                   <th className={styles.rightAlign}>Weight</th>
-                                  <th className={styles.rightAlign}>Contribution (%)</th>
-                                  <th className={styles.centerAlign}>Orbital Indices</th>
+                                  <th className={styles.rightAlign}>
+                                    Contribution (%)
+                                  </th>
+                                  <th className={styles.centerAlign}>
+                                    Orbital Indices
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
@@ -544,14 +613,20 @@ export const CalculationResultsPage = ({
                                         <span className={styles.holeOrbital}>
                                           {pair.hole_orbital}
                                         </span>
-                                        <span className={styles.transitionArrow}>
+                                        <span
+                                          className={styles.transitionArrow}
+                                        >
                                           →
                                         </span>
-                                        <span className={styles.particleOrbital}>
+                                        <span
+                                          className={styles.particleOrbital}
+                                        >
                                           {pair.particle_orbital}
                                         </span>
                                       </td>
-                                      <td className={`${styles.rightAlign} ${styles.monoFont}`}>
+                                      <td
+                                        className={`${styles.rightAlign} ${styles.monoFont}`}
+                                      >
                                         {pair.weight?.toFixed(6) || 'N/A'}
                                       </td>
                                       <td className={styles.rightAlign}>
@@ -561,21 +636,25 @@ export const CalculationResultsPage = ({
                                               pair.contribution >= 50
                                                 ? styles.contributionBarHigh
                                                 : pair.contribution >= 25
-                                                ? styles.contributionBarMedium
-                                                : styles.contributionBarLow
+                                                  ? styles.contributionBarMedium
+                                                  : styles.contributionBarLow
                                             }`}
                                             style={{
-                                              width: `${Math.min(pair.contribution || 0, 100)}%`
+                                              width: `${Math.min(pair.contribution || 0, 100)}%`,
                                             }}
                                           />
-                                          <span className={styles.contributionValue}>
+                                          <span
+                                            className={styles.contributionValue}
+                                          >
                                             {pair.contribution?.toFixed(1) ||
                                               'N/A'}
                                             %
                                           </span>
                                         </div>
                                       </td>
-                                      <td className={`${styles.centerAlign} ${styles.ntoIndices}`}>
+                                      <td
+                                        className={`${styles.centerAlign} ${styles.ntoIndices}`}
+                                      >
                                         {pair.hole_orbital_index} →{' '}
                                         {pair.particle_orbital_index}
                                       </td>
@@ -658,13 +737,21 @@ export const CalculationResultsPage = ({
           )}
 
         {/* CCSD Results Section */}
-        {(parameters.calculation_method === 'CCSD' || parameters.calculation_method === 'CCSD_T') && (
-          <section className={`${styles.calculationSection} ${styles.ccsdSection}`}>
+        {(parameters.calculation_method === 'CCSD' ||
+          parameters.calculation_method === 'CCSD_T') && (
+          <section
+            className={`${styles.calculationSection} ${styles.ccsdSection}`}
+          >
             <h2>CCSD Results</h2>
             <div className={styles.thermochemicalGrid}>
               <div>
                 <strong>HF Energy:</strong>{' '}
-                <code>{((results as any).hf_energy || results.scf_energy)?.toFixed(6)} Hartree</code>
+                <code>
+                  {((results as any).hf_energy || results.scf_energy)?.toFixed(
+                    6
+                  )}{' '}
+                  Hartree
+                </code>
               </div>
               <div>
                 <strong>CCSD Correlation Energy:</strong>{' '}
@@ -678,25 +765,30 @@ export const CalculationResultsPage = ({
                   {(results as any).ccsd_total_energy?.toFixed(6)} Hartree
                 </code>
               </div>
-              {parameters.calculation_method === 'CCSD_T' && (results as any).ccsd_t_correction && (
-                <>
-                  <div>
-                    <strong>CCSD(T) Triples Correction:</strong>{' '}
-                    <code>
-                      {(results as any).ccsd_t_correction?.toFixed(6)} Hartree
-                    </code>
-                  </div>
-                  <div>
-                    <strong>CCSD(T) Total Energy:</strong>{' '}
-                    <code>
-                      {(results as any).ccsd_t_total_energy?.toFixed(6)} Hartree
-                    </code>
-                  </div>
-                </>
-              )}
+              {parameters.calculation_method === 'CCSD_T' &&
+                (results as any).ccsd_t_correction && (
+                  <>
+                    <div>
+                      <strong>CCSD(T) Triples Correction:</strong>{' '}
+                      <code>
+                        {(results as any).ccsd_t_correction?.toFixed(6)} Hartree
+                      </code>
+                    </div>
+                    <div>
+                      <strong>CCSD(T) Total Energy:</strong>{' '}
+                      <code>
+                        {(results as any).ccsd_t_total_energy?.toFixed(6)}{' '}
+                        Hartree
+                      </code>
+                    </div>
+                  </>
+                )}
             </div>
             {(results as any).frozen_core && (
-              <div className={styles.sectionDescription} style={{ marginTop: '15px' }}>
+              <div
+                className={styles.sectionDescription}
+                style={{ marginTop: '15px' }}
+              >
                 ℹ️ Frozen core approximation was used in this calculation
               </div>
             )}
@@ -704,7 +796,9 @@ export const CalculationResultsPage = ({
         )}
 
         {/* Checkpoint File Information */}
-        <section className={`${styles.calculationSection} ${styles.checkpointSection}`}>
+        <section
+          className={`${styles.calculationSection} ${styles.checkpointSection}`}
+        >
           <h2>Checkpoint File Information</h2>
           <div>
             <div className={styles.checkpointInfo}>
@@ -838,7 +932,7 @@ export const CalculationResultsPage = ({
                       const isPositive = chargeData.charge > 0;
                       const chargeColor = isPositive ? '#d32f2f' : '#1976d2';
                       const chargeBgColor = isPositive ? '#ffebee' : '#e3f2fd';
-                      
+
                       return (
                         <tr
                           key={index}
@@ -877,7 +971,8 @@ export const CalculationResultsPage = ({
                               fontWeight: 'bold',
                             }}
                           >
-                            {chargeData.charge > 0 ? '+' : ''}{chargeData.charge.toFixed(4)}
+                            {chargeData.charge > 0 ? '+' : ''}
+                            {chargeData.charge.toFixed(4)}
                           </td>
                           <td
                             style={{
@@ -910,9 +1005,10 @@ export const CalculationResultsPage = ({
               <code>
                 {results.mulliken_charges
                   .reduce((sum: number, charge: any) => sum + charge.charge, 0)
-                  .toFixed(4)} e
-              </code>
-              {' '}(分子電荷: <code>{results.charge || 0}</code> e)
+                  .toFixed(4)}{' '}
+                e
+              </code>{' '}
+              (分子電荷: <code>{results.charge || 0}</code> e)
             </div>
           </section>
         )}
@@ -926,20 +1022,32 @@ export const CalculationResultsPage = ({
             borderRadius: '8px',
           }}
         >
-          {(parameters.calculation_method === 'HF' || 
-            parameters.calculation_method === 'MP2' || 
-            parameters.calculation_method === 'CCSD' || 
-            parameters.calculation_method === 'CCSD_T') ? (
+          {parameters.calculation_method === 'HF' ||
+          parameters.calculation_method === 'MP2' ||
+          parameters.calculation_method === 'CCSD' ||
+          parameters.calculation_method === 'CCSD_T' ? (
             <>
               <h2>HF-Optimized Geometry</h2>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+              <div
+                style={{
+                  fontSize: '14px',
+                  color: '#666',
+                  marginBottom: '15px',
+                }}
+              >
                 ℹ️ Geometry optimized using Hartree-Fock method
               </div>
             </>
           ) : (
             <>
               <h2>DFT-Optimized Geometry</h2>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+              <div
+                style={{
+                  fontSize: '14px',
+                  color: '#666',
+                  marginBottom: '15px',
+                }}
+              >
                 ℹ️ Geometry optimized using DFT method
               </div>
             </>
@@ -967,7 +1075,9 @@ export const CalculationResultsPage = ({
         </section>
 
         {/* Calculation Parameters */}
-        <section className={`${styles.calculationSection} ${styles.parametersSection}`}>
+        <section
+          className={`${styles.calculationSection} ${styles.parametersSection}`}
+        >
           <h2>Calculation Parameters</h2>
           <div className={styles.parametersGrid}>
             <div>

@@ -45,11 +45,11 @@ export const useCalculationSubscription = ({
       try {
         // Leave calculation room if we have an active calculation
         if (currentCalculationIdRef.current) {
-          socket.emit('leave_calculation', { 
-            calculation_id: currentCalculationIdRef.current 
+          socket.emit('leave_calculation', {
+            calculation_id: currentCalculationIdRef.current,
           });
         }
-        
+
         // Disconnect from Socket.IO server
         socket.disconnect();
       } catch (error) {
@@ -82,13 +82,13 @@ export const useCalculationSubscription = ({
       try {
         // Get the Flask-SocketIO server URL (always HTTP in Electron)
         const serverUrl = `http://127.0.0.1:${window.flaskPort}`;
-        
+
         // Create Socket.IO connection
         const socket = io(serverUrl, {
           transports: ['websocket', 'polling'],
           timeout: 5000,
         });
-        
+
         socketRef.current = socket;
         currentCalculationIdRef.current = calcId;
 
@@ -98,52 +98,61 @@ export const useCalculationSubscription = ({
           socket.emit('join_calculation', { calculation_id: calcId });
         });
 
-        socket.on('calculation_update', (updatedCalculation: CalculationInstance) => {
-          try {
-            if (onUpdateRef.current) {
-              onUpdateRef.current(updatedCalculation);
-            }
-            
-            // 計算が失敗した場合、詳細エラーをトースト通知で表示
-            if (updatedCalculation.status === 'error') {
-              const calculationName = updatedCalculation.name || updatedCalculation.id;
-              
-              // 複数のエラー情報ソースを確認（バックエンドとの不整合に対応）
-              const errorMessage = updatedCalculation.errorMessage || 
-                                 (updatedCalculation as any).error || // バックエンドが設定するフィールド
-                                 updatedCalculation.results?.error ||
-                                 '詳細なエラー情報が利用できません。';
-              
-              showErrorNotification(
-                `計算「${calculationName}」が失敗しました`,
-                errorMessage
-              );
-            }
-            
-            // 計算が完了または失敗した場合、少し待ってから接続を切断
-            if (updatedCalculation.status === 'completed' || updatedCalculation.status === 'error') {
-              // 既存のタイマーをクリア
-              clearDisconnectTimer();
-              
-              // 3秒後に切断
-              disconnectTimerRef.current = setTimeout(() => {
-                disconnect();
-              }, 3000);
-            }
-          } catch (e) {
-            console.error('Failed to process calculation update:', e);
-            if (onErrorRef.current) {
-              onErrorRef.current(
-                'サーバーからの応答が解析できませんでした。計算状況の更新が一時的に停止する可能性があります。'
-              );
+        socket.on(
+          'calculation_update',
+          (updatedCalculation: CalculationInstance) => {
+            try {
+              if (onUpdateRef.current) {
+                onUpdateRef.current(updatedCalculation);
+              }
+
+              // 計算が失敗した場合、詳細エラーをトースト通知で表示
+              if (updatedCalculation.status === 'error') {
+                const calculationName =
+                  updatedCalculation.name || updatedCalculation.id;
+
+                // 複数のエラー情報ソースを確認（バックエンドとの不整合に対応）
+                const errorMessage =
+                  updatedCalculation.errorMessage ||
+                  (updatedCalculation as any).error || // バックエンドが設定するフィールド
+                  updatedCalculation.results?.error ||
+                  '詳細なエラー情報が利用できません。';
+
+                showErrorNotification(
+                  `計算「${calculationName}」が失敗しました`,
+                  errorMessage
+                );
+              }
+
+              // 計算が完了または失敗した場合、少し待ってから接続を切断
+              if (
+                updatedCalculation.status === 'completed' ||
+                updatedCalculation.status === 'error'
+              ) {
+                // 既存のタイマーをクリア
+                clearDisconnectTimer();
+
+                // 3秒後に切断
+                disconnectTimerRef.current = setTimeout(() => {
+                  disconnect();
+                }, 3000);
+              }
+            } catch (e) {
+              console.error('Failed to process calculation update:', e);
+              if (onErrorRef.current) {
+                onErrorRef.current(
+                  'サーバーからの応答が解析できませんでした。計算状況の更新が一時的に停止する可能性があります。'
+                );
+              }
             }
           }
-        });
+        );
 
         socket.on('error', (errorData: any) => {
           console.error('Socket.IO error:', errorData);
           if (onErrorRef.current) {
-            const errorMessage = errorData?.error || '計算状況の監視に問題が発生しました。';
+            const errorMessage =
+              errorData?.error || '計算状況の監視に問題が発生しました。';
             onErrorRef.current(errorMessage);
           }
         });
@@ -151,12 +160,15 @@ export const useCalculationSubscription = ({
         socket.on('connect_error', (error: Error) => {
           console.error('Socket.IO connection error:', error);
           if (onErrorRef.current) {
-            let errorMessage = 'サーバーへの接続に失敗しました。ネットワーク接続を確認してください。';
-            
+            let errorMessage =
+              'サーバーへの接続に失敗しました。ネットワーク接続を確認してください。';
+
             if (error.message.includes('timeout')) {
-              errorMessage = '接続がタイムアウトしました。サーバーが起動していない可能性があります。';
+              errorMessage =
+                '接続がタイムアウトしました。サーバーが起動していない可能性があります。';
             } else if (error.message.includes('xhr poll error')) {
-              errorMessage = 'サーバーとの通信が中断されました。計算は継続中ですが、状況の更新が停止しています。';
+              errorMessage =
+                'サーバーとの通信が中断されました。計算は継続中ですが、状況の更新が停止しています。';
             }
 
             onErrorRef.current(errorMessage);
@@ -164,23 +176,27 @@ export const useCalculationSubscription = ({
         });
 
         socket.on('disconnect', (reason: string) => {
-          console.log(`Socket.IO disconnected for calculation ${calcId}, reason:`, reason);
+          console.log(
+            `Socket.IO disconnected for calculation ${calcId}, reason:`,
+            reason
+          );
           if (socketRef.current === socket) {
             socketRef.current = null;
           }
           if (currentCalculationIdRef.current === calcId) {
             currentCalculationIdRef.current = null;
           }
-          
+
           // Auto-reconnect for certain disconnect reasons
           if (reason === 'io server disconnect') {
             // Server initiated disconnect, likely planned shutdown
             if (onErrorRef.current) {
-              onErrorRef.current('サーバーとの接続が切断されました。ページを更新して状況を確認してください。');
+              onErrorRef.current(
+                'サーバーとの接続が切断されました。ページを更新して状況を確認してください。'
+              );
             }
           }
         });
-
       } catch (error) {
         console.error('Failed to create Socket.IO connection:', error);
         if (onErrorRef.current) {
@@ -188,9 +204,11 @@ export const useCalculationSubscription = ({
 
           if (error instanceof Error) {
             if (error.message.includes('network')) {
-              errorMessage = 'ネットワークエラーによりサーバーに接続できませんでした。';
+              errorMessage =
+                'ネットワークエラーによりサーバーに接続できませんでした。';
             } else if (error.message.includes('security')) {
-              errorMessage = 'セキュリティ設定により接続できませんでした。HTTPSが必要な可能性があります。';
+              errorMessage =
+                'セキュリティ設定により接続できませんでした。HTTPSが必要な可能性があります。';
             }
           }
 
@@ -205,10 +223,7 @@ export const useCalculationSubscription = ({
     // 計算IDが有効で一時的IDでない場合に接続
     // running/pending状態では即座に接続
     // completed/error状態でも接続を維持（自動切断タイマーで後で切断）
-    if (
-      calculationId &&
-      !calculationId.startsWith('new-calculation-')
-    ) {
+    if (calculationId && !calculationId.startsWith('new-calculation-')) {
       // running/pending状態では即座に接続
       if (status === 'running' || status === 'pending') {
         connect(calculationId);

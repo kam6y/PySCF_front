@@ -4,7 +4,11 @@ import {
   useUpdateCalculationName,
   useDeleteCalculation,
 } from './useCalculationQueries';
-import { CalculationInstance, QuantumCalculationRequest, ApiError } from '../types/api-types';
+import {
+  CalculationInstance,
+  QuantumCalculationRequest,
+  ApiError,
+} from '../types/api-types';
 import { useCalculationStore } from '../store/calculationStore';
 import { showErrorNotification } from '../store/notificationStore';
 
@@ -13,7 +17,8 @@ export const useCalculationActions = () => {
   const startCalculationMutation = useStartCalculation();
   const updateCalculationNameMutation = useUpdateCalculationName();
   const deleteCalculationMutation = useDeleteCalculation();
-  const { clearStagedCalculation, setActiveCalculationId } = useCalculationStore();
+  const { clearStagedCalculation, setActiveCalculationId } =
+    useCalculationStore();
 
   const handleApiError = (error: unknown, defaultMessage: string) => {
     console.error(defaultMessage, error);
@@ -31,7 +36,8 @@ export const useCalculationActions = () => {
     calculationParams: QuantumCalculationRequest
   ): Promise<CalculationInstance> => {
     try {
-      const response = await startCalculationMutation.mutateAsync(calculationParams);
+      const response =
+        await startCalculationMutation.mutateAsync(calculationParams);
       const runningCalculation = response.calculation;
 
       // 新規計算作成時の後処理
@@ -77,7 +83,7 @@ export const useCalculationActions = () => {
     handleCalculationRename,
     handleCalculationDelete,
     handleCalculationUpdate,
-    
+
     // Loading states
     isStarting: startCalculationMutation.isPending,
     isRenaming: updateCalculationNameMutation.isPending,

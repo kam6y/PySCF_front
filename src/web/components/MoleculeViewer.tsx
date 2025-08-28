@@ -310,10 +310,7 @@ export const MoleculeViewer = forwardRef<
           height,
         }}
       >
-        <div
-          ref={containerRef}
-          className={styles.moleculeViewerContainer}
-        />
+        <div ref={containerRef} className={styles.moleculeViewerContainer} />
       </div>
     );
   }

@@ -1,5 +1,8 @@
 import { useCalculationStore } from '../store/calculationStore';
-import { CalculationInstance, QuantumCalculationRequest } from '../types/api-types';
+import {
+  CalculationInstance,
+  QuantumCalculationRequest,
+} from '../types/api-types';
 
 export const useStagedCalculation = () => {
   const {
@@ -82,7 +85,7 @@ export const useStagedCalculation = () => {
     createNewFromExisting,
     updateStagedCalculation,
     clearStaged,
-    isStagedCalculation: (id: string | null) => 
+    isStagedCalculation: (id: string | null) =>
       id ? id.startsWith('new-calculation-') : false,
   };
 };

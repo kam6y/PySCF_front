@@ -23,34 +23,62 @@ const loadServerConfig = (): any => {
   try {
     // 開発環境では config/ ディレクトリから読み込み
     let configPath = path.join(__dirname, '..', 'config', 'server-config.json');
-    
+
     // パッケージ環境では同梱された設定ファイルを使用
     if (app.isPackaged) {
-      configPath = path.join(process.resourcesPath, 'config', 'server-config.json');
+      configPath = path.join(
+        process.resourcesPath,
+        'config',
+        'server-config.json'
+      );
       // フォールバック: python_distディレクトリ内の設定
       if (!fs.existsSync(configPath)) {
-        configPath = path.join(process.resourcesPath, 'python_dist', 'pyscf_front_api', 'config', 'server-config.json');
+        configPath = path.join(
+          process.resourcesPath,
+          'python_dist',
+          'pyscf_front_api',
+          'config',
+          'server-config.json'
+        );
       }
     }
-    
+
     if (fs.existsSync(configPath)) {
       const configContent = fs.readFileSync(configPath, 'utf8');
       const config = JSON.parse(configContent);
       console.log(`Loaded server configuration from: ${configPath}`);
       return config;
     } else {
-      console.log(`Configuration file not found at: ${configPath}. Using defaults.`);
+      console.log(
+        `Configuration file not found at: ${configPath}. Using defaults.`
+      );
     }
   } catch (error) {
-    console.log(`Failed to load server configuration: ${error}. Using defaults.`);
+    console.log(
+      `Failed to load server configuration: ${error}. Using defaults.`
+    );
   }
-  
+
   // デフォルト設定を返す
   return {
-    server: { host: '127.0.0.1', port: { default: 5000, auto_detect: true, range: { start: 5000, end: 5100 } } },
-    gunicorn: { workers: 1, threads: 4, timeout: 0, worker_class: 'sync', keep_alive: 30, log_level: 'info' },
+    server: {
+      host: '127.0.0.1',
+      port: {
+        default: 5000,
+        auto_detect: true,
+        range: { start: 5000, end: 5100 },
+      },
+    },
+    gunicorn: {
+      workers: 1,
+      threads: 4,
+      timeout: 0,
+      worker_class: 'sync',
+      keep_alive: 30,
+      log_level: 'info',
+    },
     production: { use_gunicorn: true },
-    development: { debug: false }
+    development: { debug: false },
   };
 };
 
@@ -103,7 +131,7 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
 const detectPythonEnvironmentPath = async (): Promise<string | null> => {
   console.log('=== Python Environment Detection (Simplified) ===');
   console.log(`Running in packaged mode: ${app.isPackaged}`);
-  
+
   // 1. パッケージ時：同梱conda環境のみ
   if (app.isPackaged) {
     const bundledCondaPath = path.join(
@@ -118,9 +146,9 @@ const detectPythonEnvironmentPath = async (): Promise<string | null> => {
       'bin',
       'gunicorn'
     );
-    
+
     console.log(`Checking bundled conda environment: ${bundledCondaPath}`);
-    
+
     if (fs.existsSync(bundledCondaPath) && fs.existsSync(bundledGunicornPath)) {
       console.log(`✓ Using bundled conda environment: ${bundledCondaPath}`);
       return bundledCondaPath;
@@ -190,9 +218,12 @@ const checkServerHealth = (
 /**
  * ポート検出を行う統一関数
  */
-const findAvailablePort = async (startPort: number, endPort: number): Promise<number> => {
+const findAvailablePort = async (
+  startPort: number,
+  endPort: number
+): Promise<number> => {
   const net = require('net');
-  
+
   for (let port = startPort; port <= endPort; port++) {
     try {
       await new Promise((resolve, reject) => {
@@ -218,11 +249,11 @@ const findAvailablePort = async (startPort: number, endPort: number): Promise<nu
 const startPythonServer = async (): Promise<void> => {
   return new Promise(async (resolve, reject) => {
     console.log('Starting Python Flask server...');
-    
+
     const serverSettings = serverConfig.server;
     const gunicornSettings = serverConfig.gunicorn;
     const productionSettings = serverConfig.production;
-    
+
     // 統一されたPython環境検出
     const pythonExecutablePath = await detectPythonEnvironmentPath();
     if (!pythonExecutablePath) {
@@ -248,75 +279,93 @@ const startPythonServer = async (): Promise<void> => {
           serverSettings.port.range.end
         );
       } catch (error) {
-        console.log(`Failed to find available port: ${error}. Using default: ${serverSettings.port.default}`);
+        console.log(
+          `Failed to find available port: ${error}. Using default: ${serverSettings.port.default}`
+        );
         serverPort = serverSettings.port.default;
       }
     } else {
       serverPort = serverSettings.port.default;
     }
-    
+
     flaskPort = serverPort;
     console.log(`Using server port: ${serverPort}`);
 
     // Python作業ディレクトリの決定
-    const pythonPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'src', 'python')  // パッケージ時は同梱されたPythonソースコード
-      : path.join(__dirname, '..', 'src', 'python');  // 開発時
-    
+    const pythonPath = app.isPackaged
+      ? path.join(process.resourcesPath, 'src', 'python') // パッケージ時は同梱されたPythonソースコード
+      : path.join(__dirname, '..', 'src', 'python'); // 開発時
+
     // 本番環境でもGunicornを使用する統一ロジック
     if (productionSettings.use_gunicorn) {
       console.log('Starting server with Gunicorn (unified mode)');
-      
+
       const gunicornArgs = [
-        '-m', 'gunicorn',
-        '--workers', String(gunicornSettings.workers),
-        '--threads', String(gunicornSettings.threads),
-        '--worker-class', gunicornSettings.worker_class,
-        '--bind', `${serverSettings.host}:${serverPort}`,
-        '--timeout', String(gunicornSettings.timeout),
-        '--keep-alive', String(gunicornSettings.keep_alive),
-        '--access-logfile', '-',
-        '--log-level', gunicornSettings.log_level,
+        '-m',
+        'gunicorn',
+        '--workers',
+        String(gunicornSettings.workers),
+        '--threads',
+        String(gunicornSettings.threads),
+        '--worker-class',
+        gunicornSettings.worker_class,
+        '--bind',
+        `${serverSettings.host}:${serverPort}`,
+        '--timeout',
+        String(gunicornSettings.timeout),
+        '--keep-alive',
+        String(gunicornSettings.keep_alive),
+        '--access-logfile',
+        '-',
+        '--log-level',
+        gunicornSettings.log_level,
         '--preload',
-        'app:app'  // Flask application (not socketio object)
+        'app:app', // Flask application (not socketio object)
       ];
-      
+
       console.log(`=== Starting Gunicorn Server ===`);
       console.log(`Python executable: ${pythonExecutablePath}`);
       console.log(`Working directory: ${pythonPath}`);
-      console.log(`Gunicorn command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`);
+      console.log(
+        `Gunicorn command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`
+      );
       console.log(`Environment variables:`, {
-        'CONDA_DEFAULT_ENV': 'pyscf-env',
-        'PATH': process.env.PATH?.split(':').filter(p => p.includes('conda')).slice(0, 3),
+        CONDA_DEFAULT_ENV: 'pyscf-env',
+        PATH: process.env.PATH?.split(':')
+          .filter(p => p.includes('conda'))
+          .slice(0, 3),
       });
-      
+
       // Verify files exist before starting
       console.log(`File checks:`);
-      console.log(`• Python executable exists: ${fs.existsSync(pythonExecutablePath)}`);
+      console.log(
+        `• Python executable exists: ${fs.existsSync(pythonExecutablePath)}`
+      );
       console.log(`• Working directory exists: ${fs.existsSync(pythonPath)}`);
-      
+
       const appPyPath = path.join(pythonPath, 'app.py');
       console.log(`• app.py exists: ${fs.existsSync(appPyPath)}`);
-      
+
       pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env, CONDA_DEFAULT_ENV: 'pyscf-env' },
       });
-      
+
       // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
       setTimeout(() => {
-        console.log(`Starting health check for Gunicorn server on port ${flaskPort}`);
+        console.log(
+          `Starting health check for Gunicorn server on port ${flaskPort}`
+        );
         checkServerHealth(flaskPort!).then(resolve).catch(reject);
       }, 2000);
-      
     } else {
       // フォールバック: 直接実行（設定でGunicorn無効時のみ）
       console.log('Starting server with direct execution (fallback mode)');
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-      
+
       // 直接実行時は実行時ポート検出を使用
       // （startPythonServer関数の残りの部分で処理）
     }
@@ -325,18 +374,20 @@ const startPythonServer = async (): Promise<void> => {
     pythonProcess.stdout?.on('data', data => {
       const output = data.toString().trim();
       console.log(`[PYTHON STDOUT] ${output}`);
-      
+
       // 直接実行モード（フォールバック）でのポート検出
       if (!productionSettings.use_gunicorn) {
         const match = output.match(/FLASK_SERVER_PORT:(\d+)/);
         if (match && match[1]) {
           flaskPort = parseInt(match[1], 10);
-          console.log(`✓ Detected Flask server port from direct execution: ${flaskPort}`);
+          console.log(
+            `✓ Detected Flask server port from direct execution: ${flaskPort}`
+          );
           // ヘルスチェックを開始してサーバー起動を待つ
           checkServerHealth(flaskPort).then(resolve).catch(reject);
         }
       }
-      
+
       // Look for important startup messages
       if (output.includes('Starting gunicorn')) {
         console.log('✓ Gunicorn is starting up...');
@@ -350,7 +401,10 @@ const startPythonServer = async (): Promise<void> => {
       if (output.includes('Application object must be callable')) {
         console.log('✗ CRITICAL: Flask application object error detected');
       }
-      if (output.includes('ModuleNotFoundError') || output.includes('ImportError')) {
+      if (
+        output.includes('ModuleNotFoundError') ||
+        output.includes('ImportError')
+      ) {
         console.log(`✗ CRITICAL: Python import error detected - ${output}`);
       }
     });
@@ -358,7 +412,7 @@ const startPythonServer = async (): Promise<void> => {
     pythonProcess.stderr?.on('data', data => {
       const errorOutput = data.toString().trim();
       console.log(`[PYTHON STDERR] ${errorOutput}`);
-      
+
       // Analyze stderr for specific error patterns
       if (errorOutput.includes('ModuleNotFoundError')) {
         console.log(`✗ CRITICAL: Missing Python module - ${errorOutput}`);
@@ -375,7 +429,10 @@ const startPythonServer = async (): Promise<void> => {
       if (errorOutput.includes('Address already in use')) {
         console.log(`✗ CRITICAL: Port ${serverPort} is already in use`);
       }
-      if (errorOutput.includes('[CRITICAL]') || errorOutput.includes('CRITICAL')) {
+      if (
+        errorOutput.includes('[CRITICAL]') ||
+        errorOutput.includes('CRITICAL')
+      ) {
         console.log(`✗ CRITICAL ERROR FROM PYTHON: ${errorOutput}`);
       }
     });
@@ -389,9 +446,11 @@ const startPythonServer = async (): Promise<void> => {
       console.error(`Python executable path: ${pythonExecutablePath}`);
       console.error(`Working directory: ${pythonPath}`);
       console.error(`Environment variables:`, {
-        'CONDA_DEFAULT_ENV': process.env.CONDA_DEFAULT_ENV,
-        'PATH': process.env.PATH?.split(':').filter(p => p.includes('conda')).slice(0, 3),
-        'PYTHONPATH': process.env.PYTHONPATH || 'Not set'
+        CONDA_DEFAULT_ENV: process.env.CONDA_DEFAULT_ENV,
+        PATH: process.env.PATH?.split(':')
+          .filter(p => p.includes('conda'))
+          .slice(0, 3),
+        PYTHONPATH: process.env.PYTHONPATH || 'Not set',
       });
       reject(error);
     });
@@ -404,13 +463,13 @@ const startPythonServer = async (): Promise<void> => {
       console.log(`Server port: ${serverPort}`);
       console.log(`Python executable: ${pythonExecutablePath}`);
       console.log(`Working directory: ${pythonPath}`);
-      
+
       pythonProcess = null;
-      
+
       // ユーザーがアプリを終了しようとしている場合以外での終了は異常とみなす
       if (!isQuitting) {
         const errorMessage = `The Python backend process has unexpectedly stopped (exit code: ${code})${signal ? `, signal: ${signal}` : ''}.\n\nDebugging Information:\n• Python executable: ${pythonExecutablePath}\n• Working directory: ${pythonPath}\n• Server port: ${serverPort}\n• Packaged mode: ${app.isPackaged}\n\nPlease check the console output for detailed error messages and restart the application.`;
-        
+
         console.log(`✗ CRITICAL: Showing error dialog to user`);
         dialog.showErrorBox('Backend Process Error', errorMessage);
         app.quit();

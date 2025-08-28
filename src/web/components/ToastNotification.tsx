@@ -43,7 +43,9 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 
   const toastClassName = [
     styles.toast,
-    styles[`toast${notification.type.charAt(0).toUpperCase()}${notification.type.slice(1)}`],
+    styles[
+      `toast${notification.type.charAt(0).toUpperCase()}${notification.type.slice(1)}`
+    ],
     isVisible ? styles.toastVisible : '',
     isExiting ? styles.toastExiting : '',
   ]
@@ -52,17 +54,11 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 
   return (
     <div className={toastClassName}>
-      <div className={styles.toastIcon}>
-        {getIcon()}
-      </div>
+      <div className={styles.toastIcon}>{getIcon()}</div>
       <div className={styles.toastContent}>
-        <div className={styles.toastTitle}>
-          {notification.title}
-        </div>
+        <div className={styles.toastTitle}>{notification.title}</div>
         {notification.message && (
-          <div className={styles.toastMessage}>
-            {notification.message}
-          </div>
+          <div className={styles.toastMessage}>{notification.message}</div>
         )}
       </div>
       <button

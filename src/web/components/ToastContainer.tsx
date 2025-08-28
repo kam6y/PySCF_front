@@ -12,7 +12,7 @@ export const ToastContainer: React.FC = () => {
 
   return (
     <div className={styles.toastContainer}>
-      {notifications.map((notification) => (
+      {notifications.map(notification => (
         <ToastNotification
           key={notification.id}
           notification={notification}

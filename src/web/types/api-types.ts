@@ -96,7 +96,8 @@ export type OrbitalsResponseData = OrbitalsResponse['data'];
 export type OrbitalCubeResponseData = OrbitalCubeResponse['data'];
 export type CubeFilesListResponseData = CubeFilesListResponse['data'];
 export type CubeFilesDeleteResponseData = CubeFilesDeleteResponse['data'];
-export type SupportedParametersResponseData = SupportedParametersResponse['data'];
+export type SupportedParametersResponseData =
+  SupportedParametersResponse['data'];
 
 // Error handling
 export { ApiError };

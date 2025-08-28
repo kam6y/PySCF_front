@@ -5,7 +5,7 @@ import { showErrorNotification } from '../store/notificationStore';
 
 /**
  * WebSocket経由の計算更新を処理する専用フック
- * 
+ *
  * React Queryキャッシュの更新ロジックを統一し、
  * App.tsxから複雑なキャッシュ操作を分離
  */
@@ -28,7 +28,11 @@ export const useCalculationWebSocket = (
 
       const updatedCalculations = oldData.calculations.map((calc: any) =>
         calc.id === updatedCalculation.id
-          ? { ...calc, status: updatedCalculation.status, date: updatedCalculation.updatedAt }
+          ? {
+              ...calc,
+              status: updatedCalculation.status,
+              date: updatedCalculation.updatedAt,
+            }
           : calc
       );
 
@@ -39,20 +43,17 @@ export const useCalculationWebSocket = (
     });
 
     // 3. バックグラウンドでの最新データ取得用（念のため）
-    queryClient.invalidateQueries({ 
-      queryKey: ['calculations'] 
+    queryClient.invalidateQueries({
+      queryKey: ['calculations'],
     });
   };
 
   // エラーハンドリング
   const handleWebSocketError = (error: string) => {
     console.error('WebSocket error:', error);
-    
+
     // WebSocketエラーをトースト通知で表示
-    showErrorNotification(
-      'リアルタイム監視エラー',
-      error
-    );
+    showErrorNotification('リアルタイム監視エラー', error);
   };
 
   // WebSocket接続の管理

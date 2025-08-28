@@ -23,7 +23,6 @@ export const setApiBaseUrl = (port: number) => {
   console.log(`API base URL set to: ${API_BASE_URL}`);
 };
 
-
 // Re-export the generated type for backward compatibility
 export type StartCalculationResponse = StartCalculationResponseData;
 
@@ -416,9 +415,10 @@ export const deleteCubeFiles = (
 /**
  * Get supported quantum chemistry parameters
  */
-export const getSupportedParameters = (): Promise<SupportedParametersResponseData> => {
-  return request<SupportedParametersResponseData>(
-    '/api/quantum/supported-parameters',
-    { method: 'GET' }
-  );
-};
+export const getSupportedParameters =
+  (): Promise<SupportedParametersResponseData> => {
+    return request<SupportedParametersResponseData>(
+      '/api/quantum/supported-parameters',
+      { method: 'GET' }
+    );
+  };

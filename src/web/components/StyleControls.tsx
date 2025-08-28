@@ -146,7 +146,9 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
 
       {(selectedStyle === 'sphere' || selectedStyle === 'ball-and-stick') && (
         <div className={styles.sizeControlSection}>
-          <div className={`${styles.toggleSwitch} ${styles.toggleSwitchWithMargin}`}>
+          <div
+            className={`${styles.toggleSwitch} ${styles.toggleSwitchWithMargin}`}
+          >
             <span className={styles.toggleLabel}>Use Atomic Radii</span>
             <label className={styles.switch}>
               <input
@@ -193,7 +195,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           </div>
         </div>
       )}
-
 
       <div className={styles.toggleSwitchSection}>
         <div className={styles.toggleSwitch}>

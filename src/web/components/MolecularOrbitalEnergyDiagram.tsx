@@ -26,12 +26,9 @@ const DIAGRAM_CONFIG = {
   gapThreshold: 0.5, // eV - threshold for highlighting HOMO-LUMO gap
 };
 
-export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagramProps> = ({
-  calculationId,
-  onError,
-  onOrbitalSelect,
-  selectedOrbitalIndex,
-}) => {
+export const MolecularOrbitalEnergyDiagram: React.FC<
+  MolecularOrbitalEnergyDiagramProps
+> = ({ calculationId, onError, onOrbitalSelect, selectedOrbitalIndex }) => {
   // 軌道情報を取得
   const {
     data: orbitalsData,
@@ -58,15 +55,21 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
 
     // Y軸位置を計算
     const energyRange = Math.max(
-      sortedOrbitals[sortedOrbitals.length - 1].energy_ev - sortedOrbitals[0].energy_ev,
+      sortedOrbitals[sortedOrbitals.length - 1].energy_ev -
+        sortedOrbitals[0].energy_ev,
       10 // 最小範囲を設定
     );
     const minEnergy = sortedOrbitals[0].energy_ev;
-    const drawableHeight = DIAGRAM_CONFIG.height - DIAGRAM_CONFIG.margin.top - DIAGRAM_CONFIG.margin.bottom;
+    const drawableHeight =
+      DIAGRAM_CONFIG.height -
+      DIAGRAM_CONFIG.margin.top -
+      DIAGRAM_CONFIG.margin.bottom;
 
     return sortedOrbitals.map((orbital, index) => ({
       ...orbital,
-      yPosition: DIAGRAM_CONFIG.margin.top + drawableHeight * (1 - (orbital.energy_ev - minEnergy) / energyRange),
+      yPosition:
+        DIAGRAM_CONFIG.margin.top +
+        drawableHeight * (1 - (orbital.energy_ev - minEnergy) / energyRange),
       displayLevel: index,
     }));
   }, [orbitalsData]);
@@ -75,13 +78,14 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
   const orbitalSummary = useMemo(() => {
     const homoOrbital = processedOrbitals.find(o => o.orbital_type === 'homo');
     const lumoOrbital = processedOrbitals.find(o => o.orbital_type === 'lumo');
-    
+
     return {
       homoOrbital,
       lumoOrbital,
-      homoLumoGap: homoOrbital && lumoOrbital 
-        ? lumoOrbital.energy_ev - homoOrbital.energy_ev 
-        : null,
+      homoLumoGap:
+        homoOrbital && lumoOrbital
+          ? lumoOrbital.energy_ev - homoOrbital.energy_ev
+          : null,
     };
   }, [processedOrbitals]);
 
@@ -141,15 +145,16 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
     );
   }
 
-  const chartWidth = DIAGRAM_CONFIG.width - DIAGRAM_CONFIG.margin.left - DIAGRAM_CONFIG.margin.right;
+  const chartWidth =
+    DIAGRAM_CONFIG.width -
+    DIAGRAM_CONFIG.margin.left -
+    DIAGRAM_CONFIG.margin.right;
 
   return (
     <div className={styles.diagramContainer}>
       {/* ヘッダー情報 */}
       <div className={styles.diagramHeader}>
-        <h3 className={styles.diagramTitle}>
-          分子軌道エネルギー準位図
-        </h3>
+        <h3 className={styles.diagramTitle}>分子軌道エネルギー準位図</h3>
         {orbitalSummary.homoLumoGap && (
           <div className={styles.homoLumoGap}>
             <strong>HOMO-LUMOギャップ:</strong>{' '}
@@ -217,7 +222,10 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
               x={DIAGRAM_CONFIG.margin.left}
               y={orbitalSummary.lumoOrbital.yPosition}
               width={chartWidth}
-              height={orbitalSummary.homoOrbital.yPosition - orbitalSummary.lumoOrbital.yPosition}
+              height={
+                orbitalSummary.homoOrbital.yPosition -
+                orbitalSummary.lumoOrbital.yPosition
+              }
               fill="rgba(255, 193, 7, 0.1)"
               stroke="rgba(255, 193, 7, 0.3)"
               strokeWidth="1"
@@ -226,10 +234,13 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
           )}
 
           {/* 軌道レベル */}
-          {processedOrbitals.map((orbital) => {
+          {processedOrbitals.map(orbital => {
             const isSelected = selectedOrbitalIndex === orbital.index;
             const color = getOrbitalColor(orbital);
-            const x = DIAGRAM_CONFIG.margin.left + chartWidth / 2 - DIAGRAM_CONFIG.orbitalWidth / 2;
+            const x =
+              DIAGRAM_CONFIG.margin.left +
+              chartWidth / 2 -
+              DIAGRAM_CONFIG.orbitalWidth / 2;
 
             return (
               <g key={orbital.index}>
@@ -242,30 +253,33 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
                   fill={color}
                   stroke={isSelected ? '#f39c12' : color}
                   strokeWidth={isSelected ? 3 : 1}
-                  style={{ 
+                  style={{
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
-                    filter: isSelected ? 'brightness(1.1)' : 'none'
+                    filter: isSelected ? 'brightness(1.1)' : 'none',
                   }}
                   onClick={() => handleOrbitalClick(orbital)}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={e => {
                     e.currentTarget.style.filter = 'brightness(1.2)';
                     e.currentTarget.style.strokeWidth = '2';
                   }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.filter = isSelected ? 'brightness(1.1)' : 'none';
+                  onMouseLeave={e => {
+                    e.currentTarget.style.filter = isSelected
+                      ? 'brightness(1.1)'
+                      : 'none';
                     e.currentTarget.style.strokeWidth = isSelected ? '3' : '1';
                   }}
                 >
                   <title>
-                    {orbital.label || `Orbital ${orbital.index}`}: {orbital.energy_ev.toFixed(4)} eV
+                    {orbital.label || `Orbital ${orbital.index}`}:{' '}
+                    {orbital.energy_ev.toFixed(4)} eV
                   </title>
                 </rect>
 
                 {/* 軌道ラベル（主要な軌道のみ表示） */}
-                {(orbital.orbital_type === 'homo' || 
-                  orbital.orbital_type === 'lumo' || 
-                  orbital.label?.includes('HOMO') || 
+                {(orbital.orbital_type === 'homo' ||
+                  orbital.orbital_type === 'lumo' ||
+                  orbital.label?.includes('HOMO') ||
                   orbital.label?.includes('LUMO')) && (
                   <>
                     {/* ラベル */}
@@ -314,8 +328,13 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
 
           {/* エネルギー軸の目盛り */}
           {processedOrbitals
-            .filter((_, index) => index % Math.max(1, Math.floor(processedOrbitals.length / 10)) === 0)
-            .map((orbital) => (
+            .filter(
+              (_, index) =>
+                index %
+                  Math.max(1, Math.floor(processedOrbitals.length / 10)) ===
+                0
+            )
+            .map(orbital => (
               <g key={`tick-${orbital.index}`}>
                 <line
                   x1={DIAGRAM_CONFIG.margin.left - 5}
@@ -341,7 +360,14 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       </div>
 
       {/* 凡例 */}
-      <div style={{ marginTop: '20px', display: 'flex', gap: '20px', fontSize: '14px' }}>
+      <div
+        style={{
+          marginTop: '20px',
+          display: 'flex',
+          gap: '20px',
+          fontSize: '14px',
+        }}
+      >
         <div className={styles.legendItem}>
           <div className={`${styles.legendColorBox} ${styles.legendHomo}`} />
           <span>HOMO</span>
@@ -351,7 +377,9 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
           <span>LUMO</span>
         </div>
         <div className={styles.legendItem}>
-          <div className={`${styles.legendColorBox} ${styles.legendOccupied}`} />
+          <div
+            className={`${styles.legendColorBox} ${styles.legendOccupied}`}
+          />
           <span>占有軌道</span>
         </div>
         <div className={styles.legendItem}>
@@ -368,20 +396,25 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       {selectedOrbitalIndex !== null && (
         <div className={styles.selectedOrbitalDetails}>
           {(() => {
-            const selectedOrbital = processedOrbitals.find(o => o.index === selectedOrbitalIndex);
+            const selectedOrbital = processedOrbitals.find(
+              o => o.index === selectedOrbitalIndex
+            );
             if (!selectedOrbital) return null;
-            
+
             return (
               <div>
                 <div className={styles.selectedOrbitalTitle}>
-                  選択された軌道: {selectedOrbital.label || `Orbital ${selectedOrbital.index}`}
+                  選択された軌道:{' '}
+                  {selectedOrbital.label || `Orbital ${selectedOrbital.index}`}
                 </div>
                 <div className={styles.selectedOrbitalGrid}>
                   <div>
-                    <strong>エネルギー:</strong> {selectedOrbital.energy_ev.toFixed(4)} eV
+                    <strong>エネルギー:</strong>{' '}
+                    {selectedOrbital.energy_ev.toFixed(4)} eV
                   </div>
                   <div>
-                    <strong>エネルギー (a.u.):</strong> {selectedOrbital.energy_hartree.toFixed(6)}
+                    <strong>エネルギー (a.u.):</strong>{' '}
+                    {selectedOrbital.energy_hartree.toFixed(6)}
                   </div>
                   <div>
                     <strong>占有数:</strong> {selectedOrbital.occupancy}
@@ -398,7 +431,8 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
 
       {/* 操作説明 */}
       <div className={styles.helpSection}>
-        💡 軌道をクリックすると詳細を確認できます。黄色のギャップ領域はHOMO-LUMOギャップを示します。
+        💡
+        軌道をクリックすると詳細を確認できます。黄色のギャップ領域はHOMO-LUMOギャップを示します。
       </div>
     </div>
   );

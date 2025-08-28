@@ -1,5 +1,6 @@
 // src/web/App.tsx
 
+import React, { useState, useMemo } from 'react';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
@@ -19,13 +20,16 @@ import {
 import { CalculationInstance } from './types/api-types';
 
 export const App = () => {
+  // 新しい状態管理
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   // 統一された状態管理フック
   const sidebarState = useSidebarState();
   const pageNavigation = usePageNavigation();
   const calculationActions = useCalculationActions();
   const stagedCalculation = useStagedCalculation();
-  
+
   // 統一されたアクティブ計算状態（複雑な導出ロジックが内部で処理される）
   const {
     activeCalculation,
@@ -41,9 +45,39 @@ export const App = () => {
 
   // WebSocketによるリアルタイム更新（簡素化されたインターフェース）
   useCalculationWebSocket(
-    activeCalculation?.id || null, 
+    activeCalculation?.id || null,
     activeCalculation?.status
   );
+
+  // 検索機能によるフィルタリング
+  const filteredCalculations = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return sidebarCalculations;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return sidebarCalculations.filter(
+      calc =>
+        calc.name.toLowerCase().includes(query) ||
+        calc.status.toLowerCase().includes(query)
+    );
+  }, [sidebarCalculations, searchQuery]);
+
+  // イベントハンドラー
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const handleCreateNew = () => {
+    stagedCalculation.createNewCalculation(
+      pageNavigation.handleDropdownOptionSelect,
+      sidebarState.handleSidebarClose
+    );
+  };
+
+  const handleUserMenuToggle = () => {
+    setIsUserMenuOpen(prev => !prev);
+  };
 
   const renderCurrentPage = () => {
     switch (pageNavigation.currentPage) {
@@ -58,7 +92,9 @@ export const App = () => {
             }
             onStartCalculation={calculationActions.handleStartCalculation}
             onCalculationRename={calculationActions.handleCalculationRename}
-            createNewCalculationFromExisting={stagedCalculation.createNewFromExisting}
+            createNewCalculationFromExisting={
+              stagedCalculation.createNewFromExisting
+            }
           />
         );
       case 'calculation-results':
@@ -83,7 +119,9 @@ export const App = () => {
             }
             onStartCalculation={calculationActions.handleStartCalculation}
             onCalculationRename={calculationActions.handleCalculationRename}
-            createNewCalculationFromExisting={stagedCalculation.createNewFromExisting}
+            createNewCalculationFromExisting={
+              stagedCalculation.createNewFromExisting
+            }
           />
         );
     }
@@ -125,10 +163,12 @@ export const App = () => {
 
       <Header
         onDropdownToggle={sidebarState.handleDropdownToggle}
-        onPlusClick={() => stagedCalculation.createNewCalculation(
-          pageNavigation.handleDropdownOptionSelect,
-          sidebarState.handleSidebarClose
-        )}
+        onPlusClick={() =>
+          stagedCalculation.createNewCalculation(
+            pageNavigation.handleDropdownOptionSelect,
+            sidebarState.handleSidebarClose
+          )
+        }
         isDropdownOpen={sidebarState.isDropdownOpen}
         isSidebarOpen={sidebarState.isSidebarOpen}
         currentPageTitle={pageNavigation.currentPageTitle}
@@ -140,14 +180,10 @@ export const App = () => {
       <Sidebar
         isOpen={sidebarState.isSidebarOpen}
         onClose={sidebarState.handleSidebarClose}
-        calculations={sidebarCalculations}
+        calculations={filteredCalculations}
         activeCalculationId={activeCalculation?.id || null}
         calculationsLoading={calculationsLoading}
-        calculationsError={
-          calculationsError
-            ? calculationsError.message
-            : null
-        }
+        calculationsError={calculationsError ? calculationsError.message : null}
         onCalculationSelect={(calculationId: string) => {
           selectCalculation(calculationId);
           stagedCalculation.clearStaged();
@@ -162,6 +198,11 @@ export const App = () => {
             pageNavigation.handleDropdownOptionSelect('calculation-settings');
           }
         }}
+        onCreateNew={handleCreateNew}
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+        onUserMenuToggle={handleUserMenuToggle}
+        isUserMenuOpen={isUserMenuOpen}
       />
 
       <main
