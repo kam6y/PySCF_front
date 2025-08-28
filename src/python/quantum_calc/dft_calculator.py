@@ -89,7 +89,7 @@ class DFTCalculator(BaseCalculator):
                 'basis': basis,
                 'xc_functional': xc,
                 'charge': charge,
-                'spin_multiplicity': 2 * spin,
+                'spin_multiplicity': spin,
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,

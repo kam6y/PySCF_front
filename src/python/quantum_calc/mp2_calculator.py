@@ -85,7 +85,7 @@ class MP2Calculator(BaseCalculator):
             self.results.update({
                 'basis': basis,
                 'charge': charge,
-                'spin_multiplicity': 2 * spin,
+                'spin_multiplicity': spin,
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,

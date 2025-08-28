@@ -95,7 +95,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         setup_params = {
             'basis': parameters['basis_function'],
             'charge': parameters['charges'],
-            'spin': parameters['spin_multiplicity'] // 2,
+            'spin': parameters['spin_multiplicity'],
             'max_cycle': 150,
             'solvent_method': parameters['solvent_method'],
             'solvent': parameters['solvent'],
