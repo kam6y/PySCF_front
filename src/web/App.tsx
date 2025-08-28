@@ -1,6 +1,5 @@
 // src/web/App.tsx
 
-import { useQueryClient } from '@tanstack/react-query';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
@@ -8,76 +7,51 @@ import { Sidebar } from './components/Sidebar';
 import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
 import { CalculationResultsPage } from './pages/CalculationResultsPage';
 import { DrawMoleculePage } from './pages/DrawMoleculePage';
-import { useCalculationSubscription } from './hooks/useCalculationSubscription';
 import {
   useSidebarState,
   usePageNavigation,
-  useActiveCalculationId,
-  useCalculationData,
+  useActiveCalculation,
   useCalculationActions,
   useStagedCalculation,
+  useCalculationWebSocket,
 } from './hooks';
 import { CalculationInstance } from './types/api-types';
 
 export const App = () => {
-  const queryClient = useQueryClient();
 
-  // 新しいリファクタリングされたフック（責務分離）
+  // 統一された状態管理フック
   const sidebarState = useSidebarState();
   const pageNavigation = usePageNavigation();
-  const { activeCalculationId, selectCalculation } = useActiveCalculationId();
-  const calculationData = useCalculationData(activeCalculationId);
   const calculationActions = useCalculationActions();
   const stagedCalculation = useStagedCalculation();
+  
+  // 統一されたアクティブ計算状態（複雑な導出ロジックが内部で処理される）
+  const {
+    activeCalculation,
+    activeCalculationId,
+    isStagedCalculation,
+    selectCalculation,
+    isLoading: calculationLoading,
+    detailsLoading,
+    calculationsLoading,
+    calculationsError,
+    sidebarCalculations,
+  } = useActiveCalculation();
 
-  // アクティブ計算の決定：staged計算を優先、なければサーバーから詳細データ、最後にリストから基本データ
-  const activeCalculation = 
-    stagedCalculation.stagedCalculation ||
-    calculationData.activeCalculationDetail ||
-    calculationData.activeCalculationBasic;
-
-  // WebSocketによるリアルタイム更新
-  useCalculationSubscription({
-    calculationId: activeCalculation?.id || null,
-    status: activeCalculation?.status,
-    onUpdate: (updatedCalculation: CalculationInstance) => {
-      // 個別計算詳細のキャッシュを更新
-      queryClient.setQueryData(['calculation', updatedCalculation.id], {
-        calculation: updatedCalculation,
-      });
-
-      // 計算リストのキャッシュも直接更新して即座に反映
-      queryClient.setQueryData(['calculations'], (oldData: any) => {
-        if (!oldData?.calculations) return oldData;
-
-        const updatedCalculations = oldData.calculations.map((calc: any) =>
-          calc.id === updatedCalculation.id
-            ? { ...calc, status: updatedCalculation.status }
-            : calc
-        );
-
-        return {
-          ...oldData,
-          calculations: updatedCalculations,
-        };
-      });
-
-      // 念のため計算リストも無効化（バックグラウンドでの最新データ取得用）
-      queryClient.invalidateQueries({ queryKey: ['calculations'] });
-    },
-    onError: (error: string) => {
-      console.error('WebSocket error:', error);
-    },
-  });
+  // WebSocketによるリアルタイム更新（簡素化されたインターフェース）
+  useCalculationWebSocket(
+    activeCalculation?.id || null, 
+    activeCalculation?.status
+  );
 
   const renderCurrentPage = () => {
     switch (pageNavigation.currentPage) {
       case 'calculation-settings':
         return (
           <CalculationSettingsPage
-            activeCalculation={activeCalculation}
+            activeCalculation={activeCalculation || undefined}
             onCalculationUpdate={
-              stagedCalculation.isStagedCalculation(activeCalculation?.id || null)
+              isStagedCalculation
                 ? stagedCalculation.updateStagedCalculation
                 : calculationActions.handleCalculationUpdate
             }
@@ -89,8 +63,8 @@ export const App = () => {
       case 'calculation-results':
         return (
           <CalculationResultsPage
-            activeCalculation={activeCalculation}
-            isLoadingDetails={calculationData.detailsLoading}
+            activeCalculation={activeCalculation || undefined}
+            isLoadingDetails={detailsLoading}
             detailsError={null}
             onCalculationUpdate={calculationActions.handleCalculationUpdate}
           />
@@ -100,9 +74,9 @@ export const App = () => {
       default:
         return (
           <CalculationSettingsPage
-            activeCalculation={activeCalculation}
+            activeCalculation={activeCalculation || undefined}
             onCalculationUpdate={
-              stagedCalculation.isStagedCalculation(activeCalculation?.id || null)
+              isStagedCalculation
                 ? stagedCalculation.updateStagedCalculation
                 : calculationActions.handleCalculationUpdate
             }
@@ -165,12 +139,12 @@ export const App = () => {
       <Sidebar
         isOpen={sidebarState.isSidebarOpen}
         onClose={sidebarState.handleSidebarClose}
-        calculations={calculationData.sidebarCalculations}
+        calculations={sidebarCalculations}
         activeCalculationId={activeCalculation?.id || null}
-        calculationsLoading={calculationData.calculationsLoading}
+        calculationsLoading={calculationsLoading}
         calculationsError={
-          calculationData.calculationsError
-            ? calculationData.calculationsError.message
+          calculationsError
+            ? calculationsError.message
             : null
         }
         onCalculationSelect={(calculationId: string) => {

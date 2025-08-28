@@ -2,12 +2,13 @@
 export * from './useCalculationQueries';
 export { useCalculationSubscription } from './useCalculationSubscription';
 export type { UseCalculationSubscriptionOptions } from './useCalculationSubscription';
+export { useCalculationWebSocket } from './useCalculationWebSocket';
 
 // 新しいリファクタリングされたフック
 export { useActiveCalculationId } from './useActiveCalculationId';
-export { useCalculationData } from './useCalculationData';
 export { useCalculationActions } from './useCalculationActions';
 export { useStagedCalculation } from './useStagedCalculation';
+export { useActiveCalculation } from './useActiveCalculation';
 
 // UI状態管理フック
 export { useSidebarState } from './useSidebarState';

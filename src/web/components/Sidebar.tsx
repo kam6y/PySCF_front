@@ -1,5 +1,5 @@
 import React from 'react';
-import { CalculationInstance } from '../types/api-types';
+import { CalculationSummary } from '../types/api-types';
 import styles from './Sidebar.module.css';
 
 // Status display configuration
@@ -35,7 +35,7 @@ type StatusType = keyof typeof STATUS_CONFIG;
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  calculations: CalculationInstance[];
+  calculations: CalculationSummary[];
   activeCalculationId: string | null;
   calculationsLoading: boolean;
   calculationsError: string | null;
@@ -98,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className={styles.calculationName}>{calculation.name}</div>
                     <div className={styles.calculationMeta}>
                       <div className={styles.calculationDate}>
-                        {new Date(calculation.updatedAt).toLocaleDateString()}
+                        {new Date(calculation.date).toLocaleDateString()}
                       </div>
                       <div className={styles.calculationStatus}>
                         <span
