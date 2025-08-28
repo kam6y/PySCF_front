@@ -9,6 +9,7 @@ import { ToastContainer } from './components/ToastContainer';
 import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
 import { CalculationResultsPage } from './pages/CalculationResultsPage';
 import { DrawMoleculePage } from './pages/DrawMoleculePage';
+import { SettingsPage } from './pages/SettingsPage';
 import {
   useSidebarState,
   usePageNavigation,
@@ -23,6 +24,7 @@ export const App = () => {
   // 新しい状態管理
   const [searchQuery, setSearchQuery] = useState('');
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // 統一された状態管理フック
   const sidebarState = useSidebarState();
@@ -77,6 +79,15 @@ export const App = () => {
 
   const handleUserMenuToggle = () => {
     setIsUserMenuOpen(prev => !prev);
+  };
+
+  const handleSettingsOpen = () => {
+    setIsSettingsOpen(true);
+    setIsUserMenuOpen(false); // Close user menu when opening settings
+  };
+
+  const handleSettingsClose = () => {
+    setIsSettingsOpen(false);
   };
 
   const renderCurrentPage = () => {
@@ -203,6 +214,7 @@ export const App = () => {
         onSearchChange={handleSearchChange}
         onUserMenuToggle={handleUserMenuToggle}
         isUserMenuOpen={isUserMenuOpen}
+        onSettingsOpen={handleSettingsOpen}
       />
 
       <main
@@ -210,6 +222,39 @@ export const App = () => {
       >
         {renderCurrentPage()}
       </main>
+
+      {/* Settings Overlay */}
+      {isSettingsOpen && (
+        <div className={styles.settingsOverlay}>
+          <div className={styles.settingsModalBackdrop} onClick={handleSettingsClose} />
+          <div className={styles.settingsModal}>
+            <div className={styles.settingsModalHeader}>
+              <button
+                onClick={handleSettingsClose}
+                className={styles.settingsCloseButton}
+                aria-label="Close settings"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M15 5L5 15M5 5L15 15"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+            <SettingsPage />
+          </div>
+        </div>
+      )}
 
       <ToastContainer />
     </div>

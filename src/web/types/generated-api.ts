@@ -236,6 +236,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get application settings
+         * @description Retrieve current application settings including parallel processing limits
+         */
+        get: operations["getSettings"];
+        /**
+         * Update application settings
+         * @description Update application settings including parallel processing limits
+         */
+        put: operations["updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -259,7 +283,7 @@ export interface components {
          * @description Status of a calculation
          * @enum {string}
          */
-        CalculationStatus: "pending" | "running" | "completed" | "error";
+        CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting";
         PubChemSearchRequest: {
             /** @description Search query for PubChem */
             query: string;
@@ -766,6 +790,21 @@ export interface components {
             success: boolean;
             data: components["schemas"]["SupportedParametersData"];
         };
+        AppSettings: {
+            /**
+             * @description Maximum number of parallel calculation instances
+             * @example 4
+             */
+            max_parallel_instances: number;
+        };
+        SettingsResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                settings: components["schemas"]["AppSettings"];
+            };
+        };
+        SettingsUpdateRequest: components["schemas"]["AppSettings"];
         ErrorResponse: {
             /** @example false */
             success: boolean;
@@ -1329,6 +1368,77 @@ export interface operations {
                 };
             };
             /** @description Failed to retrieve supported parameters */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Failed to retrieve settings */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Settings updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Invalid settings data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to update settings */
             500: {
                 headers: {
                     [name: string]: unknown;

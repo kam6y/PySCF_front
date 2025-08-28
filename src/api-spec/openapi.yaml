@@ -460,6 +460,55 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/settings:
+    get:
+      summary: Get application settings
+      description: Retrieve current application settings including parallel processing limits
+      operationId: getSettings
+      responses:
+        '200':
+          description: Settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsResponse'
+        '500':
+          description: Failed to retrieve settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update application settings
+      description: Update application settings including parallel processing limits
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsUpdateRequest'
+      responses:
+        '200':
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsResponse'
+        '400':
+          description: Invalid settings data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to update settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
 
 components:
   schemas:
@@ -481,7 +530,7 @@ components:
 
     CalculationStatus:
       type: string
-      enum: [pending, running, completed, error]
+      enum: [pending, running, completed, error, waiting]
       description: Status of a calculation
 
     # Request Models
@@ -1349,6 +1398,35 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/SupportedParametersData'
+
+    # Settings-related schemas
+    AppSettings:
+      type: object
+      required: [max_parallel_instances]
+      properties:
+        max_parallel_instances:
+          type: integer
+          minimum: 1
+          maximum: 32
+          description: Maximum number of parallel calculation instances
+          example: 4
+
+    SettingsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [settings]
+          properties:
+            settings:
+              $ref: '#/components/schemas/AppSettings'
+
+    SettingsUpdateRequest:
+      $ref: '#/components/schemas/AppSettings'
 
     ErrorResponse:
       type: object

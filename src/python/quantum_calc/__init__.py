@@ -11,6 +11,7 @@ from .exceptions import CalculationError, ConvergenceError, InputError, Geometry
 from .process_manager import CalculationProcessManager, get_process_manager, shutdown_process_manager
 from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
 from .supported_parameters import get_all_supported_parameters
+from .settings_manager import SettingsManager, get_settings_manager, get_current_settings, update_app_settings
 
 __all__ = [
     'BaseCalculator',
@@ -34,5 +35,9 @@ __all__ = [
     'WebSocketCalculationWatcher',
     'get_websocket_watcher',
     'shutdown_websocket_watcher',
-    'get_all_supported_parameters'
+    'get_all_supported_parameters',
+    'SettingsManager',
+    'get_settings_manager',
+    'get_current_settings',
+    'update_app_settings'
 ]

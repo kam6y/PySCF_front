@@ -15,6 +15,7 @@ import {
   CubeFilesDeleteResponseData,
   SupportedParametersResponseData,
 } from './types/api-types';
+import { components } from './types/generated-api';
 
 let API_BASE_URL = 'http://127.0.0.1:5000'; // Default, will be updated
 
@@ -25,6 +26,10 @@ export const setApiBaseUrl = (port: number) => {
 
 // Re-export the generated type for backward compatibility
 export type StartCalculationResponse = StartCalculationResponseData;
+
+// Settings API types
+type AppSettings = components['schemas']['AppSettings'];
+type SettingsResponse = components['schemas']['SettingsResponse'];
 
 type ApiResponse<T> = {
   success: boolean;
@@ -422,3 +427,20 @@ export const getSupportedParameters =
       { method: 'GET' }
     );
   };
+
+/**
+ * Get current application settings
+ */
+export const getSettings = (): Promise<SettingsResponse> => {
+  return request<SettingsResponse>('/api/settings', { method: 'GET' });
+};
+
+/**
+ * Update application settings
+ */
+export const updateSettings = (settings: AppSettings): Promise<SettingsResponse> => {
+  return request<SettingsResponse>('/api/settings', {
+    method: 'PUT',
+    body: JSON.stringify(settings),
+  });
+};

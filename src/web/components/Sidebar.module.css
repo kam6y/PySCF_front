@@ -288,6 +288,11 @@
   color: #dc2626;
 }
 
+.statusWaiting {
+  background: #fff3e0;
+  color: #e65100;
+}
+
 .statusUnknown {
   background: #f3f4f6;
   color: #6b7280;

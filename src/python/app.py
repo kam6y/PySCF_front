@@ -23,10 +23,10 @@ from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator, MolecularOrbitalGenerator, CalculationError, ConvergenceError, InputError, GeometryError
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
-from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher, get_all_supported_parameters
+from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher, get_all_supported_parameters, get_current_settings, update_app_settings
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
-    QuantumCalculationRequest, CalculationUpdateRequest
+    QuantumCalculationRequest, CalculationUpdateRequest, AppSettings, SettingsUpdateRequest
 )
 
 # Load server configuration
@@ -297,6 +297,62 @@ def get_supported_parameters():
         }), 500
 
 
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    """Get current application settings."""
+    try:
+        logger.info("Getting application settings")
+        
+        # Get current settings
+        settings = get_current_settings()
+        
+        logger.info(f"Successfully retrieved settings: {settings}")
+        return jsonify({
+            'success': True,
+            'data': {
+                'settings': settings.model_dump()
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to retrieve settings: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to retrieve settings: {str(e)}'
+        }), 500
+
+
+@app.route('/api/settings', methods=['PUT'])
+@validate()
+def update_settings(body: SettingsUpdateRequest):
+    """Update application settings."""
+    try:
+        logger.info(f"Updating application settings: {body}")
+        
+        # Extract settings from root model
+        new_settings = body.root if hasattr(body, 'root') else body
+        
+        # Update settings
+        updated_settings = update_app_settings(new_settings.model_dump())
+        
+        # Update process manager with new parallel instance limit
+        process_manager = get_process_manager()
+        process_manager.set_max_parallel_instances(updated_settings.max_parallel_instances)
+        
+        logger.info(f"Successfully updated settings: {updated_settings}")
+        return jsonify({
+            'success': True,
+            'data': {
+                'settings': updated_settings.model_dump()
+            }
+        })
+    except Exception as e:
+        logger.error(f"Failed to update settings: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to update settings: {str(e)}'
+        }), 400 if isinstance(e, ValueError) else 500
+
+
 @app.route('/api/quantum/calculate', methods=['POST'])
 @validate()
 def quantum_calculate(body: QuantumCalculationRequest):
@@ -330,13 +386,12 @@ def quantum_calculate(body: QuantumCalculationRequest):
         calc_dir = file_manager.create_calculation_dir(parameters['name'])
         calculation_id = os.path.basename(calc_dir)
         
-        # Save initial parameters and status
+        # Save initial parameters (status will be set based on submission result)
         file_manager.save_calculation_parameters(calc_dir, parameters)
-        file_manager.save_calculation_status(calc_dir, 'running')
 
-        # Submit calculation to process pool
+        # Submit calculation to process pool or queue
         process_manager = get_process_manager()
-        success = process_manager.submit_calculation(calculation_id, parameters)
+        success, initial_status = process_manager.submit_calculation(calculation_id, parameters)
         
         if not success:
             # If submission failed, update status to error
@@ -344,6 +399,9 @@ def quantum_calculate(body: QuantumCalculationRequest):
             file_manager.save_calculation_results(calc_dir, {'error': 'Failed to submit calculation to process pool.'})
             logger.error(f"Failed to submit calculation {calculation_id} to process pool")
             return jsonify({'success': False, 'error': 'Failed to queue calculation.'}), 500
+        
+        # Set initial status based on submission result
+        file_manager.save_calculation_status(calc_dir, initial_status)
         
         # Register completion callback for immediate WebSocket notification
         def on_calculation_complete(calc_id: str, success: bool, error_message: str):
@@ -359,7 +417,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
         initial_instance = {
             'id': calculation_id,
             'name': parameters['name'],
-            'status': 'running', # Frontend polls for actual status, so this is fine
+            'status': initial_status,  # Use actual status (running or waiting)
             'createdAt': parameters['created_at'],
             'updatedAt': parameters['created_at'],
             'parameters': parameters

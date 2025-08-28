@@ -29,6 +29,12 @@ const STATUS_CONFIG = {
     className: styles.statusError,
     color: '#f44336',
   },
+  waiting: {
+    icon: '⏰',
+    label: 'Waiting',
+    className: styles.statusWaiting,
+    color: '#ff9800',
+  },
 } as const;
 
 type StatusType = keyof typeof STATUS_CONFIG;
@@ -153,6 +159,7 @@ interface SidebarProps {
   onSearchChange: (query: string) => void;
   onUserMenuToggle: () => void;
   isUserMenuOpen: boolean;
+  onSettingsOpen: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -169,6 +176,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSearchChange,
   onUserMenuToggle,
   isUserMenuOpen,
+  onSettingsOpen,
 }) => {
   return (
     <>
@@ -266,7 +274,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               {isUserMenuOpen && (
                 <div className={styles.userMenu}>
-                  <button className={styles.userMenuItem}>Settings</button>
+                  <button className={styles.userMenuItem} onClick={onSettingsOpen}>Settings</button>
                   <button className={styles.userMenuItem}>Profile</button>
                   <button className={styles.userMenuItem}>About</button>
                 </div>

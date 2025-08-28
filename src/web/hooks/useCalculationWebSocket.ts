@@ -11,7 +11,7 @@ import { showErrorNotification } from '../store/notificationStore';
  */
 export const useCalculationWebSocket = (
   calculationId: string | null,
-  status?: 'pending' | 'running' | 'completed' | 'error'
+  status?: 'pending' | 'running' | 'completed' | 'error' | 'waiting'
 ) => {
   const queryClient = useQueryClient();
 

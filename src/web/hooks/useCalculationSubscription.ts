@@ -7,7 +7,7 @@ import { showErrorNotification } from '../store/notificationStore';
 
 export interface UseCalculationSubscriptionOptions {
   calculationId: string | null;
-  status?: 'pending' | 'running' | 'completed' | 'error';
+  status?: 'pending' | 'running' | 'completed' | 'error' | 'waiting';
   onUpdate: (calculation: CalculationInstance) => void;
   onError?: (error: string) => void;
 }
