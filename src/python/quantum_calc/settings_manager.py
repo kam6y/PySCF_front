@@ -35,37 +35,101 @@ class SettingsManager:
     
     def get_default_settings(self) -> AppSettings:
         """Get default application settings."""
+        try:
+            import psutil
+            total_cores = psutil.cpu_count(logical=True)
+            total_memory_mb = int(psutil.virtual_memory().total / (1024 * 1024))
+        except ImportError:
+            # Fallback when psutil is not available
+            total_cores = multiprocessing.cpu_count()
+            total_memory_mb = 4096  # Conservative 4GB estimate
+        
         return AppSettings(
-            max_parallel_instances=min(4, multiprocessing.cpu_count())  # Default to min(4, CPU cores)
+            max_parallel_instances=min(4, total_cores),
+            max_cpu_utilization_percent=80.0,
+            max_memory_utilization_percent=80.0,
+            system_total_cores=total_cores,
+            system_total_memory_mb=total_memory_mb
         )
     
     def load_settings(self) -> AppSettings:
         """
-        Load settings from file.
+        Load settings from file with automatic migration support.
         
         Returns:
-            AppSettings: Loaded settings, or default settings if file doesn't exist.
+            AppSettings: Loaded settings, with migration applied if necessary.
         """
         try:
             if self.settings_file.exists():
                 with open(self.settings_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                 
-                # Validate loaded data using Pydantic model
-                settings = AppSettings(**data)
-                logger.info(f"Loaded settings: {settings}")
-                return settings
+                try:
+                    # Try to validate loaded data using Pydantic model
+                    settings = AppSettings(**data)
+                    logger.info(f"Loaded settings: {settings}")
+                    return settings
+                except Exception as validation_error:
+                    # Migration needed - merge existing data with defaults
+                    logger.warning(f"Settings validation failed: {validation_error}. Performing migration.")
+                    return self._migrate_settings(data)
             else:
-                # Return default settings if file doesn't exist
+                # Create new settings file with defaults
                 default_settings = self.get_default_settings()
-                logger.info(f"Using default settings: {default_settings}")
+                self.save_settings(default_settings)
+                logger.info(f"Created new settings file with defaults: {default_settings}")
                 return default_settings
                 
         except (json.JSONDecodeError, ValueError, TypeError) as e:
-            logger.warning(f"Failed to load settings from {self.settings_file}: {e}. Using defaults.")
-            return self.get_default_settings()
+            logger.warning(f"Failed to parse settings from {self.settings_file}: {e}. Resetting to defaults.")
+            default_settings = self.get_default_settings()
+            self.save_settings(default_settings)
+            return default_settings
         except Exception as e:
             logger.error(f"Unexpected error loading settings: {e}. Using defaults.")
+            return self.get_default_settings()
+    
+    def _migrate_settings(self, existing_data: Dict[str, Any]) -> AppSettings:
+        """
+        Migrate existing settings data to current schema.
+        
+        Args:
+            existing_data: Existing settings data from file.
+            
+        Returns:
+            AppSettings: Migrated settings.
+        """
+        try:
+            # Get default settings as baseline
+            default_settings = self.get_default_settings()
+            default_dict = default_settings.model_dump()
+            
+            # Merge existing data with defaults (existing data takes priority where valid)
+            merged_data = default_dict.copy()
+            
+            # Update with existing valid values
+            for key, value in existing_data.items():
+                if key in default_dict:
+                    # Validate the type matches expected type
+                    expected_type = type(default_dict[key])
+                    if isinstance(value, expected_type):
+                        merged_data[key] = value
+                    else:
+                        logger.warning(f"Settings migration: ignoring invalid type for {key}: {type(value)} (expected {expected_type})")
+            
+            # Create validated settings object
+            migrated_settings = AppSettings(**merged_data)
+            
+            # Save migrated settings back to file
+            if self.save_settings(migrated_settings):
+                logger.info(f"Successfully migrated settings: {migrated_settings}")
+            else:
+                logger.warning("Failed to save migrated settings to file")
+            
+            return migrated_settings
+            
+        except Exception as e:
+            logger.error(f"Settings migration failed: {e}. Using defaults.")
             return self.get_default_settings()
     
     def save_settings(self, settings: AppSettings) -> bool:

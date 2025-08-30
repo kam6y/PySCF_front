@@ -260,6 +260,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/resource-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get system resource status
+         * @description Get current system resource information, constraints, and allocation status
+         */
+        get: operations["getSystemResourceStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -796,6 +816,26 @@ export interface components {
              * @example 4
              */
             max_parallel_instances: number;
+            /**
+             * @description Maximum CPU utilization percentage for the system
+             * @example 80
+             */
+            max_cpu_utilization_percent: number;
+            /**
+             * @description Maximum memory utilization percentage for the system
+             * @example 80
+             */
+            max_memory_utilization_percent: number;
+            /**
+             * @description Total number of CPU cores in the system (auto-detected)
+             * @example 8
+             */
+            system_total_cores: number;
+            /**
+             * @description Total system memory in MB (auto-detected)
+             * @example 16384
+             */
+            system_total_memory_mb: number;
         };
         SettingsResponse: {
             /** @example true */
@@ -810,6 +850,97 @@ export interface components {
             success: boolean;
             /** @description Error message */
             error: string;
+        };
+        SystemResourceInfo: {
+            /**
+             * @description Total number of CPU cores
+             * @example 8
+             */
+            total_cpu_cores: number;
+            /**
+             * @description Total system memory in MB
+             * @example 16384
+             */
+            total_memory_mb: number;
+            /**
+             * @description Available system memory in MB
+             * @example 8192
+             */
+            available_memory_mb: number;
+            /**
+             * @description Current CPU usage percentage
+             * @example 25.5
+             */
+            cpu_usage_percent: number;
+            /**
+             * @description Current memory usage percentage
+             * @example 50.2
+             */
+            memory_usage_percent: number;
+            /**
+             * Format: date-time
+             * @description Timestamp when the resource info was collected
+             */
+            timestamp: string;
+        };
+        ResourceConstraints: {
+            /**
+             * @description Maximum CPU utilization percentage
+             * @example 80
+             */
+            max_cpu_utilization_percent: number;
+            /**
+             * @description Maximum memory utilization percentage
+             * @example 80
+             */
+            max_memory_utilization_percent: number;
+            /**
+             * @description Maximum allowed CPU cores for calculations
+             * @example 6
+             */
+            max_allowed_cpu_cores: number;
+            /**
+             * @description Maximum allowed memory in MB for calculations
+             * @example 13107
+             */
+            max_allowed_memory_mb: number;
+        };
+        AllocatedResources: {
+            /**
+             * @description Total CPU cores currently allocated to calculations
+             * @example 4
+             */
+            total_allocated_cpu_cores: number;
+            /**
+             * @description Total memory in MB currently allocated to calculations
+             * @example 8192
+             */
+            total_allocated_memory_mb: number;
+            /**
+             * @description Available CPU cores for new calculations
+             * @example 2
+             */
+            available_cpu_cores: number;
+            /**
+             * @description Available memory in MB for new calculations
+             * @example 4915
+             */
+            available_memory_mb: number;
+            /**
+             * @description Number of active calculations
+             * @example 2
+             */
+            active_calculations_count: number;
+        };
+        SystemResourceSummary: {
+            system_info: components["schemas"]["SystemResourceInfo"];
+            resource_constraints: components["schemas"]["ResourceConstraints"];
+            allocated_resources: components["schemas"]["AllocatedResources"];
+        };
+        SystemResourceResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["SystemResourceSummary"];
         };
     };
     responses: never;
@@ -1439,6 +1570,35 @@ export interface operations {
                 };
             };
             /** @description Failed to update settings */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSystemResourceStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description System resource status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemResourceResponse"];
+                };
+            };
+            /** @description Failed to retrieve system resource status */
             500: {
                 headers: {
                     [name: string]: unknown;

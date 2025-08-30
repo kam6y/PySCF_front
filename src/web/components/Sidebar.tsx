@@ -38,18 +38,27 @@ const STATUS_CONFIG = {
 } as const;
 
 // Status order for grouping
-const STATUS_ORDER: (keyof typeof STATUS_CONFIG)[] = ['error', 'pending', 'waiting', 'running', 'completed'];
+const STATUS_ORDER: (keyof typeof STATUS_CONFIG)[] = [
+  'error',
+  'pending',
+  'waiting',
+  'running',
+  'completed',
+];
 
 // Group calculations by status
 const groupCalculationsByStatus = (calculations: CalculationSummary[]) => {
-  const grouped = calculations.reduce((acc, calculation) => {
-    const status = calculation.status as keyof typeof STATUS_CONFIG;
-    if (!acc[status]) {
-      acc[status] = [];
-    }
-    acc[status].push(calculation);
-    return acc;
-  }, {} as Record<keyof typeof STATUS_CONFIG, CalculationSummary[]>);
+  const grouped = calculations.reduce(
+    (acc, calculation) => {
+      const status = calculation.status as keyof typeof STATUS_CONFIG;
+      if (!acc[status]) {
+        acc[status] = [];
+      }
+      acc[status].push(calculation);
+      return acc;
+    },
+    {} as Record<keyof typeof STATUS_CONFIG, CalculationSummary[]>
+  );
 
   // Return groups in the specified order
   return STATUS_ORDER.map(status => ({
@@ -193,20 +202,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSettingsOpen,
 }) => {
   // Bulk delete handler for error instances
-  const handleBulkDeleteError = async (errorCalculations: CalculationSummary[]) => {
+  const handleBulkDeleteError = async (
+    errorCalculations: CalculationSummary[]
+  ) => {
     if (errorCalculations.length === 0) return;
-    
+
     const count = errorCalculations.length;
     const confirmed = confirm(
       `${count}件のエラーインスタンスを削除しますか？この操作は取り消せません。`
     );
-    
+
     if (!confirmed) return;
-    
+
     try {
       // Delete all error calculations in parallel
       await Promise.all(
-        errorCalculations.map(calculation => onCalculationDelete(calculation.id))
+        errorCalculations.map(calculation =>
+          onCalculationDelete(calculation.id)
+        )
       );
     } catch (error) {
       console.error('一括削除中にエラーが発生しました:', error);
@@ -293,36 +306,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div key={group.status} className={styles.statusSection}>
                     <div className={styles.statusSectionHeader}>
                       <div className={styles.statusSectionInfo}>
-                        <span className={styles.statusSectionIcon}>{group.config.icon}</span>
-                        <h4 className={styles.statusSectionTitle}>{group.config.label}</h4>
+                        <span className={styles.statusSectionIcon}>
+                          {group.config.icon}
+                        </span>
+                        <h4 className={styles.statusSectionTitle}>
+                          {group.config.label}
+                        </h4>
                       </div>
-                      {group.status === 'error' && group.calculations.length > 0 && (
-                        <button
-                          className={styles.bulkDeleteButton}
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleBulkDeleteError(group.calculations);
-                          }}
-                          title={`${group.calculations.length}件のエラーインスタンスを一括削除`}
-                        >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                      {group.status === 'error' &&
+                        group.calculations.length > 0 && (
+                          <button
+                            className={styles.bulkDeleteButton}
+                            onClick={e => {
+                              e.stopPropagation();
+                              handleBulkDeleteError(group.calculations);
+                            }}
+                            title={`${group.calculations.length}件のエラーインスタンスを一括削除`}
                           >
-                            <polyline points="3,6 5,6 21,6"></polyline>
-                            <path d="m5,6 1,14 c0,1 1,2 2,2 h8 c1,0 2,-1 2,-2 l1,-14"></path>
-                            <path d="m10,11 v6"></path>
-                            <path d="m14,11 v6"></path>
-                            <path d="m7,6 V4 c0,-1 1,-2 2,-2 h6 c1,0 2,1 2,2 v2"></path>
-                          </svg>
-                        </button>
-                      )}
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="3,6 5,6 21,6"></polyline>
+                              <path d="m5,6 1,14 c0,1 1,2 2,2 h8 c1,0 2,-1 2,-2 l1,-14"></path>
+                              <path d="m10,11 v6"></path>
+                              <path d="m14,11 v6"></path>
+                              <path d="m7,6 V4 c0,-1 1,-2 2,-2 h6 c1,0 2,1 2,2 v2"></path>
+                            </svg>
+                          </button>
+                        )}
                     </div>
                     <div className={styles.statusSectionCalculations}>
                       {group.calculations.map(calculation => (
@@ -349,7 +367,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               {isUserMenuOpen && (
                 <div className={styles.userMenu}>
-                  <button className={styles.userMenuItem} onClick={onSettingsOpen}>Settings</button>
+                  <button
+                    className={styles.userMenuItem}
+                    onClick={onSettingsOpen}
+                  >
+                    Settings
+                  </button>
                   <button className={styles.userMenuItem}>Profile</button>
                   <button className={styles.userMenuItem}>About</button>
                 </div>

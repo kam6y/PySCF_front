@@ -226,7 +226,10 @@ export const App = () => {
       {/* Settings Overlay */}
       {isSettingsOpen && (
         <div className={styles.settingsOverlay}>
-          <div className={styles.settingsModalBackdrop} onClick={handleSettingsClose} />
+          <div
+            className={styles.settingsModalBackdrop}
+            onClick={handleSettingsClose}
+          />
           <div className={styles.settingsModal}>
             <div className={styles.settingsModalHeader}>
               <button

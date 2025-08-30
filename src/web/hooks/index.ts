@@ -17,7 +17,11 @@ export { usePageNavigation } from './usePageNavigation';
 export type { PageNavigation } from './usePageNavigation';
 
 // 設定管理フック
-export { useAppSettings, useGetSettings, useUpdateSettings } from './useAppSettings';
+export {
+  useAppSettings,
+  useGetSettings,
+  useUpdateSettings,
+} from './useAppSettings';
 
 // 互換性のため残存（非推奨）
 export { useCalculationOperations } from './useCalculationOperations';

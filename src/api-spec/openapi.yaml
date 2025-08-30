@@ -509,6 +509,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/system/resource-status:
+    get:
+      summary: Get system resource status
+      description: Get current system resource information, constraints, and allocation status
+      operationId: getSystemResourceStatus
+      responses:
+        '200':
+          description: System resource status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemResourceResponse'
+        '500':
+          description: Failed to retrieve system resource status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
@@ -1402,7 +1420,7 @@ components:
     # Settings-related schemas
     AppSettings:
       type: object
-      required: [max_parallel_instances]
+      required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb]
       properties:
         max_parallel_instances:
           type: integer
@@ -1410,6 +1428,28 @@ components:
           maximum: 32
           description: Maximum number of parallel calculation instances
           example: 4
+        max_cpu_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum CPU utilization percentage for the system
+          example: 80.0
+        max_memory_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum memory utilization percentage for the system
+          example: 80.0
+        system_total_cores:
+          type: integer
+          minimum: 1
+          description: Total number of CPU cores in the system (auto-detected)
+          example: 8
+        system_total_memory_mb:
+          type: integer
+          minimum: 1
+          description: Total system memory in MB (auto-detected)
+          example: 16384
 
     SettingsResponse:
       type: object
@@ -1438,3 +1478,118 @@ components:
         error:
           type: string
           description: Error message
+
+    # System resource-related schemas
+    SystemResourceInfo:
+      type: object
+      required: [total_cpu_cores, total_memory_mb, available_memory_mb, cpu_usage_percent, memory_usage_percent, timestamp]
+      properties:
+        total_cpu_cores:
+          type: integer
+          minimum: 1
+          description: Total number of CPU cores
+          example: 8
+        total_memory_mb:
+          type: integer
+          minimum: 1
+          description: Total system memory in MB
+          example: 16384
+        available_memory_mb:
+          type: integer
+          minimum: 0
+          description: Available system memory in MB
+          example: 8192
+        cpu_usage_percent:
+          type: number
+          minimum: 0.0
+          maximum: 100.0
+          description: Current CPU usage percentage
+          example: 25.5
+        memory_usage_percent:
+          type: number
+          minimum: 0.0
+          maximum: 100.0
+          description: Current memory usage percentage
+          example: 50.2
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the resource info was collected
+
+    ResourceConstraints:
+      type: object
+      required: [max_cpu_utilization_percent, max_memory_utilization_percent, max_allowed_cpu_cores, max_allowed_memory_mb]
+      properties:
+        max_cpu_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum CPU utilization percentage
+          example: 80.0
+        max_memory_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum memory utilization percentage
+          example: 80.0
+        max_allowed_cpu_cores:
+          type: integer
+          minimum: 1
+          description: Maximum allowed CPU cores for calculations
+          example: 6
+        max_allowed_memory_mb:
+          type: integer
+          minimum: 1
+          description: Maximum allowed memory in MB for calculations
+          example: 13107
+
+    AllocatedResources:
+      type: object
+      required: [total_allocated_cpu_cores, total_allocated_memory_mb, available_cpu_cores, available_memory_mb, active_calculations_count]
+      properties:
+        total_allocated_cpu_cores:
+          type: integer
+          minimum: 0
+          description: Total CPU cores currently allocated to calculations
+          example: 4
+        total_allocated_memory_mb:
+          type: integer
+          minimum: 0
+          description: Total memory in MB currently allocated to calculations
+          example: 8192
+        available_cpu_cores:
+          type: integer
+          minimum: 0
+          description: Available CPU cores for new calculations
+          example: 2
+        available_memory_mb:
+          type: integer
+          minimum: 0
+          description: Available memory in MB for new calculations
+          example: 4915
+        active_calculations_count:
+          type: integer
+          minimum: 0
+          description: Number of active calculations
+          example: 2
+
+    SystemResourceSummary:
+      type: object
+      required: [system_info, resource_constraints, allocated_resources]
+      properties:
+        system_info:
+          $ref: '#/components/schemas/SystemResourceInfo'
+        resource_constraints:
+          $ref: '#/components/schemas/ResourceConstraints'
+        allocated_resources:
+          $ref: '#/components/schemas/AllocatedResources'
+
+    SystemResourceResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/SystemResourceSummary'

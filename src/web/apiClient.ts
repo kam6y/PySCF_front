@@ -31,6 +31,10 @@ export type StartCalculationResponse = StartCalculationResponseData;
 type AppSettings = components['schemas']['AppSettings'];
 type SettingsResponse = components['schemas']['SettingsResponse'];
 
+// System resource API types
+type SystemResourceResponse = components['schemas']['SystemResourceResponse'];
+type SystemResourceSummary = components['schemas']['SystemResourceSummary'];
+
 type ApiResponse<T> = {
   success: boolean;
   data: T;
@@ -431,16 +435,27 @@ export const getSupportedParameters =
 /**
  * Get current application settings
  */
-export const getSettings = (): Promise<SettingsResponse> => {
-  return request<SettingsResponse>('/api/settings', { method: 'GET' });
+export const getSettings = (): Promise<SettingsResponse['data']> => {
+  return request<SettingsResponse['data']>('/api/settings', { method: 'GET' });
 };
 
 /**
  * Update application settings
  */
-export const updateSettings = (settings: AppSettings): Promise<SettingsResponse> => {
-  return request<SettingsResponse>('/api/settings', {
+export const updateSettings = (
+  settings: AppSettings
+): Promise<SettingsResponse['data']> => {
+  return request<SettingsResponse['data']>('/api/settings', {
     method: 'PUT',
     body: JSON.stringify(settings),
+  });
+};
+
+/**
+ * Get current system resource status
+ */
+export const getSystemResourceStatus = (): Promise<SystemResourceResponse> => {
+  return request<SystemResourceResponse>('/api/system/resource-status', {
+    method: 'GET',
   });
 };

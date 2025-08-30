@@ -10,7 +10,10 @@ import {
   ApiError,
 } from '../types/api-types';
 import { useCalculationStore } from '../store/calculationStore';
-import { showErrorNotification, showInfoNotification } from '../store/notificationStore';
+import {
+  showErrorNotification,
+  showInfoNotification,
+} from '../store/notificationStore';
 
 export const useCalculationActions = () => {
   const queryClient = useQueryClient();
@@ -45,7 +48,10 @@ export const useCalculationActions = () => {
       setActiveCalculationId(runningCalculation.id);
 
       // 計算開始成功の通知
-      showInfoNotification('計算を開始しました', `${calculationParams.name}の計算を開始しました。`);
+      showInfoNotification(
+        '計算を開始しました',
+        `${calculationParams.name}の計算を開始しました。`
+      );
 
       return runningCalculation;
     } catch (error) {

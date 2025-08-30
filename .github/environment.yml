@@ -16,6 +16,8 @@ dependencies:
   - threadpoolctl
   - gunicorn
   - gevent
+  # System monitoring and resource management
+  - psutil
   # Development and testing dependencies
   - pytest
   - pip

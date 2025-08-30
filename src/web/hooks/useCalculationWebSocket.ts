@@ -1,7 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCalculationSubscription } from './useCalculationSubscription';
 import { CalculationInstance } from '../types/api-types';
-import { showErrorNotification, showSuccessNotification } from '../store/notificationStore';
+import {
+  showErrorNotification,
+  showSuccessNotification,
+} from '../store/notificationStore';
 
 /**
  * WebSocket経由の計算更新を処理する専用フック
@@ -18,12 +21,21 @@ export const useCalculationWebSocket = (
   // 統一されたキャッシュ更新ロジック
   const handleCalculationUpdate = (updatedCalculation: CalculationInstance) => {
     // 前のステータスを取得してステータス変化を検出
-    const previousData = queryClient.getQueryData(['calculation', updatedCalculation.id]) as { calculation: CalculationInstance } | undefined;
+    const previousData = queryClient.getQueryData([
+      'calculation',
+      updatedCalculation.id,
+    ]) as { calculation: CalculationInstance } | undefined;
     const previousStatus = previousData?.calculation?.status;
 
     // 計算完了通知: running -> completed の変化を検出
-    if (previousStatus === 'running' && updatedCalculation.status === 'completed') {
-      showSuccessNotification('計算が完了しました', `${updatedCalculation.name}の計算が完了しました。`);
+    if (
+      previousStatus === 'running' &&
+      updatedCalculation.status === 'completed'
+    ) {
+      showSuccessNotification(
+        '計算が完了しました',
+        `${updatedCalculation.name}の計算が完了しました。`
+      );
     }
 
     // 1. 個別計算詳細のキャッシュを更新

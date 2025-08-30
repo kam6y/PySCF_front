@@ -28,15 +28,16 @@ export const useUpdateSettings = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (settings: AppSettings) => updateSettings(settings).then(response => response.settings),
-    onSuccess: (updatedSettings) => {
+    mutationFn: (settings: AppSettings) =>
+      updateSettings(settings).then(response => response.settings),
+    onSuccess: updatedSettings => {
       // Update the cache with new settings
       queryClient.setQueryData(settingsKeys.settings(), updatedSettings);
-      
+
       // Invalidate related queries to ensure consistency
       queryClient.invalidateQueries({ queryKey: settingsKeys.all });
     },
-    onError: (error) => {
+    onError: error => {
       console.error('Failed to update settings:', error);
     },
   });
@@ -50,22 +51,22 @@ export const useAppSettings = () => {
   return {
     // Settings data
     settings: getSettingsQuery.data,
-    
+
     // Loading states
     isLoading: getSettingsQuery.isLoading,
     isUpdating: updateSettingsMutation.isPending,
-    
+
     // Error states
     error: getSettingsQuery.error || updateSettingsMutation.error,
-    
+
     // Update function
     updateSettings: updateSettingsMutation.mutate,
     updateSettingsAsync: updateSettingsMutation.mutateAsync,
-    
+
     // Status flags
     isSuccess: getSettingsQuery.isSuccess && !updateSettingsMutation.isPending,
     isError: getSettingsQuery.isError || updateSettingsMutation.isError,
-    
+
     // Refetch function
     refetch: getSettingsQuery.refetch,
   };

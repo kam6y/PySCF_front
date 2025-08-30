@@ -24,9 +24,11 @@ from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalcula
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
 from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher, get_all_supported_parameters, get_current_settings, update_app_settings
+from quantum_calc.resource_manager import get_resource_manager
 from generated_models import (
     PubChemSearchRequest, SMILESConvertRequest, XYZValidateRequest,
-    QuantumCalculationRequest, CalculationUpdateRequest, AppSettings, SettingsUpdateRequest
+    QuantumCalculationRequest, CalculationUpdateRequest, AppSettings, SettingsUpdateRequest,
+    SystemResourceResponse, SystemResourceSummary, SystemResourceInfo, ResourceConstraints, AllocatedResources
 )
 
 # Load server configuration
@@ -338,6 +340,13 @@ def update_settings(body: SettingsUpdateRequest):
         process_manager = get_process_manager()
         process_manager.set_max_parallel_instances(updated_settings.max_parallel_instances)
         
+        # Update resource manager with new resource constraints
+        resource_manager = get_resource_manager()
+        resource_manager.update_resource_constraints(
+            max_cpu_utilization_percent=updated_settings.max_cpu_utilization_percent,
+            max_memory_utilization_percent=updated_settings.max_memory_utilization_percent
+        )
+        
         logger.info(f"Successfully updated settings: {updated_settings}")
         return jsonify({
             'success': True,
@@ -351,6 +360,63 @@ def update_settings(body: SettingsUpdateRequest):
             'success': False,
             'error': f'Failed to update settings: {str(e)}'
         }), 400 if isinstance(e, ValueError) else 500
+
+
+@app.route('/api/system/resource-status', methods=['GET'])
+def get_system_resource_status():
+    """Get current system resource status including constraints and allocation."""
+    try:
+        logger.info("Getting system resource status")
+        
+        # Get resource manager
+        resource_manager = get_resource_manager()
+        
+        # Get resource summary
+        resource_summary = resource_manager.get_resource_summary()
+        
+        # Create response using Pydantic models
+        system_info = SystemResourceInfo(
+            total_cpu_cores=resource_summary['system_info']['total_cpu_cores'],
+            total_memory_mb=resource_summary['system_info']['total_memory_mb'],
+            available_memory_mb=resource_summary['system_info']['available_memory_mb'],
+            cpu_usage_percent=resource_summary['system_info']['cpu_usage_percent'],
+            memory_usage_percent=resource_summary['system_info']['memory_usage_percent'],
+            timestamp=datetime.fromisoformat(resource_summary['system_info']['timestamp'].replace('Z', '+00:00'))
+        )
+        
+        resource_constraints = ResourceConstraints(
+            max_cpu_utilization_percent=resource_summary['resource_constraints']['max_cpu_utilization_percent'],
+            max_memory_utilization_percent=resource_summary['resource_constraints']['max_memory_utilization_percent'],
+            max_allowed_cpu_cores=resource_summary['resource_constraints']['max_allowed_cpu_cores'],
+            max_allowed_memory_mb=resource_summary['resource_constraints']['max_allowed_memory_mb']
+        )
+        
+        allocated_resources = AllocatedResources(
+            total_allocated_cpu_cores=resource_summary['allocated_resources']['total_allocated_cpu_cores'],
+            total_allocated_memory_mb=resource_summary['allocated_resources']['total_allocated_memory_mb'],
+            available_cpu_cores=resource_summary['allocated_resources']['available_cpu_cores'],
+            available_memory_mb=resource_summary['allocated_resources']['available_memory_mb'],
+            active_calculations_count=resource_summary['allocated_resources']['active_calculations_count']
+        )
+        
+        summary = SystemResourceSummary(
+            system_info=system_info,
+            resource_constraints=resource_constraints,
+            allocated_resources=allocated_resources
+        )
+        
+        logger.info(f"Successfully retrieved system resource status: {summary}")
+        return jsonify({
+            'success': True,
+            'data': summary.model_dump()
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve system resource status: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to retrieve system resource status: {str(e)}'
+        }), 500
 
 
 @app.route('/api/quantum/calculate', methods=['POST'])
