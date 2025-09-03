@@ -1,5 +1,8 @@
 import { create } from 'zustand';
-import { CalculationInstance, QuantumCalculationRequest } from '../types/api-types';
+import {
+  CalculationInstance,
+  QuantumCalculationRequest,
+} from '../types/api-types';
 import { useUIStore } from './uiStore';
 
 interface CalculationState {
@@ -15,7 +18,10 @@ interface CalculationState {
   // 統合されたアクション
   selectCalculation: (calculationId: string | null) => void;
   createNewCalculation: () => void;
-  createNewFromExisting: (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => void;
+  createNewFromExisting: (
+    originalCalc: CalculationInstance,
+    newParams: QuantumCalculationRequest
+  ) => void;
   updateStagedCalculation: (updatedCalculation: CalculationInstance) => void;
   clearStaged: () => void;
   isStagedCalculation: (id: string | null) => boolean;
@@ -89,7 +95,10 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
     useUIStore.getState().closeSidebar();
   },
 
-  createNewFromExisting: (originalCalc: CalculationInstance, newParams: QuantumCalculationRequest) => {
+  createNewFromExisting: (
+    originalCalc: CalculationInstance,
+    newParams: QuantumCalculationRequest
+  ) => {
     const newId = `new-calculation-${Date.now()}`;
     const newCalculation: CalculationInstance = {
       ...originalCalc,

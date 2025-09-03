@@ -1,13 +1,13 @@
 import { useMemo } from 'react';
-import { 
-  useGetCalculations, 
-  useGetCalculationDetails 
+import {
+  useGetCalculations,
+  useGetCalculationDetails,
 } from './useCalculationQueries';
 import { useCalculationStore } from '../store/calculationStore';
 
 /**
  * 計算データ取得専用フック
- * 
+ *
  * TanStack Queryを使用してサーバーからの計算データを管理
  * データフェッチングのロジックを単一の場所に集約
  */
@@ -21,10 +21,8 @@ export const useCalculationData = () => {
     error: calculationsError,
   } = useGetCalculations();
 
-  const { 
-    data: detailsData, 
-    isLoading: detailsLoading 
-  } = useGetCalculationDetails(activeCalculationId);
+  const { data: detailsData, isLoading: detailsLoading } =
+    useGetCalculationDetails(activeCalculationId);
 
   // アクティブ計算の決定（優先順位付き）
   const activeCalculation = useMemo(() => {
@@ -56,7 +54,8 @@ export const useCalculationData = () => {
   );
 
   // ローディング状態
-  const isLoading = calculationsLoading || 
+  const isLoading =
+    calculationsLoading ||
     (activeCalculationId && !stagedCalculation && detailsLoading);
 
   // サイドバー用の計算リスト
@@ -83,7 +82,7 @@ export const useCalculationData = () => {
 
     // 補助データ
     sidebarCalculations,
-    
+
     // 生のデータ（必要に応じて）
     calculationsData,
     detailsData,

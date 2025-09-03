@@ -12,10 +12,15 @@ interface SettingsPageProps {
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
-  const [maxParallelInstances, setMaxParallelInstances] = useState<number | undefined>(undefined);
-  const [maxCpuUtilization, setMaxCpuUtilization] = useState<number | undefined>(undefined);
-  const [maxMemoryUtilization, setMaxMemoryUtilization] =
-    useState<number | undefined>(undefined);
+  const [maxParallelInstances, setMaxParallelInstances] = useState<
+    number | undefined
+  >(undefined);
+  const [maxCpuUtilization, setMaxCpuUtilization] = useState<
+    number | undefined
+  >(undefined);
+  const [maxMemoryUtilization, setMaxMemoryUtilization] = useState<
+    number | undefined
+  >(undefined);
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
     maxCpuUtilization?: number;
@@ -30,13 +35,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     if (settings) {
       // Explicit type conversion and validation
       const maxParallelInstancesValue = Number(settings.max_parallel_instances);
-      const maxCpuUtilizationValue = Number(settings.max_cpu_utilization_percent);
-      const maxMemoryUtilizationValue = Number(settings.max_memory_utilization_percent);
-      
+      const maxCpuUtilizationValue = Number(
+        settings.max_cpu_utilization_percent
+      );
+      const maxMemoryUtilizationValue = Number(
+        settings.max_memory_utilization_percent
+      );
+
       const newValues = {
-        maxParallelInstances: !isNaN(maxParallelInstancesValue) ? maxParallelInstancesValue : DEFAULT_MAX_PARALLEL_INSTANCES,
-        maxCpuUtilization: !isNaN(maxCpuUtilizationValue) ? maxCpuUtilizationValue : DEFAULT_MAX_CPU_UTILIZATION,
-        maxMemoryUtilization: !isNaN(maxMemoryUtilizationValue) ? maxMemoryUtilizationValue : DEFAULT_MAX_MEMORY_UTILIZATION,
+        maxParallelInstances: !isNaN(maxParallelInstancesValue)
+          ? maxParallelInstancesValue
+          : DEFAULT_MAX_PARALLEL_INSTANCES,
+        maxCpuUtilization: !isNaN(maxCpuUtilizationValue)
+          ? maxCpuUtilizationValue
+          : DEFAULT_MAX_CPU_UTILIZATION,
+        maxMemoryUtilization: !isNaN(maxMemoryUtilizationValue)
+          ? maxMemoryUtilizationValue
+          : DEFAULT_MAX_MEMORY_UTILIZATION,
       };
 
       if (process.env.NODE_ENV === 'development') {
@@ -47,9 +62,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxCpuUtilization(newValues.maxCpuUtilization);
       setMaxMemoryUtilization(newValues.maxMemoryUtilization);
       setOriginalValues(newValues);
-      
+
       if (process.env.NODE_ENV === 'development') {
-        console.log('SettingsPage: State updated', { originalValues: newValues });
+        console.log('SettingsPage: State updated', {
+          originalValues: newValues,
+        });
       }
     }
   }, [settings]);
@@ -57,9 +74,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const handleSave = async () => {
     try {
       updateSettings({
-        max_parallel_instances: maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
-        max_cpu_utilization_percent: maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION,
-        max_memory_utilization_percent: maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
+        max_parallel_instances:
+          maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
+        max_cpu_utilization_percent:
+          maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION,
+        max_memory_utilization_percent:
+          maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
       });
@@ -92,13 +112,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     }
 
     // Use default values for comparison if values are undefined
-    const currentParallel = maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
+    const currentParallel =
+      maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
     const currentCpu = maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
-    const currentMemory = maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
-    
-    const originalParallel = originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
-    const originalCpu = originalValues.maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
-    const originalMemory = originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
+    const currentMemory =
+      maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
+
+    const originalParallel =
+      originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
+    const originalCpu =
+      originalValues.maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
+    const originalMemory =
+      originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
@@ -112,7 +137,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         current: { currentParallel, currentCpu, currentMemory },
         original: { originalParallel, originalCpu, originalMemory },
         changes: { parallelChanged, cpuChanged, memoryChanged },
-        hasChanges
+        hasChanges,
       });
     }
 
@@ -123,7 +148,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     maxMemoryUtilization,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
-    originalValues?.maxMemoryUtilization
+    originalValues?.maxMemoryUtilization,
   ]);
 
   if (isLoading) {
@@ -217,7 +242,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   onChange={e => {
                     const newValue = Number(e.target.value);
                     if (process.env.NODE_ENV === 'development') {
-                      console.log('SettingsPage: maxParallelInstances changed', newValue);
+                      console.log(
+                        'SettingsPage: maxParallelInstances changed',
+                        newValue
+                      );
                     }
                     setMaxParallelInstances(newValue);
                   }}
@@ -263,7 +291,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   onChange={e => {
                     const newValue = Number(e.target.value);
                     if (process.env.NODE_ENV === 'development') {
-                      console.log('SettingsPage: maxCpuUtilization changed', newValue);
+                      console.log(
+                        'SettingsPage: maxCpuUtilization changed',
+                        newValue
+                      );
                     }
                     setMaxCpuUtilization(newValue);
                   }}
@@ -279,7 +310,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
-                  {(maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION).toFixed(0)}%
+                  {(maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION).toFixed(
+                    0
+                  )}
+                  %
                 </span>
                 <span className={styles.valueUnit}>CPU</span>
               </div>
@@ -310,7 +344,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   onChange={e => {
                     const newValue = Number(e.target.value);
                     if (process.env.NODE_ENV === 'development') {
-                      console.log('SettingsPage: maxMemoryUtilization changed', newValue);
+                      console.log(
+                        'SettingsPage: maxMemoryUtilization changed',
+                        newValue
+                      );
                     }
                     setMaxMemoryUtilization(newValue);
                   }}
@@ -326,7 +363,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
-                  {(maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION).toFixed(0)}%
+                  {(
+                    maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION
+                  ).toFixed(0)}
+                  %
                 </span>
                 <span className={styles.valueUnit}>Memory</span>
               </div>
@@ -353,7 +393,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

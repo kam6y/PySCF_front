@@ -3,7 +3,7 @@ import { useCalculationStore } from '../store/calculationStore';
 
 /**
  * UIStoreとCalculationStoreを統合したアプリケーション状態へのアクセス
- * 
+ *
  * このフックは、UIとCalculation両方の状態とアクションを
  * 単一のインターフェースで提供し、App.tsxの複雑さを軽減
  */
@@ -21,16 +21,16 @@ export const useAppState = () => {
       closeSidebar: uiState.closeSidebar,
       toggleDropdown: uiState.toggleDropdown,
       closeDropdown: uiState.closeDropdown,
-      
+
       // Page navigation
       currentPage: uiState.currentPage,
       currentPageTitle: uiState.getCurrentPageTitle(),
       setCurrentPage: uiState.setCurrentPage,
-      
+
       // Search
       searchQuery: uiState.searchQuery,
       setSearchQuery: uiState.setSearchQuery,
-      
+
       // Modals
       isUserMenuOpen: uiState.isUserMenuOpen,
       isSettingsOpen: uiState.isSettingsOpen,
@@ -45,7 +45,7 @@ export const useAppState = () => {
       // Basic state
       activeCalculationId: calculationState.activeCalculationId,
       stagedCalculation: calculationState.stagedCalculation,
-      
+
       // Actions
       selectCalculation: calculationState.selectCalculation,
       createNewCalculation: calculationState.createNewCalculation,
@@ -59,7 +59,7 @@ export const useAppState = () => {
     actions: {
       // 新規計算作成（UI状態も更新）
       handleCreateNew: calculationState.createNewCalculation,
-      
+
       // 計算選択（UI状態も更新）
       handleCalculationSelect: (calculationId: string) => {
         calculationState.selectCalculation(calculationId);

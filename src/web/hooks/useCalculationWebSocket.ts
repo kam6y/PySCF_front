@@ -32,9 +32,10 @@ export const useCalculationWebSocket = (
       previousStatus === 'running' &&
       updatedCalculation.status === 'completed'
     ) {
+      const molecularName = updatedCalculation.name || updatedCalculation.id;
       showSuccessNotification(
         '計算が完了しました',
-        `${updatedCalculation.name}の計算が完了しました。`
+        `${molecularName}の計算が完了しました。`
       );
     }
 

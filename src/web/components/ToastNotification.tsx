@@ -5,11 +5,13 @@ import { Notification } from '../store/notificationStore';
 interface ToastNotificationProps {
   notification: Notification;
   onClose: (id: string) => void;
+  onNavigate?: (calculationId: string) => void;
 }
 
 export const ToastNotification: React.FC<ToastNotificationProps> = ({
   notification,
   onClose,
+  onNavigate,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
@@ -26,6 +28,12 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
     setTimeout(() => {
       onClose(notification.id);
     }, 300);
+  };
+
+  const handleClick = () => {
+    if (notification.clickable && notification.calculationId && onNavigate) {
+      onNavigate(notification.calculationId);
+    }
   };
 
   const getIcon = () => {
@@ -48,12 +56,17 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
     ],
     isVisible ? styles.toastVisible : '',
     isExiting ? styles.toastExiting : '',
+    notification.clickable ? styles.toastClickable : '',
   ]
     .filter(Boolean)
     .join(' ');
 
   return (
-    <div className={toastClassName}>
+    <div
+      className={toastClassName}
+      onClick={handleClick}
+      style={{ cursor: notification.clickable ? 'pointer' : 'default' }}
+    >
       <div className={styles.toastIcon}>{getIcon()}</div>
       <div className={styles.toastContent}>
         <div className={styles.toastTitle}>{notification.title}</div>
@@ -63,7 +76,10 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
       </div>
       <button
         className={styles.toastCloseButton}
-        onClick={handleClose}
+        onClick={e => {
+          e.stopPropagation(); // 親のクリックイベントを阻止
+          handleClose();
+        }}
         aria-label="通知を閉じる"
       >
         ×

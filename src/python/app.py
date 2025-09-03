@@ -130,7 +130,10 @@ def send_immediate_websocket_notification(calculation_id: str, status: str, erro
             
             # Send to all clients in the calculation room
             socketio.emit('calculation_update', calculation_instance, room=f'calculation_{calculation_id}')
-            logger.debug(f"Sent immediate notification for calculation {calculation_id} with status {status}")
+            
+            # Also send to global updates room for non-active calculations monitoring
+            socketio.emit('calculation_update', calculation_instance, room='global_updates')
+            logger.debug(f"Sent immediate notification for calculation {calculation_id} with status {status} to both specific and global rooms")
         else:
             logger.warning(f"Calculation directory not found for immediate notification: {calc_dir}")
             
@@ -1112,6 +1115,24 @@ def on_leave_calculation(data):
             logger.debug(f"Error cleaning up file watcher for {calculation_id}: {e}")
     
     logger.info(f"Client left calculation {calculation_id}")
+
+
+@socketio.on('join_global_updates')
+def on_join_global_updates():
+    """Join global updates room to receive all calculation updates."""
+    from flask_socketio import join_room
+    
+    join_room('global_updates')
+    logger.info("Client joined global_updates room for real-time monitoring of all calculations")
+
+
+@socketio.on('leave_global_updates')
+def on_leave_global_updates():
+    """Leave global updates room."""
+    from flask_socketio import leave_room
+    
+    leave_room('global_updates')
+    logger.info("Client left global_updates room")
 
 
 @socketio.on('disconnect')

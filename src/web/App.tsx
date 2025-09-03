@@ -13,7 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { useAppState } from './hooks/useAppState';
 import { useCalculationData } from './hooks/useCalculationData';
 import { useCalculationActions } from './hooks/useCalculationActions';
-import { useCalculationWebSocket } from './hooks/useCalculationWebSocket';
+import { useGlobalCalculationWebSocket } from './hooks/useGlobalCalculationWebSocket';
 
 export const App = () => {
   // 統合された状態管理
@@ -21,11 +21,8 @@ export const App = () => {
   const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
 
-  // WebSocketによるリアルタイム更新
-  useCalculationWebSocket(
-    calculationData.activeCalculation?.id || null,
-    calculationData.activeCalculation?.status
-  );
+  // グローバルWebSocketによるリアルタイム更新（全ての計算を監視）
+  useGlobalCalculationWebSocket(calculationData.activeCalculation?.id || null);
 
   // 検索機能によるフィルタリング
   const filteredCalculations = useMemo(() => {
@@ -154,7 +151,11 @@ export const App = () => {
         calculations={filteredCalculations}
         activeCalculationId={calculationData.activeCalculation?.id || null}
         calculationsLoading={calculationData.calculationsLoading}
-        calculationsError={calculationData.calculationsError ? calculationData.calculationsError.message : null}
+        calculationsError={
+          calculationData.calculationsError
+            ? calculationData.calculationsError.message
+            : null
+        }
         onCalculationSelect={handleCalculationSelect}
         onCalculationDelete={async (calculationId: string) => {
           await calculationActions.handleCalculationDelete(calculationId);

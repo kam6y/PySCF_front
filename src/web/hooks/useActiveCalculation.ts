@@ -3,7 +3,7 @@ import { useCalculationStore } from '../store/calculationStore';
 
 /**
  * アクティブ計算への簡素化されたアクセス
- * 
+ *
  * 複雑なロジックはuseCalculationDataに移動し、
  * このフックは主要なアクティブ計算情報への簡単なアクセスを提供
  */
