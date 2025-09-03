@@ -1065,6 +1065,10 @@ components:
           type: string
           nullable: true
           description: Error details if status is error
+        waitingReason:
+          type: string
+          nullable: true
+          description: Reason why calculation is waiting (if status is waiting)
 
     CalculationSummary:
       type: object

@@ -138,13 +138,16 @@ class CalculationFileManager:
         except (json.JSONDecodeError, OSError):
             return None
             
-    def save_calculation_status(self, calc_dir: str, status: str) -> None:
+    def save_calculation_status(self, calc_dir: str, status: str, waiting_reason: Optional[str] = None) -> None:
         """Save calculation status to JSON file."""
         status_file = Path(calc_dir) / "status.json"
         status_data = {
             'status': status,
             'updated_at': datetime.now().isoformat()
         }
+        if waiting_reason is not None:
+            status_data['waiting_reason'] = waiting_reason
+        
         with open(status_file, 'w') as f:
             json.dump(status_data, f, indent=2)
 
@@ -162,6 +165,25 @@ class CalculationFileManager:
                 return json.load(f).get('status', 'pending')
         except (json.JSONDecodeError, OSError):
             return 'pending'
+    
+    def read_calculation_status_details(self, calc_dir: str) -> tuple[str, Optional[str]]:
+        """Read calculation status and waiting reason from JSON file."""
+        status_file = Path(calc_dir) / "status.json"
+        if not status_file.exists():
+            if self.file_exists(calc_dir, 'results.json'):
+                return 'completed', None
+            if self.file_exists(calc_dir, 'parameters.json'):
+                return 'pending', None
+            return 'error', None
+        
+        try:
+            with open(status_file, 'r') as f:
+                status_data = json.load(f)
+                status = status_data.get('status', 'pending')
+                waiting_reason = status_data.get('waiting_reason')
+                return status, waiting_reason
+        except (json.JSONDecodeError, OSError):
+            return 'pending', None
 
     def get_cube_files_info(self, calc_dir: str) -> List[Dict[str, Any]]:
         """Get information about CUBE files in a calculation directory."""

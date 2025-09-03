@@ -460,7 +460,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
 
         # Submit calculation to process pool or queue
         process_manager = get_process_manager()
-        success, initial_status = process_manager.submit_calculation(calculation_id, parameters)
+        success, initial_status, waiting_reason = process_manager.submit_calculation(calculation_id, parameters)
         
         if not success:
             # If submission failed, update status to error
@@ -470,7 +470,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
             return jsonify({'success': False, 'error': False}), 500  # ここではエラーメッセージを返さない
 
         # Set initial status based on submission result
-        file_manager.save_calculation_status(calc_dir, initial_status)
+        file_manager.save_calculation_status(calc_dir, initial_status, waiting_reason)
         
         # Register completion callback for immediate WebSocket notification
         def on_calculation_complete(calc_id: str, success: bool, error_message: str):
@@ -491,6 +491,10 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'updatedAt': parameters['created_at'],
             'parameters': parameters
         }
+        
+        # Include waiting reason if available
+        if waiting_reason is not None:
+            initial_instance['waitingReason'] = waiting_reason
 
         return jsonify({'success': True, 'data': {'calculation': initial_instance}}), 202
 
@@ -594,7 +598,7 @@ def get_calculation_details(calculation_id):
         # Read all calculation data from disk
         parameters = file_manager.read_calculation_parameters(calc_path) or {}
         results = file_manager.read_calculation_results(calc_path)
-        status = file_manager.read_calculation_status(calc_path)
+        status, waiting_reason = file_manager.read_calculation_status_details(calc_path)
         
         display_name = file_manager._get_display_name(calculation_id, parameters)
         creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
@@ -609,6 +613,10 @@ def get_calculation_details(calculation_id):
             'parameters': parameters,
             'results': results
         }
+        
+        # Include waiting reason if available
+        if waiting_reason is not None:
+            calculation_instance['waitingReason'] = waiting_reason
         
         return jsonify({
             'success': True,

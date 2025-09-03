@@ -47,11 +47,32 @@ export const useCalculationActions = () => {
       clearStagedCalculation();
       setActiveCalculationId(runningCalculation.id);
 
-      // 計算開始成功の通知
-      showInfoNotification(
-        '計算を開始しました',
-        `${calculationParams.name}の計算を開始しました。`
-      );
+      // ステータスに基づく通知
+      if (runningCalculation.status === 'waiting') {
+        const waitingReason =
+          runningCalculation.waitingReason ||
+          'システムリソースの空きまたは実行スロットの空きをお待ちください。';
+        showInfoNotification(
+          '計算を待機中です',
+          `${calculationParams.name}の計算は現在待機中です。理由: ${waitingReason}`
+        );
+      } else if (runningCalculation.status === 'running') {
+        showInfoNotification(
+          '計算を開始しました',
+          `${calculationParams.name}の計算を開始しました。`
+        );
+      } else if (runningCalculation.status === 'pending') {
+        showInfoNotification(
+          '計算を準備中です',
+          `${calculationParams.name}の計算を準備しています。まもなく開始されます。`
+        );
+      } else {
+        // その他のステータス（error等）の場合は汎用メッセージ
+        showInfoNotification(
+          '計算をリクエストしました',
+          `${calculationParams.name}の計算をリクエストしました。ステータス: ${runningCalculation.status}`
+        );
+      }
 
       return runningCalculation;
     } catch (error) {

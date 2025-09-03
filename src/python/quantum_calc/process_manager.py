@@ -21,6 +21,7 @@ class QueuedCalculation:
     calculation_id: str
     parameters: dict
     created_at: datetime
+    waiting_reason: Optional[str] = None
     
     def __lt__(self, other):
         """For priority queue ordering by creation time."""
@@ -216,7 +217,7 @@ class CalculationProcessManager:
         if self.max_parallel_instances > old_max:
             self._process_queue()
     
-    def submit_calculation(self, calculation_id: str, parameters: dict) -> tuple[bool, str]:
+    def submit_calculation(self, calculation_id: str, parameters: dict) -> tuple[bool, str, Optional[str]]:
         """
         Submit a calculation to the process pool or queue with resource checking.
         
@@ -225,15 +226,16 @@ class CalculationProcessManager:
             parameters: Calculation parameters
             
         Returns:
-            Tuple of (success: bool, status: str) where status is 'running', 'waiting', or 'error'
+            Tuple of (success: bool, status: str, waiting_reason: Optional[str]) 
+            where status is 'running', 'waiting', or 'error'
         """
         if self._shutdown:
             logger.error("Cannot submit calculation: process manager is shut down")
-            return False, 'error'
+            return False, 'error', None
         
         if self.executor is None:
             logger.error("Process pool executor is not available")
-            return False, 'error'
+            return False, 'error', None
         
         user_cpu_cores = parameters.get('cpu_cores') or 1
         user_memory_mb = parameters.get('memory_mb') or 2000
@@ -252,13 +254,14 @@ class CalculationProcessManager:
             queued_calc = QueuedCalculation(
                 calculation_id=calculation_id,
                 parameters=parameters,
-                created_at=datetime.now()
+                created_at=datetime.now(),
+                waiting_reason=reason
             )
             self.calculation_queue.append(queued_calc)
             self.calculation_queue.sort(key=lambda x: x.created_at)
             
             logger.info(f"Added calculation {calculation_id} to queue due to resource constraints: {reason}")
-            return True, 'waiting'
+            return True, 'waiting', reason
         
         # Check if we can start the calculation immediately (slot availability)
         if len(self.active_futures) < self.max_parallel_instances:
@@ -279,19 +282,21 @@ class CalculationProcessManager:
                 future.add_done_callback(lambda f: self._cleanup_future(calculation_id, f))
                 
                 logger.info(f"Started calculation {calculation_id} immediately with {user_cpu_cores} CPU cores and {user_memory_mb} MB memory ({len(self.active_futures)}/{self.max_parallel_instances} slots used)")
-                return True, 'running'
+                return True, 'running', None
                 
             except Exception as e:
                 logger.error(f"Failed to submit calculation {calculation_id}: {e}")
                 # Unregister resources on failure
                 self.resource_manager.unregister_calculation(calculation_id)
-                return False, 'error'
+                return False, 'error', None
         else:
-            # Add to queue
+            # Add to queue when all slots are occupied
+            slot_reason = f"All calculation slots occupied ({len(self.active_futures)}/{self.max_parallel_instances})"
             queued_calc = QueuedCalculation(
                 calculation_id=calculation_id,
                 parameters=parameters,
-                created_at=datetime.now()
+                created_at=datetime.now(),
+                waiting_reason=slot_reason
             )
             self.calculation_queue.append(queued_calc)
             
@@ -299,7 +304,7 @@ class CalculationProcessManager:
             self.calculation_queue.sort(key=lambda x: x.created_at)
             
             logger.info(f"Added calculation {calculation_id} to queue (position {len(self.calculation_queue)}) - all {self.max_parallel_instances} slots occupied")
-            return True, 'waiting'
+            return True, 'waiting', slot_reason
     
     def _cleanup_future(self, calculation_id: str, future: Future):
         """Clean up a completed future, call completion callbacks, and process queue."""

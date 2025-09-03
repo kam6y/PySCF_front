@@ -611,6 +611,8 @@ export interface components {
             workingDirectory?: string | null;
             /** @description Error details if status is error */
             errorMessage?: string | null;
+            /** @description Reason why calculation is waiting (if status is waiting) */
+            waitingReason?: string | null;
         };
         CalculationSummary: {
             /** @description Unique calculation ID */

@@ -114,6 +114,37 @@ export const useGlobalCalculationWebSocket = (
         }
       }
 
+      // 待機からの開始通知: waiting -> running の変化を検出
+      if (
+        previousStatus === 'waiting' &&
+        updatedCalculation.status === 'running'
+      ) {
+        if (!isActiveCalculation) {
+          showInfoNotification(
+            '待機中の計算を開始しました',
+            `${molecularName}の計算が待機状態から開始されました。`,
+            calculationId
+          );
+        }
+      }
+
+      // 待機状態への移行通知: pending -> waiting の変化を検出
+      if (
+        previousStatus === 'pending' &&
+        updatedCalculation.status === 'waiting'
+      ) {
+        if (!isActiveCalculation) {
+          const waitingReason =
+            updatedCalculation.waitingReason ||
+            'システムリソースの空きまたは実行スロットの空きをお待ちください。';
+          showInfoNotification(
+            '計算を待機中です',
+            `${molecularName}の計算は現在待機中です。理由: ${waitingReason}`,
+            calculationId
+          );
+        }
+      }
+
       // 4. バックグラウンドでの最新データ取得用（念のため）
       queryClient.invalidateQueries({
         queryKey: ['calculations'],
