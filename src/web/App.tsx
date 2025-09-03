@@ -1,6 +1,6 @@
 // src/web/App.tsx
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
@@ -10,109 +10,74 @@ import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
 import { CalculationResultsPage } from './pages/CalculationResultsPage';
 import { DrawMoleculePage } from './pages/DrawMoleculePage';
 import { SettingsPage } from './pages/SettingsPage';
-import {
-  useSidebarState,
-  usePageNavigation,
-  useActiveCalculation,
-  useCalculationActions,
-  useStagedCalculation,
-  useCalculationWebSocket,
-} from './hooks';
-import { CalculationInstance } from './types/api-types';
+import { useAppState } from './hooks/useAppState';
+import { useCalculationData } from './hooks/useCalculationData';
+import { useCalculationActions } from './hooks/useCalculationActions';
+import { useCalculationWebSocket } from './hooks/useCalculationWebSocket';
 
 export const App = () => {
-  // 新しい状態管理
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // 統一された状態管理フック
-  const sidebarState = useSidebarState();
-  const pageNavigation = usePageNavigation();
+  // 統合された状態管理
+  const appState = useAppState();
+  const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
-  const stagedCalculation = useStagedCalculation();
 
-  // 統一されたアクティブ計算状態（複雑な導出ロジックが内部で処理される）
-  const {
-    activeCalculation,
-    activeCalculationId,
-    isStagedCalculation,
-    selectCalculation,
-    isLoading: calculationLoading,
-    detailsLoading,
-    calculationsLoading,
-    calculationsError,
-    sidebarCalculations,
-  } = useActiveCalculation();
-
-  // WebSocketによるリアルタイム更新（簡素化されたインターフェース）
+  // WebSocketによるリアルタイム更新
   useCalculationWebSocket(
-    activeCalculation?.id || null,
-    activeCalculation?.status
+    calculationData.activeCalculation?.id || null,
+    calculationData.activeCalculation?.status
   );
 
   // 検索機能によるフィルタリング
   const filteredCalculations = useMemo(() => {
+    const searchQuery = appState.ui.searchQuery;
     if (!searchQuery.trim()) {
-      return sidebarCalculations;
+      return calculationData.sidebarCalculations;
     }
 
     const query = searchQuery.toLowerCase();
-    return sidebarCalculations.filter(
+    return calculationData.sidebarCalculations.filter(
       calc =>
         calc.name.toLowerCase().includes(query) ||
         calc.status.toLowerCase().includes(query)
     );
-  }, [sidebarCalculations, searchQuery]);
+  }, [calculationData.sidebarCalculations, appState.ui.searchQuery]);
 
-  // イベントハンドラー
+  // イベントハンドラー（統合されたアクションを使用）
   const handleSearchChange = (query: string) => {
-    setSearchQuery(query);
+    appState.ui.setSearchQuery(query);
   };
 
   const handleCreateNew = () => {
-    stagedCalculation.createNewCalculation(
-      pageNavigation.handleDropdownOptionSelect,
-      sidebarState.handleSidebarClose
-    );
+    appState.calculation.createNewCalculation();
   };
 
-  const handleUserMenuToggle = () => {
-    setIsUserMenuOpen(prev => !prev);
-  };
-
-  const handleSettingsOpen = () => {
-    setIsSettingsOpen(true);
-    setIsUserMenuOpen(false); // Close user menu when opening settings
-  };
-
-  const handleSettingsClose = () => {
-    setIsSettingsOpen(false);
+  const handleCalculationSelect = (calculationId: string) => {
+    appState.actions.handleCalculationSelect(calculationId);
   };
 
   const renderCurrentPage = () => {
-    switch (pageNavigation.currentPage) {
+    switch (appState.ui.currentPage) {
       case 'calculation-settings':
         return (
           <CalculationSettingsPage
-            activeCalculation={activeCalculation || undefined}
+            activeCalculation={calculationData.activeCalculation || undefined}
             onCalculationUpdate={
-              isStagedCalculation
-                ? stagedCalculation.updateStagedCalculation
+              calculationData.isStagedCalculation
+                ? appState.calculation.updateStagedCalculation
                 : calculationActions.handleCalculationUpdate
             }
             onStartCalculation={calculationActions.handleStartCalculation}
             onCalculationRename={calculationActions.handleCalculationRename}
             createNewCalculationFromExisting={
-              stagedCalculation.createNewFromExisting
+              appState.calculation.createNewFromExisting
             }
           />
         );
       case 'calculation-results':
         return (
           <CalculationResultsPage
-            activeCalculation={activeCalculation || undefined}
-            isLoadingDetails={detailsLoading}
+            activeCalculation={calculationData.activeCalculation || undefined}
+            isLoadingDetails={calculationData.detailsLoading}
             detailsError={null}
             onCalculationUpdate={calculationActions.handleCalculationUpdate}
           />
@@ -122,16 +87,16 @@ export const App = () => {
       default:
         return (
           <CalculationSettingsPage
-            activeCalculation={activeCalculation || undefined}
+            activeCalculation={calculationData.activeCalculation || undefined}
             onCalculationUpdate={
-              isStagedCalculation
-                ? stagedCalculation.updateStagedCalculation
+              calculationData.isStagedCalculation
+                ? appState.calculation.updateStagedCalculation
                 : calculationActions.handleCalculationUpdate
             }
             onStartCalculation={calculationActions.handleStartCalculation}
             onCalculationRename={calculationActions.handleCalculationRename}
             createNewCalculationFromExisting={
-              stagedCalculation.createNewFromExisting
+              appState.calculation.createNewFromExisting
             }
           />
         );
@@ -141,8 +106,8 @@ export const App = () => {
   return (
     <div className={styles.appContainer}>
       <button
-        className={`${styles.independentSidebarToggle} ${sidebarState.isSidebarOpen ? styles.sidebarOpen : ''}`}
-        onClick={sidebarState.handleSidebarToggle}
+        className={`${styles.independentSidebarToggle} ${appState.ui.isSidebarOpen ? styles.sidebarOpen : ''}`}
+        onClick={appState.ui.toggleSidebar}
         aria-label="Toggle sidebar"
       >
         <svg
@@ -152,7 +117,7 @@ export const App = () => {
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
         >
-          {sidebarState.isSidebarOpen ? (
+          {appState.ui.isSidebarOpen ? (
             <path
               d="M10 4L6 8L10 12"
               stroke="currentColor"
@@ -173,67 +138,58 @@ export const App = () => {
       </button>
 
       <Header
-        onDropdownToggle={sidebarState.handleDropdownToggle}
-        onPlusClick={() =>
-          stagedCalculation.createNewCalculation(
-            pageNavigation.handleDropdownOptionSelect,
-            sidebarState.handleSidebarClose
-          )
-        }
-        isDropdownOpen={sidebarState.isDropdownOpen}
-        isSidebarOpen={sidebarState.isSidebarOpen}
-        currentPageTitle={pageNavigation.currentPageTitle}
-        currentPage={pageNavigation.currentPage}
-        onDropdownOptionSelect={pageNavigation.handleDropdownOptionSelect}
-        onDropdownClose={sidebarState.handleDropdownClose}
+        onDropdownToggle={appState.ui.toggleDropdown}
+        onPlusClick={handleCreateNew}
+        isDropdownOpen={appState.ui.isDropdownOpen}
+        isSidebarOpen={appState.ui.isSidebarOpen}
+        currentPageTitle={appState.ui.currentPageTitle}
+        currentPage={appState.ui.currentPage}
+        onDropdownOptionSelect={appState.ui.setCurrentPage}
+        onDropdownClose={appState.ui.closeDropdown}
       />
 
       <Sidebar
-        isOpen={sidebarState.isSidebarOpen}
-        onClose={sidebarState.handleSidebarClose}
+        isOpen={appState.ui.isSidebarOpen}
+        onClose={appState.ui.closeSidebar}
         calculations={filteredCalculations}
-        activeCalculationId={activeCalculation?.id || null}
-        calculationsLoading={calculationsLoading}
-        calculationsError={calculationsError ? calculationsError.message : null}
-        onCalculationSelect={(calculationId: string) => {
-          selectCalculation(calculationId);
-          stagedCalculation.clearStaged();
-          sidebarState.handleSidebarClose();
-        }}
+        activeCalculationId={calculationData.activeCalculation?.id || null}
+        calculationsLoading={calculationData.calculationsLoading}
+        calculationsError={calculationData.calculationsError ? calculationData.calculationsError.message : null}
+        onCalculationSelect={handleCalculationSelect}
         onCalculationDelete={async (calculationId: string) => {
           await calculationActions.handleCalculationDelete(calculationId);
           // 削除された計算がアクティブだった場合はクリア
-          if (activeCalculationId === calculationId) {
-            selectCalculation(null);
-            stagedCalculation.clearStaged();
-            pageNavigation.handleDropdownOptionSelect('calculation-settings');
+          if (calculationData.activeCalculationId === calculationId) {
+            appState.calculation.selectCalculation(null);
+            appState.calculation.clearStaged();
+            appState.ui.setCurrentPage('calculation-settings');
           }
         }}
         onCreateNew={handleCreateNew}
-        searchQuery={searchQuery}
+        searchQuery={appState.ui.searchQuery}
         onSearchChange={handleSearchChange}
-        onUserMenuToggle={handleUserMenuToggle}
-        isUserMenuOpen={isUserMenuOpen}
-        onSettingsOpen={handleSettingsOpen}
+        onUserMenuToggle={appState.ui.toggleUserMenu}
+        isUserMenuOpen={appState.ui.isUserMenuOpen}
+        onSettingsOpen={appState.ui.openSettings}
       />
 
       <main
-        className={`${styles.appContent} ${sidebarState.isSidebarOpen ? styles.sidebarOpen : ''}`}
+        className={`${styles.appContent} ${appState.ui.isSidebarOpen ? styles.sidebarOpen : ''}`}
       >
         {renderCurrentPage()}
       </main>
 
       {/* Settings Overlay */}
-      {isSettingsOpen && (
+      {appState.ui.isSettingsOpen && (
         <div className={styles.settingsOverlay}>
           <div
             className={styles.settingsModalBackdrop}
-            onClick={handleSettingsClose}
+            onClick={appState.ui.closeSettings}
           />
           <div className={styles.settingsModal}>
             <div className={styles.settingsModalHeader}>
               <button
-                onClick={handleSettingsClose}
+                onClick={appState.ui.closeSettings}
                 className={styles.settingsCloseButton}
                 aria-label="Close settings"
               >
