@@ -31,7 +31,7 @@ export const useCalculationActions = () => {
     } else if (error instanceof Error) {
       showErrorNotification(defaultMessage, error.message);
     } else {
-      showErrorNotification(defaultMessage, '不明なエラーが発生しました。');
+      showErrorNotification(defaultMessage, 'An unknown error occurred.');
     }
   };
 
@@ -51,32 +51,32 @@ export const useCalculationActions = () => {
       if (runningCalculation.status === 'waiting') {
         const waitingReason =
           runningCalculation.waitingReason ||
-          'システムリソースの空きまたは実行スロットの空きをお待ちください。';
+          'Please wait for available system resources or execution slots.';
         showInfoNotification(
-          '計算を待機中です',
-          `${calculationParams.name}の計算は現在待機中です。理由: ${waitingReason}`
+          'Calculation is waiting',
+          `Calculation for ${calculationParams.name} is currently waiting. Reason: ${waitingReason}`
         );
       } else if (runningCalculation.status === 'running') {
         showInfoNotification(
-          '計算を開始しました',
-          `${calculationParams.name}の計算を開始しました。`
+          'Calculation started',
+          `Calculation for ${calculationParams.name} has been started.`
         );
       } else if (runningCalculation.status === 'pending') {
         showInfoNotification(
-          '計算を準備中です',
-          `${calculationParams.name}の計算を準備しています。まもなく開始されます。`
+          'Preparing calculation',
+          `Preparing calculation for ${calculationParams.name}. It will start soon.`
         );
       } else {
         // その他のステータス（error等）の場合は汎用メッセージ
         showInfoNotification(
-          '計算をリクエストしました',
-          `${calculationParams.name}の計算をリクエストしました。ステータス: ${runningCalculation.status}`
+          'Calculation requested',
+          `Calculation for ${calculationParams.name} has been requested. Status: ${runningCalculation.status}`
         );
       }
 
       return runningCalculation;
     } catch (error) {
-      handleApiError(error, '計算の開始に失敗しました');
+      handleApiError(error, 'Failed to start calculation');
       throw error;
     }
   };
@@ -95,7 +95,7 @@ export const useCalculationActions = () => {
       await deleteCalculationMutation.mutateAsync(calculationId);
       // 削除された計算がアクティブだった場合の後処理は呼び出し元で処理
     } catch (error) {
-      handleApiError(error, '計算の削除に失敗しました');
+      handleApiError(error, 'Failed to delete calculation');
       throw error;
     }
   };

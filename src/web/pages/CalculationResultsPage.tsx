@@ -292,9 +292,9 @@ export const CalculationResultsPage = ({
         <section
           className={`${styles.calculationSection} ${styles.energyDiagramSection}`}
         >
-          <h2>分子軌道エネルギー準位図</h2>
+          <h2>Molecular Orbital Energy Level Diagram</h2>
           <div className={styles.sectionDescription}>
-            分子軌道のエネルギー準位を図示します。軌道をクリックすると3D可視化で詳細を確認できます。
+            Energy levels of molecular orbitals are illustrated. Click on orbitals to view details in 3D visualization.
           </div>
           <MolecularOrbitalEnergyDiagram
             key={`energy-${activeCalculation.id}`}
@@ -309,9 +309,9 @@ export const CalculationResultsPage = ({
         <section
           className={`${styles.calculationSection} ${styles.orbitalViewerSection}`}
         >
-          <h2>分子軌道可視化</h2>
+          <h2>Molecular Orbital Visualization</h2>
           <div className={styles.sectionDescription}>
-            量子化学計算で得られた分子軌道を3D可視化します。軌道を選択して形状や分布を確認できます。
+            3D visualization of molecular orbitals obtained from quantum chemistry calculations. Select orbitals to view their shapes and distributions.
           </div>
           <MolecularOrbitalViewer
             key={activeCalculation.id}
@@ -700,7 +700,7 @@ export const CalculationResultsPage = ({
                     }}
                   >
                     <h4 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>
-                      💡 NTO解析の読み方
+                      💡 How to Read NTO Analysis
                     </h4>
                     <ul
                       style={{
@@ -712,11 +712,11 @@ export const CalculationResultsPage = ({
                     >
                       <li>
                         <strong>Hole軌道（赤色）</strong>:
-                        励起により電子が抜ける軌道（主にHOMO系）
+                        Orbitals from which electrons are excited (mainly HOMO-type)
                       </li>
                       <li>
                         <strong>Particle軌道（青色）</strong>:
-                        励起により電子が移る軌道（主にLUMO系）
+                        Orbitals to which electrons are excited (mainly LUMO-type)
                       </li>
                       <li>
                         <strong>Weight</strong>:
@@ -727,7 +727,7 @@ export const CalculationResultsPage = ({
                         全遷移に対するそのペアの寄与率（%）
                       </li>
                       <li>
-                        寄与率が高いペアほどその励起状態の主要な電子遷移を表しています
+                        Higher contribution pairs represent the main electronic transitions of the excited state
                       </li>
                     </ul>
                   </div>
@@ -825,19 +825,18 @@ export const CalculationResultsPage = ({
                 }}
               >
                 <h4 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>
-                  📁 ファイルへのアクセス方法
+                  📁 File Access Methods
                 </h4>
                 <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
                   <p>
-                    <strong>Finder:</strong> {results.working_directory}{' '}
-                    をFinderで開く
+                    <strong>Finder:</strong> Open {results.working_directory} in Finder
                   </p>
                   <p>
                     <strong>Terminal:</strong>{' '}
                     <code>cd {results.working_directory}</code>
                   </p>
                   <p>
-                    <strong>チェックポイントファイル:</strong>{' '}
+                    <strong>Checkpoint File:</strong>{' '}
                     <code>calculation.chk</code>
                   </p>
                   <p
@@ -848,7 +847,7 @@ export const CalculationResultsPage = ({
                     }}
                   >
                     ※
-                    このディレクトリには分子軌道データや波動関数情報が保存されています
+                    This directory contains molecular orbital data and wave function information
                   </p>
                 </div>
               </div>
@@ -866,7 +865,7 @@ export const CalculationResultsPage = ({
               borderRadius: '8px',
             }}
           >
-            <h2>Mulliken電荷解析</h2>
+            <h2>Mulliken Charge Analysis</h2>
             <div
               style={{
                 marginBottom: '15px',
@@ -874,7 +873,7 @@ export const CalculationResultsPage = ({
                 color: '#666',
               }}
             >
-              Mulliken人口解析による各原子の部分電荷。正の値は電子不足（正電荷）、負の値は電子過剰（負電荷）を示します。
+              Partial charges of each atom by Mulliken population analysis. Positive values indicate electron deficiency (positive charge), negative values indicate electron excess (negative charge).
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table
@@ -895,7 +894,7 @@ export const CalculationResultsPage = ({
                         textAlign: 'center',
                       }}
                     >
-                      原子番号
+                      Atom Number
                     </th>
                     <th
                       style={{
@@ -904,7 +903,7 @@ export const CalculationResultsPage = ({
                         textAlign: 'center',
                       }}
                     >
-                      元素
+                      Element
                     </th>
                     <th
                       style={{
@@ -913,7 +912,7 @@ export const CalculationResultsPage = ({
                         textAlign: 'center',
                       }}
                     >
-                      Mulliken電荷 (e)
+                      Mulliken Charge (e)
                     </th>
                     <th
                       style={{
@@ -922,7 +921,7 @@ export const CalculationResultsPage = ({
                         textAlign: 'center',
                       }}
                     >
-                      電荷の性質
+                      Charge Character
                     </th>
                   </tr>
                 </thead>
@@ -983,7 +982,7 @@ export const CalculationResultsPage = ({
                               fontWeight: 'bold',
                             }}
                           >
-                            {isPositive ? '陽性（δ+）' : '陰性（δ−）'}
+                            {isPositive ? 'Positive (δ+)' : 'Negative (δ−)'}
                           </td>
                         </tr>
                       );
@@ -1001,14 +1000,14 @@ export const CalculationResultsPage = ({
                 fontSize: '14px',
               }}
             >
-              <strong>合計電荷:</strong>{' '}
+              <strong>Total Charge:</strong>{' '}
               <code>
                 {results.mulliken_charges
                   .reduce((sum: number, charge: any) => sum + charge.charge, 0)
                   .toFixed(4)}{' '}
                 e
               </code>{' '}
-              (分子電荷: <code>{results.charge || 0}</code> e)
+              (Molecular Charge: <code>{results.charge || 0}</code> e)
             </div>
           </section>
         )}

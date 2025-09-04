@@ -34,8 +34,8 @@ export const useCalculationWebSocket = (
     ) {
       const molecularName = updatedCalculation.name || updatedCalculation.id;
       showSuccessNotification(
-        '計算が完了しました',
-        `${molecularName}の計算が完了しました。`
+        'Calculation completed',
+        `Calculation for ${molecularName} has been completed.`
       );
     }
 
@@ -75,7 +75,7 @@ export const useCalculationWebSocket = (
     console.error('WebSocket error:', error);
 
     // WebSocketエラーをトースト通知で表示
-    showErrorNotification('リアルタイム監視エラー', error);
+    showErrorNotification('Real-time monitoring error', error);
   };
 
   // WebSocket接続の管理

@@ -102,7 +102,7 @@ const CalculationCard: React.FC<CalculationCardProps> = ({
         <div className={styles.calculationName}>{calculation.name}</div>
         <div className={styles.calculationMeta}>
           <div className={styles.calculationDate}>
-            {new Date(calculation.date).toLocaleString('ja-JP', {
+            {new Date(calculation.date).toLocaleString('en-US', {
               year: 'numeric',
               month: '2-digit',
               day: '2-digit',
@@ -209,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const count = errorCalculations.length;
     const confirmed = confirm(
-      `${count}件のエラーインスタンスを削除しますか？この操作は取り消せません。`
+      `Do you want to delete ${count} error instances? This operation cannot be undone.`
     );
 
     if (!confirmed) return;
@@ -223,7 +223,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       );
     } catch (error) {
       console.error('一括削除中にエラーが発生しました:', error);
-      alert('一部のインスタンスの削除に失敗しました。');
+      alert('Failed to delete some instances.');
     }
   };
 
@@ -321,7 +321,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               e.stopPropagation();
                               handleBulkDeleteError(group.calculations);
                             }}
-                            title={`${group.calculations.length}件のエラーインスタンスを一括削除`}
+                            title={`Bulk delete ${group.calculations.length} error instances`}
                           >
                             <svg
                               width="14"

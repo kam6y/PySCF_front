@@ -117,7 +117,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
     return (
       <div className={styles.loadingContainer}>
         <div className={styles.loadingText}>
-          ⚛️ エネルギー準位データを読み込み中...
+          ⚛️ Loading energy level data...
         </div>
       </div>
     );
@@ -126,9 +126,9 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
   if (orbitalsError) {
     return (
       <div className={styles.errorContainer}>
-        <div>❌ エネルギー準位データの読み込みに失敗しました</div>
+        <div>❌ Failed to load energy level data</div>
         <div className={styles.errorMessage}>
-          {orbitalsError.message || '不明なエラーが発生しました'}
+          {orbitalsError.message || 'An unknown error occurred'}
         </div>
       </div>
     );
@@ -137,9 +137,9 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
   if (processedOrbitals.length === 0) {
     return (
       <div className={styles.noDataContainer}>
-        <div>📊 軌道エネルギー情報がありません。</div>
+        <div>📊 No orbital energy information available.</div>
         <div className={styles.noDataMessage}>
-          計算が完了していないか、軌道データが生成されていません。
+          Calculation is not complete or orbital data has not been generated.
         </div>
       </div>
     );
@@ -154,10 +154,10 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
     <div className={styles.diagramContainer}>
       {/* ヘッダー情報 */}
       <div className={styles.diagramHeader}>
-        <h3 className={styles.diagramTitle}>分子軌道エネルギー準位図</h3>
+        <h3 className={styles.diagramTitle}>Molecular Orbital Energy Level Diagram</h3>
         {orbitalSummary.homoLumoGap && (
           <div className={styles.homoLumoGap}>
-            <strong>HOMO-LUMOギャップ:</strong>{' '}
+            <strong>HOMO-LUMO Gap:</strong>{' '}
             <span className={styles.gapValue}>
               {orbitalSummary.homoLumoGap.toFixed(4)} eV
             </span>
@@ -213,7 +213,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
             fill="#666"
             transform={`rotate(-90, 20, ${DIAGRAM_CONFIG.height / 2})`}
           >
-            エネルギー (eV)
+            Energy (eV)
           </text>
 
           {/* HOMO-LUMOギャップの強調表示 */}
@@ -380,15 +380,15 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
           <div
             className={`${styles.legendColorBox} ${styles.legendOccupied}`}
           />
-          <span>占有軌道</span>
+          <span>Occupied Orbitals</span>
         </div>
         <div className={styles.legendItem}>
           <div className={`${styles.legendColorBox} ${styles.legendVirtual}`} />
-          <span>仮想軌道</span>
+          <span>Virtual Orbitals</span>
         </div>
         <div className={styles.legendItem}>
           <div className={styles.legendElectron} />
-          <span>電子</span>
+          <span>Electrons</span>
         </div>
       </div>
 
@@ -404,23 +404,23 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
             return (
               <div>
                 <div className={styles.selectedOrbitalTitle}>
-                  選択された軌道:{' '}
+                  Selected Orbital:{' '}
                   {selectedOrbital.label || `Orbital ${selectedOrbital.index}`}
                 </div>
                 <div className={styles.selectedOrbitalGrid}>
                   <div>
-                    <strong>エネルギー:</strong>{' '}
+                    <strong>Energy:</strong>{' '}
                     {selectedOrbital.energy_ev.toFixed(4)} eV
                   </div>
                   <div>
-                    <strong>エネルギー (a.u.):</strong>{' '}
+                    <strong>Energy (a.u.):</strong>{' '}
                     {selectedOrbital.energy_hartree.toFixed(6)}
                   </div>
                   <div>
-                    <strong>占有数:</strong> {selectedOrbital.occupancy}
+                    <strong>Occupancy:</strong> {selectedOrbital.occupancy}
                   </div>
                   <div>
-                    <strong>軌道タイプ:</strong> {selectedOrbital.orbital_type}
+                    <strong>Orbital type:</strong> {selectedOrbital.orbital_type}
                   </div>
                 </div>
               </div>
@@ -432,7 +432,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
       {/* 操作説明 */}
       <div className={styles.helpSection}>
         💡
-        軌道をクリックすると詳細を確認できます。黄色のギャップ領域はHOMO-LUMOギャップを示します。
+        Click on orbitals to view details. The yellow gap area indicates the HOMO-LUMO gap.
       </div>
     </div>
   );

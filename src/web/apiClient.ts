@@ -89,28 +89,28 @@ export class ApiError extends Error {
   getUserMessage(): string {
     switch (this.errorType) {
       case 'network':
-        return 'ネットワーク接続エラーが発生しました。インターネット接続を確認してください。';
+        return 'A network connection error occurred. Please check your internet connection.';
       case 'client':
         if (this.status === 404) {
-          return 'お探しのリソースが見つかりませんでした。';
+          return 'The requested resource was not found.';
         }
         if (this.status === 400) {
-          return 'リクエストに問題があります。入力内容を確認してください。';
+          return 'There is an issue with the request. Please check your input.';
         }
         if (this.status === 401) {
-          return '認証が必要です。';
+          return 'Authentication is required.';
         }
         if (this.status === 403) {
-          return 'このリソースにアクセスする権限がありません。';
+          return 'You do not have permission to access this resource.';
         }
-        return 'リクエストエラーが発生しました。';
+        return 'A request error occurred.';
       case 'server':
         if (this.status === 503) {
-          return 'サーバーが一時的に利用できません。しばらく後にお試しください。';
+          return 'The server is temporarily unavailable. Please try again later.';
         }
-        return 'サーバーエラーが発生しました。管理者に連絡してください。';
+        return 'A server error occurred. Please contact the administrator.';
       default:
-        return this.message || '不明なエラーが発生しました。';
+        return this.message || 'An unknown error occurred.';
     }
   }
 }
@@ -140,7 +140,7 @@ const request = async <T>(
     } catch (jsonError) {
       // JSON解析エラー（レスポンスがJSONでない場合）
       throw new ApiError(
-        'サーバーから無効なレスポンスが返されました。',
+        'An invalid response was returned from the server.',
         response.status,
         response.statusText,
         url,
@@ -173,7 +173,7 @@ const request = async <T>(
 
     // ネットワークエラーやその他のfetchエラー
     throw new ApiError(
-      'ネットワークエラーが発生しました。サーバーに接続できません。',
+      'A network error occurred. Unable to connect to the server.',
       0, // ネットワークエラーの場合はステータスコード0
       'Network Error',
       url,

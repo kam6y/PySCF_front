@@ -116,10 +116,10 @@ export const useCalculationSubscription = ({
                   updatedCalculation.errorMessage ||
                   (updatedCalculation as any).error || // バックエンドが設定するフィールド
                   updatedCalculation.results?.error ||
-                  '詳細なエラー情報が利用できません。';
+                  'Detailed error information is not available.';
 
                 showErrorNotification(
-                  `計算「${calculationName}」が失敗しました`,
+                  `Calculation "${calculationName}" failed`,
                   errorMessage
                 );
               }
@@ -141,7 +141,7 @@ export const useCalculationSubscription = ({
               console.error('Failed to process calculation update:', e);
               if (onErrorRef.current) {
                 onErrorRef.current(
-                  'サーバーからの応答が解析できませんでした。計算状況の更新が一時的に停止する可能性があります。'
+                  'Unable to parse response from server. Calculation status updates may be temporarily stopped.'
                 );
               }
             }
@@ -152,7 +152,7 @@ export const useCalculationSubscription = ({
           console.error('Socket.IO error:', errorData);
           if (onErrorRef.current) {
             const errorMessage =
-              errorData?.error || '計算状況の監視に問題が発生しました。';
+              errorData?.error || 'A problem occurred while monitoring calculation status.';
             onErrorRef.current(errorMessage);
           }
         });
@@ -161,14 +161,14 @@ export const useCalculationSubscription = ({
           console.error('Socket.IO connection error:', error);
           if (onErrorRef.current) {
             let errorMessage =
-              'サーバーへの接続に失敗しました。ネットワーク接続を確認してください。';
+              'Failed to connect to server. Please check your network connection.';
 
             if (error.message.includes('timeout')) {
               errorMessage =
-                '接続がタイムアウトしました。サーバーが起動していない可能性があります。';
+                'Connection timed out. The server may not be running.';
             } else if (error.message.includes('xhr poll error')) {
               errorMessage =
-                'サーバーとの通信が中断されました。計算は継続中ですが、状況の更新が停止しています。';
+                'Communication with server was interrupted. Calculation continues, but status updates have stopped.';
             }
 
             onErrorRef.current(errorMessage);
@@ -192,7 +192,7 @@ export const useCalculationSubscription = ({
             // Server initiated disconnect, likely planned shutdown
             if (onErrorRef.current) {
               onErrorRef.current(
-                'サーバーとの接続が切断されました。ページを更新して状況を確認してください。'
+                'Connection to server was disconnected. Please refresh the page to check status.'
               );
             }
           }
@@ -200,15 +200,15 @@ export const useCalculationSubscription = ({
       } catch (error) {
         console.error('Failed to create Socket.IO connection:', error);
         if (onErrorRef.current) {
-          let errorMessage = 'リアルタイム監視の開始に失敗しました。';
+          let errorMessage = 'Failed to start real-time monitoring.';
 
           if (error instanceof Error) {
             if (error.message.includes('network')) {
               errorMessage =
-                'ネットワークエラーによりサーバーに接続できませんでした。';
+                'Unable to connect to server due to network error.';
             } else if (error.message.includes('security')) {
               errorMessage =
-                'セキュリティ設定により接続できませんでした。HTTPSが必要な可能性があります。';
+                'Connection blocked by security settings. HTTPS may be required.';
             }
           }
 

@@ -80,7 +80,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
           e.stopPropagation(); // 親のクリックイベントを阻止
           handleClose();
         }}
-        aria-label="通知を閉じる"
+        aria-label="Close notification"
       >
         ×
       </button>

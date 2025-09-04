@@ -74,8 +74,8 @@ export const useGlobalCalculationWebSocket = (
         // 非アクティブな計算のみ通知
         if (!isActiveCalculation) {
           showSuccessNotification(
-            '計算が完了しました',
-            `${molecularName}の計算が完了しました。`,
+            'Calculation completed',
+            `Calculation for ${molecularName} has been completed.`,
             calculationId
           );
         }
@@ -90,10 +90,10 @@ export const useGlobalCalculationWebSocket = (
           const errorMessage =
             updatedCalculation.errorMessage ||
             updatedCalculation.results?.error ||
-            '詳細なエラー情報が利用できません。';
+            'Detailed error information is not available.';
 
           showErrorNotification(
-            `計算「${molecularName}」が失敗しました`,
+            `Calculation "${molecularName}" failed`,
             errorMessage,
             calculationId
           );
@@ -107,8 +107,8 @@ export const useGlobalCalculationWebSocket = (
       ) {
         if (!isActiveCalculation) {
           showInfoNotification(
-            '計算を開始しました',
-            `${molecularName}の計算を開始しました。`,
+            'Calculation started',
+            `Calculation for ${molecularName} has been started.`,
             calculationId
           );
         }
@@ -121,8 +121,8 @@ export const useGlobalCalculationWebSocket = (
       ) {
         if (!isActiveCalculation) {
           showInfoNotification(
-            '待機中の計算を開始しました',
-            `${molecularName}の計算が待機状態から開始されました。`,
+            'Queued calculation started',
+            `Calculation for ${molecularName} has started from queued status.`,
             calculationId
           );
         }
@@ -136,10 +136,10 @@ export const useGlobalCalculationWebSocket = (
         if (!isActiveCalculation) {
           const waitingReason =
             updatedCalculation.waitingReason ||
-            'システムリソースの空きまたは実行スロットの空きをお待ちください。';
+            'Please wait for available system resources or execution slots.';
           showInfoNotification(
-            '計算を待機中です',
-            `${molecularName}の計算は現在待機中です。理由: ${waitingReason}`,
+            'Calculation is waiting',
+            `Calculation for ${molecularName} is currently waiting. Reason: ${waitingReason}`,
             calculationId
           );
         }
@@ -156,7 +156,7 @@ export const useGlobalCalculationWebSocket = (
   // エラーハンドリング
   const handleWebSocketError = useCallback((error: string) => {
     console.error('Global WebSocket error:', error);
-    showErrorNotification('リアルタイム監視エラー', error);
+    showErrorNotification('Real-time monitoring error', error);
   }, []);
 
   // 遅延切断タイマーをクリアするヘルパー関数
@@ -222,7 +222,7 @@ export const useGlobalCalculationWebSocket = (
           } catch (e) {
             console.error('Failed to process global calculation update:', e);
             handleWebSocketError(
-              'サーバーからの応答が解析できませんでした。計算状況の更新が一時的に停止する可能性があります。'
+              'Unable to parse response from server. Calculation status updates may be temporarily stopped.'
             );
           }
         }
@@ -231,19 +231,19 @@ export const useGlobalCalculationWebSocket = (
       socket.on('error', (errorData: any) => {
         console.error('Global Socket.IO error:', errorData);
         const errorMessage =
-          errorData?.error || 'グローバル計算監視に問題が発生しました。';
+          errorData?.error || 'A problem occurred with global calculation monitoring.';
         handleWebSocketError(errorMessage);
       });
 
       socket.on('connect_error', (error: Error) => {
         console.error('Global Socket.IO connection error:', error);
-        let errorMessage = 'グローバル監視用サーバーへの接続に失敗しました。';
+        let errorMessage = 'Failed to connect to global monitoring server.';
 
         if (error.message.includes('timeout')) {
           errorMessage =
-            'グローバル監視接続がタイムアウトしました。サーバーが起動していない可能性があります。';
+            'Global monitoring connection timed out. The server may not be running.';
         } else if (error.message.includes('xhr poll error')) {
-          errorMessage = 'グローバル監視のサーバー通信が中断されました。';
+          errorMessage = 'Global monitoring server communication was interrupted.';
         }
 
         handleWebSocketError(errorMessage);
@@ -259,21 +259,21 @@ export const useGlobalCalculationWebSocket = (
         if (reason === 'io server disconnect') {
           // Server initiated disconnect, likely planned shutdown
           handleWebSocketError(
-            'グローバル監視サーバーとの接続が切断されました。ページを更新して状況を確認してください。'
+            'Connection to global monitoring server was disconnected. Please refresh the page to check status.'
           );
         }
       });
     } catch (error) {
       console.error('Failed to create global Socket.IO connection:', error);
-      let errorMessage = 'グローバル監視の開始に失敗しました。';
+      let errorMessage = 'Failed to start global monitoring.';
 
       if (error instanceof Error) {
         if (error.message.includes('network')) {
           errorMessage =
-            'ネットワークエラーによりグローバル監視サーバーに接続できませんでした。';
+            'Unable to connect to global monitoring server due to network error.';
         } else if (error.message.includes('security')) {
           errorMessage =
-            'セキュリティ設定によりグローバル監視接続できませんでした。';
+            'Global monitoring connection blocked by security settings.';
         }
       }
 

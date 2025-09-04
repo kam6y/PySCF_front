@@ -442,7 +442,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
           {/* 軌道選択 */}
           <div>
             <label htmlFor="orbital-select" className={styles.controlLabel}>
-              分子軌道:
+              Molecular Orbital:
             </label>
             <select
               id="orbital-select"
@@ -468,7 +468,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
                 fontWeight: 'bold',
               }}
             >
-              グリッドサイズ: {viewerOptions.gridSize}
+              Grid Size: {viewerOptions.gridSize}
             </label>
             <input
               id="grid-size"
@@ -490,7 +490,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               htmlFor="isovalue-pos"
               className={`${styles.rangeLabel} ${styles.controlLabel}`}
             >
-              正等値面: {viewerOptions.isovaluePos.toFixed(3)}
+              Positive Isovalue: {viewerOptions.isovaluePos.toFixed(3)}
             </label>
             <input
               id="isovalue-pos"
@@ -512,7 +512,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               htmlFor="isovalue-neg"
               className={`${styles.rangeLabel} ${styles.controlLabel}`}
             >
-              負等値面: {viewerOptions.isovalueNeg.toFixed(3)}
+              Negative Isovalue: {viewerOptions.isovalueNeg.toFixed(3)}
             </label>
             <input
               id="isovalue-neg"
@@ -533,15 +533,15 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
         {selectedOrbital && (
           <div className={styles.selectedOrbitalInfo}>
             <div>
-              <strong>{selectedOrbital.label}</strong> (軌道 #
+              <strong>{selectedOrbital.label}</strong> (Orbital #
               {selectedOrbital.index})
               <br />
-              エネルギー: <code>
+              Energy: <code>
                 {selectedOrbital.energy_ev.toFixed(4)} eV
               </code>{' '}
               (<code>{selectedOrbital.energy_hartree.toFixed(6)} a.u.</code>)
               <br />
-              占有: <code>{selectedOrbital.occupancy}</code>
+              Occupancy: <code>{selectedOrbital.occupancy}</code>
             </div>
           </div>
         )}
@@ -560,7 +560,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
         {/* ローディングオーバーレイ */}
         {(isLoading || cubeLoading) && (
-          <div className={styles.loadingOverlay}>⚛️ 軌道データを生成中...</div>
+          <div className={styles.loadingOverlay}>⚛️ Generating orbital data...</div>
         )}
       </div>
     </div>
