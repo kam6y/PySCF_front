@@ -52,6 +52,7 @@ class SystemResourceManager:
         """Initialize the system resource manager."""
         self._active_calculations: Dict[str, CalculationResourceUsage] = {}
         self._resource_constraints = ResourceConstraints()
+        self._last_system_info: Optional[SystemResourceInfo] = None
         
         if psutil is None:
             logger.warning("psutil is not available. Resource monitoring will be limited.")
@@ -69,9 +70,11 @@ class SystemResourceManager:
     
     def get_system_info(self) -> SystemResourceInfo:
         """Get current system resource information."""
+        system_info = None
+        
         if psutil is None:
             # Return conservative estimates when psutil is not available
-            return SystemResourceInfo(
+            system_info = SystemResourceInfo(
                 total_cpu_cores=self._resource_constraints.system_total_cores,
                 total_memory_mb=self._resource_constraints.system_total_memory_mb,
                 available_memory_mb=int(self._resource_constraints.system_total_memory_mb * 0.5),  # Assume 50% available
@@ -79,30 +82,34 @@ class SystemResourceManager:
                 memory_usage_percent=50.0,  # Conservative estimate
                 timestamp=datetime.now(timezone.utc)
             )
+        else:
+            try:
+                memory = psutil.virtual_memory()
+                cpu_percent = psutil.cpu_percent(interval=0.1)
+                
+                system_info = SystemResourceInfo(
+                    total_cpu_cores=self._resource_constraints.system_total_cores,
+                    total_memory_mb=int(memory.total / (1024 * 1024)),
+                    available_memory_mb=int(memory.available / (1024 * 1024)),
+                    cpu_usage_percent=cpu_percent,
+                    memory_usage_percent=memory.percent,
+                    timestamp=datetime.now(timezone.utc)
+                )
+            except Exception as e:
+                logger.error(f"Error getting system information: {e}")
+                # Return fallback values
+                system_info = SystemResourceInfo(
+                    total_cpu_cores=self._resource_constraints.system_total_cores,
+                    total_memory_mb=self._resource_constraints.system_total_memory_mb,
+                    available_memory_mb=int(self._resource_constraints.system_total_memory_mb * 0.5),
+                    cpu_usage_percent=0.0,
+                    memory_usage_percent=0.0,
+                    timestamp=datetime.now(timezone.utc)
+                )
         
-        try:
-            memory = psutil.virtual_memory()
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            
-            return SystemResourceInfo(
-                total_cpu_cores=self._resource_constraints.system_total_cores,
-                total_memory_mb=int(memory.total / (1024 * 1024)),
-                available_memory_mb=int(memory.available / (1024 * 1024)),
-                cpu_usage_percent=cpu_percent,
-                memory_usage_percent=memory.percent,
-                timestamp=datetime.now(timezone.utc)
-            )
-        except Exception as e:
-            logger.error(f"Error getting system information: {e}")
-            # Return fallback values
-            return SystemResourceInfo(
-                total_cpu_cores=self._resource_constraints.system_total_cores,
-                total_memory_mb=self._resource_constraints.system_total_memory_mb,
-                available_memory_mb=int(self._resource_constraints.system_total_memory_mb * 0.5),
-                cpu_usage_percent=0.0,
-                memory_usage_percent=0.0,
-                timestamp=datetime.now(timezone.utc)
-            )
+        # Store for resource improvement detection
+        self._last_system_info = system_info
+        return system_info
     
     def get_resource_constraints(self) -> ResourceConstraints:
         """Get current resource constraints."""
@@ -224,6 +231,70 @@ class SystemResourceManager:
                 "active_calculations_count": len(self._active_calculations)
             }
         }
+    
+    def has_resources_improved(self, improvement_threshold_percent: float = 10.0) -> Tuple[bool, str]:
+        """
+        Check if system resources have improved significantly since the last check.
+        
+        Args:
+            improvement_threshold_percent: Minimum improvement threshold (default: 10%)
+            
+        Returns:
+            Tuple of (has_improved: bool, reason: str)
+        """
+        if self._last_system_info is None:
+            # No previous data to compare - consider improved
+            return True, "No previous resource data to compare"
+        
+        current_info = self.get_system_info()
+        previous_info = self._last_system_info
+        
+        # Check CPU usage improvement
+        cpu_improvement = previous_info.cpu_usage_percent - current_info.cpu_usage_percent
+        
+        # Check memory usage improvement  
+        memory_improvement = previous_info.memory_usage_percent - current_info.memory_usage_percent
+        
+        # Consider improved if either CPU or memory usage dropped by threshold amount
+        cpu_improved = cpu_improvement >= improvement_threshold_percent
+        memory_improved = memory_improvement >= improvement_threshold_percent
+        
+        if cpu_improved or memory_improved:
+            improvements = []
+            if cpu_improved:
+                improvements.append(f"CPU usage decreased by {cpu_improvement:.1f}%")
+            if memory_improved:
+                improvements.append(f"memory usage decreased by {memory_improvement:.1f}%")
+            
+            reason = f"Resources improved: {', '.join(improvements)}"
+            logger.info(reason)
+            return True, reason
+        else:
+            reason = f"No significant resource improvement (CPU: {cpu_improvement:+.1f}%, Memory: {memory_improvement:+.1f}%)"
+            return False, reason
+    
+    def check_if_system_resources_insufficient(self) -> Tuple[bool, str]:
+        """
+        Check if system resources are fundamentally insufficient even with no running calculations.
+        
+        Returns:
+            Tuple of (insufficient: bool, reason: str)
+        """
+        if psutil is None:
+            # Cannot determine system load without psutil
+            return False, "Cannot determine system load - psutil not available"
+            
+        system_info = self.get_system_info()
+        
+        # Check if current system load exceeds limits even with no active calculations
+        if len(self._active_calculations) == 0:
+            if system_info.cpu_usage_percent > self._resource_constraints.max_cpu_utilization_percent:
+                return True, f"System CPU usage ({system_info.cpu_usage_percent:.1f}%) exceeds limit ({self._resource_constraints.max_cpu_utilization_percent}%) with no active calculations"
+                
+            if system_info.memory_usage_percent > self._resource_constraints.max_memory_utilization_percent:
+                return True, f"System memory usage ({system_info.memory_usage_percent:.1f}%) exceeds limit ({self._resource_constraints.max_memory_utilization_percent}%) with no active calculations"
+        
+        return False, "System resources are sufficient"
     
     def _estimate_memory_usage(self, requested_memory_mb: int, calculation_method: str, cpu_cores: int) -> int:
         """

@@ -6,6 +6,7 @@ import {
   showErrorNotification,
   showSuccessNotification,
   showInfoNotification,
+  showResourceInsufficientErrorNotification,
 } from '../store/notificationStore';
 
 /**
@@ -92,11 +93,60 @@ export const useGlobalCalculationWebSocket = (
             updatedCalculation.results?.error ||
             'Detailed error information is not available.';
 
-          showErrorNotification(
-            `Calculation "${molecularName}" failed`,
-            errorMessage,
-            calculationId
-          );
+          // リソース不足エラーの判定
+          const isResourceInsufficientError = errorMessage &&
+            (errorMessage.toLowerCase().includes('cpu usage') ||
+             errorMessage.toLowerCase().includes('memory usage') ||
+             errorMessage.toLowerCase().includes('system cpu usage') ||
+             errorMessage.toLowerCase().includes('system memory usage') ||
+             errorMessage.toLowerCase().includes('no active calculations'));
+
+          if (isResourceInsufficientError) {
+            showResourceInsufficientErrorNotification(
+              errorMessage,
+              calculationId
+            );
+          } else {
+            showErrorNotification(
+              `Calculation "${molecularName}" failed`,
+              errorMessage,
+              calculationId
+            );
+          }
+        }
+      }
+
+      // 計算エラー通知: pending -> error の変化を検出（開始時のエラー）
+      if (
+        previousStatus === 'pending' &&
+        updatedCalculation.status === 'error'
+      ) {
+        if (!isActiveCalculation) {
+          const errorMessage =
+            updatedCalculation.errorMessage ||
+            updatedCalculation.results?.error ||
+            'Detailed error information is not available.';
+
+          // リソース不足エラーの判定
+          const isResourceInsufficientError = errorMessage &&
+            (errorMessage.toLowerCase().includes('cpu usage') ||
+             errorMessage.toLowerCase().includes('memory usage') ||
+             errorMessage.toLowerCase().includes('system cpu usage') ||
+             errorMessage.toLowerCase().includes('system memory usage') ||
+             errorMessage.toLowerCase().includes('no active calculations'));
+
+          if (isResourceInsufficientError) {
+            showResourceInsufficientErrorNotification(
+              errorMessage,
+              calculationId
+            );
+          } else {
+            showErrorNotification(
+              `Calculation "${molecularName}" failed to start`,
+              errorMessage,
+              calculationId
+            );
+          }
         }
       }
 

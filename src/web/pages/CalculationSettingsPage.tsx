@@ -510,6 +510,8 @@ export const CalculationSettingsPage = ({
     switch (calculationStatus) {
       case 'running':
         return 'Running...';
+      case 'waiting':
+        return 'Waiting...';
       case 'completed':
         return 'Completed!';
       case 'error':
@@ -661,31 +663,22 @@ export const CalculationSettingsPage = ({
                     ? styles.completed
                     : calculationStatus === 'running'
                       ? styles.running
-                      : calculationStatus === 'error'
-                        ? styles.error
-                        : styles.pending
+                      : calculationStatus === 'waiting'
+                        ? styles.waiting
+                        : calculationStatus === 'error'
+                          ? styles.error
+                          : styles.pending
                 }`}
                 onClick={handleStartCalculation}
                 disabled={
                   !hasValidMolecule ||
                   calculationStatus === 'running' ||
+                  calculationStatus === 'waiting' ||
                   calculationStatus === 'completed'
                 }
               >
                 {getCalculationButtonText()}
               </button>
-              {calculationError && (
-                <div
-                  className={styles.calculationError}
-                  style={{
-                    marginTop: '10px',
-                    color: '#e74c3c',
-                    fontSize: '14px',
-                  }}
-                >
-                  ❌ {calculationError}
-                </div>
-              )}
             </div>
           </div>
           <div className={styles.calculationColumn}>

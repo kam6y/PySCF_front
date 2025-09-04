@@ -464,10 +464,28 @@ def quantum_calculate(body: QuantumCalculationRequest):
         
         if not success:
             # If submission failed, update status to error
+            error_message = waiting_reason if waiting_reason else 'Failed to submit calculation to process pool.'
             file_manager.save_calculation_status(calc_dir, 'error')
-            file_manager.save_calculation_results(calc_dir, {'error': 'Failed to submit calculation to process pool.'})
-            logger.error(f"Failed to submit calculation {calculation_id} to process pool")
-            return jsonify({'success': False, 'error': False}), 500  # ここではエラーメッセージを返さない
+            file_manager.save_calculation_results(calc_dir, {'error': error_message})
+            
+            # Send immediate WebSocket notification for error status
+            send_immediate_websocket_notification(calculation_id, 'error', error_message)
+            
+            logger.error(f"Failed to submit calculation {calculation_id} to process pool: {error_message}")
+            
+            # Create error instance to return
+            error_instance = {
+                'id': calculation_id,
+                'name': parameters['name'],
+                'status': 'error',
+                'createdAt': parameters['created_at'],
+                'updatedAt': parameters['created_at'],
+                'parameters': parameters,
+                'error': error_message
+            }
+            
+            # Return error instance with 202 status (calculation was accepted but failed due to resources)
+            return jsonify(error_instance), 202
 
         # Set initial status based on submission result
         file_manager.save_calculation_status(calc_dir, initial_status, waiting_reason)

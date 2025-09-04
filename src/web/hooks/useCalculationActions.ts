@@ -13,6 +13,7 @@ import { useCalculationStore } from '../store/calculationStore';
 import {
   showErrorNotification,
   showInfoNotification,
+  showResourceInsufficientErrorNotification,
 } from '../store/notificationStore';
 
 export const useCalculationActions = () => {
@@ -66,8 +67,40 @@ export const useCalculationActions = () => {
           'Preparing calculation',
           `Preparing calculation for ${calculationParams.name}. It will start soon.`
         );
+      } else if (runningCalculation.status === 'error') {
+        // エラーステータスの場合はエラーメッセージを確認してリソース不足エラーかを判定
+        const errorMessage = runningCalculation.errorMessage || runningCalculation.results?.error;
+        
+        if (errorMessage) {
+          // リソース不足エラーの判定
+          const isResourceInsufficientError = 
+            errorMessage.toLowerCase().includes('cpu usage') ||
+            errorMessage.toLowerCase().includes('memory usage') ||
+            errorMessage.toLowerCase().includes('system cpu usage') ||
+            errorMessage.toLowerCase().includes('system memory usage') ||
+            errorMessage.toLowerCase().includes('no active calculations');
+
+          if (isResourceInsufficientError) {
+            showResourceInsufficientErrorNotification(
+              errorMessage,
+              runningCalculation.id
+            );
+          } else {
+            showErrorNotification(
+              `Calculation "${calculationParams.name}" failed`,
+              errorMessage,
+              runningCalculation.id
+            );
+          }
+        } else {
+          showErrorNotification(
+            `Calculation "${calculationParams.name}" failed`,
+            'Detailed error information is not available.',
+            runningCalculation.id
+          );
+        }
       } else {
-        // その他のステータス（error等）の場合は汎用メッセージ
+        // その他のステータスの場合は汎用メッセージ
         showInfoNotification(
           'Calculation requested',
           `Calculation for ${calculationParams.name} has been requested. Status: ${runningCalculation.status}`

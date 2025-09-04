@@ -7,6 +7,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, Future
 from typing import Dict, Any, Optional, Callable, List
 import time
+import threading
 from datetime import datetime
 from threadpoolctl import threadpool_limits
 from queue import Queue
@@ -191,16 +192,90 @@ class CalculationProcessManager:
         from .resource_manager import get_resource_manager
         self.resource_manager = get_resource_manager()
         
+        # Background resource monitoring
+        self._resource_monitor_thread = None
+        self._resource_monitor_stop_event = threading.Event()
+        self._resource_monitor_interval = 10.0  # Check every 10 seconds
+        
         # Create executor immediately with fixed worker count
         self.executor = ProcessPoolExecutor(
             max_workers=self.max_workers,
             mp_context=multiprocessing.get_context('spawn')  # Better cross-platform compatibility
         )
         
+        # Start background resource monitoring
+        self._start_resource_monitoring()
+        
         logger.info(f"Initialized CalculationProcessManager with {self.max_workers} worker processes and {self.max_parallel_instances} max parallel instances")
     
+    def _start_resource_monitoring(self):
+        """Start the background resource monitoring thread."""
+        if self._resource_monitor_thread is None or not self._resource_monitor_thread.is_alive():
+            self._resource_monitor_stop_event.clear()
+            self._resource_monitor_thread = threading.Thread(
+                target=self._resource_monitoring_loop,
+                name="ResourceMonitor",
+                daemon=True
+            )
+            self._resource_monitor_thread.start()
+            logger.info("Started background resource monitoring")
     
+    def _stop_resource_monitoring(self):
+        """Stop the background resource monitoring thread."""
+        if self._resource_monitor_thread and self._resource_monitor_thread.is_alive():
+            logger.info("Stopping background resource monitoring")
+            self._resource_monitor_stop_event.set()
+            self._resource_monitor_thread.join(timeout=5.0)
+            if self._resource_monitor_thread.is_alive():
+                logger.warning("Resource monitoring thread did not stop cleanly")
     
+    def _resource_monitoring_loop(self):
+        """Background loop that monitors system resources and processes queue when resources improve."""
+        logger.info("Resource monitoring loop started")
+        
+        while not self._resource_monitor_stop_event.is_set():
+            try:
+                # Only check for improvements if there are queued calculations
+                if self.calculation_queue and not self._shutdown:
+                    # Check if resources have improved
+                    has_improved, reason = self.resource_manager.has_resources_improved()
+                    
+                    if has_improved:
+                        logger.info(f"Resources improved: {reason}. Processing queue...")
+                        self._process_queue()
+                        
+                        # Also check for calculations that should be marked as errors
+                        self._check_queue_for_resource_errors()
+                    
+                # Wait for the next check or until stop event is set
+                self._resource_monitor_stop_event.wait(timeout=self._resource_monitor_interval)
+                
+            except Exception as e:
+                logger.error(f"Error in resource monitoring loop: {e}")
+                # Continue monitoring despite errors
+                self._resource_monitor_stop_event.wait(timeout=self._resource_monitor_interval)
+        
+        logger.info("Resource monitoring loop stopped")
+    
+    def _check_queue_for_resource_errors(self):
+        """Check queued calculations for those that should be marked as errors due to insufficient system resources."""
+        if not self.calculation_queue:
+            return
+            
+        calculations_to_error = []
+        
+        for queued_calc in self.calculation_queue:
+            # Check if system resources are fundamentally insufficient
+            insufficient, reason = self.resource_manager.check_if_system_resources_insufficient()
+            
+            if insufficient:
+                logger.warning(f"Marking calculation {queued_calc.calculation_id} as error: {reason}")
+                calculations_to_error.append((queued_calc, reason))
+        
+        # Remove from queue and update status to error
+        for calc, error_reason in calculations_to_error:
+            self.calculation_queue.remove(calc)
+            self._update_calculation_status_from_queue(calc.calculation_id, 'error', error_reason)
     
     def set_max_parallel_instances(self, max_instances: int) -> None:
         """
@@ -250,18 +325,27 @@ class CalculationProcessManager:
         
         if not can_allocate:
             logger.warning(f"Cannot start calculation {calculation_id}: {reason}")
-            # Add to queue if resource constraints prevent immediate execution
-            queued_calc = QueuedCalculation(
-                calculation_id=calculation_id,
-                parameters=parameters,
-                created_at=datetime.now(),
-                waiting_reason=reason
-            )
-            self.calculation_queue.append(queued_calc)
-            self.calculation_queue.sort(key=lambda x: x.created_at)
             
-            logger.info(f"Added calculation {calculation_id} to queue due to resource constraints: {reason}")
-            return True, 'waiting', reason
+            # Check if this is a fundamental system resource insufficiency (no active calculations)
+            insufficient, insufficient_reason = self.resource_manager.check_if_system_resources_insufficient()
+            
+            if insufficient:
+                # System resources are fundamentally insufficient - return error instead of waiting
+                logger.error(f"System resources insufficient for calculation {calculation_id}: {insufficient_reason}")
+                return False, 'error', insufficient_reason
+            else:
+                # Add to queue if resource constraints prevent immediate execution but system is generally sufficient
+                queued_calc = QueuedCalculation(
+                    calculation_id=calculation_id,
+                    parameters=parameters,
+                    created_at=datetime.now(),
+                    waiting_reason=reason
+                )
+                self.calculation_queue.append(queued_calc)
+                self.calculation_queue.sort(key=lambda x: x.created_at)
+                
+                logger.info(f"Added calculation {calculation_id} to queue due to resource constraints: {reason}")
+                return True, 'waiting', reason
         
         # Check if we can start the calculation immediately (slot availability)
         if len(self.active_futures) < self.max_parallel_instances:
@@ -409,14 +493,21 @@ class CalculationProcessManager:
                 logger.debug("No queued calculations can be started due to resource constraints")
                 break
     
-    def _update_calculation_status_from_queue(self, calculation_id: str, status: str):
-        """Update calculation status when transitioning from queue to running."""
+    def _update_calculation_status_from_queue(self, calculation_id: str, status: str, error_message: Optional[str] = None):
+        """Update calculation status when transitioning from queue."""
         try:
             from quantum_calc.file_manager import CalculationFileManager
             file_manager = CalculationFileManager()
             calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
             file_manager.save_calculation_status(calc_dir, status)
-            logger.info(f"Updated status for calculation {calculation_id} from 'waiting' to '{status}'")
+            
+            # Save error information if this is an error status
+            if status == 'error' and error_message:
+                file_manager.save_calculation_results(calc_dir, {'error': error_message})
+                logger.info(f"Updated status for calculation {calculation_id} to 'error': {error_message}")
+            else:
+                logger.info(f"Updated status for calculation {calculation_id} from 'waiting' to '{status}'")
+                
         except Exception as e:
             logger.error(f"Failed to update status for calculation {calculation_id}: {e}")
     
@@ -513,6 +604,9 @@ class CalculationProcessManager:
             return
             
         self._shutdown = True
+        
+        # Stop resource monitoring first
+        self._stop_resource_monitoring()
         
         if self.executor:
             logger.info(f"Shutting down process pool with {len(self.active_futures)} active calculations")
