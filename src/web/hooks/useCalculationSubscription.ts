@@ -152,7 +152,8 @@ export const useCalculationSubscription = ({
           console.error('Socket.IO error:', errorData);
           if (onErrorRef.current) {
             const errorMessage =
-              errorData?.error || 'A problem occurred while monitoring calculation status.';
+              errorData?.error ||
+              'A problem occurred while monitoring calculation status.';
             onErrorRef.current(errorMessage);
           }
         });

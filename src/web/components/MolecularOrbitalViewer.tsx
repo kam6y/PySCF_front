@@ -536,10 +536,8 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
               <strong>{selectedOrbital.label}</strong> (Orbital #
               {selectedOrbital.index})
               <br />
-              Energy: <code>
-                {selectedOrbital.energy_ev.toFixed(4)} eV
-              </code>{' '}
-              (<code>{selectedOrbital.energy_hartree.toFixed(6)} a.u.</code>)
+              Energy: <code>{selectedOrbital.energy_ev.toFixed(4)} eV</code> (
+              <code>{selectedOrbital.energy_hartree.toFixed(6)} a.u.</code>)
               <br />
               Occupancy: <code>{selectedOrbital.occupancy}</code>
             </div>
@@ -560,7 +558,9 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> = ({
 
         {/* ローディングオーバーレイ */}
         {(isLoading || cubeLoading) && (
-          <div className={styles.loadingOverlay}>⚛️ Generating orbital data...</div>
+          <div className={styles.loadingOverlay}>
+            ⚛️ Generating orbital data...
+          </div>
         )}
       </div>
     </div>

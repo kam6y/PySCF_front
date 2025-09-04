@@ -142,16 +142,33 @@ class SystemResourceManager:
             timestamp=datetime.now(timezone.utc)
         )
         
+        # Get current resource state for logging
+        allocated_cpu, allocated_memory = self.get_total_allocated_resources()
+        
         self._active_calculations[calculation_id] = calculation_usage
+        
+        # Log detailed resource allocation
+        new_allocated_cpu = allocated_cpu + cpu_cores
+        new_allocated_memory = allocated_memory + estimated_memory
         logger.info(f"Registered calculation {calculation_id} - CPU cores: {cpu_cores}, "
                    f"Memory: {memory_mb} MB (estimated: {estimated_memory} MB)")
+        logger.info(f"Total allocated resources after registration: CPU {new_allocated_cpu}/{self._resource_constraints.system_total_cores}, "
+                   f"Memory {new_allocated_memory}/{self._resource_constraints.system_total_memory_mb} MB")
     
     def unregister_calculation(self, calculation_id: str) -> None:
         """Unregister a calculation when it completes."""
         if calculation_id in self._active_calculations:
             calculation = self._active_calculations.pop(calculation_id)
+            
+            # Get remaining resource state for logging
+            remaining_cpu, remaining_memory = self.get_total_allocated_resources()
+            
             logger.info(f"Unregistered calculation {calculation_id} - freed {calculation.cpu_cores} CPU cores, "
                        f"{calculation.estimated_memory_mb} MB memory")
+            logger.info(f"Remaining allocated resources: CPU {remaining_cpu}/{self._resource_constraints.system_total_cores}, "
+                       f"Memory {remaining_memory}/{self._resource_constraints.system_total_memory_mb} MB")
+        else:
+            logger.warning(f"Attempted to unregister calculation {calculation_id} that was not registered")
     
     def get_active_calculations(self) -> List[CalculationResourceUsage]:
         """Get list of active calculations and their resource usage."""
@@ -180,25 +197,40 @@ class SystemResourceManager:
         total_cpu_after = allocated_cpu + cpu_cores
         total_memory_after = allocated_memory + estimated_memory
         
+        # Log detailed resource check
+        logger.debug(f"Resource allocation check for {calculation_method}: "
+                    f"Requested CPU: {cpu_cores}, Memory: {memory_mb} MB (estimated: {estimated_memory} MB)")
+        logger.debug(f"Current allocation: CPU {allocated_cpu}, Memory {allocated_memory} MB, Active calculations: {len(self._active_calculations)}")
+        
         # Check CPU constraints
         max_allowed_cpu = int(system_info.total_cpu_cores * self._resource_constraints.max_cpu_utilization_percent / 100.0)
         if total_cpu_after > max_allowed_cpu:
-            return False, f"CPU cores limit exceeded. Requested: {cpu_cores}, Available: {max_allowed_cpu - allocated_cpu}, Current usage: {allocated_cpu}/{max_allowed_cpu}"
+            reason = f"CPU cores limit exceeded. Requested: {cpu_cores}, Available: {max_allowed_cpu - allocated_cpu}, Current usage: {allocated_cpu}/{max_allowed_cpu}"
+            logger.debug(f"Resource allocation failed: {reason}")
+            return False, reason
         
         # Check memory constraints
         max_allowed_memory = int(system_info.total_memory_mb * self._resource_constraints.max_memory_utilization_percent / 100.0)
         if total_memory_after > max_allowed_memory:
-            return False, f"Memory limit exceeded. Requested: {estimated_memory} MB, Available: {max_allowed_memory - allocated_memory} MB, Current usage: {allocated_memory}/{max_allowed_memory} MB"
+            reason = f"Memory limit exceeded. Requested: {estimated_memory} MB, Available: {max_allowed_memory - allocated_memory} MB, Current usage: {allocated_memory}/{max_allowed_memory} MB"
+            logger.debug(f"Resource allocation failed: {reason}")
+            return False, reason
         
         # Check current system load (if psutil is available)
         if psutil is not None:
             if system_info.cpu_usage_percent > self._resource_constraints.max_cpu_utilization_percent:
-                return False, f"System CPU usage too high: {system_info.cpu_usage_percent:.1f}% > {self._resource_constraints.max_cpu_utilization_percent}%"
+                reason = f"System CPU usage too high: {system_info.cpu_usage_percent:.1f}% > {self._resource_constraints.max_cpu_utilization_percent}%"
+                logger.debug(f"Resource allocation failed: {reason}")
+                return False, reason
             
             if system_info.memory_usage_percent > self._resource_constraints.max_memory_utilization_percent:
-                return False, f"System memory usage too high: {system_info.memory_usage_percent:.1f}% > {self._resource_constraints.max_memory_utilization_percent}%"
+                reason = f"System memory usage too high: {system_info.memory_usage_percent:.1f}% > {self._resource_constraints.max_memory_utilization_percent}%"
+                logger.debug(f"Resource allocation failed: {reason}")
+                return False, reason
         
-        return True, "Resources available"
+        success_reason = f"Resources available - CPU: {total_cpu_after}/{max_allowed_cpu}, Memory: {total_memory_after}/{max_allowed_memory} MB"
+        logger.debug(f"Resource allocation succeeded: {success_reason}")
+        return True, success_reason
     
     def get_resource_summary(self) -> Dict:
         """Get a summary of resource usage and constraints."""

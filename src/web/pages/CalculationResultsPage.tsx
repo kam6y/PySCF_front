@@ -294,7 +294,8 @@ export const CalculationResultsPage = ({
         >
           <h2>Molecular Orbital Energy Level Diagram</h2>
           <div className={styles.sectionDescription}>
-            Energy levels of molecular orbitals are illustrated. Click on orbitals to view details in 3D visualization.
+            Energy levels of molecular orbitals are illustrated. Click on
+            orbitals to view details in 3D visualization.
           </div>
           <MolecularOrbitalEnergyDiagram
             key={`energy-${activeCalculation.id}`}
@@ -311,7 +312,9 @@ export const CalculationResultsPage = ({
         >
           <h2>Molecular Orbital Visualization</h2>
           <div className={styles.sectionDescription}>
-            3D visualization of molecular orbitals obtained from quantum chemistry calculations. Select orbitals to view their shapes and distributions.
+            3D visualization of molecular orbitals obtained from quantum
+            chemistry calculations. Select orbitals to view their shapes and
+            distributions.
           </div>
           <MolecularOrbitalViewer
             key={activeCalculation.id}
@@ -711,12 +714,12 @@ export const CalculationResultsPage = ({
                       }}
                     >
                       <li>
-                        <strong>Hole軌道（赤色）</strong>:
-                        Orbitals from which electrons are excited (mainly HOMO-type)
+                        <strong>Hole軌道（赤色）</strong>: Orbitals from which
+                        electrons are excited (mainly HOMO-type)
                       </li>
                       <li>
-                        <strong>Particle軌道（青色）</strong>:
-                        Orbitals to which electrons are excited (mainly LUMO-type)
+                        <strong>Particle軌道（青色）</strong>: Orbitals to which
+                        electrons are excited (mainly LUMO-type)
                       </li>
                       <li>
                         <strong>Weight</strong>:
@@ -727,7 +730,8 @@ export const CalculationResultsPage = ({
                         全遷移に対するそのペアの寄与率（%）
                       </li>
                       <li>
-                        Higher contribution pairs represent the main electronic transitions of the excited state
+                        Higher contribution pairs represent the main electronic
+                        transitions of the excited state
                       </li>
                     </ul>
                   </div>
@@ -829,7 +833,8 @@ export const CalculationResultsPage = ({
                 </h4>
                 <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
                   <p>
-                    <strong>Finder:</strong> Open {results.working_directory} in Finder
+                    <strong>Finder:</strong> Open {results.working_directory} in
+                    Finder
                   </p>
                   <p>
                     <strong>Terminal:</strong>{' '}
@@ -846,8 +851,8 @@ export const CalculationResultsPage = ({
                       color: '#666',
                     }}
                   >
-                    ※
-                    This directory contains molecular orbital data and wave function information
+                    ※ This directory contains molecular orbital data and wave
+                    function information
                   </p>
                 </div>
               </div>
@@ -873,7 +878,9 @@ export const CalculationResultsPage = ({
                 color: '#666',
               }}
             >
-              Partial charges of each atom by Mulliken population analysis. Positive values indicate electron deficiency (positive charge), negative values indicate electron excess (negative charge).
+              Partial charges of each atom by Mulliken population analysis.
+              Positive values indicate electron deficiency (positive charge),
+              negative values indicate electron excess (negative charge).
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table

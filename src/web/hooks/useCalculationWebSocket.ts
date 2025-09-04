@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCalculationSubscription } from './useCalculationSubscription';
 import { CalculationInstance } from '../types/api-types';
@@ -17,9 +18,21 @@ export const useCalculationWebSocket = (
   status?: 'pending' | 'running' | 'completed' | 'error' | 'waiting'
 ) => {
   const queryClient = useQueryClient();
+  const lastUpdateTimestampRef = useRef<number>(0);
 
   // 統一されたキャッシュ更新ロジック
   const handleCalculationUpdate = (updatedCalculation: CalculationInstance) => {
+    const currentTimestamp = Date.now();
+    
+    // 重複更新防止：グローバルWebSocketとの競合を回避
+    if (lastUpdateTimestampRef.current && (currentTimestamp - lastUpdateTimestampRef.current) < 100) {
+      console.log(
+        `[Individual WebSocket] Skipping duplicate update for calculation ${updatedCalculation.id} (within 100ms)`
+      );
+      return;
+    }
+    lastUpdateTimestampRef.current = currentTimestamp;
+
     // 前のステータスを取得してステータス変化を検出
     const previousData = queryClient.getQueryData([
       'calculation',
@@ -44,30 +57,9 @@ export const useCalculationWebSocket = (
       calculation: updatedCalculation,
     });
 
-    // 2. 計算リストのキャッシュを更新（即座に反映）
-    queryClient.setQueryData(['calculations'], (oldData: any) => {
-      if (!oldData?.calculations) return oldData;
-
-      const updatedCalculations = oldData.calculations.map((calc: any) =>
-        calc.id === updatedCalculation.id
-          ? {
-              ...calc,
-              status: updatedCalculation.status,
-              date: updatedCalculation.updatedAt,
-            }
-          : calc
-      );
-
-      return {
-        ...oldData,
-        calculations: updatedCalculations,
-      };
-    });
-
-    // 3. バックグラウンドでの最新データ取得用（念のため）
-    queryClient.invalidateQueries({
-      queryKey: ['calculations'],
-    });
+    // Note: 計算リスト['calculations']の更新はuseGlobalCalculationWebSocketに委任
+    // 責任分離により、グローバルWebSocketが全ての計算リストを統一管理し、
+    // 個別WebSocketは詳細データのみに集中することで競合状態を回避
   };
 
   // エラーハンドリング
@@ -76,6 +68,15 @@ export const useCalculationWebSocket = (
 
     // WebSocketエラーをトースト通知で表示
     showErrorNotification('Real-time monitoring error', error);
+
+    // フォールバック: WebSocketエラー時のみ、個別計算の詳細データを再取得
+    // グローバルWebSocketが利用可能な場合は計算リストは更新されるため、
+    // ここでは個別計算の詳細のみをフォールバックとして取得
+    if (calculationId && !calculationId.startsWith('new-calculation-')) {
+      queryClient.invalidateQueries({
+        queryKey: ['calculation', calculationId],
+      });
+    }
   };
 
   // WebSocket接続の管理

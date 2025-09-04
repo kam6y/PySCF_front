@@ -154,7 +154,9 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
     <div className={styles.diagramContainer}>
       {/* ヘッダー情報 */}
       <div className={styles.diagramHeader}>
-        <h3 className={styles.diagramTitle}>Molecular Orbital Energy Level Diagram</h3>
+        <h3 className={styles.diagramTitle}>
+          Molecular Orbital Energy Level Diagram
+        </h3>
         {orbitalSummary.homoLumoGap && (
           <div className={styles.homoLumoGap}>
             <strong>HOMO-LUMO Gap:</strong>{' '}
@@ -420,7 +422,8 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
                     <strong>Occupancy:</strong> {selectedOrbital.occupancy}
                   </div>
                   <div>
-                    <strong>Orbital type:</strong> {selectedOrbital.orbital_type}
+                    <strong>Orbital type:</strong>{' '}
+                    {selectedOrbital.orbital_type}
                   </div>
                 </div>
               </div>
@@ -431,8 +434,8 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
 
       {/* 操作説明 */}
       <div className={styles.helpSection}>
-        💡
-        Click on orbitals to view details. The yellow gap area indicates the HOMO-LUMO gap.
+        💡 Click on orbitals to view details. The yellow gap area indicates the
+        HOMO-LUMO gap.
       </div>
     </div>
   );

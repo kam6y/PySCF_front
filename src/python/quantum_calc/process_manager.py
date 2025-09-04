@@ -188,6 +188,10 @@ class CalculationProcessManager:
         self.calculation_queue: List[QueuedCalculation] = []  # Waiting calculations queue
         self._shutdown = False
         
+        # Thread safety for queue processing
+        self._queue_lock = threading.Lock()
+        self._queue_processing = False
+        
         # Initialize resource manager
         from .resource_manager import get_resource_manager
         self.resource_manager = get_resource_manager()
@@ -290,6 +294,7 @@ class CalculationProcessManager:
         
         # If we increased the limit, try to start queued calculations
         if self.max_parallel_instances > old_max:
+            logger.info(f"Max parallel instances increased, processing queue (current queue size: {len(self.calculation_queue)})")
             self._process_queue()
     
     def submit_calculation(self, calculation_id: str, parameters: dict) -> tuple[bool, str, Optional[str]]:
@@ -424,6 +429,7 @@ class CalculationProcessManager:
                         logger.error(f"Error in completion callback for {calculation_id}: {callback_error}")
             
             # Process queue to start next calculation if available
+            logger.info(f"Calculation {calculation_id} cleanup completed. Processing queue for waiting calculations...")
             self._process_queue()
                         
         except Exception as e:
@@ -431,67 +437,90 @@ class CalculationProcessManager:
     
     def _process_queue(self):
         """Process the calculation queue and start next calculations if slots and resources are available."""
-        processed_calculations = []
-        
-        while (len(self.active_futures) < self.max_parallel_instances and 
-               self.calculation_queue and 
-               not self._shutdown):
+        # Thread-safe queue processing with detailed logging
+        with self._queue_lock:
+            if self._queue_processing:
+                logger.debug("Queue processing already in progress, skipping")
+                return
+            self._queue_processing = True
             
-            # Find the first calculation in queue that can be started with current resources
-            calc_found = False
-            for i, queued_calc in enumerate(self.calculation_queue):
-                user_cpu_cores = queued_calc.parameters.get('cpu_cores') or 1
-                user_memory_mb = queued_calc.parameters.get('memory_mb') or 2000
-                calculation_method = queued_calc.parameters.get('calculation_method', 'DFT')
+        try:
+            logger.info(f"Processing calculation queue - Active: {len(self.active_futures)}/{self.max_parallel_instances}, Queued: {len(self.calculation_queue)}")
+            processed_calculations = []
+            
+            while (len(self.active_futures) < self.max_parallel_instances and 
+                   self.calculation_queue and 
+                   not self._shutdown):
                 
-                # Check if resources are available for this calculation
-                can_allocate, reason = self.resource_manager.can_allocate_resources(
-                    cpu_cores=user_cpu_cores,
-                    memory_mb=user_memory_mb,
-                    calculation_method=calculation_method
-                )
-                
-                if can_allocate:
-                    # Remove this calculation from queue and start it
-                    next_calc = self.calculation_queue.pop(i)
-                    calc_found = True
+                # Find the first calculation in queue that can be started with current resources
+                calc_found = False
+                for i, queued_calc in enumerate(self.calculation_queue):
+                    user_cpu_cores = queued_calc.parameters.get('cpu_cores') or 1
+                    user_memory_mb = queued_calc.parameters.get('memory_mb') or 2000
+                    calculation_method = queued_calc.parameters.get('calculation_method', 'DFT')
                     
-                    try:
-                        # Register resources with the resource manager
-                        self.resource_manager.register_calculation(
-                            calculation_id=next_calc.calculation_id,
-                            cpu_cores=user_cpu_cores,
-                            memory_mb=user_memory_mb,
-                            calculation_method=calculation_method
-                        )
+                    # Check if resources are available for this calculation
+                    can_allocate, reason = self.resource_manager.can_allocate_resources(
+                        cpu_cores=user_cpu_cores,
+                        memory_mb=user_memory_mb,
+                        calculation_method=calculation_method
+                    )
+                    
+                    if can_allocate:
+                        # Remove this calculation from queue and start it
+                        next_calc = self.calculation_queue.pop(i)
+                        calc_found = True
                         
-                        # Start the calculation
-                        future = self.executor.submit(calculation_worker, next_calc.calculation_id, next_calc.parameters)
-                        self.active_futures[next_calc.calculation_id] = future
-                        
-                        # Add callback to clean up completed futures
-                        future.add_done_callback(lambda f, calc_id=next_calc.calculation_id: self._cleanup_future(calc_id, f))
-                        
-                        # Update calculation status from 'waiting' to 'running'
-                        self._update_calculation_status_from_queue(next_calc.calculation_id, 'running')
-                        
-                        logger.info(f"Started queued calculation {next_calc.calculation_id} with {user_cpu_cores} CPU cores and {user_memory_mb} MB memory ({len(self.active_futures)}/{self.max_parallel_instances} slots used, {len(self.calculation_queue)} remaining in queue)")
-                        break
-                        
-                    except Exception as e:
-                        logger.error(f"Failed to start queued calculation {next_calc.calculation_id}: {e}")
-                        # Unregister resources on failure
-                        self.resource_manager.unregister_calculation(next_calc.calculation_id)
-                        # Update status to error
-                        self._update_calculation_status_from_queue(next_calc.calculation_id, 'error')
-                        break
-                else:
-                    logger.debug(f"Cannot start queued calculation {queued_calc.calculation_id}: {reason}")
+                        try:
+                            # Register resources with the resource manager
+                            self.resource_manager.register_calculation(
+                                calculation_id=next_calc.calculation_id,
+                                cpu_cores=user_cpu_cores,
+                                memory_mb=user_memory_mb,
+                                calculation_method=calculation_method
+                            )
+                            
+                            # Start the calculation
+                            future = self.executor.submit(calculation_worker, next_calc.calculation_id, next_calc.parameters)
+                            self.active_futures[next_calc.calculation_id] = future
+                            
+                            # Add callback to clean up completed futures
+                            future.add_done_callback(lambda f, calc_id=next_calc.calculation_id: self._cleanup_future(calc_id, f))
+                            
+                            # Update calculation status from 'waiting' to 'running'
+                            self._update_calculation_status_from_queue(next_calc.calculation_id, 'running')
+                            
+                            logger.info(f"Started queued calculation {next_calc.calculation_id} with {user_cpu_cores} CPU cores and {user_memory_mb} MB memory ({len(self.active_futures)}/{self.max_parallel_instances} slots used, {len(self.calculation_queue)} remaining in queue)")
+                            break
+                            
+                        except Exception as e:
+                            logger.error(f"Failed to start queued calculation {next_calc.calculation_id}: {e}")
+                            # Unregister resources on failure
+                            self.resource_manager.unregister_calculation(next_calc.calculation_id)
+                            # Update status to error
+                            self._update_calculation_status_from_queue(next_calc.calculation_id, 'error')
+                            break
+                    else:
+                        logger.debug(f"Cannot start queued calculation {queued_calc.calculation_id}: {reason}")
+                
+                # If no calculation in the queue can be started due to resource constraints, break
+                if not calc_found:
+                    if self.calculation_queue:
+                        logger.warning(f"No queued calculations can be started due to resource constraints. {len(self.calculation_queue)} calculations still waiting.")
+                        # Log details of waiting calculations
+                        for i, queued_calc in enumerate(self.calculation_queue[:3]):  # Log first 3 for debugging
+                            logger.info(f"Waiting calculation {i+1}: {queued_calc.calculation_id} (reason: {queued_calc.waiting_reason})")
+                    else:
+                        logger.debug("Queue is empty, no calculations to process")
+                    break
+                
+        finally:
+            # Always release the queue processing flag
+            with self._queue_lock:
+                self._queue_processing = False
             
-            # If no calculation in the queue can be started due to resource constraints, break
-            if not calc_found:
-                logger.debug("No queued calculations can be started due to resource constraints")
-                break
+            if processed_calculations:
+                logger.info(f"Queue processing completed - started {len(processed_calculations)} calculations from queue")
     
     def _update_calculation_status_from_queue(self, calculation_id: str, status: str, error_message: Optional[str] = None):
         """Update calculation status when transitioning from queue."""
@@ -507,6 +536,9 @@ class CalculationProcessManager:
                 logger.info(f"Updated status for calculation {calculation_id} to 'error': {error_message}")
             else:
                 logger.info(f"Updated status for calculation {calculation_id} from 'waiting' to '{status}'")
+            
+            # Send immediate WebSocket notification for status changes from queue
+            self._send_websocket_notification(calculation_id, status, error_message)
                 
         except Exception as e:
             logger.error(f"Failed to update status for calculation {calculation_id}: {e}")
@@ -619,6 +651,20 @@ class CalculationProcessManager:
             finally:
                 self.executor = None
                 self.active_futures.clear()
+    
+    def _send_websocket_notification(self, calculation_id: str, status: str, error_message: Optional[str] = None):
+        """Send immediate WebSocket notification for calculation status changes."""
+        try:
+            # Import here to avoid circular imports
+            import sys
+            app_module = sys.modules.get('app')
+            if app_module and hasattr(app_module, 'send_immediate_websocket_notification'):
+                app_module.send_immediate_websocket_notification(calculation_id, status, error_message)
+                logger.debug(f"Sent WebSocket notification for calculation {calculation_id} with status {status}")
+            else:
+                logger.debug(f"WebSocket notification not available for calculation {calculation_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send WebSocket notification for calculation {calculation_id}: {e}")
     
     def __del__(self):
         """Ensure proper cleanup when the manager is destroyed."""

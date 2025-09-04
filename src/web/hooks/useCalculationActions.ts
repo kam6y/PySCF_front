@@ -69,11 +69,12 @@ export const useCalculationActions = () => {
         );
       } else if (runningCalculation.status === 'error') {
         // エラーステータスの場合はエラーメッセージを確認してリソース不足エラーかを判定
-        const errorMessage = runningCalculation.errorMessage || runningCalculation.results?.error;
-        
+        const errorMessage =
+          runningCalculation.errorMessage || runningCalculation.results?.error;
+
         if (errorMessage) {
           // リソース不足エラーの判定
-          const isResourceInsufficientError = 
+          const isResourceInsufficientError =
             errorMessage.toLowerCase().includes('cpu usage') ||
             errorMessage.toLowerCase().includes('memory usage') ||
             errorMessage.toLowerCase().includes('system cpu usage') ||
