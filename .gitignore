@@ -76,6 +76,7 @@ htmlcov/
 .idea/
 .vscode/
 .claude/
+.serena/
 *.suo
 *.ntvs*
 *.njsproj

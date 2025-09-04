@@ -441,6 +441,79 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/quantum/calculations/{calculationId}/ir-spectrum:
+    get:
+      summary: Generate IR spectrum for a calculation
+      description: Generate theoretical IR spectrum from vibrational frequency data with scale factor corrections and Lorentzian broadening
+      operationId: getIRSpectrum
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+        - name: broadening_fwhm
+          in: query
+          required: false
+          description: Full width at half maximum for Lorentzian broadening in cm⁻¹
+          schema:
+            type: number
+            format: float
+            default: 100.0
+            minimum: 0.1
+            maximum: 1000.0
+        - name: x_min
+          in: query
+          required: false
+          description: Minimum wavenumber for spectrum range in cm⁻¹
+          schema:
+            type: number
+            format: float
+            default: 400.0
+            minimum: 0.0
+        - name: x_max
+          in: query
+          required: false
+          description: Maximum wavenumber for spectrum range in cm⁻¹
+          schema:
+            type: number
+            format: float
+            default: 4000.0
+            maximum: 10000.0
+        - name: show_peaks
+          in: query
+          required: false
+          description: Whether to mark individual peaks in the plot
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: IR spectrum generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IRSpectrumResponse'
+        '400':
+          description: Invalid parameters or calculation not completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calculation not found or no frequency data available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to generate IR spectrum
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/quantum/supported-parameters:
     get:
       summary: Get supported quantum chemistry parameters
@@ -1597,3 +1670,148 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/SystemResourceSummary'
+
+    IRSpectrumResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/IRSpectrumData'
+
+    IRSpectrumData:
+      type: object
+      required: [calculation_id, spectrum, plot_image_base64, generation_info]
+      properties:
+        calculation_id:
+          type: string
+          description: Unique calculation ID
+          example: "calc_20240101_120000_abcd1234"
+        spectrum:
+          $ref: '#/components/schemas/IRSpectrumDetails'
+        plot_image_base64:
+          type: string
+          format: byte
+          description: Base64 encoded PNG image of the IR spectrum plot
+        generation_info:
+          $ref: '#/components/schemas/IRGenerationInfo'
+
+    IRSpectrumDetails:
+      type: object
+      required: [x_axis, y_axis, peaks, metadata]
+      properties:
+        x_axis:
+          type: array
+          items:
+            type: number
+          description: Wavenumber values (cm⁻¹) for the x-axis
+          example: [400.0, 401.0, 402.0]
+        y_axis:
+          type: array
+          items:
+            type: number
+          description: Intensity values for the y-axis (arbitrary units)
+          example: [0.0, 0.1, 0.05]
+        peaks:
+          type: array
+          items:
+            $ref: '#/components/schemas/IRPeak'
+          description: Individual peaks in the spectrum
+        metadata:
+          $ref: '#/components/schemas/IRSpectrumMetadata'
+
+    IRPeak:
+      type: object
+      required: [frequency_cm, intensity, original_frequency_cm]
+      properties:
+        frequency_cm:
+          type: number
+          format: float
+          description: Peak frequency after scale factor correction (cm⁻¹)
+          example: 1654.2
+        intensity:
+          type: number
+          format: float
+          description: Peak intensity (arbitrary units)
+          example: 120.5
+        original_frequency_cm:
+          type: number
+          format: float
+          description: Original calculated frequency before scale factor correction (cm⁻¹)
+          example: 1723.1
+
+    IRSpectrumMetadata:
+      type: object
+      required: [method, basis_set, scale_factor, scale_message, broadening_fwhm_cm, frequency_range_cm, num_peaks_total, num_peaks_in_range, num_points]
+      properties:
+        method:
+          type: string
+          description: Computational method used
+          example: "B3LYP"
+        basis_set:
+          type: string
+          description: Basis set used
+          example: "6-31G*"
+        scale_factor:
+          type: number
+          format: float
+          description: Scale factor applied to frequencies
+          example: 0.960
+        scale_message:
+          type: string
+          description: Information about the scale factor source
+          example: "Exact match found"
+        broadening_fwhm_cm:
+          type: number
+          format: float
+          description: Full width at half maximum for Lorentzian broadening (cm⁻¹)
+          example: 100.0
+        frequency_range_cm:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: Frequency range for the spectrum [min, max] (cm⁻¹)
+          example: [400.0, 4000.0]
+        num_peaks_total:
+          type: integer
+          description: Total number of calculated frequencies
+          example: 24
+        num_peaks_in_range:
+          type: integer
+          description: Number of peaks within the specified range
+          example: 18
+        num_points:
+          type: integer
+          description: Number of points in the spectrum
+          example: 3000
+
+    IRGenerationInfo:
+      type: object
+      required: [broadening_fwhm_cm, frequency_range_cm, peaks_marked, generated_at]
+      properties:
+        broadening_fwhm_cm:
+          type: number
+          format: float
+          description: Full width at half maximum used for broadening (cm⁻¹)
+          example: 100.0
+        frequency_range_cm:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: Frequency range used [min, max] (cm⁻¹)
+          example: [400.0, 4000.0]
+        peaks_marked:
+          type: boolean
+          description: Whether individual peaks were marked in the plot
+          example: true
+        generated_at:
+          type: string
+          format: date-time
+          description: ISO timestamp when the spectrum was generated
+          example: "2024-01-01T12:00:00.000Z"

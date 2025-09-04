@@ -21,6 +21,7 @@ from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
 from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator, MolecularOrbitalGenerator, CalculationError, ConvergenceError, InputError, GeometryError
+from quantum_calc.ir_spectrum import create_ir_spectrum_from_calculation_results
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
 from quantum_calc import get_process_manager, shutdown_process_manager, get_websocket_watcher, shutdown_websocket_watcher, get_all_supported_parameters, get_current_settings, update_app_settings
@@ -994,6 +995,112 @@ def delete_cube_files(calculation_id):
         
     except Exception as e:
         logger.error(f"Unexpected error deleting CUBE files for {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/quantum/calculations/<calculation_id>/ir-spectrum', methods=['GET'])
+def get_ir_spectrum(calculation_id):
+    """Generate and return IR spectrum for a calculation."""
+    try:
+        file_manager = CalculationFileManager()
+        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+        
+        if not os.path.isdir(calc_path):
+            return jsonify({'success': False, 'error': f'Calculation "{calculation_id}" not found.'}), 404
+        
+        # Check if calculation is completed
+        status = file_manager.read_calculation_status(calc_path)
+        if status != 'completed':
+            return jsonify({
+                'success': False, 
+                'error': f'Calculation is not completed (status: {status}). IR spectrum cannot be generated.'
+            }), 400
+        
+        # Read calculation results
+        results = file_manager.read_calculation_results(calc_path)
+        if not results:
+            return jsonify({
+                'success': False,
+                'error': 'Calculation results not found.'
+            }), 404
+        
+        # Check for vibrational frequency data
+        if not results.get('vibrational_frequencies'):
+            return jsonify({
+                'success': False,
+                'error': 'No vibrational frequency data found. Frequency analysis may not have been performed or failed.'
+            }), 400
+        
+        # Get query parameters for spectrum customization
+        broadening_fwhm = request.args.get('broadening_fwhm', default=100.0, type=float)
+        x_min = request.args.get('x_min', default=400.0, type=float)
+        x_max = request.args.get('x_max', default=4000.0, type=float)
+        show_peaks = request.args.get('show_peaks', default=True, type=bool)
+        
+        # Validate parameters
+        if broadening_fwhm <= 0:
+            return jsonify({
+                'success': False,
+                'error': 'Broadening FWHM must be positive.'
+            }), 400
+        
+        if x_min >= x_max:
+            return jsonify({
+                'success': False,
+                'error': 'x_min must be less than x_max.'
+            }), 400
+        
+        logger.info(f"Generating IR spectrum for calculation {calculation_id}")
+        logger.info(f"Parameters: FWHM={broadening_fwhm}, range=({x_min}, {x_max}), show_peaks={show_peaks}")
+        
+        # Generate IR spectrum
+        ir_result = create_ir_spectrum_from_calculation_results(
+            results,
+            broadening_fwhm=broadening_fwhm,
+            x_range=(x_min, x_max),
+            show_peaks=show_peaks
+        )
+        
+        if not ir_result.get('success'):
+            error_msg = ir_result.get('error', 'Unknown error occurred during IR spectrum generation')
+            logger.error(f"IR spectrum generation failed for {calculation_id}: {error_msg}")
+            return jsonify({
+                'success': False,
+                'error': f'IR spectrum generation failed: {error_msg}'
+            }), 500
+        
+        # Extract spectrum data and plot
+        spectrum_data = ir_result.get('spectrum_data', {})
+        plot_image = ir_result.get('plot_image_base64')
+        
+        logger.info(f"IR spectrum generated successfully for {calculation_id}")
+        logger.info(f"Spectrum contains {len(spectrum_data.get('peaks', []))} peaks")
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'calculation_id': calculation_id,
+                'spectrum': {
+                    'x_axis': spectrum_data.get('x_axis', []),
+                    'y_axis': spectrum_data.get('spectrum', []),
+                    'peaks': spectrum_data.get('peaks', []),
+                    'metadata': spectrum_data.get('metadata', {})
+                },
+                'plot_image_base64': plot_image,
+                'generation_info': {
+                    'broadening_fwhm_cm': broadening_fwhm,
+                    'frequency_range_cm': [x_min, x_max],
+                    'peaks_marked': show_peaks,
+                    'generated_at': datetime.now().isoformat()
+                }
+            }
+        })
+        
+    except ValueError as e:
+        logger.error(f"Invalid parameters for IR spectrum generation ({calculation_id}): {e}")
+        return jsonify({'success': False, 'error': f'Invalid parameters: {str(e)}'}), 400
+    except Exception as e:
+        logger.error(f"Unexpected error generating IR spectrum for {calculation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 

@@ -3,6 +3,7 @@ import styles from './CalculationResultsPage.module.css';
 import { CalculationInstance } from '../types/api-types';
 import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
 import { MolecularOrbitalEnergyDiagram } from '../components/MolecularOrbitalEnergyDiagram';
+import { IRSpectrumViewer } from '../components/IRSpectrumViewer';
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -262,6 +263,21 @@ export const CalculationResultsPage = ({
                   </div>
                 )}
             </div>
+          </section>
+        )}
+
+        {/* IR Spectrum Analysis */}
+        {results.frequency_analysis_performed && results.vibrational_frequencies && results.vibrational_frequencies.length > 0 && (
+          <section className={`${styles.calculationSection} ${styles.irSpectrumSection}`}>
+            <h2>IR Spectrum Analysis</h2>
+            <div className={styles.sectionDescription}>
+              Theoretical infrared spectrum generated from vibrational frequency calculations 
+              with scale factor corrections and Lorentzian broadening for realistic peak shapes.
+            </div>
+            <IRSpectrumViewer
+              calculationId={activeCalculation.id}
+              onError={(error) => setError(error)}
+            />
           </section>
         )}
 

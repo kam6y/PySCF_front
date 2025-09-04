@@ -490,3 +490,15 @@
 .tableContainer {
   overflow-x: auto;
 }
+
+/* IR Spectrum Section */
+.irSpectrumSection {
+  margin-bottom: 20px;
+}
+
+.sectionDescription {
+  color: #666;
+  font-size: 14px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}

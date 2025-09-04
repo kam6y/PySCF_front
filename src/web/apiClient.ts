@@ -14,6 +14,7 @@ import {
   CubeFilesListResponseData,
   CubeFilesDeleteResponseData,
   SupportedParametersResponseData,
+  IRSpectrumResponseData,
 } from './types/api-types';
 import { components } from './types/generated-api';
 
@@ -431,6 +432,58 @@ export const getSupportedParameters =
       { method: 'GET' }
     );
   };
+
+/**
+ * Get IR spectrum for a calculation
+ */
+export const getIRSpectrum = (
+  calculationId: string,
+  options?: {
+    broadening_fwhm?: number;
+    x_min?: number;
+    x_max?: number;
+    show_peaks?: boolean;
+  }
+): Promise<IRSpectrumResponseData> => {
+  if (
+    !calculationId ||
+    calculationId === 'undefined' ||
+    calculationId === 'null'
+  ) {
+    return Promise.reject(
+      new ApiError(
+        'Invalid calculation ID provided.',
+        400,
+        'Bad Request',
+        `/api/quantum/calculations/${calculationId}/ir-spectrum`,
+        null,
+        false
+      )
+    );
+  }
+
+  // Build query parameters
+  const queryParams = new URLSearchParams();
+  if (options?.broadening_fwhm !== undefined) {
+    queryParams.append('broadening_fwhm', options.broadening_fwhm.toString());
+  }
+  if (options?.x_min !== undefined) {
+    queryParams.append('x_min', options.x_min.toString());
+  }
+  if (options?.x_max !== undefined) {
+    queryParams.append('x_max', options.x_max.toString());
+  }
+  if (options?.show_peaks !== undefined) {
+    queryParams.append('show_peaks', options.show_peaks.toString());
+  }
+
+  const queryString = queryParams.toString();
+  const endpoint = `/api/quantum/calculations/${calculationId}/ir-spectrum${
+    queryString ? `?${queryString}` : ''
+  }`;
+
+  return request<IRSpectrumResponseData>(endpoint, { method: 'GET' });
+};
 
 /**
  * Get current application settings

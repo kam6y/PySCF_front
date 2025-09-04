@@ -49,6 +49,7 @@ export type CubeFilesDeleteResponse =
   components['schemas']['CubeFilesDeleteResponse'];
 export type SupportedParametersResponse =
   components['schemas']['SupportedParametersResponse'];
+export type IRSpectrumResponse = components['schemas']['IRSpectrumResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Data models
@@ -58,6 +59,9 @@ export type CalculationResults = components['schemas']['CalculationResults'];
 export type CalculationInstance = components['schemas']['CalculationInstance'];
 export type CalculationSummary = components['schemas']['CalculationSummary'];
 export type OrbitalInfo = components['schemas']['OrbitalInfo'];
+export type IRSpectrumData = components['schemas']['IRSpectrumData'];
+export type IRSpectrumDetails = components['schemas']['IRSpectrumDetails'];
+export type IRSpectrumMetadata = components['schemas']['IRSpectrumMetadata'];
 
 // Operation types for reference
 export type Operations = {
@@ -75,6 +79,7 @@ export type Operations = {
   listCubeFiles: operations['listCubeFiles'];
   deleteCubeFiles: operations['deleteCubeFiles'];
   getSupportedParameters: operations['getSupportedParameters'];
+  getIRSpectrum: operations['getIRSpectrum'];
 };
 
 // Response wrapper for API responses
@@ -98,6 +103,7 @@ export type CubeFilesListResponseData = CubeFilesListResponse['data'];
 export type CubeFilesDeleteResponseData = CubeFilesDeleteResponse['data'];
 export type SupportedParametersResponseData =
   SupportedParametersResponse['data'];
+export type IRSpectrumResponseData = IRSpectrumResponse['data'];
 
 // Error handling
 export { ApiError };

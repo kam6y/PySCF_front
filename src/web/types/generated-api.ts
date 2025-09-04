@@ -216,6 +216,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quantum/calculations/{calculationId}/ir-spectrum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate IR spectrum for a calculation
+         * @description Generate theoretical IR spectrum from vibrational frequency data with scale factor corrections and Lorentzian broadening
+         */
+        get: operations["getIRSpectrum"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quantum/supported-parameters": {
         parameters: {
             query?: never;
@@ -944,6 +964,147 @@ export interface components {
             success: boolean;
             data: components["schemas"]["SystemResourceSummary"];
         };
+        IRSpectrumResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["IRSpectrumData"];
+        };
+        IRSpectrumData: {
+            /**
+             * @description Unique calculation ID
+             * @example calc_20240101_120000_abcd1234
+             */
+            calculation_id: string;
+            spectrum: components["schemas"]["IRSpectrumDetails"];
+            /**
+             * Format: byte
+             * @description Base64 encoded PNG image of the IR spectrum plot
+             */
+            plot_image_base64: string;
+            generation_info: components["schemas"]["IRGenerationInfo"];
+        };
+        IRSpectrumDetails: {
+            /**
+             * @description Wavenumber values (cm⁻¹) for the x-axis
+             * @example [
+             *       400,
+             *       401,
+             *       402
+             *     ]
+             */
+            x_axis: number[];
+            /**
+             * @description Intensity values for the y-axis (arbitrary units)
+             * @example [
+             *       0,
+             *       0.1,
+             *       0.05
+             *     ]
+             */
+            y_axis: number[];
+            /** @description Individual peaks in the spectrum */
+            peaks: components["schemas"]["IRPeak"][];
+            metadata: components["schemas"]["IRSpectrumMetadata"];
+        };
+        IRPeak: {
+            /**
+             * Format: float
+             * @description Peak frequency after scale factor correction (cm⁻¹)
+             * @example 1654.2
+             */
+            frequency_cm: number;
+            /**
+             * Format: float
+             * @description Peak intensity (arbitrary units)
+             * @example 120.5
+             */
+            intensity: number;
+            /**
+             * Format: float
+             * @description Original calculated frequency before scale factor correction (cm⁻¹)
+             * @example 1723.1
+             */
+            original_frequency_cm: number;
+        };
+        IRSpectrumMetadata: {
+            /**
+             * @description Computational method used
+             * @example B3LYP
+             */
+            method: string;
+            /**
+             * @description Basis set used
+             * @example 6-31G*
+             */
+            basis_set: string;
+            /**
+             * Format: float
+             * @description Scale factor applied to frequencies
+             * @example 0.96
+             */
+            scale_factor: number;
+            /**
+             * @description Information about the scale factor source
+             * @example Exact match found
+             */
+            scale_message: string;
+            /**
+             * Format: float
+             * @description Full width at half maximum for Lorentzian broadening (cm⁻¹)
+             * @example 100
+             */
+            broadening_fwhm_cm: number;
+            /**
+             * @description Frequency range for the spectrum [min, max] (cm⁻¹)
+             * @example [
+             *       400,
+             *       4000
+             *     ]
+             */
+            frequency_range_cm: number[];
+            /**
+             * @description Total number of calculated frequencies
+             * @example 24
+             */
+            num_peaks_total: number;
+            /**
+             * @description Number of peaks within the specified range
+             * @example 18
+             */
+            num_peaks_in_range: number;
+            /**
+             * @description Number of points in the spectrum
+             * @example 3000
+             */
+            num_points: number;
+        };
+        IRGenerationInfo: {
+            /**
+             * Format: float
+             * @description Full width at half maximum used for broadening (cm⁻¹)
+             * @example 100
+             */
+            broadening_fwhm_cm: number;
+            /**
+             * @description Frequency range used [min, max] (cm⁻¹)
+             * @example [
+             *       400,
+             *       4000
+             *     ]
+             */
+            frequency_range_cm: number[];
+            /**
+             * @description Whether individual peaks were marked in the plot
+             * @example true
+             */
+            peaks_marked: boolean;
+            /**
+             * Format: date-time
+             * @description ISO timestamp when the spectrum was generated
+             * @example 2024-01-01T12:00:00.000Z
+             */
+            generated_at: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1472,6 +1633,65 @@ export interface operations {
                 };
             };
             /** @description Failed to delete CUBE files */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getIRSpectrum: {
+        parameters: {
+            query?: {
+                /** @description Full width at half maximum for Lorentzian broadening in cm⁻¹ */
+                broadening_fwhm?: number;
+                /** @description Minimum wavenumber for spectrum range in cm⁻¹ */
+                x_min?: number;
+                /** @description Maximum wavenumber for spectrum range in cm⁻¹ */
+                x_max?: number;
+                /** @description Whether to mark individual peaks in the plot */
+                show_peaks?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description IR spectrum generated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IRSpectrumResponse"];
+                };
+            };
+            /** @description Invalid parameters or calculation not completed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Calculation not found or no frequency data available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to generate IR spectrum */
             500: {
                 headers: {
                     [name: string]: unknown;
