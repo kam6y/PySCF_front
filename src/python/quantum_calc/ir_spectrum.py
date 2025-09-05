@@ -1,28 +1,19 @@
-"""IR Spectrum calculation and plotting functionality for quantum chemistry calculations.
+"""IR Spectrum calculation functionality for quantum chemistry calculations.
 
 This module provides functionality to generate theoretical IR spectra from vibrational
 frequency calculations, including:
 - Scale factor corrections for different computational methods
 - Lorentzian broadening for realistic peak shapes
-- Plot generation with matplotlib
-- Base64 encoding for web display
 
 Based on harmonic approximation with corrections for experimental comparison.
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 from typing import List, Dict, Any, Optional, Tuple
 import logging
-import base64
-import io
 from data.scale_factors import get_recommended_scale_factor
 
 logger = logging.getLogger(__name__)
-
-# Set matplotlib backend to non-interactive for server environments
-plt.switch_backend('Agg')
 
 
 class IRSpectrumCalculator:
@@ -163,169 +154,7 @@ class IRSpectrumCalculator:
         
         return spectrum
     
-    def generate_plot(self, 
-                     spectrum_data: Dict[str, Any],
-                     title: Optional[str] = None,
-                     figure_size: Tuple[float, float] = (12, 6),
-                     dpi: int = 100,
-                     show_peaks: bool = True,
-                     peak_threshold: float = 0.05) -> str:
-        """
-        Generate IR spectrum plot and return as base64 encoded image.
-        
-        Args:
-            spectrum_data: Output from calculate_ir_spectrum()
-            title: Plot title (auto-generated if None)
-            figure_size: Figure size in inches (width, height)
-            dpi: Figure DPI for resolution
-            show_peaks: Whether to mark individual peaks
-            peak_threshold: Minimum relative intensity to show peak markers
-            
-        Returns:
-            Base64 encoded PNG image
-        """
-        try:
-            plt.style.use('default')
-            fig, ax = plt.subplots(figsize=figure_size, dpi=dpi)
-            
-            # Extract data
-            x_axis = np.array(spectrum_data['x_axis'])
-            spectrum = np.array(spectrum_data['spectrum'])
-            peaks = spectrum_data['peaks']
-            metadata = spectrum_data['metadata']
-            
-            # Plot spectrum
-            ax.plot(x_axis, spectrum, 'b-', linewidth=1.5, label='IR Spectrum')
-            
-            # Mark significant peaks if requested
-            if show_peaks and peaks:
-                max_intensity = np.max(spectrum) if len(spectrum) > 0 else 1.0
-                threshold = max_intensity * peak_threshold
-                
-                marked_peaks = 0
-                for peak in peaks:
-                    freq = peak['frequency_cm']
-                    intensity = peak['intensity']
-                    
-                    # Find the spectrum intensity at this frequency
-                    freq_idx = np.argmin(np.abs(x_axis - freq))
-                    spectrum_intensity = spectrum[freq_idx]
-                    
-                    if spectrum_intensity >= threshold:
-                        ax.axvline(x=freq, color='red', linestyle='--', alpha=0.6, linewidth=0.8)
-                        ax.plot(freq, spectrum_intensity, 'ro', markersize=4)
-                        
-                        # Add frequency label for the strongest peaks
-                        if spectrum_intensity >= max_intensity * 0.3:  # Only label strong peaks
-                            ax.annotate(f'{freq:.0f}', 
-                                      xy=(freq, spectrum_intensity),
-                                      xytext=(5, 5), 
-                                      textcoords='offset points',
-                                      fontsize=8, 
-                                      color='red')
-                        marked_peaks += 1
-                
-                logger.info(f"Marked {marked_peaks} significant peaks")
-            
-            # Set labels and title
-            ax.set_xlabel('Wavenumber (cm⁻¹)', fontsize=12)
-            ax.set_ylabel('Intensity (arb. units)', fontsize=12)
-            
-            if title is None:
-                title = f"IR Spectrum - {metadata['method']}/{metadata['basis_set']}"
-                title += f"\nScale factor: {metadata['scale_factor']:.3f}, "
-                title += f"Broadening FWHM: {metadata['broadening_fwhm_cm']:.0f} cm⁻¹"
-            
-            ax.set_title(title, fontsize=14, pad=20)
-            
-            # Invert x-axis (standard for IR spectra)
-            ax.invert_xaxis()
-            
-            # Set y-axis to start from 0
-            ax.set_ylim(bottom=0)
-            
-            # Add grid
-            ax.grid(True, alpha=0.3)
-            
-            # Add metadata text box
-            info_text = f"Method: {metadata['method']}\n"
-            info_text += f"Basis set: {metadata['basis_set']}\n"
-            info_text += f"Scale factor: {metadata['scale_factor']:.3f}\n"
-            info_text += f"Peaks shown: {metadata['num_peaks_in_range']}/{metadata['num_peaks_total']}"
-            
-            ax.text(0.98, 0.98, info_text,
-                   transform=ax.transAxes,
-                   verticalalignment='top',
-                   horizontalalignment='right',
-                   bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                   fontsize=9)
-            
-            # Adjust layout
-            plt.tight_layout()
-            
-            # Convert to base64
-            buffer = io.BytesIO()
-            plt.savefig(buffer, format='png', dpi=dpi, bbox_inches='tight')
-            buffer.seek(0)
-            
-            image_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            
-            plt.close(fig)  # Clean up
-            
-            logger.info("IR spectrum plot generated successfully")
-            return image_base64
-            
-        except Exception as e:
-            logger.error(f"Plot generation failed: {str(e)}")
-            plt.close('all')  # Clean up any open figures
-            raise
-    
-    def generate_spectrum_with_plot(self,
-                                  frequencies: List[float],
-                                  intensities: Optional[List[float]] = None,
-                                  broadening_fwhm: float = 100.0,
-                                  x_range: Tuple[float, float] = (400, 4000),
-                                  **plot_kwargs) -> Dict[str, Any]:
-        """
-        Generate IR spectrum data and plot in one call.
-        
-        Args:
-            frequencies: Vibrational frequencies in cm⁻¹ (unscaled)
-            intensities: IR intensities (if None, uniform intensities are used)
-            broadening_fwhm: Full width at half maximum for Lorentzian broadening (cm⁻¹)
-            x_range: Frequency range for spectrum (min_freq, max_freq) in cm⁻¹
-            **plot_kwargs: Additional arguments for plot generation
-            
-        Returns:
-            Dictionary containing spectrum data, plot image, and metadata
-        """
-        try:
-            # Calculate spectrum
-            spectrum_data = self.calculate_ir_spectrum(
-                frequencies, intensities, broadening_fwhm, x_range
-            )
-            
-            # Generate plot
-            plot_image = self.generate_plot(spectrum_data, **plot_kwargs)
-            
-            # Combine results
-            result = {
-                'spectrum_data': spectrum_data,
-                'plot_image_base64': plot_image,
-                'success': True
-            }
-            
-            logger.info("IR spectrum with plot generated successfully")
-            return result
-            
-        except Exception as e:
-            logger.error(f"IR spectrum generation failed: {str(e)}")
-            return {
-                'spectrum_data': None,
-                'plot_image_base64': None,
-                'success': False,
-                'error': str(e)
-            }
+
 
 
 def create_ir_spectrum_from_calculation_results(calculation_results: Dict[str, Any],
@@ -338,7 +167,7 @@ def create_ir_spectrum_from_calculation_results(calculation_results: Dict[str, A
         **kwargs: Additional arguments for spectrum generation
         
     Returns:
-        Dictionary containing spectrum data and plot
+        Dictionary containing spectrum data only
     """
     try:
         # Extract frequency data
@@ -363,16 +192,18 @@ def create_ir_spectrum_from_calculation_results(calculation_results: Dict[str, A
         # Initialize calculator
         calculator = IRSpectrumCalculator(method=method, basis_set=basis_set)
         
-        # Generate spectrum
-        result = calculator.generate_spectrum_with_plot(frequencies, **kwargs)
+        # Generate spectrum data only
+        spectrum_data = calculator.calculate_ir_spectrum(frequencies, **kwargs)
         
-        return result
+        return {
+            'spectrum_data': spectrum_data,
+            'success': True
+        }
         
     except Exception as e:
         logger.error(f"Failed to create IR spectrum from calculation results: {str(e)}")
         return {
             'spectrum_data': None,
-            'plot_image_base64': None,
             'success': False,
             'error': str(e)
         }

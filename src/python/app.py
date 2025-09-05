@@ -1057,8 +1057,7 @@ def get_ir_spectrum(calculation_id):
         ir_result = create_ir_spectrum_from_calculation_results(
             results,
             broadening_fwhm=broadening_fwhm,
-            x_range=(x_min, x_max),
-            show_peaks=show_peaks
+            x_range=(x_min, x_max)
         )
         
         if not ir_result.get('success'):

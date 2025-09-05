@@ -1683,7 +1683,7 @@ components:
 
     IRSpectrumData:
       type: object
-      required: [calculation_id, spectrum, plot_image_base64, generation_info]
+      required: [calculation_id, spectrum, generation_info]
       properties:
         calculation_id:
           type: string
@@ -1691,10 +1691,6 @@ components:
           example: "calc_20240101_120000_abcd1234"
         spectrum:
           $ref: '#/components/schemas/IRSpectrumDetails'
-        plot_image_base64:
-          type: string
-          format: byte
-          description: Base64 encoded PNG image of the IR spectrum plot
         generation_info:
           $ref: '#/components/schemas/IRGenerationInfo'
 

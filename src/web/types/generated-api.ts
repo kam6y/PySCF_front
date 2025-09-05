@@ -976,11 +976,6 @@ export interface components {
              */
             calculation_id: string;
             spectrum: components["schemas"]["IRSpectrumDetails"];
-            /**
-             * Format: byte
-             * @description Base64 encoded PNG image of the IR spectrum plot
-             */
-            plot_image_base64: string;
             generation_info: components["schemas"]["IRGenerationInfo"];
         };
         IRSpectrumDetails: {
