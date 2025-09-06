@@ -680,7 +680,7 @@ components:
           maximum: 10
           default: 0
           description: Molecular charge
-        spin_multiplicity:
+        spin:
           type: integer
           minimum: 0
           maximum: 10
@@ -862,7 +862,7 @@ components:
 
     CalculationParameters:
       type: object
-      required: [calculation_method, basis_function, exchange_correlation, charges, spin_multiplicity, solvent_method, solvent, xyz]
+      required: [calculation_method, basis_function, exchange_correlation, charges, spin, solvent_method, solvent, xyz]
       properties:
         calculation_method:
           $ref: '#/components/schemas/CalculationMethod'
@@ -872,7 +872,7 @@ components:
           type: string
         charges:
           type: integer
-        spin_multiplicity:
+        spin:
           type: integer
         solvent_method:
           $ref: '#/components/schemas/SolventMethod'
@@ -948,9 +948,9 @@ components:
         charge:
           type: number
           description: Molecular charge
-        spin_multiplicity:
+        spin:
           type: integer
-          description: Spin multiplicity
+          description: Spin (2S), number of unpaired electrons
         max_cycle:
           type: integer
           description: Maximum SCF cycles

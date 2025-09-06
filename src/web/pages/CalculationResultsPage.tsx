@@ -145,7 +145,7 @@ export const CalculationResultsPage = ({
               <strong>Charge:</strong> {results.charge}
             </div>
             <div>
-              <strong>Spin Multiplicity:</strong> {results.spin_multiplicity}
+              <strong>Spin (2S):</strong> {results.spin}
             </div>
             <div>
               <strong>Completed:</strong>{' '}

@@ -85,7 +85,7 @@ class MP2Calculator(BaseCalculator):
             self.results.update({
                 'basis': basis,
                 'charge': charge,
-                'spin_multiplicity': spin,
+                'spin': spin,
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,
@@ -151,7 +151,7 @@ class MP2Calculator(BaseCalculator):
     
     def _create_scf_method(self, mol):
         """Create HF method object for MP2 reference (RHF/UHF)."""
-        spin = self.results.get('spin_multiplicity', 0)
+        spin = self.results.get('spin', 0)
         
         if spin == 0:
             mf = scf.RHF(mol)
@@ -168,6 +168,6 @@ class MP2Calculator(BaseCalculator):
     
     def _get_base_method_description(self) -> str:
         """Get description of base method for logging."""
-        spin = self.results.get('spin_multiplicity', 0)
+        spin = self.results.get('spin', 0)
         return f"{'UHF' if spin > 0 else 'RHF'} (MP2 reference)"
     

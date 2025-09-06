@@ -94,7 +94,7 @@ class TDDFTCalculator(BaseCalculator):
                 'basis': basis,
                 'xc_functional': xc,
                 'charge': charge,
-                'spin_multiplicity': spin,
+                'spin': spin,
                 'max_cycle': max_cycle,
                 'solvent_method': solvent_method,
                 'solvent': solvent,
@@ -204,7 +204,7 @@ class TDDFTCalculator(BaseCalculator):
     
     def _create_scf_method(self, mol):
         """Create DFT method object for TDDFT ground state (RKS/UKS)."""
-        spin = self.results.get('spin_multiplicity', 0)
+        spin = self.results.get('spin', 0)
         
         if spin == 0:
             mf = dft.RKS(mol)
@@ -224,7 +224,7 @@ class TDDFTCalculator(BaseCalculator):
     
     def _get_base_method_description(self) -> str:
         """Get description of base method for logging."""
-        spin = self.results.get('spin_multiplicity', 0)
+        spin = self.results.get('spin', 0)
         return f"{'UKS' if spin > 0 else 'RKS'} (TDDFT ground state)"
     
     def _requires_geometry_optimization(self) -> bool:

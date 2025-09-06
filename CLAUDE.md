@@ -431,6 +431,18 @@ The application uses a `ProcessPoolExecutor`-based system for quantum chemistry 
 
 ---
 
+## Spin Multiplicity Notes
+
+PySCF uses the `spin` attribute to specify the number of unpaired electrons (2S), which differs from the traditional quantum chemistry notation of 2S+1. Therefore, for a doublet state molecule (one unpaired electron), use `spin=1`, and for a triplet state (two unpaired electrons), use `spin=2`.
+
+**Examples:**
+- Singlet state (closed-shell): spin=0
+- Doublet state (1 unpaired electron): spin=1  
+- Triplet state (2 unpaired electrons): spin=2
+- Quartet state (3 unpaired electrons): spin=3
+
+---
+
 ## Troubleshooting
 
 ### Environment Setup Issues

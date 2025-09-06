@@ -362,7 +362,7 @@ export interface components {
              * @description Spin (2S), number of unpaired electrons
              * @default 0
              */
-            spin_multiplicity: number;
+            spin: number;
             /** @default none */
             solvent_method: components["schemas"]["SolventMethod"];
             /**
@@ -483,7 +483,7 @@ export interface components {
             basis_function: string;
             exchange_correlation: string;
             charges: number;
-            spin_multiplicity: number;
+            spin: number;
             solvent_method: components["schemas"]["SolventMethod"];
             solvent: string;
             xyz: string;
@@ -526,8 +526,8 @@ export interface components {
             xc_functional?: string;
             /** @description Molecular charge */
             charge?: number;
-            /** @description Spin multiplicity */
-            spin_multiplicity?: number;
+            /** @description Spin (2S), number of unpaired electrons */
+            spin?: number;
             /** @description Maximum SCF cycles */
             max_cycle?: number;
             /** @description Number of atoms */

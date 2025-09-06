@@ -64,7 +64,7 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       basis_function: '6-31G(d)',
       exchange_correlation: 'B3LYP',
       charges: 0,
-      spin_multiplicity: 0,
+      spin: 0,
       solvent_method: 'none',
       solvent: '-',
       xyz: '',

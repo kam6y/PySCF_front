@@ -437,7 +437,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'basis_function': body.basis_function,
             'exchange_correlation': body.exchange_correlation,
             'charges': body.charges,
-            'spin_multiplicity': body.spin_multiplicity,
+            'spin': body.spin,
             'solvent_method': body.solvent_method.value,
             'solvent': body.solvent,
             'xyz': body.xyz,

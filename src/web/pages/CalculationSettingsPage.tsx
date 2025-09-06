@@ -191,7 +191,7 @@ export const CalculationSettingsPage = ({
           basis_function: adjustedParams.basis_function || '6-31G(d)',
           exchange_correlation: adjustedParams.exchange_correlation || 'B3LYP',
           charges: adjustedParams.charges || 0,
-          spin_multiplicity: adjustedParams.spin_multiplicity || 0,
+          spin: adjustedParams.spin || 0,
           solvent_method: adjustedParams.solvent_method || 'none',
           solvent: adjustedParams.solvent || '-',
           name:
@@ -258,7 +258,7 @@ export const CalculationSettingsPage = ({
           basis_function: currentParams.basis_function || '6-31G(d)',
           exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
           charges: currentParams.charges || 0,
-          spin_multiplicity: currentParams.spin_multiplicity || 0,
+          spin: currentParams.spin || 0,
           solvent_method: currentParams.solvent_method || 'none',
           solvent: currentParams.solvent || '-',
           name:
@@ -376,7 +376,7 @@ export const CalculationSettingsPage = ({
       basis_function: currentParams.basis_function || '6-31G(d)',
       exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
       charges: currentParams.charges || 0,
-      spin_multiplicity: currentParams.spin_multiplicity || 0,
+      spin: currentParams.spin || 0,
       solvent_method: currentParams.solvent_method || 'none',
       solvent: currentParams.solvent || '-',
       name: moleculeName,
@@ -457,7 +457,7 @@ export const CalculationSettingsPage = ({
           basis_function: params.basis_function || '6-31G(d)',
           exchange_correlation: params.exchange_correlation || 'B3LYP',
           charges: params.charges || 0,
-          spin_multiplicity: params.spin_multiplicity || 0,
+          spin: params.spin || 0,
           solvent_method: params.solvent_method || 'none',
           solvent: params.solvent || '-',
           name: moleculeName,
@@ -784,10 +784,10 @@ export const CalculationSettingsPage = ({
                 <label>Spin (2S)</label>
                 <input
                   type="number"
-                  value={params.spin_multiplicity || 0}
+                  value={params.spin || 0}
                   onChange={e =>
                     handleParamChange(
-                      'spin_multiplicity',
+                      'spin',
                       Number(e.target.value)
                     )
                   }
