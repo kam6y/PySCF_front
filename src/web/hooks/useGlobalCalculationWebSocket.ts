@@ -180,33 +180,31 @@ export const useGlobalCalculationWebSocket = (
         previousStatus === 'running' &&
         updatedCalculation.status === 'error'
       ) {
-        if (!isActiveCalculation) {
-          const errorMessage =
-            updatedCalculation.errorMessage ||
-            updatedCalculation.results?.error ||
-            'Detailed error information is not available.';
+        const errorMessage =
+          updatedCalculation.errorMessage ||
+          updatedCalculation.results?.error ||
+          'Detailed error information is not available.';
 
-          // リソース不足エラーの判定
-          const isResourceInsufficientError =
-            errorMessage &&
-            (errorMessage.toLowerCase().includes('cpu usage') ||
-              errorMessage.toLowerCase().includes('memory usage') ||
-              errorMessage.toLowerCase().includes('system cpu usage') ||
-              errorMessage.toLowerCase().includes('system memory usage') ||
-              errorMessage.toLowerCase().includes('no active calculations'));
+        // リソース不足エラーの判定
+        const isResourceInsufficientError =
+          errorMessage &&
+          (errorMessage.toLowerCase().includes('cpu usage') ||
+            errorMessage.toLowerCase().includes('memory usage') ||
+            errorMessage.toLowerCase().includes('system cpu usage') ||
+            errorMessage.toLowerCase().includes('system memory usage') ||
+            errorMessage.toLowerCase().includes('no active calculations'));
 
-          if (isResourceInsufficientError) {
-            showResourceInsufficientErrorNotification(
-              errorMessage,
-              calculationId
-            );
-          } else {
-            showErrorNotification(
-              `Calculation "${molecularName}" failed`,
-              errorMessage,
-              calculationId
-            );
-          }
+        if (isResourceInsufficientError) {
+          showResourceInsufficientErrorNotification(
+            errorMessage,
+            calculationId
+          );
+        } else {
+          showErrorNotification(
+            `Calculation "${molecularName}" failed`,
+            errorMessage,
+            calculationId
+          );
         }
       }
 
@@ -215,33 +213,31 @@ export const useGlobalCalculationWebSocket = (
         previousStatus === 'pending' &&
         updatedCalculation.status === 'error'
       ) {
-        if (!isActiveCalculation) {
-          const errorMessage =
-            updatedCalculation.errorMessage ||
-            updatedCalculation.results?.error ||
-            'Detailed error information is not available.';
+        const errorMessage =
+          updatedCalculation.errorMessage ||
+          updatedCalculation.results?.error ||
+          'Detailed error information is not available.';
 
-          // リソース不足エラーの判定
-          const isResourceInsufficientError =
-            errorMessage &&
-            (errorMessage.toLowerCase().includes('cpu usage') ||
-              errorMessage.toLowerCase().includes('memory usage') ||
-              errorMessage.toLowerCase().includes('system cpu usage') ||
-              errorMessage.toLowerCase().includes('system memory usage') ||
-              errorMessage.toLowerCase().includes('no active calculations'));
+        // リソース不足エラーの判定
+        const isResourceInsufficientError =
+          errorMessage &&
+          (errorMessage.toLowerCase().includes('cpu usage') ||
+            errorMessage.toLowerCase().includes('memory usage') ||
+            errorMessage.toLowerCase().includes('system cpu usage') ||
+            errorMessage.toLowerCase().includes('system memory usage') ||
+            errorMessage.toLowerCase().includes('no active calculations'));
 
-          if (isResourceInsufficientError) {
-            showResourceInsufficientErrorNotification(
-              errorMessage,
-              calculationId
-            );
-          } else {
-            showErrorNotification(
-              `Calculation "${molecularName}" failed to start`,
-              errorMessage,
-              calculationId
-            );
-          }
+        if (isResourceInsufficientError) {
+          showResourceInsufficientErrorNotification(
+            errorMessage,
+            calculationId
+          );
+        } else {
+          showErrorNotification(
+            `Calculation "${molecularName}" failed to start`,
+            errorMessage,
+            calculationId
+          );
         }
       }
 
