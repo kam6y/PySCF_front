@@ -1109,7 +1109,7 @@ def build_calculation_instance(calc_id: str, calc_path: str, file_manager: Calcu
     try:
         parameters = file_manager.read_calculation_parameters(calc_path) or {}
         results = file_manager.read_calculation_results(calc_path)
-        status = file_manager.read_calculation_status(calc_path) or 'unknown'
+        status = file_manager.read_calculation_status(calc_path) or 'pending'
         display_name = file_manager._get_display_name(calc_id, parameters)
         
         # Safe date retrieval

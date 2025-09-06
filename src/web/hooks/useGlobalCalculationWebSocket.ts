@@ -83,7 +83,7 @@ export const useGlobalCalculationWebSocket = (
       }
 
       console.log(
-        `[WebSocket] Status change detected for ${calculationId}: ${previousStatus || 'unknown'} -> ${updatedCalculation.status}`
+        `[WebSocket] Status change detected for ${calculationId}: ${previousStatus || 'pending'} -> ${updatedCalculation.status}`
       );
 
       try {
