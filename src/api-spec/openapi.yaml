@@ -685,7 +685,7 @@ components:
           minimum: 0
           maximum: 10
           default: 0
-          description: Spin multiplicity (2S)
+          description: Spin (2S), number of unpaired electrons
         solvent_method:
           $ref: '#/components/schemas/SolventMethod'
           default: none

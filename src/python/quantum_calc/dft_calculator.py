@@ -116,7 +116,7 @@ class DFTCalculator(BaseCalculator):
     
     def _create_scf_method(self, mol):
         """Create DFT method object (RKS/UKS)."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin_multiplicity', 0)
         
         if spin == 0:
             mf = dft.RKS(mol)
@@ -136,6 +136,6 @@ class DFTCalculator(BaseCalculator):
     
     def _get_base_method_description(self) -> str:
         """Get description of base method for logging."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin_multiplicity', 0)
         return 'UKS' if spin > 0 else 'RKS'
     

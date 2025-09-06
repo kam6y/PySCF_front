@@ -359,7 +359,7 @@ export interface components {
              */
             charges: number;
             /**
-             * @description Spin multiplicity (2S)
+             * @description Spin (2S), number of unpaired electrons
              * @default 0
              */
             spin_multiplicity: number;

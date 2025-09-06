@@ -781,7 +781,7 @@ export const CalculationSettingsPage = ({
                 />
               </div>
               <div className={styles.settingRow}>
-                <label>Spin Multiplicity (2S)</label>
+                <label>Spin (2S)</label>
                 <input
                   type="number"
                   value={params.spin_multiplicity || 0}
