@@ -4,8 +4,8 @@ import styles from './SettingsPage.module.css';
 
 // Default values constants
 const DEFAULT_MAX_PARALLEL_INSTANCES = 4;
-const DEFAULT_MAX_CPU_UTILIZATION = 80.0;
-const DEFAULT_MAX_MEMORY_UTILIZATION = 80.0;
+const DEFAULT_MAX_CPU_UTILIZATION = 95.0;
+const DEFAULT_MAX_MEMORY_UTILIZATION = 95.0;
 
 interface SettingsPageProps {
   // Props will be added when integrating with the main app
