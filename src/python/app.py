@@ -20,7 +20,7 @@ from flask_socketio import SocketIO, emit, disconnect
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
 from pubchem import parser as xyz_parser
 from SMILES.smiles_converter import smiles_to_xyz, SMILESError
-from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator, MolecularOrbitalGenerator, CalculationError, ConvergenceError, InputError, GeometryError
+from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator, MolecularOrbitalGenerator, CalculationError, ConvergenceError, InputError, GeometryError, ProcessManagerError
 from quantum_calc.ir_spectrum import create_ir_spectrum_from_calculation_results
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError, WebSocketError
 from quantum_calc.file_manager import CalculationFileManager
@@ -431,14 +431,20 @@ def quantum_calculate(body: QuantumCalculationRequest):
     Immediately returns a calculation ID to track the job.
     """
     try:
+        # Helper function to safely extract value from enum or string
+        def get_enum_value(field_value):
+            if hasattr(field_value, 'value'):
+                return field_value.value
+            return field_value
+        
         # Prepare parameters using validated data from Pydantic model
         parameters = {
-            'calculation_method': body.calculation_method.value,
+            'calculation_method': get_enum_value(body.calculation_method),
             'basis_function': body.basis_function,
             'exchange_correlation': body.exchange_correlation,
             'charges': body.charges,
             'spin': body.spin,
-            'solvent_method': body.solvent_method.value,
+            'solvent_method': get_enum_value(body.solvent_method),
             'solvent': body.solvent,
             'xyz': body.xyz,
             'name': body.name,
@@ -447,21 +453,70 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'created_at': datetime.now().isoformat(),
             # Always include TDDFT parameters for consistency
             'tddft_nstates': body.tddft_nstates,
-            'tddft_method': body.tddft_method.value if body.tddft_method else 'TDDFT',
+            'tddft_method': get_enum_value(body.tddft_method) if body.tddft_method else 'TDDFT',
             'tddft_analyze_nto': body.tddft_analyze_nto
         }
         
-        # Initialize file manager and create directory
-        file_manager = CalculationFileManager()
-        calc_dir = file_manager.create_calculation_dir(parameters['name'])
-        calculation_id = os.path.basename(calc_dir)
-        
-        # Save initial parameters (status will be set based on submission result)
-        file_manager.save_calculation_parameters(calc_dir, parameters)
+        # Initialize file manager and create directory with error handling
+        try:
+            file_manager = CalculationFileManager()
+            calc_dir = file_manager.create_calculation_dir(parameters['name'])
+            calculation_id = os.path.basename(calc_dir)
+            
+            # Save initial parameters (status will be set based on submission result)
+            file_manager.save_calculation_parameters(calc_dir, parameters)
+            logger.info(f"Created calculation directory and saved parameters for calculation {calculation_id}")
+            
+        except Exception as file_error:
+            logger.error(f"Failed to set up calculation files: {file_error}")
+            return jsonify({'success': False, 'error': f'Failed to initialize calculation: {str(file_error)}'}), 500
 
-        # Submit calculation to process pool or queue
-        process_manager = get_process_manager()
-        success, initial_status, waiting_reason = process_manager.submit_calculation(calculation_id, parameters)
+        # Get process manager with enhanced error handling
+        try:
+            process_manager = get_process_manager()
+            
+            # Apply current settings to process manager if not already done
+            try:
+                from quantum_calc import update_process_manager_settings
+                update_process_manager_settings()
+            except Exception as settings_error:
+                logger.warning(f"Failed to update process manager settings: {settings_error}")
+                # Continue without settings update
+                
+        except Exception as pm_error:
+            logger.error(f"Failed to initialize process manager: {pm_error}")
+            # Clean up created directory on process manager failure
+            try:
+                import shutil
+                shutil.rmtree(calc_dir, ignore_errors=True)
+            except Exception:
+                pass
+            return jsonify({'success': False, 'error': f'System initialization error: Unable to initialize calculation system. Please check system resources and try again.'}), 503
+
+        # Submit calculation to process pool or queue with enhanced error handling
+        try:
+            success, initial_status, waiting_reason = process_manager.submit_calculation(calculation_id, parameters)
+        except Exception as submit_error:
+            logger.error(f"Unexpected error during calculation submission: {submit_error}")
+            # Update status to error and save error information
+            file_manager.save_calculation_status(calc_dir, 'error')
+            error_message = f'Failed to submit calculation: {str(submit_error)}'
+            file_manager.save_calculation_results(calc_dir, {'error': error_message})
+            
+            # Send immediate WebSocket notification for error status
+            send_immediate_websocket_notification(calculation_id, 'error', error_message)
+            
+            # Return error instance
+            error_instance = {
+                'id': calculation_id,
+                'name': parameters['name'],
+                'status': 'error',
+                'createdAt': parameters['created_at'],
+                'updatedAt': parameters['created_at'],
+                'parameters': parameters,
+                'error': error_message
+            }
+            return jsonify(error_instance), 500
         
         if not success:
             # If submission failed, update status to error
@@ -524,8 +579,15 @@ def quantum_calculate(body: QuantumCalculationRequest):
         logger.error(f"File management error during calculation setup: {e}")
         return jsonify({'success': False, 'error': 'Failed to set up calculation files.'}), 500
     except ProcessManagerError as e:
-        logger.error(f"Process manager error during calculation submission: {e}")
-        return jsonify({'success': False, 'error': 'Calculation system is currently unavailable.'}), 503
+        logger.error(f"Process manager initialization/operation error: {e}")
+        # Try to clean up any created files
+        try:
+            if 'calc_dir' in locals():
+                import shutil
+                shutil.rmtree(calc_dir, ignore_errors=True)
+        except Exception:
+            pass
+        return jsonify({'success': False, 'error': f'Calculation system error: {str(e)}. The system may need to be restarted.'}), 503
     except OSError as e:
         logger.error(f"System error during calculation setup: {e}")
         return jsonify({'success': False, 'error': 'Insufficient system resources to start calculation.'}), 507
@@ -598,6 +660,236 @@ def get_calculation_status():
     except Exception as e:
         logger.error(f"Unexpected error getting calculation status: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@app.route('/api/debug/system-diagnostics', methods=['GET'])
+def get_system_diagnostics():
+    """Get comprehensive system diagnostics for troubleshooting."""
+    try:
+        logger.info("Getting comprehensive system diagnostics")
+        
+        # Collect system information
+        diagnostics = {
+            'timestamp': datetime.now().isoformat(),
+            'service_info': {
+                'service': 'pyscf-front-api',
+                'version': '0.3.0',
+                'pid': os.getpid(),
+                'working_directory': os.getcwd()
+            },
+            'system_info': {
+                'cpu_count': multiprocessing.cpu_count(),
+                'platform': os.name,
+                'python_version': sys.version
+            }
+        }
+        
+        # Process manager diagnostics
+        try:
+            process_manager = get_process_manager()
+            diagnostics['process_manager'] = {
+                'status': 'available',
+                'max_workers': process_manager.max_workers,
+                'max_parallel_instances': process_manager.max_parallel_instances,
+                'active_calculations': len(process_manager.active_futures),
+                'queued_calculations': len(process_manager.calculation_queue),
+                'is_shutdown': process_manager._shutdown,
+                'queue_status': process_manager.get_queue_status()
+            }
+        except Exception as pm_error:
+            diagnostics['process_manager'] = {
+                'status': 'error',
+                'error': str(pm_error),
+                'error_type': type(pm_error).__name__
+            }
+        
+        # Resource manager diagnostics
+        try:
+            resource_manager = get_resource_manager()
+            diagnostics['resource_manager'] = resource_manager.get_diagnostics()
+        except Exception as rm_error:
+            diagnostics['resource_manager'] = {
+                'status': 'error',
+                'error': str(rm_error),
+                'error_type': type(rm_error).__name__
+            }
+        
+        # File manager diagnostics
+        try:
+            from quantum_calc.file_manager import CalculationFileManager
+            file_manager = CalculationFileManager()
+            base_dir = file_manager.get_base_directory()
+            
+            diagnostics['file_manager'] = {
+                'status': 'available',
+                'base_directory': base_dir,
+                'base_directory_exists': os.path.exists(base_dir),
+                'base_directory_writable': os.access(base_dir, os.W_OK) if os.path.exists(base_dir) else False
+            }
+            
+            # Count calculation directories
+            try:
+                calculations = file_manager.list_calculations()
+                diagnostics['file_manager']['total_calculations'] = len(calculations)
+                diagnostics['file_manager']['calculation_statuses'] = {}
+                
+                # Count by status
+                status_counts = {}
+                for calc in calculations[:20]:  # Limit to first 20 for performance
+                    try:
+                        status = file_manager.read_calculation_status(os.path.join(base_dir, calc['id']))
+                        status_counts[status] = status_counts.get(status, 0) + 1
+                    except Exception:
+                        status_counts['unknown'] = status_counts.get('unknown', 0) + 1
+                
+                diagnostics['file_manager']['calculation_statuses'] = status_counts
+            except Exception as calc_error:
+                diagnostics['file_manager']['calculations_error'] = str(calc_error)
+                
+        except Exception as fm_error:
+            diagnostics['file_manager'] = {
+                'status': 'error',
+                'error': str(fm_error),
+                'error_type': type(fm_error).__name__
+            }
+        
+        # Settings diagnostics
+        try:
+            settings = get_current_settings()
+            diagnostics['settings'] = {
+                'status': 'available',
+                'settings': settings.model_dump()
+            }
+        except Exception as settings_error:
+            diagnostics['settings'] = {
+                'status': 'error',
+                'error': str(settings_error),
+                'error_type': type(settings_error).__name__
+            }
+        
+        logger.info("Successfully retrieved comprehensive system diagnostics")
+        return jsonify({
+            'success': True,
+            'data': diagnostics
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve system diagnostics: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to retrieve system diagnostics: {str(e)}'
+        }), 500
+
+
+@app.route('/api/debug/process-manager-diagnostics', methods=['GET'])
+def get_process_manager_diagnostics():
+    """Get detailed process manager diagnostics."""
+    try:
+        logger.info("Getting process manager diagnostics")
+        
+        try:
+            process_manager = get_process_manager()
+            
+            # Get detailed process manager state
+            diagnostics = {
+                'timestamp': datetime.now().isoformat(),
+                'status': 'available',
+                'configuration': {
+                    'max_workers': process_manager.max_workers,
+                    'max_parallel_instances': process_manager.max_parallel_instances,
+                    'is_shutdown': process_manager._shutdown
+                },
+                'current_state': {
+                    'active_futures_count': len(process_manager.active_futures),
+                    'active_calculation_ids': list(process_manager.active_futures.keys()),
+                    'queued_calculations_count': len(process_manager.calculation_queue),
+                    'completion_callbacks_count': len(process_manager.completion_callbacks)
+                },
+                'queue_details': [],
+                'resource_monitoring': {
+                    'monitoring_active': process_manager._resource_monitor_thread is not None and process_manager._resource_monitor_thread.is_alive(),
+                    'monitoring_interval': process_manager._resource_monitor_interval
+                }
+            }
+            
+            # Get detailed queue information
+            for i, queued_calc in enumerate(process_manager.calculation_queue[:10]):  # Limit to first 10
+                queue_item = {
+                    'position': i + 1,
+                    'calculation_id': queued_calc.calculation_id,
+                    'created_at': queued_calc.created_at.isoformat(),
+                    'waiting_reason': queued_calc.waiting_reason,
+                    'calculation_method': queued_calc.parameters.get('calculation_method', 'unknown'),
+                    'cpu_cores': queued_calc.parameters.get('cpu_cores', 'unknown'),
+                    'memory_mb': queued_calc.parameters.get('memory_mb', 'unknown')
+                }
+                diagnostics['queue_details'].append(queue_item)
+            
+            # Executor status
+            if process_manager.executor is not None:
+                diagnostics['executor'] = {
+                    'available': True,
+                    'type': type(process_manager.executor).__name__
+                }
+            else:
+                diagnostics['executor'] = {
+                    'available': False,
+                    'error': 'ProcessPoolExecutor is None'
+                }
+                
+        except Exception as pm_error:
+            diagnostics = {
+                'timestamp': datetime.now().isoformat(),
+                'status': 'error',
+                'error': str(pm_error),
+                'error_type': type(pm_error).__name__
+            }
+        
+        logger.info("Successfully retrieved process manager diagnostics")
+        return jsonify({
+            'success': True,
+            'data': diagnostics
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve process manager diagnostics: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to retrieve process manager diagnostics: {str(e)}'
+        }), 500
+
+
+@app.route('/api/debug/resource-manager-diagnostics', methods=['GET'])
+def get_resource_manager_diagnostics():
+    """Get detailed resource manager diagnostics."""
+    try:
+        logger.info("Getting resource manager diagnostics")
+        
+        try:
+            resource_manager = get_resource_manager()
+            diagnostics = resource_manager.get_diagnostics()
+            diagnostics['timestamp'] = datetime.now().isoformat()
+            
+        except Exception as rm_error:
+            diagnostics = {
+                'timestamp': datetime.now().isoformat(),
+                'status': 'error',
+                'error': str(rm_error),
+                'error_type': type(rm_error).__name__
+            }
+        
+        logger.info("Successfully retrieved resource manager diagnostics")
+        return jsonify({
+            'success': True,
+            'data': diagnostics
+        })
+        
+    except Exception as e:
+        logger.error(f"Failed to retrieve resource manager diagnostics: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': f'Failed to retrieve resource manager diagnostics: {str(e)}'
+        }), 500
 
 
 @app.route('/api/quantum/calculations/<calculation_id>', methods=['GET'])

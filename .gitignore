@@ -19,7 +19,7 @@ yarn-error.log*
 # Build and Packaging output
 # ビルドやパッケージングの出力先
 # -----------------------------------------------------------------------------
-/dist
+*dist
 /release
 /out
 /build/
@@ -32,7 +32,7 @@ yarn-error.log*
 # Dependencies
 # 依存関係のフォルダ
 # -----------------------------------------------------------------------------
-/node_modules
+*node_modules
 /.pnp
 .pnp.js
 

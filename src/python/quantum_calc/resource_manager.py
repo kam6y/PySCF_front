@@ -53,63 +53,88 @@ class SystemResourceManager:
         self._active_calculations: Dict[str, CalculationResourceUsage] = {}
         self._resource_constraints = ResourceConstraints()
         self._last_system_info: Optional[SystemResourceInfo] = None
+        self._psutil_available = psutil is not None
+        self._fallback_mode = False
         
-        if psutil is None:
-            logger.warning("psutil is not available. Resource monitoring will be limited.")
-            # Fallback to basic multiprocessing info
-            self._resource_constraints.system_total_cores = multiprocessing.cpu_count()
-            # Estimate 4GB as fallback (conservative)
-            self._resource_constraints.system_total_memory_mb = 4096
-        else:
-            # Get system information
-            self._resource_constraints.system_total_cores = psutil.cpu_count(logical=True)
-            self._resource_constraints.system_total_memory_mb = int(psutil.virtual_memory().total / (1024 * 1024))
+        # Initialize system information with fallback handling
+        try:
+            if psutil is not None:
+                # Get system information using psutil
+                self._resource_constraints.system_total_cores = psutil.cpu_count(logical=True)
+                self._resource_constraints.system_total_memory_mb = int(psutil.virtual_memory().total / (1024 * 1024))
+                logger.info("SystemResourceManager initialized with psutil")
+            else:
+                raise ImportError("psutil not available")
+        except (ImportError, Exception) as e:
+            logger.warning(f"Failed to initialize with psutil: {e}. Using fallback mode.")
+            self._fallback_mode = True
+            self._psutil_available = False
             
-        logger.info(f"Initialized SystemResourceManager - CPU cores: {self._resource_constraints.system_total_cores}, "
+            # Fallback to basic multiprocessing info
+            try:
+                self._resource_constraints.system_total_cores = multiprocessing.cpu_count()
+            except Exception:
+                # Ultimate fallback
+                self._resource_constraints.system_total_cores = 4
+                logger.warning("Failed to detect CPU count, using fallback value of 4 cores")
+            
+            # Conservative memory estimate
+            self._resource_constraints.system_total_memory_mb = 4096
+            logger.warning("Using conservative memory estimate of 4GB")
+            
+        logger.info(f"Initialized SystemResourceManager - Mode: {'psutil' if self._psutil_available else 'fallback'}, "
+                   f"CPU cores: {self._resource_constraints.system_total_cores}, "
                    f"Total memory: {self._resource_constraints.system_total_memory_mb} MB")
     
     def get_system_info(self) -> SystemResourceInfo:
         """Get current system resource information."""
-        system_info = None
+        current_time = datetime.now(timezone.utc)
         
-        if psutil is None:
+        if self._fallback_mode or not self._psutil_available:
             # Return conservative estimates when psutil is not available
             system_info = SystemResourceInfo(
                 total_cpu_cores=self._resource_constraints.system_total_cores,
                 total_memory_mb=self._resource_constraints.system_total_memory_mb,
-                available_memory_mb=int(self._resource_constraints.system_total_memory_mb * 0.5),  # Assume 50% available
-                cpu_usage_percent=50.0,  # Conservative estimate
-                memory_usage_percent=50.0,  # Conservative estimate
-                timestamp=datetime.now(timezone.utc)
+                available_memory_mb=int(self._resource_constraints.system_total_memory_mb * 0.6),  # Assume 60% available
+                cpu_usage_percent=30.0,  # Conservative estimate
+                memory_usage_percent=40.0,  # Conservative estimate
+                timestamp=current_time
             )
-        else:
-            try:
-                memory = psutil.virtual_memory()
-                cpu_percent = psutil.cpu_percent(interval=0.1)
-                
-                system_info = SystemResourceInfo(
-                    total_cpu_cores=self._resource_constraints.system_total_cores,
-                    total_memory_mb=int(memory.total / (1024 * 1024)),
-                    available_memory_mb=int(memory.available / (1024 * 1024)),
-                    cpu_usage_percent=cpu_percent,
-                    memory_usage_percent=memory.percent,
-                    timestamp=datetime.now(timezone.utc)
-                )
-            except Exception as e:
-                logger.error(f"Error getting system information: {e}")
-                # Return fallback values
-                system_info = SystemResourceInfo(
-                    total_cpu_cores=self._resource_constraints.system_total_cores,
-                    total_memory_mb=self._resource_constraints.system_total_memory_mb,
-                    available_memory_mb=int(self._resource_constraints.system_total_memory_mb * 0.5),
-                    cpu_usage_percent=0.0,
-                    memory_usage_percent=0.0,
-                    timestamp=datetime.now(timezone.utc)
-                )
+            logger.debug("Using fallback system info")
+            return system_info
         
-        # Store for resource improvement detection
-        self._last_system_info = system_info
-        return system_info
+        # Try to get system info using psutil with fallback handling
+        try:
+            memory = psutil.virtual_memory()
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            
+            system_info = SystemResourceInfo(
+                total_cpu_cores=self._resource_constraints.system_total_cores,
+                total_memory_mb=int(memory.total / (1024 * 1024)),
+                available_memory_mb=int(memory.available / (1024 * 1024)),
+                cpu_usage_percent=cpu_percent,
+                memory_usage_percent=memory.percent,
+                timestamp=current_time
+            )
+            logger.debug(f"Got system info via psutil: CPU {cpu_percent:.1f}%, Memory {memory.percent:.1f}%")
+            return system_info
+            
+        except Exception as e:
+            logger.warning(f"Error getting system information via psutil: {e}. Switching to fallback mode.")
+            self._fallback_mode = True
+            self._psutil_available = False
+            
+            # Return fallback values
+            system_info = SystemResourceInfo(
+                total_cpu_cores=self._resource_constraints.system_total_cores,
+                total_memory_mb=self._resource_constraints.system_total_memory_mb,
+                available_memory_mb=int(self._resource_constraints.system_total_memory_mb * 0.6),
+                cpu_usage_percent=30.0,  # Conservative estimate
+                memory_usage_percent=40.0,  # Conservative estimate  
+                timestamp=current_time
+            )
+            logger.debug("Using fallback system info due to psutil error")
+            return system_info
     
     def get_resource_constraints(self) -> ResourceConstraints:
         """Get current resource constraints."""
@@ -216,17 +241,22 @@ class SystemResourceManager:
             logger.debug(f"Resource allocation failed: {reason}")
             return False, reason
         
-        # Check current system load (if psutil is available)
-        if psutil is not None:
-            if system_info.cpu_usage_percent > self._resource_constraints.max_cpu_utilization_percent:
-                reason = f"System CPU usage too high: {system_info.cpu_usage_percent:.1f}% > {self._resource_constraints.max_cpu_utilization_percent}%"
-                logger.debug(f"Resource allocation failed: {reason}")
-                return False, reason
-            
-            if system_info.memory_usage_percent > self._resource_constraints.max_memory_utilization_percent:
-                reason = f"System memory usage too high: {system_info.memory_usage_percent:.1f}% > {self._resource_constraints.max_memory_utilization_percent}%"
-                logger.debug(f"Resource allocation failed: {reason}")
-                return False, reason
+        # Check current system load (if psutil is available and not in fallback mode)
+        if not self._fallback_mode and self._psutil_available:
+            try:
+                if system_info.cpu_usage_percent > self._resource_constraints.max_cpu_utilization_percent:
+                    reason = f"System CPU usage too high: {system_info.cpu_usage_percent:.1f}% > {self._resource_constraints.max_cpu_utilization_percent}%"
+                    logger.debug(f"Resource allocation failed: {reason}")
+                    return False, reason
+                
+                if system_info.memory_usage_percent > self._resource_constraints.max_memory_utilization_percent:
+                    reason = f"System memory usage too high: {system_info.memory_usage_percent:.1f}% > {self._resource_constraints.max_memory_utilization_percent}%"
+                    logger.debug(f"Resource allocation failed: {reason}")
+                    return False, reason
+            except Exception as e:
+                logger.warning(f"Failed to check system load: {e}. Proceeding with resource allocation.")
+        else:
+            logger.debug("Skipping system load check - fallback mode active")
         
         success_reason = f"Resources available - CPU: {total_cpu_after}/{max_allowed_cpu}, Memory: {total_memory_after}/{max_allowed_memory} MB"
         logger.debug(f"Resource allocation succeeded: {success_reason}")
@@ -274,36 +304,48 @@ class SystemResourceManager:
         Returns:
             Tuple of (has_improved: bool, reason: str)
         """
-        if self._last_system_info is None:
-            # No previous data to compare - consider improved
-            return True, "No previous resource data to compare"
+        if self._fallback_mode or not self._psutil_available:
+            # In fallback mode, periodically return True to allow queue processing
+            # This prevents calculations from being stuck indefinitely
+            logger.debug("Resource improvement check skipped - fallback mode active")
+            return True, "Fallback mode - allowing queue processing"
         
-        current_info = self.get_system_info()
-        previous_info = self._last_system_info
-        
-        # Check CPU usage improvement
-        cpu_improvement = previous_info.cpu_usage_percent - current_info.cpu_usage_percent
-        
-        # Check memory usage improvement  
-        memory_improvement = previous_info.memory_usage_percent - current_info.memory_usage_percent
-        
-        # Consider improved if either CPU or memory usage dropped by threshold amount
-        cpu_improved = cpu_improvement >= improvement_threshold_percent
-        memory_improved = memory_improvement >= improvement_threshold_percent
-        
-        if cpu_improved or memory_improved:
-            improvements = []
-            if cpu_improved:
-                improvements.append(f"CPU usage decreased by {cpu_improvement:.1f}%")
-            if memory_improved:
-                improvements.append(f"memory usage decreased by {memory_improvement:.1f}%")
+        try:
+            if self._last_system_info is None:
+                # No previous data to compare - consider improved
+                return True, "No previous resource data to compare"
             
-            reason = f"Resources improved: {', '.join(improvements)}"
-            logger.info(reason)
-            return True, reason
-        else:
-            reason = f"No significant resource improvement (CPU: {cpu_improvement:+.1f}%, Memory: {memory_improvement:+.1f}%)"
-            return False, reason
+            current_info = self.get_system_info()
+            previous_info = self._last_system_info
+            
+            # Check CPU usage improvement
+            cpu_improvement = previous_info.cpu_usage_percent - current_info.cpu_usage_percent
+            
+            # Check memory usage improvement  
+            memory_improvement = previous_info.memory_usage_percent - current_info.memory_usage_percent
+            
+            # Consider improved if either CPU or memory usage dropped by threshold amount
+            cpu_improved = cpu_improvement >= improvement_threshold_percent
+            memory_improved = memory_improvement >= improvement_threshold_percent
+            
+            if cpu_improved or memory_improved:
+                improvements = []
+                if cpu_improved:
+                    improvements.append(f"CPU usage decreased by {cpu_improvement:.1f}%")
+                if memory_improved:
+                    improvements.append(f"memory usage decreased by {memory_improvement:.1f}%")
+                
+                reason = f"Resources improved: {', '.join(improvements)}"
+                logger.info(reason)
+                return True, reason
+            else:
+                reason = f"No significant resource improvement (CPU: {cpu_improvement:+.1f}%, Memory: {memory_improvement:+.1f}%)"
+                return False, reason
+                
+        except Exception as e:
+            logger.warning(f"Failed to check resource improvements: {e}")
+            # In case of error, allow queue processing to prevent calculations from being stuck
+            return True, f"Resource improvement check failed - allowing queue processing"
     
     def check_if_system_resources_insufficient(self) -> Tuple[bool, str]:
         """
@@ -312,22 +354,81 @@ class SystemResourceManager:
         Returns:
             Tuple of (insufficient: bool, reason: str)
         """
-        if psutil is None:
-            # Cannot determine system load without psutil
-            return False, "Cannot determine system load - psutil not available"
+        if self._fallback_mode or not self._psutil_available:
+            # In fallback mode, assume resources are sufficient unless overridden
+            # This prevents false errors when system monitoring is not available
+            logger.debug("Resource insufficiency check skipped - fallback mode active")
+            return False, "Resource monitoring unavailable - assuming sufficient resources"
             
-        system_info = self.get_system_info()
-        
-        # Check if current system load exceeds limits even with no active calculations
-        if len(self._active_calculations) == 0:
-            if system_info.cpu_usage_percent > self._resource_constraints.max_cpu_utilization_percent:
-                return True, f"System CPU usage ({system_info.cpu_usage_percent:.1f}%) exceeds limit ({self._resource_constraints.max_cpu_utilization_percent}%) with no active calculations"
-                
-            if system_info.memory_usage_percent > self._resource_constraints.max_memory_utilization_percent:
-                return True, f"System memory usage ({system_info.memory_usage_percent:.1f}%) exceeds limit ({self._resource_constraints.max_memory_utilization_percent}%) with no active calculations"
-        
-        return False, "System resources are sufficient"
+        try:
+            system_info = self.get_system_info()
+            
+            # Check if current system load exceeds limits even with no active calculations
+            if len(self._active_calculations) == 0:
+                if system_info.cpu_usage_percent > self._resource_constraints.max_cpu_utilization_percent:
+                    return True, f"System CPU usage ({system_info.cpu_usage_percent:.1f}%) exceeds limit ({self._resource_constraints.max_cpu_utilization_percent}%) with no active calculations"
+                    
+                if system_info.memory_usage_percent > self._resource_constraints.max_memory_utilization_percent:
+                    return True, f"System memory usage ({system_info.memory_usage_percent:.1f}%) exceeds limit ({self._resource_constraints.max_memory_utilization_percent}%) with no active calculations"
+            
+            return False, "System resources are sufficient"
+            
+        except Exception as e:
+            logger.warning(f"Failed to check system resource insufficiency: {e}")
+            # In case of error, assume resources are sufficient to avoid blocking calculations
+            return False, f"Resource check failed ({str(e)}) - assuming sufficient resources"
     
+    def get_diagnostics(self) -> Dict:
+        """Get diagnostic information about the resource manager state."""
+        try:
+            system_info = self.get_system_info()
+            allocated_cpu, allocated_memory = self.get_total_allocated_resources()
+            
+            return {
+                "mode": "psutil" if (self._psutil_available and not self._fallback_mode) else "fallback",
+                "psutil_available": self._psutil_available,
+                "fallback_mode": self._fallback_mode,
+                "system_info": {
+                    "total_cpu_cores": system_info.total_cpu_cores,
+                    "total_memory_mb": system_info.total_memory_mb,
+                    "current_cpu_usage_percent": system_info.cpu_usage_percent,
+                    "current_memory_usage_percent": system_info.memory_usage_percent,
+                    "available_memory_mb": system_info.available_memory_mb,
+                },
+                "resource_constraints": {
+                    "max_cpu_utilization_percent": self._resource_constraints.max_cpu_utilization_percent,
+                    "max_memory_utilization_percent": self._resource_constraints.max_memory_utilization_percent,
+                },
+                "active_calculations": {
+                    "count": len(self._active_calculations),
+                    "allocated_cpu_cores": allocated_cpu,
+                    "allocated_memory_mb": allocated_memory,
+                    "calculation_details": [
+                        {
+                            "id": calc.calculation_id,
+                            "cpu_cores": calc.cpu_cores,
+                            "memory_mb": calc.memory_mb,
+                            "estimated_memory_mb": calc.estimated_memory_mb
+                        }
+                        for calc in self._active_calculations.values()
+                    ]
+                },
+                "capacity": {
+                    "max_allowed_cpu": max(1, int(system_info.total_cpu_cores * self._resource_constraints.max_cpu_utilization_percent / 100.0)),
+                    "max_allowed_memory_mb": max(256, int(system_info.total_memory_mb * self._resource_constraints.max_memory_utilization_percent / 100.0)),
+                    "available_cpu_cores": max(0, max(1, int(system_info.total_cpu_cores * self._resource_constraints.max_cpu_utilization_percent / 100.0)) - allocated_cpu),
+                    "available_memory_mb": max(0, max(256, int(system_info.total_memory_mb * self._resource_constraints.max_memory_utilization_percent / 100.0)) - allocated_memory)
+                }
+            }
+        except Exception as e:
+            logger.error(f"Failed to get resource diagnostics: {e}")
+            return {
+                "error": str(e),
+                "mode": "error",
+                "psutil_available": self._psutil_available,
+                "fallback_mode": self._fallback_mode
+            }
+
     def _estimate_memory_usage(self, requested_memory_mb: int, calculation_method: str, cpu_cores: int) -> int:
         """
         Estimate actual memory usage based on calculation method and parameters.

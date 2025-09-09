@@ -8,7 +8,7 @@ from .ccsd_calculator import CCSDCalculator
 from .tddft_calculator import TDDFTCalculator
 from .orbital_generator import MolecularOrbitalGenerator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError, FileManagerError, ProcessManagerError, WebSocketError, XYZValidationError
-from .process_manager import CalculationProcessManager, get_process_manager, shutdown_process_manager
+from .process_manager import CalculationProcessManager, get_process_manager, shutdown_process_manager, update_process_manager_settings
 from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
 from .supported_parameters import get_all_supported_parameters
 from .settings_manager import SettingsManager, get_settings_manager, get_current_settings, update_app_settings
@@ -32,6 +32,7 @@ __all__ = [
     'CalculationProcessManager',
     'get_process_manager',
     'shutdown_process_manager',
+    'update_process_manager_settings',
     'WebSocketCalculationWatcher',
     'get_websocket_watcher',
     'shutdown_websocket_watcher',

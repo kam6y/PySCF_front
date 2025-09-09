@@ -16,6 +16,11 @@ from dataclasses import dataclass
 logger = logging.getLogger(__name__)
 
 
+class ProcessManagerError(Exception):
+    """Exception raised when process manager initialization or operation fails."""
+    pass
+
+
 @dataclass
 class QueuedCalculation:
     """Represents a calculation waiting in the queue."""
@@ -192,23 +197,42 @@ class CalculationProcessManager:
         self._queue_lock = threading.Lock()
         self._queue_processing = False
         
-        # Initialize resource manager
-        from .resource_manager import get_resource_manager
-        self.resource_manager = get_resource_manager()
+        # Initialize resource manager with error handling
+        try:
+            from .resource_manager import get_resource_manager
+            self.resource_manager = get_resource_manager()
+            logger.info("Resource manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize resource manager: {e}")
+            # Create a minimal fallback resource manager
+            self.resource_manager = None
+            logger.warning("Continuing without resource manager - calculations may not be resource-constrained")
         
-        # Background resource monitoring
+        # Initialize process pool executor with error handling
+        self.executor = None
+        try:
+            self.executor = ProcessPoolExecutor(
+                max_workers=self.max_workers,
+                mp_context=multiprocessing.get_context('spawn')  # Better cross-platform compatibility
+            )
+            logger.info(f"ProcessPoolExecutor created successfully with {self.max_workers} workers")
+        except Exception as e:
+            logger.error(f"Failed to create ProcessPoolExecutor: {e}")
+            raise ProcessManagerError(f"Cannot create process pool: {str(e)}")
+        
+        # Background resource monitoring (only if resource manager is available)
         self._resource_monitor_thread = None
         self._resource_monitor_stop_event = threading.Event()
         self._resource_monitor_interval = 10.0  # Check every 10 seconds
         
-        # Create executor immediately with fixed worker count
-        self.executor = ProcessPoolExecutor(
-            max_workers=self.max_workers,
-            mp_context=multiprocessing.get_context('spawn')  # Better cross-platform compatibility
-        )
-        
-        # Start background resource monitoring
-        self._start_resource_monitoring()
+        if self.resource_manager is not None:
+            try:
+                self._start_resource_monitoring()
+                logger.info("Background resource monitoring started")
+            except Exception as e:
+                logger.warning(f"Failed to start resource monitoring: {e}")
+        else:
+            logger.warning("Skipping resource monitoring due to resource manager initialization failure")
         
         logger.info(f"Initialized CalculationProcessManager with {self.max_workers} worker processes and {self.max_parallel_instances} max parallel instances")
     
@@ -239,17 +263,23 @@ class CalculationProcessManager:
         
         while not self._resource_monitor_stop_event.is_set():
             try:
-                # Only check for improvements if there are queued calculations
-                if self.calculation_queue and not self._shutdown:
-                    # Check if resources have improved
-                    has_improved, reason = self.resource_manager.has_resources_improved()
-                    
-                    if has_improved:
-                        logger.info(f"Resources improved: {reason}. Processing queue...")
-                        self._process_queue()
+                # Only check for improvements if there are queued calculations and resource manager is available
+                if self.calculation_queue and not self._shutdown and self.resource_manager is not None:
+                    try:
+                        # Check if resources have improved
+                        has_improved, reason = self.resource_manager.has_resources_improved()
                         
-                        # Also check for calculations that should be marked as errors
-                        self._check_queue_for_resource_errors()
+                        if has_improved:
+                            logger.info(f"Resources improved: {reason}. Processing queue...")
+                            self._process_queue()
+                            
+                            # Also check for calculations that should be marked as errors
+                            self._check_queue_for_resource_errors()
+                    except Exception as e:
+                        logger.warning(f"Failed to check resource improvements: {e}")
+                        # Try to process queue anyway
+                        if self.calculation_queue:
+                            self._process_queue()
                     
                 # Wait for the next check or until stop event is set
                 self._resource_monitor_stop_event.wait(timeout=self._resource_monitor_interval)
@@ -269,8 +299,16 @@ class CalculationProcessManager:
         calculations_to_error = []
         
         for queued_calc in self.calculation_queue:
-            # Check if system resources are fundamentally insufficient
-            insufficient, reason = self.resource_manager.check_if_system_resources_insufficient()
+            # Check if system resources are fundamentally insufficient (if resource manager is available)
+            insufficient = False
+            reason = None
+            
+            if self.resource_manager is not None:
+                try:
+                    insufficient, reason = self.resource_manager.check_if_system_resources_insufficient()
+                except Exception as e:
+                    logger.warning(f"Failed to check system resources insufficiency for queued calculation: {e}")
+                    insufficient = False
             
             if insufficient:
                 logger.warning(f"Marking calculation {queued_calc.calculation_id} as error: {reason}")
@@ -321,18 +359,36 @@ class CalculationProcessManager:
         user_memory_mb = parameters.get('memory_mb') or 2000
         calculation_method = parameters.get('calculation_method', 'DFT')
         
-        # Check resource availability
-        can_allocate, reason = self.resource_manager.can_allocate_resources(
-            cpu_cores=user_cpu_cores,
-            memory_mb=user_memory_mb,
-            calculation_method=calculation_method
-        )
+        # Check resource availability (skip if resource manager is not available)
+        can_allocate = True
+        reason = "Resource checking disabled"
+        
+        if self.resource_manager is not None:
+            try:
+                can_allocate, reason = self.resource_manager.can_allocate_resources(
+                    cpu_cores=user_cpu_cores,
+                    memory_mb=user_memory_mb,
+                    calculation_method=calculation_method
+                )
+            except Exception as e:
+                logger.warning(f"Resource checking failed: {e}. Proceeding without resource constraints.")
+                can_allocate = True
+                reason = "Resource checking failed - proceeding without constraints"
         
         if not can_allocate:
             logger.warning(f"Cannot start calculation {calculation_id}: {reason}")
             
             # Check if this is a fundamental system resource insufficiency (no active calculations)
-            insufficient, insufficient_reason = self.resource_manager.check_if_system_resources_insufficient()
+            # Only check if resource manager is available
+            insufficient = False
+            insufficient_reason = None
+            
+            if self.resource_manager is not None:
+                try:
+                    insufficient, insufficient_reason = self.resource_manager.check_if_system_resources_insufficient()
+                except Exception as e:
+                    logger.warning(f"Failed to check system resource insufficiency: {e}")
+                    insufficient = False
             
             if insufficient:
                 # System resources are fundamentally insufficient - return error instead of waiting
@@ -356,13 +412,18 @@ class CalculationProcessManager:
         if len(self.active_futures) < self.max_parallel_instances:
             # Start calculation immediately
             try:
-                # Register resources with the resource manager
-                self.resource_manager.register_calculation(
-                    calculation_id=calculation_id,
-                    cpu_cores=user_cpu_cores,
-                    memory_mb=user_memory_mb,
-                    calculation_method=calculation_method
-                )
+                # Register resources with the resource manager (if available)
+                if self.resource_manager is not None:
+                    try:
+                        self.resource_manager.register_calculation(
+                            calculation_id=calculation_id,
+                            cpu_cores=user_cpu_cores,
+                            memory_mb=user_memory_mb,
+                            calculation_method=calculation_method
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to register calculation resources: {e}")
+                        # Continue without resource registration
                 
                 future = self.executor.submit(calculation_worker, calculation_id, parameters)
                 self.active_futures[calculation_id] = future
@@ -375,8 +436,12 @@ class CalculationProcessManager:
                 
             except Exception as e:
                 logger.error(f"Failed to submit calculation {calculation_id}: {e}")
-                # Unregister resources on failure
-                self.resource_manager.unregister_calculation(calculation_id)
+                # Unregister resources on failure (if resource manager is available)
+                if self.resource_manager is not None:
+                    try:
+                        self.resource_manager.unregister_calculation(calculation_id)
+                    except Exception as cleanup_error:
+                        logger.warning(f"Failed to unregister calculation resources on failure: {cleanup_error}")
                 return False, 'error', None
         else:
             # Add to queue when all slots are occupied
@@ -404,8 +469,12 @@ class CalculationProcessManager:
             if calculation_id in self.active_futures:
                 del self.active_futures[calculation_id]
             
-            # Unregister resources from resource manager
-            self.resource_manager.unregister_calculation(calculation_id)
+            # Unregister resources from resource manager (if available)
+            if self.resource_manager is not None:
+                try:
+                    self.resource_manager.unregister_calculation(calculation_id)
+                except Exception as e:
+                    logger.warning(f"Failed to unregister calculation resources: {e}")
             
             # Determine result and log
             if future.exception():
@@ -459,12 +528,21 @@ class CalculationProcessManager:
                     user_memory_mb = queued_calc.parameters.get('memory_mb') or 2000
                     calculation_method = queued_calc.parameters.get('calculation_method', 'DFT')
                     
-                    # Check if resources are available for this calculation
-                    can_allocate, reason = self.resource_manager.can_allocate_resources(
-                        cpu_cores=user_cpu_cores,
-                        memory_mb=user_memory_mb,
-                        calculation_method=calculation_method
-                    )
+                    # Check if resources are available for this calculation (if resource manager is available)
+                    can_allocate = True
+                    reason = "Resource checking disabled"
+                    
+                    if self.resource_manager is not None:
+                        try:
+                            can_allocate, reason = self.resource_manager.can_allocate_resources(
+                                cpu_cores=user_cpu_cores,
+                                memory_mb=user_memory_mb,
+                                calculation_method=calculation_method
+                            )
+                        except Exception as e:
+                            logger.warning(f"Resource checking failed in queue processing: {e}")
+                            can_allocate = True
+                            reason = "Resource checking failed"
                     
                     if can_allocate:
                         # Remove this calculation from queue and start it
@@ -472,13 +550,18 @@ class CalculationProcessManager:
                         calc_found = True
                         
                         try:
-                            # Register resources with the resource manager
-                            self.resource_manager.register_calculation(
-                                calculation_id=next_calc.calculation_id,
-                                cpu_cores=user_cpu_cores,
-                                memory_mb=user_memory_mb,
-                                calculation_method=calculation_method
-                            )
+                            # Register resources with the resource manager (if available)
+                            if self.resource_manager is not None:
+                                try:
+                                    self.resource_manager.register_calculation(
+                                        calculation_id=next_calc.calculation_id,
+                                        cpu_cores=user_cpu_cores,
+                                        memory_mb=user_memory_mb,
+                                        calculation_method=calculation_method
+                                    )
+                                except Exception as e:
+                                    logger.warning(f"Failed to register queued calculation resources: {e}")
+                                    # Continue without resource registration
                             
                             # Start the calculation
                             future = self.executor.submit(calculation_worker, next_calc.calculation_id, next_calc.parameters)
@@ -495,8 +578,12 @@ class CalculationProcessManager:
                             
                         except Exception as e:
                             logger.error(f"Failed to start queued calculation {next_calc.calculation_id}: {e}")
-                            # Unregister resources on failure
-                            self.resource_manager.unregister_calculation(next_calc.calculation_id)
+                            # Unregister resources on failure (if resource manager is available)
+                            if self.resource_manager is not None:
+                                try:
+                                    self.resource_manager.unregister_calculation(next_calc.calculation_id)
+                                except Exception as cleanup_error:
+                                    logger.warning(f"Failed to unregister queued calculation resources on failure: {cleanup_error}")
                             # Update status to error
                             self._update_calculation_status_from_queue(next_calc.calculation_id, 'error')
                             break
@@ -680,17 +767,34 @@ def get_process_manager() -> CalculationProcessManager:
     """Get the global process manager instance."""
     global _process_manager
     if _process_manager is None:
-        # Get current settings to determine max parallel instances
+        # Initialize with default values to avoid circular imports
+        # Settings will be applied later via update_process_manager_settings()
+        default_max_parallel = min(4, multiprocessing.cpu_count())
+        logger.info(f"Initializing process manager with default settings: max_parallel={default_max_parallel}")
+        
+        try:
+            _process_manager = CalculationProcessManager(max_parallel_instances=default_max_parallel)
+            logger.info("Process manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize process manager: {e}")
+            # Create a minimal process manager that can handle errors gracefully
+            _process_manager = None
+            raise ProcessManagerError(f"Failed to initialize process manager: {str(e)}")
+    
+    return _process_manager
+
+
+def update_process_manager_settings():
+    """Update process manager settings from settings manager (called after initialization)."""
+    global _process_manager
+    if _process_manager is not None:
         try:
             from .settings_manager import get_current_settings
             settings = get_current_settings()
-            max_parallel = settings.max_parallel_instances
+            _process_manager.set_max_parallel_instances(settings.max_parallel_instances)
+            logger.info(f"Updated process manager settings: max_parallel_instances={settings.max_parallel_instances}")
         except Exception as e:
-            logger.warning(f"Failed to load settings for process manager: {e}. Using default.")
-            max_parallel = min(4, multiprocessing.cpu_count())
-        
-        _process_manager = CalculationProcessManager(max_parallel_instances=max_parallel)
-    return _process_manager
+            logger.warning(f"Failed to update process manager settings: {e}. Keeping current settings.")
 
 
 def shutdown_process_manager():
