@@ -598,14 +598,14 @@ class AppSettings(BaseModel):
     max_cpu_utilization_percent: float = Field(
         ...,
         description='Maximum CPU utilization percentage for the system',
-        examples=[80.0],
+        examples=[95.0],
         ge=10.0,
         le=100.0,
     )
     max_memory_utilization_percent: float = Field(
         ...,
         description='Maximum memory utilization percentage for the system',
-        examples=[80.0],
+        examples=[95.0],
         ge=10.0,
         le=100.0,
     )
@@ -674,14 +674,14 @@ class ResourceConstraints(BaseModel):
     max_cpu_utilization_percent: float = Field(
         ...,
         description='Maximum CPU utilization percentage',
-        examples=[80.0],
+        examples=[95.0],
         ge=10.0,
         le=100.0,
     )
     max_memory_utilization_percent: float = Field(
         ...,
         description='Maximum memory utilization percentage',
-        examples=[80.0],
+        examples=[95.0],
         ge=10.0,
         le=100.0,
     )

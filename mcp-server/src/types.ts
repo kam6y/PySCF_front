@@ -840,12 +840,12 @@ export interface components {
             max_parallel_instances: number;
             /**
              * @description Maximum CPU utilization percentage for the system
-             * @example 80
+             * @example 95
              */
             max_cpu_utilization_percent: number;
             /**
              * @description Maximum memory utilization percentage for the system
-             * @example 80
+             * @example 95
              */
             max_memory_utilization_percent: number;
             /**
@@ -908,12 +908,12 @@ export interface components {
         ResourceConstraints: {
             /**
              * @description Maximum CPU utilization percentage
-             * @example 80
+             * @example 95
              */
             max_cpu_utilization_percent: number;
             /**
              * @description Maximum memory utilization percentage
-             * @example 80
+             * @example 95
              */
             max_memory_utilization_percent: number;
             /**

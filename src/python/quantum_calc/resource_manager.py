@@ -39,8 +39,8 @@ class CalculationResourceUsage:
 @dataclass
 class ResourceConstraints:
     """Resource usage constraints for the system."""
-    max_cpu_utilization_percent: float = 80.0
-    max_memory_utilization_percent: float = 80.0
+    max_cpu_utilization_percent: float = 95.0
+    max_memory_utilization_percent: float = 95.0
     system_total_cores: int = 0
     system_total_memory_mb: int = 0
 

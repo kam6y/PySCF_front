@@ -1510,13 +1510,13 @@ components:
           minimum: 10.0
           maximum: 100.0
           description: Maximum CPU utilization percentage for the system
-          example: 80.0
+          example: 95.0
         max_memory_utilization_percent:
           type: number
           minimum: 10.0
           maximum: 100.0
           description: Maximum memory utilization percentage for the system
-          example: 80.0
+          example: 95.0
         system_total_cores:
           type: integer
           minimum: 1
@@ -1602,13 +1602,13 @@ components:
           minimum: 10.0
           maximum: 100.0
           description: Maximum CPU utilization percentage
-          example: 80.0
+          example: 95.0
         max_memory_utilization_percent:
           type: number
           minimum: 10.0
           maximum: 100.0
           description: Maximum memory utilization percentage
-          example: 80.0
+          example: 95.0
         max_allowed_cpu_cores:
           type: integer
           minimum: 1

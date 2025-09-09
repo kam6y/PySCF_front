@@ -46,8 +46,8 @@ class SettingsManager:
         
         return AppSettings(
             max_parallel_instances=min(4, total_cores),
-            max_cpu_utilization_percent=80.0,
-            max_memory_utilization_percent=80.0,
+            max_cpu_utilization_percent=95.0,
+            max_memory_utilization_percent=95.0,
             system_total_cores=total_cores,
             system_total_memory_mb=total_memory_mb
         )
