@@ -203,14 +203,14 @@ class SystemResourceManager:
         logger.debug(f"Current allocation: CPU {allocated_cpu}, Memory {allocated_memory} MB, Active calculations: {len(self._active_calculations)}")
         
         # Check CPU constraints
-        max_allowed_cpu = int(system_info.total_cpu_cores * self._resource_constraints.max_cpu_utilization_percent / 100.0)
+        max_allowed_cpu = max(1, int(system_info.total_cpu_cores * self._resource_constraints.max_cpu_utilization_percent / 100.0))
         if total_cpu_after > max_allowed_cpu:
             reason = f"CPU cores limit exceeded. Requested: {cpu_cores}, Available: {max_allowed_cpu - allocated_cpu}, Current usage: {allocated_cpu}/{max_allowed_cpu}"
             logger.debug(f"Resource allocation failed: {reason}")
             return False, reason
         
         # Check memory constraints
-        max_allowed_memory = int(system_info.total_memory_mb * self._resource_constraints.max_memory_utilization_percent / 100.0)
+        max_allowed_memory = max(256, int(system_info.total_memory_mb * self._resource_constraints.max_memory_utilization_percent / 100.0))
         if total_memory_after > max_allowed_memory:
             reason = f"Memory limit exceeded. Requested: {estimated_memory} MB, Available: {max_allowed_memory - allocated_memory} MB, Current usage: {allocated_memory}/{max_allowed_memory} MB"
             logger.debug(f"Resource allocation failed: {reason}")
@@ -237,8 +237,8 @@ class SystemResourceManager:
         system_info = self.get_system_info()
         allocated_cpu, allocated_memory = self.get_total_allocated_resources()
         
-        max_allowed_cpu = int(system_info.total_cpu_cores * self._resource_constraints.max_cpu_utilization_percent / 100.0)
-        max_allowed_memory = int(system_info.total_memory_mb * self._resource_constraints.max_memory_utilization_percent / 100.0)
+        max_allowed_cpu = max(1, int(system_info.total_cpu_cores * self._resource_constraints.max_cpu_utilization_percent / 100.0))
+        max_allowed_memory = max(256, int(system_info.total_memory_mb * self._resource_constraints.max_memory_utilization_percent / 100.0))
         
         return {
             "system_info": {
