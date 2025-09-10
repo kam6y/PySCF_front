@@ -223,8 +223,10 @@ const findAvailablePort = async (
   endPort: number
 ): Promise<number> => {
   const net = require('net');
+  const attemptedPorts: number[] = [];
 
   for (let port = startPort; port <= endPort; port++) {
+    attemptedPorts.push(port);
     try {
       await new Promise((resolve, reject) => {
         const server = net.createServer();
@@ -236,10 +238,20 @@ const findAvailablePort = async (
       return port;
     } catch (error) {
       // Port is in use, try next
+      if (endPort - startPort <= 5) {
+        // 少ない範囲の場合は詳細ログを出力
+        console.log(`  Port ${port} is in use, trying next...`);
+      }
       continue;
     }
   }
-  throw new Error(`No available port found in range ${startPort}-${endPort}`);
+  
+  const rangeSize = endPort - startPort + 1;
+  const errorDetails = rangeSize <= 10 
+    ? ` (tried: ${attemptedPorts.join(', ')})` 
+    : ` (checked ${rangeSize} ports)`;
+  
+  throw new Error(`No available port found in range ${startPort}-${endPort}${errorDetails}`);
 };
 
 /**
@@ -274,18 +286,42 @@ const startPythonServer = async (): Promise<void> => {
     let serverPort: number;
     if (serverSettings.port.auto_detect) {
       try {
+        console.log(`Auto-detecting available port in range ${serverSettings.port.default}-${serverSettings.port.range.end}...`);
         serverPort = await findAvailablePort(
           serverSettings.port.default,
           serverSettings.port.range.end
         );
+        console.log(`✓ Found available port: ${serverPort}`);
       } catch (error) {
-        console.log(
-          `Failed to find available port: ${error}. Using default: ${serverSettings.port.default}`
-        );
-        serverPort = serverSettings.port.default;
+        console.log(`⚠️  Auto-detection failed: ${error}`);
+        console.log(`Attempting to use fallback port: ${serverSettings.port.default}`);
+        
+        // フォールバック時もポートの利用可能性をチェック
+        try {
+          await findAvailablePort(serverSettings.port.default, serverSettings.port.default);
+          serverPort = serverSettings.port.default;
+          console.log(`✓ Fallback port ${serverSettings.port.default} is available`);
+        } catch (fallbackError) {
+          console.log(`✗ CRITICAL: Fallback port ${serverSettings.port.default} is also unavailable`);
+          // 最後の手段として、さらに広い範囲で検索
+          try {
+            console.log(`Searching in extended range ${serverSettings.port.range.end + 1}-${serverSettings.port.range.end + 100}...`);
+            serverPort = await findAvailablePort(
+              serverSettings.port.range.end + 1,
+              serverSettings.port.range.end + 100
+            );
+            console.log(`✓ Found port in extended range: ${serverPort}`);
+          } catch (extendedError) {
+            const errorMessage = `CRITICAL: No available ports found in any range. This may indicate:\n1. Too many services running on localhost\n2. Firewall blocking port access\n3. System resource limitations\n\nTried ranges: ${serverSettings.port.default}-${serverSettings.port.range.end}, ${serverSettings.port.range.end + 1}-${serverSettings.port.range.end + 100}`;
+            console.error(errorMessage);
+            reject(new Error(errorMessage));
+            return;
+          }
+        }
       }
     } else {
       serverPort = serverSettings.port.default;
+      console.log(`Using configured fixed port: ${serverPort}`);
     }
 
     flaskPort = serverPort;
