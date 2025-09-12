@@ -245,13 +245,16 @@ const findAvailablePort = async (
       continue;
     }
   }
-  
+
   const rangeSize = endPort - startPort + 1;
-  const errorDetails = rangeSize <= 10 
-    ? ` (tried: ${attemptedPorts.join(', ')})` 
-    : ` (checked ${rangeSize} ports)`;
-  
-  throw new Error(`No available port found in range ${startPort}-${endPort}${errorDetails}`);
+  const errorDetails =
+    rangeSize <= 10
+      ? ` (tried: ${attemptedPorts.join(', ')})`
+      : ` (checked ${rangeSize} ports)`;
+
+  throw new Error(
+    `No available port found in range ${startPort}-${endPort}${errorDetails}`
+  );
 };
 
 /**
@@ -286,7 +289,9 @@ const startPythonServer = async (): Promise<void> => {
     let serverPort: number;
     if (serverSettings.port.auto_detect) {
       try {
-        console.log(`Auto-detecting available port in range ${serverSettings.port.default}-${serverSettings.port.range.end}...`);
+        console.log(
+          `Auto-detecting available port in range ${serverSettings.port.default}-${serverSettings.port.range.end}...`
+        );
         serverPort = await findAvailablePort(
           serverSettings.port.default,
           serverSettings.port.range.end
@@ -294,18 +299,29 @@ const startPythonServer = async (): Promise<void> => {
         console.log(`✓ Found available port: ${serverPort}`);
       } catch (error) {
         console.log(`⚠️  Auto-detection failed: ${error}`);
-        console.log(`Attempting to use fallback port: ${serverSettings.port.default}`);
-        
+        console.log(
+          `Attempting to use fallback port: ${serverSettings.port.default}`
+        );
+
         // フォールバック時もポートの利用可能性をチェック
         try {
-          await findAvailablePort(serverSettings.port.default, serverSettings.port.default);
+          await findAvailablePort(
+            serverSettings.port.default,
+            serverSettings.port.default
+          );
           serverPort = serverSettings.port.default;
-          console.log(`✓ Fallback port ${serverSettings.port.default} is available`);
+          console.log(
+            `✓ Fallback port ${serverSettings.port.default} is available`
+          );
         } catch (fallbackError) {
-          console.log(`✗ CRITICAL: Fallback port ${serverSettings.port.default} is also unavailable`);
+          console.log(
+            `✗ CRITICAL: Fallback port ${serverSettings.port.default} is also unavailable`
+          );
           // 最後の手段として、さらに広い範囲で検索
           try {
-            console.log(`Searching in extended range ${serverSettings.port.range.end + 1}-${serverSettings.port.range.end + 100}...`);
+            console.log(
+              `Searching in extended range ${serverSettings.port.range.end + 1}-${serverSettings.port.range.end + 100}...`
+            );
             serverPort = await findAvailablePort(
               serverSettings.port.range.end + 1,
               serverSettings.port.range.end + 100

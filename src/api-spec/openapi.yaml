@@ -616,7 +616,7 @@ components:
 
     CalculationMethod:
       type: string
-      enum: [DFT, HF, MP2, CCSD, CCSD_T, TDDFT]
+      enum: [DFT, HF, MP2, CCSD, CCSD_T, TDDFT, CASCI, CASSCF]
       description: Quantum calculation method
 
     CalculationStatus:
@@ -729,6 +729,48 @@ components:
           type: boolean
           default: false
           description: Perform Natural Transition Orbital analysis (TDDFT only)
+        ncas:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 6
+          description: Number of active space orbitals (CASCI/CASSCF only)
+        nelecas:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 8
+          description: Number of active space electrons (CASCI/CASSCF only)
+        max_cycle_macro:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+          description: Maximum CASSCF macro iterations (CASSCF only)
+        max_cycle_micro:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 4
+          description: Maximum CI solver micro iterations (CASCI/CASSCF)
+        natorb:
+          type: boolean
+          default: true
+          description: Transform to natural orbitals in active space (CASCI/CASSCF only)
+        conv_tol:
+          type: number
+          format: float
+          minimum: 1e-12
+          maximum: 1e-3
+          default: 0.00000001
+          description: Energy convergence tolerance (CASSCF only)
+        conv_tol_grad:
+          type: number
+          format: float
+          minimum: 1e-8
+          maximum: 1e-2
+          default: 0.0001
+          description: Gradient convergence tolerance (CASSCF only)
 
     CalculationUpdateRequest:
       type: object
@@ -905,6 +947,36 @@ components:
           type: boolean
           nullable: true
           description: Whether NTO analysis was performed
+        ncas:
+          type: integer
+          nullable: true
+          description: Number of active space orbitals (CASCI/CASSCF)
+        nelecas:
+          type: integer
+          nullable: true
+          description: Number of active space electrons (CASCI/CASSCF)
+        max_cycle_macro:
+          type: integer
+          nullable: true
+          description: Maximum CASSCF macro iterations
+        max_cycle_micro:
+          type: integer
+          nullable: true
+          description: Maximum CI solver micro iterations
+        natorb:
+          type: boolean
+          nullable: true
+          description: Whether natural orbital transformation was used
+        conv_tol:
+          type: number
+          format: float
+          nullable: true
+          description: Energy convergence tolerance used
+        conv_tol_grad:
+          type: number
+          format: float
+          nullable: true
+          description: Gradient convergence tolerance used
 
     CalculationResults:
       type: object
@@ -1104,6 +1176,62 @@ components:
           type: number
           nullable: true
           description: Heat capacity at 298.15 K in Hartree/K
+        casci_energy:
+          type: number
+          nullable: true
+          description: CASCI energy in Hartree (CASCI only)
+        casscf_energy:
+          type: number
+          nullable: true
+          description: CASSCF energy in Hartree (CASSCF only)
+        correlation_energy:
+          type: number
+          nullable: true
+          description: Correlation energy (CASCI/CASSCF - SCF) in Hartree
+        macro_iterations:
+          type: integer
+          nullable: true
+          description: Number of CASSCF macro iterations performed
+        natural_orbital_analysis:
+          $ref: '#/components/schemas/NaturalOrbitalAnalysis'
+          nullable: true
+          description: Natural orbital analysis results (CASCI/CASSCF)
+        ci_coefficient_analysis:
+          $ref: '#/components/schemas/CICoefficientAnalysis'
+          nullable: true
+          description: CI coefficient analysis results (CASCI/CASSCF)
+        mulliken_spin_analysis:
+          $ref: '#/components/schemas/MullikenSpinAnalysis'
+          nullable: true
+          description: Mulliken atomic spin density analysis (CASCI/CASSCF open-shell)
+        orbital_overlap_analysis:
+          $ref: '#/components/schemas/OrbitalOverlapAnalysis'
+          nullable: true
+          description: Orbital overlap analysis between SCF and CASCI/CASSCF orbitals
+        orbital_rotation_analysis:
+          $ref: '#/components/schemas/OrbitalRotationAnalysis'
+          nullable: true
+          description: Orbital rotation analysis during CASSCF optimization (CASSCF only)
+        kernel_return_info:
+          type: object
+          nullable: true
+          description: Information about kernel() return value structure
+          properties:
+            tuple_length:
+              type: integer
+              description: Number of elements in kernel() return tuple
+            ci_coefficients_shape:
+              type: string
+              description: Shape of CI coefficients array
+          additionalProperties: true
+        ci_coefficients_available:
+          type: boolean
+          nullable: true
+          description: Whether CI coefficients are available from kernel() return
+        enhanced_ci_analysis:
+          $ref: '#/components/schemas/EnhancedCIAnalysis'
+          nullable: true
+          description: Enhanced CI coefficient analysis from kernel() return
 
     CalculationInstance:
       type: object
@@ -1811,3 +1939,302 @@ components:
           format: date-time
           description: ISO timestamp when the spectrum was generated
           example: "2024-01-01T12:00:00.000Z"
+
+    # CASCI/CASSCF Analysis Schemas
+    NaturalOrbitalAnalysis:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether natural orbital analysis was performed
+        occupation_numbers:
+          type: array
+          items:
+            type: number
+            format: float
+          nullable: true
+          description: Natural orbital occupation numbers
+        strongly_occupied_count:
+          type: integer
+          description: Number of strongly occupied orbitals (occupation > 1.5)
+        weakly_occupied_count:
+          type: integer
+          description: Number of weakly occupied orbitals (0.1 < occupation <= 1.5)
+        virtual_count:
+          type: integer
+          description: Number of virtual orbitals (occupation <= 0.1)
+        total_orbitals:
+          type: integer
+          description: Total number of active space orbitals analyzed
+        total_active_electrons:
+          type: number
+          format: float
+          description: Total number of electrons in active space
+        effective_electron_pairs:
+          type: number
+          format: float
+          description: Effective number of electron pairs
+        effective_unpaired_electrons:
+          type: number
+          format: float
+          description: Effective number of unpaired electrons
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    CICoefficientAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether CI coefficient analysis is available
+        total_configurations:
+          type: integer
+          description: Total number of configurations
+        major_configurations:
+          type: array
+          items:
+            type: object
+            properties:
+              configuration_index:
+                type: integer
+                description: Index of the configuration
+              coefficient:
+                type: number
+                format: float
+                description: CI coefficient value
+              contribution_percent:
+                type: number
+                format: float
+                description: Percentage contribution to the wavefunction
+              cumulative_percent:
+                type: number
+                format: float
+                description: Cumulative percentage contribution
+          description: Major configurations with significant contributions
+        leading_coefficient:
+          type: number
+          format: float
+          description: Leading CI coefficient (largest magnitude)
+        leading_contribution_percent:
+          type: number
+          format: float
+          description: Percentage contribution of the leading configuration
+        multiconfigurational_character:
+          type: number
+          format: float
+          description: Percentage multiconfigurational character (100 - leading contribution)
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    MullikenSpinAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether Mulliken spin analysis is available
+        atomic_spin_densities:
+          type: array
+          items:
+            type: object
+            properties:
+              atom_index:
+                type: integer
+                description: 0-based index of the atom
+              element:
+                type: string
+                description: Element symbol
+              spin_density:
+                type: number
+                format: float
+                description: Atomic spin density (alpha - beta electrons)
+              abs_spin_density:
+                type: number
+                format: float
+                description: Absolute value of atomic spin density
+          description: Spin density for each atom
+        total_spin_density:
+          type: number
+          format: float
+          description: Total spin density of the molecule
+        total_absolute_spin_density:
+          type: number
+          format: float
+          description: Sum of absolute atomic spin densities
+        expected_spin:
+          type: number
+          format: float
+          description: Expected spin (2S) from molecular parameters
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    OrbitalOverlapAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether orbital overlap analysis is available
+        active_space_orbitals:
+          type: integer
+          description: Number of active space orbitals analyzed
+        active_orbital_analysis:
+          type: array
+          items:
+            type: object
+            properties:
+              active_orbital_index:
+                type: integer
+                description: Index of active space orbital
+              dominant_scf_orbital:
+                type: integer
+                description: Index of dominant SCF orbital
+              max_overlap:
+                type: number
+                format: float
+                description: Maximum overlap with SCF orbitals
+              scf_orbital_type:
+                type: string
+                enum: [occupied, partially_occupied, virtual, unknown]
+                description: Type of dominant SCF orbital
+          description: Analysis of each active space orbital
+        average_max_overlap:
+          type: number
+          format: float
+          description: Average maximum overlap across active orbitals
+        orbital_transformation_character:
+          type: string
+          enum: [minimal, significant]
+          description: Character of orbital transformation
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    OrbitalRotationAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether orbital rotation analysis is available
+        core_orbital_rotation_magnitude:
+          type: number
+          format: float
+          description: Maximum rotation magnitude for core orbitals
+        active_orbital_rotation_magnitude:
+          type: number
+          format: float
+          description: Maximum rotation magnitude for active orbitals
+        virtual_orbital_rotation_magnitude:
+          type: number
+          format: float
+          description: Maximum rotation magnitude for virtual orbitals
+        overall_rotation_magnitude:
+          type: number
+          format: float
+          description: Overall maximum rotation magnitude
+        rotation_extent:
+          type: string
+          enum: [minimal, moderate, significant]
+          description: Extent of orbital rotation during CASSCF optimization
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    EnhancedCIAnalysis:
+      type: object
+      properties:
+        source:
+          type: string
+          enum: [kernel_return]
+          description: Source of CI analysis (from kernel return value)
+        available:
+          type: boolean
+          description: Whether enhanced CI analysis is available
+        total_coefficients:
+          type: integer
+          description: Total number of CI coefficients
+        ci_vector_shape:
+          type: string
+          description: Shape of the CI coefficient vector/matrix
+        major_configurations:
+          type: array
+          items:
+            type: object
+            properties:
+              configuration_index:
+                type: integer
+                description: Index of the configuration
+              coefficient:
+                type: number
+                format: float
+                description: CI coefficient value
+              contribution_percent:
+                type: number
+                format: float
+                description: Percentage contribution to the wavefunction
+              cumulative_percent:
+                type: number
+                format: float
+                description: Cumulative percentage contribution
+          description: Major configurations with >0.5% contribution
+        leading_coefficient:
+          type: number
+          format: float
+          description: Leading CI coefficient (largest magnitude)
+        leading_contribution_percent:
+          type: number
+          format: float
+          description: Percentage contribution of the leading configuration
+        multiconfigurational_character:
+          type: number
+          format: float
+          description: Multiconfigurational character (100 - leading contribution %)
+        effective_configurations:
+          type: integer
+          description: Number of configurations with significant contribution
+        wavefunction_entropy:
+          type: number
+          format: float
+          description: Entropy measure of wavefunction multiconfigurational character
+        wavefunction_character:
+          type: string
+          enum: [single_configuration, few_configuration, multiconfigurational]
+          description: Overall character of the wavefunction
+        normalization:
+          type: number
+          format: float
+          description: Normalization of the CI vector
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed

@@ -23,9 +23,12 @@ export const useCalculationWebSocket = (
   // 統一されたキャッシュ更新ロジック
   const handleCalculationUpdate = (updatedCalculation: CalculationInstance) => {
     const currentTimestamp = Date.now();
-    
+
     // 重複更新防止：グローバルWebSocketとの競合を回避
-    if (lastUpdateTimestampRef.current && (currentTimestamp - lastUpdateTimestampRef.current) < 100) {
+    if (
+      lastUpdateTimestampRef.current &&
+      currentTimestamp - lastUpdateTimestampRef.current < 100
+    ) {
       console.log(
         `[Individual WebSocket] Skipping duplicate update for calculation ${updatedCalculation.id} (within 100ms)`
       );

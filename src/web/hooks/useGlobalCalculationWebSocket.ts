@@ -34,7 +34,8 @@ export const useGlobalCalculationWebSocket = (
 
       // 重複更新防止：同じ計算の更新が短時間内に複数回来た場合はスキップ
       const lastUpdateTime = lastUpdateTimestamps.current.get(calculationId);
-      if (lastUpdateTime && (currentTimestamp - lastUpdateTime) < 100) { // 100ms以内の重複更新は無視
+      if (lastUpdateTime && currentTimestamp - lastUpdateTime < 100) {
+        // 100ms以内の重複更新は無視
         console.log(
           `[WebSocket] Skipping duplicate update for calculation ${calculationId} (within 100ms)`
         );
@@ -63,17 +64,21 @@ export const useGlobalCalculationWebSocket = (
       const previousListStatus = previousListItem?.status;
 
       // ステータス・エラーメッセージ変更の検証：ステータス変化またはエラーメッセージの変化があった場合に更新
-      const currentErrorMessage = updatedCalculation.errorMessage || updatedCalculation.results?.error;
-      const previousErrorMessage = previousDetailData?.calculation?.errorMessage || 
-                                   previousDetailData?.calculation?.results?.error;
-      
+      const currentErrorMessage =
+        updatedCalculation.errorMessage || updatedCalculation.results?.error;
+      const previousErrorMessage =
+        previousDetailData?.calculation?.errorMessage ||
+        previousDetailData?.calculation?.results?.error;
+
       const hasStatusChanged =
         previousStatus !== updatedCalculation.status ||
         previousListStatus !== updatedCalculation.status;
-      
-      const hasErrorMessageChanged = currentErrorMessage !== previousErrorMessage;
-      
-      const shouldUpdate = hasStatusChanged || hasErrorMessageChanged || !previousStatus;
+
+      const hasErrorMessageChanged =
+        currentErrorMessage !== previousErrorMessage;
+
+      const shouldUpdate =
+        hasStatusChanged || hasErrorMessageChanged || !previousStatus;
 
       if (!shouldUpdate) {
         console.log(
@@ -112,10 +117,13 @@ export const useGlobalCalculationWebSocket = (
               id: calculationId,
               name: updatedCalculation.name || calculationId,
               status: updatedCalculation.status,
-              date: updatedCalculation.updatedAt || updatedCalculation.createdAt || new Date().toISOString(),
+              date:
+                updatedCalculation.updatedAt ||
+                updatedCalculation.createdAt ||
+                new Date().toISOString(),
               // 最小限必要な情報のみを設定
             };
-            
+
             // リストの先頭に新しい計算を追加
             updatedCalculations = [newCalculationItem, ...oldData.calculations];
             console.log(

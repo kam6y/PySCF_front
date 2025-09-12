@@ -72,6 +72,14 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       tddft_nstates: 10,
       tddft_method: 'TDDFT',
       tddft_analyze_nto: false,
+      // CASCI/CASSCF parameters (required by generated types)
+      ncas: 6,
+      nelecas: 8,
+      max_cycle_macro: 50,
+      max_cycle_micro: 4,
+      natorb: true,
+      conv_tol: 1e-8,
+      conv_tol_grad: 1e-4,
     };
 
     const newId = `new-calculation-${Date.now()}`;

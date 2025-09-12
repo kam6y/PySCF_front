@@ -1,5 +1,21 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from 'react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine,
+} from 'recharts';
 import styles from './IRSpectrumViewer.module.css';
 import { getIRSpectrum } from '../apiClient';
 import type { components } from '../types/generated-api';
@@ -27,10 +43,15 @@ interface CustomTooltipProps {
   peaks?: IRPeak[];
 }
 
-const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label, peaks }) => {
+const CustomTooltip: React.FC<CustomTooltipProps> = ({
+  active,
+  payload,
+  label,
+  peaks,
+}) => {
   if (active && payload && payload.length && label !== undefined) {
-    const nearbyPeak = peaks?.find(peak => 
-      Math.abs(peak.frequency_cm - label) < 10
+    const nearbyPeak = peaks?.find(
+      peak => Math.abs(peak.frequency_cm - label) < 10
     );
 
     return (
@@ -39,7 +60,9 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label, p
         <p>{`Intensity: ${payload[0].value.toFixed(3)}`}</p>
         {nearbyPeak && (
           <div className={styles.peakInfo}>
-            <p><strong>Peak: {nearbyPeak.frequency_cm.toFixed(1)} cm⁻¹</strong></p>
+            <p>
+              <strong>Peak: {nearbyPeak.frequency_cm.toFixed(1)} cm⁻¹</strong>
+            </p>
             <p>Original: {nearbyPeak.original_frequency_cm.toFixed(1)} cm⁻¹</p>
           </div>
         )}
@@ -49,9 +72,9 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label, p
   return null;
 };
 
-export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({ 
-  calculationId, 
-  onError 
+export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
+  calculationId,
+  onError,
 }) => {
   const [spectrumData, setSpectrumData] = useState<IRSpectrumData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -60,7 +83,7 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
     broadening_fwhm: 100.0,
     x_min: 400.0,
     x_max: 4000.0,
-    show_peaks: true
+    show_peaks: true,
   });
   const [showSettings, setShowSettings] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -83,9 +106,9 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
         broadening_fwhm: settings.broadening_fwhm,
         x_min: settings.x_min,
         x_max: settings.x_max,
-        show_peaks: settings.show_peaks
+        show_peaks: settings.show_peaks,
       });
-      
+
       if (isMountedRef.current) {
         setSpectrumData(result);
       }
@@ -93,9 +116,10 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
       if (err instanceof Error && err.name === 'AbortError') {
         return; // キャンセルされた場合は何もしない
       }
-      
+
       if (isMountedRef.current) {
-        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown error';
         setError(errorMessage);
         if (onError) {
           onError(errorMessage);
@@ -115,7 +139,7 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
   // クリーンアップ用のuseEffect
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     return () => {
       isMountedRef.current = false;
       if (abortControllerRef.current) {
@@ -136,20 +160,20 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
   // メモリ効率を改善：最初から必要な範囲だけを生成
   const filteredChartData = useMemo(() => {
     if (!spectrumData?.spectrum) return [];
-    
+
     const { x_axis, y_axis } = spectrumData.spectrum;
     const filteredData: ChartDataPoint[] = [];
-    
+
     for (let i = 0; i < x_axis.length; i++) {
       const wavenumber = x_axis[i];
       if (wavenumber >= settings.x_min && wavenumber <= settings.x_max) {
         filteredData.push({
           wavenumber,
-          intensity: y_axis[i]
+          intensity: y_axis[i],
         });
       }
     }
-    
+
     return filteredData;
   }, [spectrumData, settings.x_min, settings.x_max]);
 
@@ -165,9 +189,7 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
     return (
       <div className={styles.container}>
         <div className={styles.loadingContainer}>
-          <div className={styles.loadingText}>
-            ⚛️ Generating IR spectrum...
-          </div>
+          <div className={styles.loadingText}>⚛️ Generating IR spectrum...</div>
         </div>
       </div>
     );
@@ -219,10 +241,12 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
               <input
                 type="number"
                 value={settings.broadening_fwhm}
-                onChange={(e) => setSettings(prev => ({
-                  ...prev,
-                  broadening_fwhm: parseFloat(e.target.value) || 100
-                }))}
+                onChange={e =>
+                  setSettings(prev => ({
+                    ...prev,
+                    broadening_fwhm: parseFloat(e.target.value) || 100,
+                  }))
+                }
                 min={0.1}
                 max={1000}
                 step={10}
@@ -235,10 +259,12 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
                 <input
                   type="number"
                   value={settings.x_min}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    x_min: parseFloat(e.target.value) || 400
-                  }))}
+                  onChange={e =>
+                    setSettings(prev => ({
+                      ...prev,
+                      x_min: parseFloat(e.target.value) || 400,
+                    }))
+                  }
                   min={0}
                   max={10000}
                   step={100}
@@ -248,10 +274,12 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
                 <input
                   type="number"
                   value={settings.x_max}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    x_max: parseFloat(e.target.value) || 4000
-                  }))}
+                  onChange={e =>
+                    setSettings(prev => ({
+                      ...prev,
+                      x_max: parseFloat(e.target.value) || 4000,
+                    }))
+                  }
                   min={0}
                   max={10000}
                   step={100}
@@ -265,20 +293,28 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
                 <input
                   type="checkbox"
                   checked={settings.show_peaks}
-                  onChange={(e) => setSettings(prev => ({
-                    ...prev,
-                    show_peaks: e.target.checked
-                  }))}
+                  onChange={e =>
+                    setSettings(prev => ({
+                      ...prev,
+                      show_peaks: e.target.checked,
+                    }))
+                  }
                 />
                 Show peak markers
               </label>
             </div>
           </div>
           <div className={styles.settingsActions}>
-            <button onClick={handleSettingsUpdate} className={styles.applyButton}>
+            <button
+              onClick={handleSettingsUpdate}
+              className={styles.applyButton}
+            >
               Apply
             </button>
-            <button onClick={() => setShowSettings(false)} className={styles.cancelButton}>
+            <button
+              onClick={() => setShowSettings(false)}
+              className={styles.cancelButton}
+            >
               Cancel
             </button>
           </div>
@@ -298,82 +334,104 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
               }}
             >
               <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-              <XAxis 
+              <XAxis
                 dataKey="wavenumber"
                 type="number"
                 scale="linear"
                 domain={[settings.x_max, settings.x_min]}
                 tick={{ fontSize: 11 }}
-                tickFormatter={(value) => Math.round(value).toString()}
+                tickFormatter={value => Math.round(value).toString()}
                 ticks={[
                   settings.x_max,
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.1),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.2),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.3),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.4),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.5),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.6),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.7),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.8),
-                  Math.round(settings.x_max - (settings.x_max - settings.x_min) * 0.9),
-                  settings.x_min
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.1
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.2
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.3
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.4
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.5
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.6
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.7
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.8
+                  ),
+                  Math.round(
+                    settings.x_max - (settings.x_max - settings.x_min) * 0.9
+                  ),
+                  settings.x_min,
                 ]}
-                label={{ 
-                  value: 'Wavenumber (cm⁻¹)', 
-                  position: 'insideBottom', 
+                label={{
+                  value: 'Wavenumber (cm⁻¹)',
+                  position: 'insideBottom',
                   offset: -25,
-                  style: { textAnchor: 'middle' }
+                  style: { textAnchor: 'middle' },
                 }}
               />
-              <YAxis 
+              <YAxis
                 tick={{ fontSize: 12 }}
                 domain={[0, 'dataMax']}
-                tickFormatter={(value) => {
+                tickFormatter={value => {
                   if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
                   if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
                   return value.toFixed(1);
                 }}
-                label={{ 
-                  value: 'Intensity (arb. units)', 
-                  angle: -90, 
+                label={{
+                  value: 'Intensity (arb. units)',
+                  angle: -90,
                   position: 'insideLeft',
-                  style: { textAnchor: 'middle' }
+                  style: { textAnchor: 'middle' },
                 }}
               />
-              <Tooltip 
+              <Tooltip
                 content={<CustomTooltip peaks={peaks} />}
                 cursor={{ strokeDasharray: '3 3' }}
               />
 
-              <Line 
-                type="monotone" 
-                dataKey="intensity" 
-                stroke="#2563eb" 
+              <Line
+                type="monotone"
+                dataKey="intensity"
+                stroke="#2563eb"
                 strokeWidth={1.5}
                 dot={false}
                 name="IR Spectrum"
                 isAnimationActive={false}
               />
-              
-              {settings.show_peaks && peaks.map((peak: IRPeak, index: number) => {
-                if (peak.frequency_cm >= settings.x_min && peak.frequency_cm <= settings.x_max) {
-                  return (
-                    <ReferenceLine 
-                      key={index}
-                      x={peak.frequency_cm}
-                      stroke="#dc2626"
-                      strokeDasharray="5 5"
-                      strokeOpacity={0.7}
-                      label={{
-                        value: peak.frequency_cm.toFixed(0),
-                        position: 'top',
-                        style: { fill: '#dc2626', fontSize: '10px' }
-                      }}
-                    />
-                  );
-                }
-                return null;
-              })}
+
+              {settings.show_peaks &&
+                peaks.map((peak: IRPeak, index: number) => {
+                  if (
+                    peak.frequency_cm >= settings.x_min &&
+                    peak.frequency_cm <= settings.x_max
+                  ) {
+                    return (
+                      <ReferenceLine
+                        key={index}
+                        x={peak.frequency_cm}
+                        stroke="#dc2626"
+                        strokeDasharray="5 5"
+                        strokeOpacity={0.7}
+                        label={{
+                          value: peak.frequency_cm.toFixed(0),
+                          position: 'top',
+                          style: { fill: '#dc2626', fontSize: '10px' },
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })}
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -391,11 +449,15 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
             </div>
             <div className={styles.metadataItem}>
               <span className={styles.metadataLabel}>Scale Factor:</span>
-              <span className={styles.metadataValue}>{metadata.scale_factor.toFixed(3)}</span>
+              <span className={styles.metadataValue}>
+                {metadata.scale_factor.toFixed(3)}
+              </span>
             </div>
             <div className={styles.metadataItem}>
               <span className={styles.metadataLabel}>Broadening FWHM:</span>
-              <span className={styles.metadataValue}>{metadata.broadening_fwhm_cm.toFixed(0)} cm⁻¹</span>
+              <span className={styles.metadataValue}>
+                {metadata.broadening_fwhm_cm.toFixed(0)} cm⁻¹
+              </span>
             </div>
             <div className={styles.metadataItem}>
               <span className={styles.metadataLabel}>Peaks Shown:</span>
@@ -416,16 +478,20 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
                 <span>Original Freq.</span>
               </div>
               {peaks
-                .filter((peak: IRPeak) => peak.frequency_cm >= settings.x_min && peak.frequency_cm <= settings.x_max)
+                .filter(
+                  (peak: IRPeak) =>
+                    peak.frequency_cm >= settings.x_min &&
+                    peak.frequency_cm <= settings.x_max
+                )
                 .sort((a: IRPeak, b: IRPeak) => b.intensity - a.intensity)
                 .slice(0, 10)
                 .map((peak: IRPeak, index: number) => (
-                <div key={index} className={styles.peaksRow}>
-                  <span>{formatFrequency(peak.frequency_cm)}</span>
-                  <span>{formatIntensity(peak.intensity)}</span>
-                  <span>{formatFrequency(peak.original_frequency_cm)}</span>
-                </div>
-              ))}
+                  <div key={index} className={styles.peaksRow}>
+                    <span>{formatFrequency(peak.frequency_cm)}</span>
+                    <span>{formatIntensity(peak.intensity)}</span>
+                    <span>{formatFrequency(peak.original_frequency_cm)}</span>
+                  </div>
+                ))}
             </div>
           </div>
         )}

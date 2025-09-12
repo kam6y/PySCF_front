@@ -176,6 +176,40 @@ export const CalculationSettingsPage = ({
             (adjustedParams as any).tddft_analyze_nto !== undefined
               ? (adjustedParams as any).tddft_analyze_nto
               : false;
+        } else if (value === 'CASCI' || value === 'CASSCF') {
+          // CASCI/CASSCF defaults
+          adjustedParams.basis_function =
+            adjustedParams.basis_function || '6-31G(d)';
+          adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
+          // Initialize CASCI/CASSCF parameters if not already set
+          (adjustedParams as any).ncas =
+            (adjustedParams as any).ncas !== undefined
+              ? (adjustedParams as any).ncas
+              : 6;
+          (adjustedParams as any).nelecas =
+            (adjustedParams as any).nelecas !== undefined
+              ? (adjustedParams as any).nelecas
+              : 8;
+          (adjustedParams as any).max_cycle_macro =
+            (adjustedParams as any).max_cycle_macro !== undefined
+              ? (adjustedParams as any).max_cycle_macro
+              : 50;
+          (adjustedParams as any).max_cycle_micro =
+            (adjustedParams as any).max_cycle_micro !== undefined
+              ? (adjustedParams as any).max_cycle_micro
+              : 4;
+          (adjustedParams as any).natorb =
+            (adjustedParams as any).natorb !== undefined
+              ? (adjustedParams as any).natorb
+              : true;
+          (adjustedParams as any).conv_tol =
+            (adjustedParams as any).conv_tol !== undefined
+              ? (adjustedParams as any).conv_tol
+              : 1e-8;
+          (adjustedParams as any).conv_tol_grad =
+            (adjustedParams as any).conv_tol_grad !== undefined
+              ? (adjustedParams as any).conv_tol_grad
+              : 1e-4;
         } else {
           // DFT/HF defaults
           adjustedParams.basis_function =
@@ -184,33 +218,63 @@ export const CalculationSettingsPage = ({
         }
       }
 
-      const safeParams: QuantumCalculationRequest & { frozen_core?: boolean } =
-        {
-          xyz: adjustedParams.xyz || '',
-          calculation_method: adjustedParams.calculation_method || 'DFT',
-          basis_function: adjustedParams.basis_function || '6-31G(d)',
-          exchange_correlation: adjustedParams.exchange_correlation || 'B3LYP',
-          charges: adjustedParams.charges || 0,
-          spin: adjustedParams.spin || 0,
-          solvent_method: adjustedParams.solvent_method || 'none',
-          solvent: adjustedParams.solvent || '-',
-          name:
-            (adjustedParams as any).name ||
-            (adjustedParams as any).molecule_name ||
-            'Unnamed Calculation',
-          cpu_cores: adjustedParams.cpu_cores || undefined,
-          memory_mb: adjustedParams.memory_mb || undefined,
-          tddft_nstates:
-            (adjustedParams as any).tddft_nstates !== undefined
-              ? (adjustedParams as any).tddft_nstates
-              : 10,
-          tddft_method: (adjustedParams as any).tddft_method || 'TDDFT',
-          tddft_analyze_nto:
-            (adjustedParams as any).tddft_analyze_nto !== undefined
-              ? (adjustedParams as any).tddft_analyze_nto
-              : false,
-          frozen_core: (adjustedParams as any).frozen_core !== false, // Default to true
-        };
+      const safeParams: QuantumCalculationRequest & {
+        frozen_core?: boolean;
+      } = {
+        xyz: adjustedParams.xyz || '',
+        calculation_method: adjustedParams.calculation_method || 'DFT',
+        basis_function: adjustedParams.basis_function || '6-31G(d)',
+        exchange_correlation: adjustedParams.exchange_correlation || 'B3LYP',
+        charges: adjustedParams.charges || 0,
+        spin: adjustedParams.spin || 0,
+        solvent_method: adjustedParams.solvent_method || 'none',
+        solvent: adjustedParams.solvent || '-',
+        name:
+          (adjustedParams as any).name ||
+          (adjustedParams as any).molecule_name ||
+          'Unnamed Calculation',
+        cpu_cores: adjustedParams.cpu_cores || undefined,
+        memory_mb: adjustedParams.memory_mb || undefined,
+        tddft_nstates:
+          (adjustedParams as any).tddft_nstates !== undefined
+            ? (adjustedParams as any).tddft_nstates
+            : 10,
+        tddft_method: (adjustedParams as any).tddft_method || 'TDDFT',
+        tddft_analyze_nto:
+          (adjustedParams as any).tddft_analyze_nto !== undefined
+            ? (adjustedParams as any).tddft_analyze_nto
+            : false,
+        frozen_core: (adjustedParams as any).frozen_core !== false, // Default to true
+        // CASCI/CASSCF parameters - now required
+        ncas:
+          (adjustedParams as any).ncas !== undefined
+            ? (adjustedParams as any).ncas
+            : 6,
+        nelecas:
+          (adjustedParams as any).nelecas !== undefined
+            ? (adjustedParams as any).nelecas
+            : 8,
+        max_cycle_macro:
+          (adjustedParams as any).max_cycle_macro !== undefined
+            ? (adjustedParams as any).max_cycle_macro
+            : 50,
+        max_cycle_micro:
+          (adjustedParams as any).max_cycle_micro !== undefined
+            ? (adjustedParams as any).max_cycle_micro
+            : 4,
+        natorb:
+          (adjustedParams as any).natorb !== undefined
+            ? (adjustedParams as any).natorb
+            : true,
+        conv_tol:
+          (adjustedParams as any).conv_tol !== undefined
+            ? (adjustedParams as any).conv_tol
+            : 1e-8,
+        conv_tol_grad:
+          (adjustedParams as any).conv_tol_grad !== undefined
+            ? (adjustedParams as any).conv_tol_grad
+            : 1e-4,
+      };
 
       if (isCompleted && isParamChange) {
         const newParams = { ...safeParams, [field]: processedValue };
@@ -277,6 +341,35 @@ export const CalculationSettingsPage = ({
               ? (currentParams as any).tddft_analyze_nto
               : false,
           frozen_core: (currentParams as any).frozen_core !== false, // Default to true
+          // CASCI/CASSCF parameters - now required
+          ncas:
+            (currentParams as any).ncas !== undefined
+              ? (currentParams as any).ncas
+              : 6,
+          nelecas:
+            (currentParams as any).nelecas !== undefined
+              ? (currentParams as any).nelecas
+              : 8,
+          max_cycle_macro:
+            (currentParams as any).max_cycle_macro !== undefined
+              ? (currentParams as any).max_cycle_macro
+              : 50,
+          max_cycle_micro:
+            (currentParams as any).max_cycle_micro !== undefined
+              ? (currentParams as any).max_cycle_micro
+              : 4,
+          natorb:
+            (currentParams as any).natorb !== undefined
+              ? (currentParams as any).natorb
+              : true,
+          conv_tol:
+            (currentParams as any).conv_tol !== undefined
+              ? (currentParams as any).conv_tol
+              : 1e-8,
+          conv_tol_grad:
+            (currentParams as any).conv_tol_grad !== undefined
+              ? (currentParams as any).conv_tol_grad
+              : 1e-4,
         };
 
         if (isCompleted) {
@@ -370,7 +463,9 @@ export const CalculationSettingsPage = ({
     setCalculationError(null);
 
     const currentParams = activeCalculation.parameters;
-    const finalParams: QuantumCalculationRequest & { frozen_core?: boolean } = {
+    const finalParams: QuantumCalculationRequest & {
+      frozen_core?: boolean;
+    } = {
       xyz: currentParams.xyz || '',
       calculation_method: currentParams.calculation_method || 'DFT',
       basis_function: currentParams.basis_function || '6-31G(d)',
@@ -392,6 +487,35 @@ export const CalculationSettingsPage = ({
           ? (currentParams as any).tddft_analyze_nto
           : false,
       frozen_core: (currentParams as any).frozen_core !== false, // Default to true
+      // CASCI/CASSCF parameters - now required
+      ncas:
+        (currentParams as any).ncas !== undefined
+          ? (currentParams as any).ncas
+          : 6,
+      nelecas:
+        (currentParams as any).nelecas !== undefined
+          ? (currentParams as any).nelecas
+          : 8,
+      max_cycle_macro:
+        (currentParams as any).max_cycle_macro !== undefined
+          ? (currentParams as any).max_cycle_macro
+          : 50,
+      max_cycle_micro:
+        (currentParams as any).max_cycle_micro !== undefined
+          ? (currentParams as any).max_cycle_micro
+          : 4,
+      natorb:
+        (currentParams as any).natorb !== undefined
+          ? (currentParams as any).natorb
+          : true,
+      conv_tol:
+        (currentParams as any).conv_tol !== undefined
+          ? (currentParams as any).conv_tol
+          : 1e-8,
+      conv_tol_grad:
+        (currentParams as any).conv_tol_grad !== undefined
+          ? (currentParams as any).conv_tol_grad
+          : 1e-4,
     };
 
     try {
@@ -450,30 +574,53 @@ export const CalculationSettingsPage = ({
         activeCalculation.status === 'completed' ||
         activeCalculation.status === 'error';
 
-      const safeParams: QuantumCalculationRequest & { frozen_core?: boolean } =
-        {
-          xyz: data.xyz,
-          calculation_method: params.calculation_method || 'DFT',
-          basis_function: params.basis_function || '6-31G(d)',
-          exchange_correlation: params.exchange_correlation || 'B3LYP',
-          charges: params.charges || 0,
-          spin: params.spin || 0,
-          solvent_method: params.solvent_method || 'none',
-          solvent: params.solvent || '-',
-          name: moleculeName,
-          cpu_cores: params.cpu_cores || undefined,
-          memory_mb: params.memory_mb || undefined,
-          tddft_nstates:
-            (params as any).tddft_nstates !== undefined
-              ? (params as any).tddft_nstates
-              : 10,
-          tddft_method: (params as any).tddft_method || 'TDDFT',
-          tddft_analyze_nto:
-            (params as any).tddft_analyze_nto !== undefined
-              ? (params as any).tddft_analyze_nto
-              : false,
-          frozen_core: (params as any).frozen_core !== false, // Default to true
-        };
+      const safeParams: QuantumCalculationRequest & {
+        frozen_core?: boolean;
+      } = {
+        xyz: data.xyz,
+        calculation_method: params.calculation_method || 'DFT',
+        basis_function: params.basis_function || '6-31G(d)',
+        exchange_correlation: params.exchange_correlation || 'B3LYP',
+        charges: params.charges || 0,
+        spin: params.spin || 0,
+        solvent_method: params.solvent_method || 'none',
+        solvent: params.solvent || '-',
+        name: moleculeName,
+        cpu_cores: params.cpu_cores || undefined,
+        memory_mb: params.memory_mb || undefined,
+        tddft_nstates:
+          (params as any).tddft_nstates !== undefined
+            ? (params as any).tddft_nstates
+            : 10,
+        tddft_method: (params as any).tddft_method || 'TDDFT',
+        tddft_analyze_nto:
+          (params as any).tddft_analyze_nto !== undefined
+            ? (params as any).tddft_analyze_nto
+            : false,
+        frozen_core: (params as any).frozen_core !== false, // Default to true
+        // CASCI/CASSCF parameters - now required
+        ncas: (params as any).ncas !== undefined ? (params as any).ncas : 6,
+        nelecas:
+          (params as any).nelecas !== undefined ? (params as any).nelecas : 8,
+        max_cycle_macro:
+          (params as any).max_cycle_macro !== undefined
+            ? (params as any).max_cycle_macro
+            : 50,
+        max_cycle_micro:
+          (params as any).max_cycle_micro !== undefined
+            ? (params as any).max_cycle_micro
+            : 4,
+        natorb:
+          (params as any).natorb !== undefined ? (params as any).natorb : true,
+        conv_tol:
+          (params as any).conv_tol !== undefined
+            ? (params as any).conv_tol
+            : 1e-8,
+        conv_tol_grad:
+          (params as any).conv_tol_grad !== undefined
+            ? (params as any).conv_tol_grad
+            : 1e-4,
+      };
 
       if (isCompleted) {
         createNewCalculationFromExisting(activeCalculation, safeParams);
@@ -786,10 +933,7 @@ export const CalculationSettingsPage = ({
                   type="number"
                   value={params.spin || 0}
                   onChange={e =>
-                    handleParamChange(
-                      'spin',
-                      Number(e.target.value)
-                    )
+                    handleParamChange('spin', Number(e.target.value))
                   }
                   min={0}
                   step={1}
@@ -798,6 +942,162 @@ export const CalculationSettingsPage = ({
                 />
               </div>
             </section>
+            {(params.calculation_method === 'CASCI' ||
+              params.calculation_method === 'CASSCF') && (
+              <section className={styles.calculationSettingsSection}>
+                <div className={styles.settingRow}>
+                  <label>Number of Active Orbitals (ncas)</label>
+                  <input
+                    type="number"
+                    value={
+                      (params as any).ncas !== undefined
+                        ? (params as any).ncas
+                        : 6
+                    }
+                    onChange={e =>
+                      handleParamChange(
+                        'ncas' as any,
+                        Math.max(1, Math.min(20, Number(e.target.value)))
+                      )
+                    }
+                    min={1}
+                    max={20}
+                    step={1}
+                    className={`${styles.numberInput} ${styles.withSpinner}`}
+                    disabled={calculationStatus === 'running'}
+                  />
+                </div>
+                <div className={styles.settingRow}>
+                  <label>Number of Active Electrons (nelecas)</label>
+                  <input
+                    type="number"
+                    value={
+                      (params as any).nelecas !== undefined
+                        ? (params as any).nelecas
+                        : 8
+                    }
+                    onChange={e =>
+                      handleParamChange(
+                        'nelecas' as any,
+                        Math.max(0, Math.min(40, Number(e.target.value)))
+                      )
+                    }
+                    min={0}
+                    max={40}
+                    step={1}
+                    className={`${styles.numberInput} ${styles.withSpinner}`}
+                    disabled={calculationStatus === 'running'}
+                  />
+                </div>
+                {params.calculation_method === 'CASSCF' && (
+                  <div className={styles.settingRow}>
+                    <label>CASSCF Max Macro Iterations</label>
+                    <input
+                      type="number"
+                      value={
+                        (params as any).max_cycle_macro !== undefined
+                          ? (params as any).max_cycle_macro
+                          : 50
+                      }
+                      onChange={e =>
+                        handleParamChange(
+                          'max_cycle_macro' as any,
+                          Math.max(1, Math.min(200, Number(e.target.value)))
+                        )
+                      }
+                      min={1}
+                      max={200}
+                      step={1}
+                      className={`${styles.numberInput} ${styles.withSpinner}`}
+                      disabled={calculationStatus === 'running'}
+                    />
+                  </div>
+                )}
+                <div className={styles.settingRow}>
+                  <label>CI Max Micro Iterations</label>
+                  <input
+                    type="number"
+                    value={
+                      (params as any).max_cycle_micro !== undefined
+                        ? (params as any).max_cycle_micro
+                        : 4
+                    }
+                    onChange={e =>
+                      handleParamChange(
+                        'max_cycle_micro' as any,
+                        Math.max(1, Math.min(100, Number(e.target.value)))
+                      )
+                    }
+                    min={1}
+                    max={100}
+                    step={1}
+                    className={`${styles.numberInput} ${styles.withSpinner}`}
+                    disabled={calculationStatus === 'running'}
+                  />
+                </div>
+                <div className={styles.settingRow}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={(params as any).natorb !== false}
+                      onChange={e =>
+                        handleParamChange('natorb' as any, e.target.checked)
+                      }
+                      disabled={calculationStatus === 'running'}
+                    />
+                    Transform to Natural Orbitals in Active Space
+                  </label>
+                </div>
+                {params.calculation_method === 'CASSCF' && (
+                  <>
+                    <div className={styles.settingRow}>
+                      <label>Energy Convergence Tolerance</label>
+                      <select
+                        value={
+                          (params as any).conv_tol !== undefined
+                            ? (params as any).conv_tol
+                            : 1e-8
+                        }
+                        onChange={e =>
+                          handleParamChange(
+                            'conv_tol' as any,
+                            parseFloat(e.target.value)
+                          )
+                        }
+                        disabled={calculationStatus === 'running'}
+                      >
+                        <option value={1e-5}>1e-5 (loose)</option>
+                        <option value={1e-6}>1e-6 (normal)</option>
+                        <option value={1e-7}>1e-7 (tight)</option>
+                        <option value={1e-8}>1e-8 (very tight)</option>
+                      </select>
+                    </div>
+                    <div className={styles.settingRow}>
+                      <label>Gradient Convergence Tolerance</label>
+                      <select
+                        value={
+                          (params as any).conv_tol_grad !== undefined
+                            ? (params as any).conv_tol_grad
+                            : 1e-4
+                        }
+                        onChange={e =>
+                          handleParamChange(
+                            'conv_tol_grad' as any,
+                            parseFloat(e.target.value)
+                          )
+                        }
+                        disabled={calculationStatus === 'running'}
+                      >
+                        <option value={1e-3}>1e-3 (loose)</option>
+                        <option value={1e-4}>1e-4 (normal)</option>
+                        <option value={1e-5}>1e-5 (tight)</option>
+                        <option value={1e-6}>1e-6 (very tight)</option>
+                      </select>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
             {params.calculation_method === 'TDDFT' && (
               <section className={styles.calculationSettingsSection}>
                 <div className={styles.settingRow}>

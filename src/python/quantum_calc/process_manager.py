@@ -55,7 +55,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     memory_mb = parameters.get('memory_mb') or 2000  # Noneや空の値をデフォルト値に置き換え
 
     # Import here to avoid issues with multiprocessing and module loading
-    from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator
+    from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator, CASCICalculator, CASSCFCalculator
     from quantum_calc import CalculationError, ConvergenceError, InputError
     from quantum_calc.file_manager import CalculationFileManager
     from threadpoolctl import threadpool_info
@@ -106,6 +106,10 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         elif calculation_method == 'TDDFT':
             calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        elif calculation_method == 'CASCI':
+            calculator = CASCICalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+        elif calculation_method == 'CASSCF':
+            calculator = CASSCFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         else:  # Default to DFT
             calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         
@@ -137,6 +141,19 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             setup_params['nstates'] = parameters.get('tddft_nstates', 10)
             setup_params['tddft_method'] = parameters.get('tddft_method', 'TDDFT')
             setup_params['analyze_nto'] = parameters.get('tddft_analyze_nto', False)
+        
+        # Add CASCI/CASSCF-specific parameters
+        if calculation_method in ['CASCI', 'CASSCF']:
+            setup_params['ncas'] = parameters.get('ncas', 6)
+            setup_params['nelecas'] = parameters.get('nelecas', 8)
+            setup_params['natorb'] = parameters.get('natorb', True)
+            setup_params['max_cycle_micro'] = parameters.get('max_cycle_micro', 4)
+            
+            # CASSCF-specific parameters
+            if calculation_method == 'CASSCF':
+                setup_params['max_cycle_macro'] = parameters.get('max_cycle_macro', 50)
+                setup_params['conv_tol'] = parameters.get('conv_tol', 1e-7)
+                setup_params['conv_tol_grad'] = parameters.get('conv_tol_grad', 1e-4)
         
         calculator.setup_calculation(atoms, **setup_params)
         
