@@ -36,6 +36,22 @@ export const CalculationSettingsPage = ({
   onCalculationRename,
   createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
+  // Helper functions for safely getting parameters with defaults
+  const getValidNumberParam = (value: any, defaultValue: number, minValue: number = 0): number => {
+    return (typeof value === 'number' && !isNaN(value) && value >= minValue) 
+      ? value 
+      : defaultValue;
+  };
+
+  const getValidBooleanParam = (value: any, defaultValue: boolean): boolean => {
+    return (typeof value === 'boolean') ? value : defaultValue;
+  };
+
+  const getValidFloatParam = (value: any, defaultValue: number, minValue: number = 0): number => {
+    return (typeof value === 'number' && !isNaN(value) && value >= minValue) 
+      ? value 
+      : defaultValue;
+  };
   const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const previousCalculationIdRef = useRef<string | null>(null);
   const currentStyleRef = useRef<StyleSpec | null>(null);
@@ -181,35 +197,14 @@ export const CalculationSettingsPage = ({
           adjustedParams.basis_function =
             adjustedParams.basis_function || '6-31G(d)';
           adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
-          // Initialize CASCI/CASSCF parameters if not already set
-          (adjustedParams as any).ncas =
-            (adjustedParams as any).ncas !== undefined
-              ? (adjustedParams as any).ncas
-              : 6;
-          (adjustedParams as any).nelecas =
-            (adjustedParams as any).nelecas !== undefined
-              ? (adjustedParams as any).nelecas
-              : 8;
-          (adjustedParams as any).max_cycle_macro =
-            (adjustedParams as any).max_cycle_macro !== undefined
-              ? (adjustedParams as any).max_cycle_macro
-              : 50;
-          (adjustedParams as any).max_cycle_micro =
-            (adjustedParams as any).max_cycle_micro !== undefined
-              ? (adjustedParams as any).max_cycle_micro
-              : 4;
-          (adjustedParams as any).natorb =
-            (adjustedParams as any).natorb !== undefined
-              ? (adjustedParams as any).natorb
-              : true;
-          (adjustedParams as any).conv_tol =
-            (adjustedParams as any).conv_tol !== undefined
-              ? (adjustedParams as any).conv_tol
-              : 1e-8;
-          (adjustedParams as any).conv_tol_grad =
-            (adjustedParams as any).conv_tol_grad !== undefined
-              ? (adjustedParams as any).conv_tol_grad
-              : 1e-4;
+          // Preserve existing CASCI/CASSCF parameters or use defaults
+          (adjustedParams as any).ncas = getValidNumberParam((adjustedParams as any).ncas, 6, 1);
+          (adjustedParams as any).nelecas = getValidNumberParam((adjustedParams as any).nelecas, 8, 1);
+          (adjustedParams as any).max_cycle_macro = getValidNumberParam((adjustedParams as any).max_cycle_macro, 50, 1);
+          (adjustedParams as any).max_cycle_micro = getValidNumberParam((adjustedParams as any).max_cycle_micro, 4, 1);
+          (adjustedParams as any).natorb = getValidBooleanParam((adjustedParams as any).natorb, true);
+          (adjustedParams as any).conv_tol = getValidFloatParam((adjustedParams as any).conv_tol, 1e-8, 1e-12);
+          (adjustedParams as any).conv_tol_grad = getValidFloatParam((adjustedParams as any).conv_tol_grad, 1e-4, 1e-8);
         } else {
           // DFT/HF defaults
           adjustedParams.basis_function =
@@ -245,35 +240,14 @@ export const CalculationSettingsPage = ({
             ? (adjustedParams as any).tddft_analyze_nto
             : false,
         frozen_core: (adjustedParams as any).frozen_core !== false, // Default to true
-        // CASCI/CASSCF parameters - now required
-        ncas:
-          (adjustedParams as any).ncas !== undefined
-            ? (adjustedParams as any).ncas
-            : 6,
-        nelecas:
-          (adjustedParams as any).nelecas !== undefined
-            ? (adjustedParams as any).nelecas
-            : 8,
-        max_cycle_macro:
-          (adjustedParams as any).max_cycle_macro !== undefined
-            ? (adjustedParams as any).max_cycle_macro
-            : 50,
-        max_cycle_micro:
-          (adjustedParams as any).max_cycle_micro !== undefined
-            ? (adjustedParams as any).max_cycle_micro
-            : 4,
-        natorb:
-          (adjustedParams as any).natorb !== undefined
-            ? (adjustedParams as any).natorb
-            : true,
-        conv_tol:
-          (adjustedParams as any).conv_tol !== undefined
-            ? (adjustedParams as any).conv_tol
-            : 1e-8,
-        conv_tol_grad:
-          (adjustedParams as any).conv_tol_grad !== undefined
-            ? (adjustedParams as any).conv_tol_grad
-            : 1e-4,
+        // CASCI/CASSCF parameters - preserve current values or use defaults
+        ncas: getValidNumberParam((adjustedParams as any).ncas, 6, 1),
+        nelecas: getValidNumberParam((adjustedParams as any).nelecas, 8, 1),
+        max_cycle_macro: getValidNumberParam((adjustedParams as any).max_cycle_macro, 50, 1),
+        max_cycle_micro: getValidNumberParam((adjustedParams as any).max_cycle_micro, 4, 1),
+        natorb: getValidBooleanParam((adjustedParams as any).natorb, true),
+        conv_tol: getValidFloatParam((adjustedParams as any).conv_tol, 1e-8, 1e-12),
+        conv_tol_grad: getValidFloatParam((adjustedParams as any).conv_tol_grad, 1e-4, 1e-8),
       };
 
       if (isCompleted && isParamChange) {
@@ -341,35 +315,14 @@ export const CalculationSettingsPage = ({
               ? (currentParams as any).tddft_analyze_nto
               : false,
           frozen_core: (currentParams as any).frozen_core !== false, // Default to true
-          // CASCI/CASSCF parameters - now required
-          ncas:
-            (currentParams as any).ncas !== undefined
-              ? (currentParams as any).ncas
-              : 6,
-          nelecas:
-            (currentParams as any).nelecas !== undefined
-              ? (currentParams as any).nelecas
-              : 8,
-          max_cycle_macro:
-            (currentParams as any).max_cycle_macro !== undefined
-              ? (currentParams as any).max_cycle_macro
-              : 50,
-          max_cycle_micro:
-            (currentParams as any).max_cycle_micro !== undefined
-              ? (currentParams as any).max_cycle_micro
-              : 4,
-          natorb:
-            (currentParams as any).natorb !== undefined
-              ? (currentParams as any).natorb
-              : true,
-          conv_tol:
-            (currentParams as any).conv_tol !== undefined
-              ? (currentParams as any).conv_tol
-              : 1e-8,
-          conv_tol_grad:
-            (currentParams as any).conv_tol_grad !== undefined
-              ? (currentParams as any).conv_tol_grad
-              : 1e-4,
+          // CASCI/CASSCF parameters - preserve current values or use defaults
+          ncas: getValidNumberParam((currentParams as any).ncas, 6, 1),
+          nelecas: getValidNumberParam((currentParams as any).nelecas, 8, 1),
+          max_cycle_macro: getValidNumberParam((currentParams as any).max_cycle_macro, 50, 1),
+          max_cycle_micro: getValidNumberParam((currentParams as any).max_cycle_micro, 4, 1),
+          natorb: getValidBooleanParam((currentParams as any).natorb, true),
+          conv_tol: getValidFloatParam((currentParams as any).conv_tol, 1e-8, 1e-12),
+          conv_tol_grad: getValidFloatParam((currentParams as any).conv_tol_grad, 1e-4, 1e-8),
         };
 
         if (isCompleted) {
@@ -487,35 +440,14 @@ export const CalculationSettingsPage = ({
           ? (currentParams as any).tddft_analyze_nto
           : false,
       frozen_core: (currentParams as any).frozen_core !== false, // Default to true
-      // CASCI/CASSCF parameters - now required
-      ncas:
-        (currentParams as any).ncas !== undefined
-          ? (currentParams as any).ncas
-          : 6,
-      nelecas:
-        (currentParams as any).nelecas !== undefined
-          ? (currentParams as any).nelecas
-          : 8,
-      max_cycle_macro:
-        (currentParams as any).max_cycle_macro !== undefined
-          ? (currentParams as any).max_cycle_macro
-          : 50,
-      max_cycle_micro:
-        (currentParams as any).max_cycle_micro !== undefined
-          ? (currentParams as any).max_cycle_micro
-          : 4,
-      natorb:
-        (currentParams as any).natorb !== undefined
-          ? (currentParams as any).natorb
-          : true,
-      conv_tol:
-        (currentParams as any).conv_tol !== undefined
-          ? (currentParams as any).conv_tol
-          : 1e-8,
-      conv_tol_grad:
-        (currentParams as any).conv_tol_grad !== undefined
-          ? (currentParams as any).conv_tol_grad
-          : 1e-4,
+      // CASCI/CASSCF parameters - preserve current values or use defaults
+      ncas: getValidNumberParam((currentParams as any).ncas, 6, 1),
+      nelecas: getValidNumberParam((currentParams as any).nelecas, 8, 1),
+      max_cycle_macro: getValidNumberParam((currentParams as any).max_cycle_macro, 50, 1),
+      max_cycle_micro: getValidNumberParam((currentParams as any).max_cycle_micro, 4, 1),
+      natorb: getValidBooleanParam((currentParams as any).natorb, true),
+      conv_tol: getValidFloatParam((currentParams as any).conv_tol, 1e-8, 1e-12),
+      conv_tol_grad: getValidFloatParam((currentParams as any).conv_tol_grad, 1e-4, 1e-8),
     };
 
     try {
@@ -598,28 +530,14 @@ export const CalculationSettingsPage = ({
             ? (params as any).tddft_analyze_nto
             : false,
         frozen_core: (params as any).frozen_core !== false, // Default to true
-        // CASCI/CASSCF parameters - now required
-        ncas: (params as any).ncas !== undefined ? (params as any).ncas : 6,
-        nelecas:
-          (params as any).nelecas !== undefined ? (params as any).nelecas : 8,
-        max_cycle_macro:
-          (params as any).max_cycle_macro !== undefined
-            ? (params as any).max_cycle_macro
-            : 50,
-        max_cycle_micro:
-          (params as any).max_cycle_micro !== undefined
-            ? (params as any).max_cycle_micro
-            : 4,
-        natorb:
-          (params as any).natorb !== undefined ? (params as any).natorb : true,
-        conv_tol:
-          (params as any).conv_tol !== undefined
-            ? (params as any).conv_tol
-            : 1e-8,
-        conv_tol_grad:
-          (params as any).conv_tol_grad !== undefined
-            ? (params as any).conv_tol_grad
-            : 1e-4,
+        // CASCI/CASSCF parameters - preserve current values or use defaults
+        ncas: getValidNumberParam((params as any).ncas, 6, 1),
+        nelecas: getValidNumberParam((params as any).nelecas, 8, 1),
+        max_cycle_macro: getValidNumberParam((params as any).max_cycle_macro, 50, 1),
+        max_cycle_micro: getValidNumberParam((params as any).max_cycle_micro, 4, 1),
+        natorb: getValidBooleanParam((params as any).natorb, true),
+        conv_tol: getValidFloatParam((params as any).conv_tol, 1e-8, 1e-12),
+        conv_tol_grad: getValidFloatParam((params as any).conv_tol_grad, 1e-4, 1e-8),
       };
 
       if (isCompleted) {
@@ -949,11 +867,7 @@ export const CalculationSettingsPage = ({
                   <label>Number of Active Orbitals (ncas)</label>
                   <input
                     type="number"
-                    value={
-                      (params as any).ncas !== undefined
-                        ? (params as any).ncas
-                        : 6
-                    }
+                    value={getValidNumberParam((params as any).ncas, 6, 1)}
                     onChange={e =>
                       handleParamChange(
                         'ncas' as any,
@@ -971,18 +885,14 @@ export const CalculationSettingsPage = ({
                   <label>Number of Active Electrons (nelecas)</label>
                   <input
                     type="number"
-                    value={
-                      (params as any).nelecas !== undefined
-                        ? (params as any).nelecas
-                        : 8
-                    }
+                    value={getValidNumberParam((params as any).nelecas, 8, 1)}
                     onChange={e =>
                       handleParamChange(
                         'nelecas' as any,
-                        Math.max(0, Math.min(40, Number(e.target.value)))
+                        Math.max(1, Math.min(40, Number(e.target.value)))
                       )
                     }
-                    min={0}
+                    min={1}
                     max={40}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
@@ -1053,11 +963,7 @@ export const CalculationSettingsPage = ({
                     <div className={styles.settingRow}>
                       <label>Energy Convergence Tolerance</label>
                       <select
-                        value={
-                          (params as any).conv_tol !== undefined
-                            ? (params as any).conv_tol
-                            : 1e-8
-                        }
+                        value={getValidFloatParam((params as any).conv_tol, 1e-8, 1e-12)}
                         onChange={e =>
                           handleParamChange(
                             'conv_tol' as any,
@@ -1075,11 +981,7 @@ export const CalculationSettingsPage = ({
                     <div className={styles.settingRow}>
                       <label>Gradient Convergence Tolerance</label>
                       <select
-                        value={
-                          (params as any).conv_tol_grad !== undefined
-                            ? (params as any).conv_tol_grad
-                            : 1e-4
-                        }
+                        value={getValidFloatParam((params as any).conv_tol_grad, 1e-4, 1e-8)}
                         onChange={e =>
                           handleParamChange(
                             'conv_tol_grad' as any,
