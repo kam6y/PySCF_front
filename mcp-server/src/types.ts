@@ -318,7 +318,7 @@ export interface components {
          * @description Quantum calculation method
          * @enum {string}
          */
-        CalculationMethod: "DFT" | "HF" | "MP2" | "CCSD" | "CCSD_T" | "TDDFT";
+        CalculationMethod: "DFT" | "HF" | "MP2" | "CCSD" | "CCSD_T" | "TDDFT" | "CASCI" | "CASSCF";
         /**
          * @description Status of a calculation
          * @enum {string}
@@ -398,6 +398,43 @@ export interface components {
              * @default false
              */
             tddft_analyze_nto: boolean;
+            /**
+             * @description Number of active space orbitals (CASCI/CASSCF only)
+             * @default 6
+             */
+            ncas: number;
+            /**
+             * @description Number of active space electrons (CASCI/CASSCF only)
+             * @default 8
+             */
+            nelecas: number;
+            /**
+             * @description Maximum CASSCF macro iterations (CASSCF only)
+             * @default 50
+             */
+            max_cycle_macro: number;
+            /**
+             * @description Maximum CI solver micro iterations (CASCI/CASSCF)
+             * @default 4
+             */
+            max_cycle_micro: number;
+            /**
+             * @description Transform to natural orbitals in active space (CASCI/CASSCF only)
+             * @default true
+             */
+            natorb: boolean;
+            /**
+             * Format: float
+             * @description Energy convergence tolerance (CASSCF only)
+             * @default 1e-8
+             */
+            conv_tol: number;
+            /**
+             * Format: float
+             * @description Gradient convergence tolerance (CASSCF only)
+             * @default 0.0001
+             */
+            conv_tol_grad: number;
         };
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */
@@ -498,6 +535,26 @@ export interface components {
             tddft_method?: string | null;
             /** @description Whether NTO analysis was performed */
             tddft_analyze_nto?: boolean | null;
+            /** @description Number of active space orbitals (CASCI/CASSCF) */
+            ncas?: number | null;
+            /** @description Number of active space electrons (CASCI/CASSCF) */
+            nelecas?: number | null;
+            /** @description Maximum CASSCF macro iterations */
+            max_cycle_macro?: number | null;
+            /** @description Maximum CI solver micro iterations */
+            max_cycle_micro?: number | null;
+            /** @description Whether natural orbital transformation was used */
+            natorb?: boolean | null;
+            /**
+             * Format: float
+             * @description Energy convergence tolerance used
+             */
+            conv_tol?: number | null;
+            /**
+             * Format: float
+             * @description Gradient convergence tolerance used
+             */
+            conv_tol_grad?: number | null;
         };
         CalculationResults: {
             /** @description SCF energy result */
@@ -608,6 +665,37 @@ export interface components {
             gibbs_free_energy_298K?: number | null;
             /** @description Heat capacity at 298.15 K in Hartree/K */
             heat_capacity_298K?: number | null;
+            /** @description CASCI energy in Hartree (CASCI only) */
+            casci_energy?: number | null;
+            /** @description CASSCF energy in Hartree (CASSCF only) */
+            casscf_energy?: number | null;
+            /** @description Correlation energy (CASCI/CASSCF - SCF) in Hartree */
+            correlation_energy?: number | null;
+            /** @description Number of CASSCF macro iterations performed */
+            macro_iterations?: number | null;
+            /** @description Natural orbital analysis results (CASCI/CASSCF) */
+            natural_orbital_analysis?: components["schemas"]["NaturalOrbitalAnalysis"];
+            /** @description CI coefficient analysis results (CASCI/CASSCF) */
+            ci_coefficient_analysis?: components["schemas"]["CICoefficientAnalysis"];
+            /** @description Mulliken atomic spin density analysis (CASCI/CASSCF open-shell) */
+            mulliken_spin_analysis?: components["schemas"]["MullikenSpinAnalysis"];
+            /** @description Orbital overlap analysis between SCF and CASCI/CASSCF orbitals */
+            orbital_overlap_analysis?: components["schemas"]["OrbitalOverlapAnalysis"];
+            /** @description Orbital rotation analysis during CASSCF optimization (CASSCF only) */
+            orbital_rotation_analysis?: components["schemas"]["OrbitalRotationAnalysis"];
+            /** @description Information about kernel() return value structure */
+            kernel_return_info?: ({
+                /** @description Number of elements in kernel() return tuple */
+                tuple_length?: number;
+                /** @description Shape of CI coefficients array */
+                ci_coefficients_shape?: string;
+            } & {
+                [key: string]: unknown;
+            }) | null;
+            /** @description Whether CI coefficients are available from kernel() return */
+            ci_coefficients_available?: boolean | null;
+            /** @description Enhanced CI coefficient analysis from kernel() return */
+            enhanced_ci_analysis?: components["schemas"]["EnhancedCIAnalysis"];
         };
         CalculationInstance: {
             /** @description Unique calculation ID */
@@ -1099,6 +1187,263 @@ export interface components {
              * @example 2024-01-01T12:00:00.000Z
              */
             generated_at: string;
+        };
+        NaturalOrbitalAnalysis: {
+            /** @description Whether natural orbital analysis was performed */
+            enabled?: boolean;
+            /** @description Natural orbital occupation numbers */
+            occupation_numbers?: number[] | null;
+            /** @description Number of strongly occupied orbitals (occupation > 1.5) */
+            strongly_occupied_count?: number;
+            /** @description Number of weakly occupied orbitals (0.1 < occupation <= 1.5) */
+            weakly_occupied_count?: number;
+            /** @description Number of virtual orbitals (occupation <= 0.1) */
+            virtual_count?: number;
+            /** @description Total number of active space orbitals analyzed */
+            total_orbitals?: number;
+            /**
+             * Format: float
+             * @description Total number of electrons in active space
+             */
+            total_active_electrons?: number;
+            /**
+             * Format: float
+             * @description Effective number of electron pairs
+             */
+            effective_electron_pairs?: number;
+            /**
+             * Format: float
+             * @description Effective number of unpaired electrons
+             */
+            effective_unpaired_electrons?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        CICoefficientAnalysis: {
+            /** @description Whether CI coefficient analysis is available */
+            available?: boolean;
+            /** @description Total number of configurations */
+            total_configurations?: number;
+            /** @description Major configurations with significant contributions */
+            major_configurations?: {
+                /** @description Index of the configuration */
+                configuration_index?: number;
+                /**
+                 * Format: float
+                 * @description CI coefficient value
+                 */
+                coefficient?: number;
+                /**
+                 * Format: float
+                 * @description Percentage contribution to the wavefunction
+                 */
+                contribution_percent?: number;
+                /**
+                 * Format: float
+                 * @description Cumulative percentage contribution
+                 */
+                cumulative_percent?: number;
+            }[];
+            /**
+             * Format: float
+             * @description Leading CI coefficient (largest magnitude)
+             */
+            leading_coefficient?: number;
+            /**
+             * Format: float
+             * @description Percentage contribution of the leading configuration
+             */
+            leading_contribution_percent?: number;
+            /**
+             * Format: float
+             * @description Percentage multiconfigurational character (100 - leading contribution)
+             */
+            multiconfigurational_character?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        MullikenSpinAnalysis: {
+            /** @description Whether Mulliken spin analysis is available */
+            available?: boolean;
+            /** @description Spin density for each atom */
+            atomic_spin_densities?: {
+                /** @description 0-based index of the atom */
+                atom_index?: number;
+                /** @description Element symbol */
+                element?: string;
+                /**
+                 * Format: float
+                 * @description Atomic spin density (alpha - beta electrons)
+                 */
+                spin_density?: number;
+                /**
+                 * Format: float
+                 * @description Absolute value of atomic spin density
+                 */
+                abs_spin_density?: number;
+            }[];
+            /**
+             * Format: float
+             * @description Total spin density of the molecule
+             */
+            total_spin_density?: number;
+            /**
+             * Format: float
+             * @description Sum of absolute atomic spin densities
+             */
+            total_absolute_spin_density?: number;
+            /**
+             * Format: float
+             * @description Expected spin (2S) from molecular parameters
+             */
+            expected_spin?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        OrbitalOverlapAnalysis: {
+            /** @description Whether orbital overlap analysis is available */
+            available?: boolean;
+            /** @description Number of active space orbitals analyzed */
+            active_space_orbitals?: number;
+            /** @description Analysis of each active space orbital */
+            active_orbital_analysis?: {
+                /** @description Index of active space orbital */
+                active_orbital_index?: number;
+                /** @description Index of dominant SCF orbital */
+                dominant_scf_orbital?: number;
+                /**
+                 * Format: float
+                 * @description Maximum overlap with SCF orbitals
+                 */
+                max_overlap?: number;
+                /**
+                 * @description Type of dominant SCF orbital
+                 * @enum {string}
+                 */
+                scf_orbital_type?: "occupied" | "partially_occupied" | "virtual" | "unknown";
+            }[];
+            /**
+             * Format: float
+             * @description Average maximum overlap across active orbitals
+             */
+            average_max_overlap?: number;
+            /**
+             * @description Character of orbital transformation
+             * @enum {string}
+             */
+            orbital_transformation_character?: "minimal" | "significant";
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        OrbitalRotationAnalysis: {
+            /** @description Whether orbital rotation analysis is available */
+            available?: boolean;
+            /**
+             * Format: float
+             * @description Maximum rotation magnitude for core orbitals
+             */
+            core_orbital_rotation_magnitude?: number;
+            /**
+             * Format: float
+             * @description Maximum rotation magnitude for active orbitals
+             */
+            active_orbital_rotation_magnitude?: number;
+            /**
+             * Format: float
+             * @description Maximum rotation magnitude for virtual orbitals
+             */
+            virtual_orbital_rotation_magnitude?: number;
+            /**
+             * Format: float
+             * @description Overall maximum rotation magnitude
+             */
+            overall_rotation_magnitude?: number;
+            /**
+             * @description Extent of orbital rotation during CASSCF optimization
+             * @enum {string}
+             */
+            rotation_extent?: "minimal" | "moderate" | "significant";
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        EnhancedCIAnalysis: {
+            /**
+             * @description Source of CI analysis (from kernel return value)
+             * @enum {string}
+             */
+            source?: "kernel_return";
+            /** @description Whether enhanced CI analysis is available */
+            available?: boolean;
+            /** @description Total number of CI coefficients */
+            total_coefficients?: number;
+            /** @description Shape of the CI coefficient vector/matrix */
+            ci_vector_shape?: string;
+            /** @description Major configurations with >0.5% contribution */
+            major_configurations?: {
+                /** @description Index of the configuration */
+                configuration_index?: number;
+                /**
+                 * Format: float
+                 * @description CI coefficient value
+                 */
+                coefficient?: number;
+                /**
+                 * Format: float
+                 * @description Percentage contribution to the wavefunction
+                 */
+                contribution_percent?: number;
+                /**
+                 * Format: float
+                 * @description Cumulative percentage contribution
+                 */
+                cumulative_percent?: number;
+            }[];
+            /**
+             * Format: float
+             * @description Leading CI coefficient (largest magnitude)
+             */
+            leading_coefficient?: number;
+            /**
+             * Format: float
+             * @description Percentage contribution of the leading configuration
+             */
+            leading_contribution_percent?: number;
+            /**
+             * Format: float
+             * @description Multiconfigurational character (100 - leading contribution %)
+             */
+            multiconfigurational_character?: number;
+            /** @description Number of configurations with significant contribution */
+            effective_configurations?: number;
+            /**
+             * Format: float
+             * @description Entropy measure of wavefunction multiconfigurational character
+             */
+            wavefunction_entropy?: number;
+            /**
+             * @description Overall character of the wavefunction
+             * @enum {string}
+             */
+            wavefunction_character?: "single_configuration" | "few_configuration" | "multiconfigurational";
+            /**
+             * Format: float
+             * @description Normalization of the CI vector
+             */
+            normalization?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
         };
     };
     responses: never;

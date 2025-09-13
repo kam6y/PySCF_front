@@ -196,7 +196,7 @@ class TestCASSCFCalculator:
             nelecas=2,  # 2 electrons
             max_cycle_macro=30,
             max_cycle_micro=4,
-            conv_tol=1e-7,
+            conv_tol=1e-6,
             conv_tol_grad=1e-4
         )
         
@@ -206,7 +206,7 @@ class TestCASSCFCalculator:
         assert casscf_calculator.nelecas == 2
         assert casscf_calculator.max_cycle_macro == 30
         assert casscf_calculator.max_cycle_micro == 4
-        assert casscf_calculator.conv_tol == 1e-7
+        assert casscf_calculator.conv_tol == 1e-6
         assert casscf_calculator.conv_tol_grad == 1e-4
         mock_gto.M.assert_called_once()
     

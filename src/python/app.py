@@ -14,7 +14,7 @@ from flask_pydantic import validate
 from pydantic import ValidationError
 import socket
 import shutil
-from typing import Dict
+from typing import Dict, Optional
 from flask_socketio import SocketIO, emit, disconnect
 
 from pubchem.client import PubChemClient, PubChemError, PubChemNotFoundError
@@ -423,6 +423,61 @@ def get_system_resource_status():
         }), 500
 
 
+def validate_calculation_parameters(body: QuantumCalculationRequest) -> Optional[str]:
+    """
+    Validate calculation parameters for compatibility and theoretical correctness.
+
+    Returns:
+        None if validation passes, error message string if validation fails
+    """
+    def get_enum_value(field_value):
+        if hasattr(field_value, 'value'):
+            return field_value.value
+        return field_value
+
+    calculation_method = get_enum_value(body.calculation_method)
+
+    # Check HF method specific constraints
+    if calculation_method == 'HF':
+        # HF method should not use exchange-correlation functionals
+        if body.exchange_correlation and body.exchange_correlation != 'B3LYP':
+            logger.warning(f"HF calculation with non-default exchange_correlation: {body.exchange_correlation}")
+
+        # TDDFT parameters are not applicable to HF
+        if body.tddft_nstates and body.tddft_nstates > 10:
+            logger.warning(f"TDDFT parameters specified for HF calculation - these will be ignored")
+
+    # Check DFT method constraints
+    if calculation_method == 'DFT':
+        if not body.exchange_correlation:
+            return "DFT method requires an exchange-correlation functional to be specified"
+
+    # Check TDDFT method constraints
+    if calculation_method == 'TDDFT':
+        if not body.exchange_correlation:
+            return "TDDFT method requires an exchange-correlation functional to be specified"
+        if not body.tddft_nstates or body.tddft_nstates < 1:
+            return "TDDFT method requires tddft_nstates to be specified and greater than 0"
+
+    # Check CASCI/CASSCF method constraints
+    if calculation_method in ['CASCI', 'CASSCF']:
+        if not body.ncas or body.ncas < 1:
+            return f"{calculation_method} method requires ncas (active space orbitals) to be specified and greater than 0"
+        if not body.nelecas or body.nelecas < 1:
+            return f"{calculation_method} method requires nelecas (active space electrons) to be specified and greater than 0"
+        if body.nelecas > 2 * body.ncas:
+            return f"{calculation_method} method: nelecas ({body.nelecas}) cannot exceed 2 * ncas ({2 * body.ncas})"
+
+    # Check general parameter constraints
+    if body.spin < 0:
+        return "Spin multiplicity (2S) cannot be negative"
+
+    if body.charges is not None and abs(body.charges) > 10:
+        logger.warning(f"High molecular charge ({body.charges}) - please verify this is correct")
+
+    return None
+
+
 @app.route('/api/quantum/calculate', methods=['POST'])
 @validate()
 def quantum_calculate(body: QuantumCalculationRequest):
@@ -431,6 +486,14 @@ def quantum_calculate(body: QuantumCalculationRequest):
     Immediately returns a calculation ID to track the job.
     """
     try:
+        # Validate calculation parameters for compatibility and theoretical correctness
+        validation_error = validate_calculation_parameters(body)
+        if validation_error:
+            logger.warning(f"Parameter validation failed: {validation_error}")
+            return jsonify({
+                'success': False,
+                'error': f'Invalid parameters: {validation_error}'
+            }), 400
         # Helper function to safely extract value from enum or string
         def get_enum_value(field_value):
             if hasattr(field_value, 'value'):
@@ -438,10 +501,11 @@ def quantum_calculate(body: QuantumCalculationRequest):
             return field_value
         
         # Prepare parameters using validated data from Pydantic model
+        calculation_method = get_enum_value(body.calculation_method)
+
         parameters = {
-            'calculation_method': get_enum_value(body.calculation_method),
+            'calculation_method': calculation_method,
             'basis_function': body.basis_function,
-            'exchange_correlation': body.exchange_correlation,
             'charges': body.charges,
             'spin': body.spin,
             'solvent_method': get_enum_value(body.solvent_method),
@@ -451,11 +515,34 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'cpu_cores': body.cpu_cores,
             'memory_mb': body.memory_mb,
             'created_at': datetime.now().isoformat(),
-            # Always include TDDFT parameters for consistency
+        }
+
+        # Add exchange_correlation parameter only for DFT methods
+        # HF method does not use exchange-correlation functionals
+        if calculation_method != 'HF':
+            parameters['exchange_correlation'] = body.exchange_correlation
+        else:
+            # For HF method, explicitly set to None or omit to avoid confusion
+            parameters['exchange_correlation'] = None
+            logger.info(f"HF calculation - exchange_correlation parameter ignored (was: {body.exchange_correlation})")
+
+        # Always include TDDFT parameters for consistency
+        parameters.update({
             'tddft_nstates': body.tddft_nstates,
             'tddft_method': get_enum_value(body.tddft_method) if body.tddft_method else 'TDDFT',
-            'tddft_analyze_nto': body.tddft_analyze_nto
-        }
+            'tddft_analyze_nto': body.tddft_analyze_nto,
+        })
+
+        # Always include CASSCF・CASCI parameters for consistency
+        parameters.update({
+            'ncas': body.ncas,
+            'nelecas': body.nelecas,
+            'max_cycle_macro': body.max_cycle_macro,
+            'max_cycle_micro': body.max_cycle_micro,
+            'natorb': body.natorb,
+            'conv_tol': body.conv_tol,
+            'conv_tol_grad': body.conv_tol_grad
+        })
         
         # Initialize file manager and create directory with error handling
         try:

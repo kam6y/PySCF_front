@@ -74,11 +74,11 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       tddft_analyze_nto: false,
       // CASCI/CASSCF parameters (required by generated types)
       ncas: 6,
-      nelecas: 8,
+      nelecas: 6,
       max_cycle_macro: 50,
       max_cycle_micro: 4,
       natorb: true,
-      conv_tol: 1e-8,
+      conv_tol: 1e-6,
       conv_tol_grad: 1e-4,
     };
 

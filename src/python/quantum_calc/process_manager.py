@@ -145,14 +145,14 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         # Add CASCI/CASSCF-specific parameters
         if calculation_method in ['CASCI', 'CASSCF']:
             setup_params['ncas'] = parameters.get('ncas', 6)
-            setup_params['nelecas'] = parameters.get('nelecas', 8)
+            setup_params['nelecas'] = parameters.get('nelecas', 6)
             setup_params['natorb'] = parameters.get('natorb', True)
             setup_params['max_cycle_micro'] = parameters.get('max_cycle_micro', 4)
             
             # CASSCF-specific parameters
             if calculation_method == 'CASSCF':
                 setup_params['max_cycle_macro'] = parameters.get('max_cycle_macro', 50)
-                setup_params['conv_tol'] = parameters.get('conv_tol', 1e-7)
+                setup_params['conv_tol'] = parameters.get('conv_tol', 1e-6)
                 setup_params['conv_tol_grad'] = parameters.get('conv_tol_grad', 1e-4)
         
         calculator.setup_calculation(atoms, **setup_params)

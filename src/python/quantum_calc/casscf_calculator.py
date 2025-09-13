@@ -43,13 +43,18 @@ class CASSCFCalculator(BaseCalculator):
             
             # CASSCF-specific parameters
             ncas = kwargs.get('ncas', 6)  # Number of active space orbitals
-            nelecas = kwargs.get('nelecas', 8)  # Number of active space electrons
+            nelecas = kwargs.get('nelecas', 6)  # Number of active space electrons
             max_cycle_macro = kwargs.get('max_cycle_macro', 50)  # CASSCF macro iterations
-            max_cycle_micro = kwargs.get('max_cycle_micro', 4)  # CI solver micro iterations
+            max_cycle_micro = kwargs.get('max_cycle_micro', 3)  # CI solver micro iterations
             analyze_nto = kwargs.get('analyze_nto', False)  # Natural transition orbitals
             natorb = kwargs.get('natorb', True)  # Transform to natural orbitals
-            conv_tol = kwargs.get('conv_tol', 1e-7)  # Convergence tolerance
+            conv_tol = kwargs.get('conv_tol', 1e-6)  # Convergence tolerance
             conv_tol_grad = kwargs.get('conv_tol_grad', 1e-4)  # Gradient tolerance
+            
+            # AH solver parameters for improved convergence
+            ah_conv_tol = kwargs.get('ah_conv_tol', 1e-12)  # AH solver convergence tolerance
+            ah_max_cycle = kwargs.get('ah_max_cycle', 30)  # AH solver max iterations
+            ah_lindep = kwargs.get('ah_lindep', 1e-14)  # AH linear dependence threshold
             
             # Validate CASSCF parameters
             if ncas <= 0:
@@ -124,6 +129,9 @@ class CASSCFCalculator(BaseCalculator):
                 'natorb': natorb,
                 'conv_tol': conv_tol,
                 'conv_tol_grad': conv_tol_grad,
+                'ah_conv_tol': ah_conv_tol,
+                'ah_max_cycle': ah_max_cycle,
+                'ah_lindep': ah_lindep,
                 'method': 'UHF-CASSCF' if spin > 0 else 'RHF-CASSCF'
             })
             
@@ -149,12 +157,15 @@ class CASSCFCalculator(BaseCalculator):
         # CASSCF calculation
         logger.info("Starting CASSCF calculation...")
         ncas = getattr(self, 'ncas', 6)
-        nelecas = getattr(self, 'nelecas', 8)
+        nelecas = getattr(self, 'nelecas', 6)
         natorb = getattr(self, 'natorb', True)
         max_cycle_macro = getattr(self, 'max_cycle_macro', 50)
-        max_cycle_micro = getattr(self, 'max_cycle_micro', 4)
-        conv_tol = getattr(self, 'conv_tol', 1e-7)
+        max_cycle_micro = getattr(self, 'max_cycle_micro', 3)
+        conv_tol = getattr(self, 'conv_tol', 1e-6)
         conv_tol_grad = getattr(self, 'conv_tol_grad', 1e-4)
+        ah_conv_tol = getattr(self, 'ah_conv_tol', 1e-12)
+        ah_max_cycle = getattr(self, 'ah_max_cycle', 30)
+        ah_lindep = getattr(self, 'ah_lindep', 1e-14)
         
         # Create CASSCF object
         self.mycas = mcscf.CASSCF(self.mf, ncas, nelecas)
@@ -165,6 +176,11 @@ class CASSCFCalculator(BaseCalculator):
         self.mycas.max_cycle_micro = max_cycle_micro
         self.mycas.conv_tol = conv_tol
         self.mycas.conv_tol_grad = conv_tol_grad
+        
+        # Set AH solver parameters for improved convergence
+        self.mycas.ah_conv_tol = ah_conv_tol
+        self.mycas.ah_max_cycle = ah_max_cycle
+        self.mycas.ah_lindep = ah_lindep
         
         # Validate active space parameters against molecular orbital structure
         if hasattr(self.mf, 'mo_energy') and self.mf.mo_energy is not None:

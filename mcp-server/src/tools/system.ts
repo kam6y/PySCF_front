@@ -594,7 +594,15 @@ H 0.74 0.0 0.0`,
           memory_mb: 512,
           tddft_nstates: 5,
           tddft_method: 'TDDFT' as const,
-          tddft_analyze_nto: false
+          tddft_analyze_nto: false,
+          // CASCI/CASSCF parameters (with defaults)
+          ncas: 6,
+          nelecas: 6,
+          max_cycle_macro: 50,
+          max_cycle_micro: 4,
+          natorb: true,
+          conv_tol: 0.000001,
+          conv_tol_grad: 0.0001
         };
         
         const startResult = await client.startCalculation(testRequest);

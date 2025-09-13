@@ -43,7 +43,7 @@ class CASCICalculator(BaseCalculator):
             
             # CASCI-specific parameters
             ncas = kwargs.get('ncas', 6)  # Number of active space orbitals
-            nelecas = kwargs.get('nelecas', 8)  # Number of active space electrons
+            nelecas = kwargs.get('nelecas', 6)  # Number of active space electrons
             analyze_nto = kwargs.get('analyze_nto', False)  # Natural transition orbitals
             natorb = kwargs.get('natorb', True)  # Transform to natural orbitals
             

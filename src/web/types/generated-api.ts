@@ -349,10 +349,10 @@ export interface components {
              */
             basis_function: string;
             /**
-             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS)
+             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS). Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
              * @default B3LYP
              */
-            exchange_correlation: string;
+            exchange_correlation: string | null;
             /**
              * @description Molecular charge
              * @default 0
@@ -405,7 +405,7 @@ export interface components {
             ncas: number;
             /**
              * @description Number of active space electrons (CASCI/CASSCF only)
-             * @default 8
+             * @default 6
              */
             nelecas: number;
             /**
@@ -415,7 +415,7 @@ export interface components {
             max_cycle_macro: number;
             /**
              * @description Maximum CI solver micro iterations (CASCI/CASSCF)
-             * @default 4
+             * @default 3
              */
             max_cycle_micro: number;
             /**
@@ -426,7 +426,7 @@ export interface components {
             /**
              * Format: float
              * @description Energy convergence tolerance (CASSCF only)
-             * @default 1e-8
+             * @default 0.000001
              */
             conv_tol: number;
             /**
@@ -518,7 +518,8 @@ export interface components {
         CalculationParameters: {
             calculation_method: components["schemas"]["CalculationMethod"];
             basis_function: string;
-            exchange_correlation: string;
+            /** @description Exchange-correlation functional. Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals. */
+            exchange_correlation?: string | null;
             charges: number;
             spin: number;
             solvent_method: components["schemas"]["SolventMethod"];

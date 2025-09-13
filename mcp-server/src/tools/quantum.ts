@@ -3,7 +3,7 @@ import { PySCFApiClient, QuantumCalculationRequest, PySCFApiError } from '../cli
 
 export const startCalculationTool: Tool = {
   name: 'startCalculation',
-  description: 'Start a quantum chemistry calculation using PySCF with various methods (DFT, HF, MP2, CCSD, TDDFT)',
+  description: 'Start a quantum chemistry calculation using PySCF with various methods (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF)',
   inputSchema: {
     type: 'object',
     properties: {
@@ -19,7 +19,7 @@ export const startCalculationTool: Tool = {
       },
       calculation_method: {
         type: 'string',
-        enum: ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT'],
+        enum: ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT', 'CASCI', 'CASSCF'],
         description: 'Quantum calculation method',
         default: 'DFT',
       },
@@ -88,6 +88,53 @@ export const startCalculationTool: Tool = {
         description: 'Perform Natural Transition Orbital analysis (TDDFT only)',
         default: false,
       },
+      ncas: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 50,
+        description: 'Number of active space orbitals (CASCI/CASSCF only)',
+        default: 6,
+      },
+      nelecas: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 100,
+        description: 'Number of active space electrons (CASCI/CASSCF only)',
+        default: 8,
+      },
+      max_cycle_macro: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 200,
+        description: 'Maximum CASSCF macro iterations (CASSCF only)',
+        default: 50,
+      },
+      max_cycle_micro: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 20,
+        description: 'Maximum CI solver micro iterations (CASCI/CASSCF)',
+        default: 3,
+      },
+      natorb: {
+        type: 'boolean',
+        description: 'Transform to natural orbitals in active space (CASCI/CASSCF only)',
+        default: true,
+      },
+      conv_tol: {
+        type: 'number',
+        minimum: 1e-12,
+        maximum: 1e-3,
+        description: 'Energy convergence tolerance (CASSCF only)',
+        default: 0.0000001,
+      },
+      conv_tol_grad: {
+        type: 'number',
+        minimum: 1e-8,
+        maximum: 1e-2,
+        description: 'Gradient convergence tolerance (CASSCF only)',
+        default: 0.0001,
+      },
     },
     required: ['xyz'],
   },
@@ -129,6 +176,14 @@ ${params.calculation_method === 'TDDFT' ? `**TDDFT設定:**
 - **励起状態数:** ${params.tddft_nstates}
 - **手法:** ${params.tddft_method}
 - **NTO解析:** ${params.tddft_analyze_nto ? '有効' : '無効'}
+
+` : ''}${(params.calculation_method === 'CASCI' || params.calculation_method === 'CASSCF') ? `**${params.calculation_method}設定:**
+- **アクティブ空間軌道数:** ${params.ncas || 6}
+- **アクティブ空間電子数:** ${params.nelecas || 6}
+- **自然軌道変換:** ${params.natorb !== false ? '有効' : '無効'}
+${params.calculation_method === 'CASSCF' ? `- **最大マクロイテレーション:** ${params.max_cycle_macro || 50}
+- **エネルギー収束許容値:** ${params.conv_tol || '1e-6'}
+- **勾配収束許容値:** ${params.conv_tol_grad || '1e-4'}` : ''}
 
 ` : ''}**リソース:**
 - **CPUコア:** ${params.cpu_cores || 'システム設定'}
@@ -181,17 +236,24 @@ ${params.calculation_method === 'TDDFT' ? `**TDDFT設定:**
 
 **可能な原因:**
 - 無効なXYZ形式
-- サポートされていないパラメータの組み合わせ
+- **理論的に不適切なパラメータの組み合わせ**
+  - HF法で交換相関汎関数が指定されている（HF法には交換相関汎関数は不要です）
+  - TDDFT法で励起状態数が指定されていない
+  - CASCI/CASSCF法でアクティブ空間パラメータが不適切
 - リソース不足（CPU/メモリ）
 - サーバー内部エラー
 - 既存の計算との競合
 
 **解決方法:**
-1. XYZ形式を\`validateXYZ\`で確認してください
-2. \`getSupportedParameters\`で利用可能なパラメータを確認してください
-3. \`getResourceStatus\`でシステムリソースを確認してください
-4. より軽量な設定（STO-3G基底関数など）で試してください
-5. 既存の計算が完了してから再試行してください`,
+1. **パラメータの理論的適合性を確認:**
+   - HF法: 交換相関汎関数は不要（自動的に無視されます）
+   - DFT/TDDFT法: 適切な交換相関汎関数（B3LYP, PBE0等）を指定
+   - CASCI/CASSCF法: ncas（軌道数）とnelecas（電子数）を適切に設定
+2. XYZ形式を\`validateXYZ\`で確認してください
+3. \`getSupportedParameters\`で利用可能なパラメータを確認してください
+4. \`getResourceStatus\`でシステムリソースを確認してください
+5. より軽量な設定（STO-3G基底関数など）で試してください
+6. 既存の計算が完了してから再試行してください`,
         },
       ],
       isError: true,
@@ -376,6 +438,66 @@ ${results.excitation_energies.slice(0, 5)
 - **虚振動数:** ${imagCount}個 ${imagCount === 0 ? '(最適化済み構造)' : '(要最適化)'}
 - **零点エネルギー:** ${results.zero_point_energy?.toFixed(6)} Hartree
 - **自由エネルギー (298K):** ${results.gibbs_free_energy_298K?.toFixed(6)} Hartree`;
+      }
+
+      // Add CASCI/CASSCF results if available
+      if (params.calculation_method === 'CASCI' || params.calculation_method === 'CASSCF') {
+        if (results.casci_energy) {
+          resultText += `
+
+**CASCI結果:**
+- **CASCIエネルギー:** ${results.casci_energy.toFixed(8)} Hartree`;
+        }
+        
+        if (results.casscf_energy) {
+          resultText += `
+
+**CASSCF結果:**
+- **CASSCFエネルギー:** ${results.casscf_energy.toFixed(8)} Hartree`;
+          if (results.macro_iterations) {
+            resultText += `
+- **マクロイテレーション数:** ${results.macro_iterations}`;
+          }
+        }
+        
+        if (results.correlation_energy) {
+          resultText += `
+- **相関エネルギー:** ${results.correlation_energy.toFixed(8)} Hartree`;
+        }
+
+        // Natural orbital analysis
+        if (results.natural_orbital_analysis?.enabled) {
+          const noa = results.natural_orbital_analysis;
+          resultText += `
+
+**自然軌道解析:**
+- **強占有軌道:** ${noa.strongly_occupied_count}個
+- **弱占有軌道:** ${noa.weakly_occupied_count}個  
+- **仮想軌道:** ${noa.virtual_count}個
+- **有効電子対数:** ${noa.effective_electron_pairs?.toFixed(2) || 'N/A'}
+- **有効不対電子数:** ${noa.effective_unpaired_electrons?.toFixed(2) || 'N/A'}`;
+        }
+
+        // CI coefficient analysis
+        if (results.ci_coefficient_analysis?.available) {
+          const cia = results.ci_coefficient_analysis;
+          resultText += `
+
+**CI係数解析:**
+- **主要配置:** ${cia.leading_contribution_percent?.toFixed(1) || 'N/A'}%
+- **多配置性:** ${cia.multiconfigurational_character?.toFixed(1) || 'N/A'}%
+- **有効配置数:** ${cia.major_configurations?.length || 'N/A'}`;
+        }
+
+        // Mulliken spin analysis (for open-shell systems)
+        if (results.mulliken_spin_analysis?.available) {
+          const msa = results.mulliken_spin_analysis;
+          resultText += `
+
+**Mulliken スピン解析:**
+- **総スピン密度:** ${msa.total_spin_density?.toFixed(4) || 'N/A'}
+- **期待スピン:** ${msa.expected_spin || 'N/A'}`;
+        }
       }
     }
 
