@@ -52,18 +52,69 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     os.environ['VECLIB_MAXIMUM_THREADS'] = cpu_cores_str # macOS Accelerate Framework
     os.environ['NUMEXPR_NUM_THREADS'] = cpu_cores_str   # NumExpr
     
-    memory_mb = parameters.get('memory_mb') or 2000  # Noneや空の値をデフォルト値に置き換え
+    # Set appropriate memory defaults based on calculation method
+    calculation_method = parameters.get('calculation_method', 'DFT')
+    if calculation_method in ['CASCI', 'CASSCF']:
+        default_memory = 6000  # 6GB for CASCI/CASSCF calculations
+    elif calculation_method in ['CCSD', 'CCSD_T']:
+        default_memory = 4000  # 4GB for coupled cluster methods
+    else:
+        default_memory = 2000  # 2GB for DFT, HF, MP2, TDDFT
+
+    memory_mb = parameters.get('memory_mb') or default_memory
+
+    # Setup logging for this process first
+    process_logger = logging.getLogger(f'worker_{calculation_id}')
+    process_logger.setLevel(logging.INFO)
+
+    # Log memory allocation
+    if parameters.get('memory_mb'):
+        process_logger.info(f"Using user-specified memory: {memory_mb} MB for {calculation_method}")
+    else:
+        process_logger.info(f"Using default memory: {memory_mb} MB for {calculation_method}")
+
+    # Perform dependency checks for CASCI/CASSCF
+    if calculation_method in ['CASCI', 'CASSCF']:
+        process_logger.info("Performing PySCF dependency checks for CASCI/CASSCF...")
+        try:
+            import pyscf
+            process_logger.info(f"PySCF version: {pyscf.__version__}")
+
+            # Test mcscf module specifically
+            from pyscf import mcscf
+            process_logger.info("PySCF mcscf module loaded successfully")
+
+            # Test basic functionality
+            from pyscf import gto
+            test_mol = gto.M(atom='H 0 0 0; H 0 0 0.74', basis='sto-3g', verbose=0)
+            process_logger.info("PySCF basic functionality test passed")
+
+        except ImportError as e:
+            process_logger.error(f"PySCF dependency check failed: {e}")
+            process_logger.error("CASCI/CASSCF calculations will likely fail")
+        except Exception as e:
+            process_logger.warning(f"PySCF functionality test encountered issues: {e}")
+            process_logger.warning("CASCI/CASSCF calculations may have issues")
 
     # Import here to avoid issues with multiprocessing and module loading
-    from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator, CASCICalculator, CASSCFCalculator
+    from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator
     from quantum_calc import CalculationError, ConvergenceError, InputError
     from quantum_calc.file_manager import CalculationFileManager
     from threadpoolctl import threadpool_info
     from pyscf import lib
-    
-    # Setup logging for this process
-    process_logger = logging.getLogger(f'worker_{calculation_id}')
-    process_logger.setLevel(logging.INFO)
+
+    # Conditional imports for CASCI/CASSCF with error handling
+    CASCICalculator = None
+    CASSCFCalculator = None
+    try:
+        from quantum_calc import CASCICalculator, CASSCFCalculator
+        process_logger.info("Successfully imported CASCI/CASSCF calculators")
+    except ImportError as e:
+        process_logger.error(f"Failed to import CASCI/CASSCF calculators: {e}")
+        process_logger.error("CASCI and CASSCF calculations will not be available")
+    except Exception as e:
+        process_logger.error(f"Unexpected error importing CASCI/CASSCF calculators: {e}")
+        process_logger.error("CASCI and CASSCF calculations will not be available")
     
     file_manager = CalculationFileManager()
     calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
@@ -107,8 +158,14 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         elif calculation_method == 'TDDFT':
             calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         elif calculation_method == 'CASCI':
+            if CASCICalculator is None:
+                process_logger.error(f"CASCI calculator not available due to import failure")
+                raise ImportError("CASCI calculator is not available. Please check PySCF mcscf module installation.")
             calculator = CASCICalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         elif calculation_method == 'CASSCF':
+            if CASSCFCalculator is None:
+                process_logger.error(f"CASSCF calculator not available due to import failure")
+                raise ImportError("CASSCF calculator is not available. Please check PySCF mcscf module installation.")
             calculator = CASSCFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
         else:  # Default to DFT
             calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
@@ -144,8 +201,8 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         
         # Add CASCI/CASSCF-specific parameters
         if calculation_method in ['CASCI', 'CASSCF']:
-            setup_params['ncas'] = parameters.get('ncas', 6)
-            setup_params['nelecas'] = parameters.get('nelecas', 6)
+            setup_params['ncas'] = parameters.get('ncas', 4)
+            setup_params['nelecas'] = parameters.get('nelecas', 4)
             setup_params['natorb'] = parameters.get('natorb', True)
             setup_params['max_cycle_micro'] = parameters.get('max_cycle_micro', 4)
             
@@ -171,16 +228,81 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
 
     except (InputError, ConvergenceError, CalculationError) as e:
         process_logger.error(f"Calculation {calculation_id} failed: {e}")
+        # Enhanced error diagnosis
+        error_info = {
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'calculation_method': calculation_method,
+            'memory_mb': memory_mb,
+            'cpu_cores': cpu_cores
+        }
+
+        # Add specific diagnosis for CASCI/CASSCF errors
+        if calculation_method in ['CASCI', 'CASSCF']:
+            if 'import' in str(e).lower() or 'mcscf' in str(e).lower():
+                error_info['diagnosis'] = 'PySCF mcscf module import failure - check PySCF installation'
+                error_info['suggestion'] = 'Install PySCF with: conda install pyscf -c pyscf'
+            elif 'memory' in str(e).lower():
+                error_info['diagnosis'] = 'Insufficient memory for CASCI/CASSCF calculation'
+                error_info['suggestion'] = f'Increase memory allocation (current: {memory_mb} MB, try: {memory_mb * 2} MB)'
+            elif 'active' in str(e).lower() and 'space' in str(e).lower():
+                error_info['diagnosis'] = 'Invalid active space configuration'
+                error_info['suggestion'] = 'Check ncas and nelecas parameters'
+
+        process_logger.error(f"Error diagnosis: {error_info}")
         file_manager.save_calculation_status(calc_dir, 'error')
         # Save error information to results.json
-        file_manager.save_calculation_results(calc_dir, {'error': str(e)})
+        file_manager.save_calculation_results(calc_dir, {'error': str(e), 'diagnosis': error_info})
+        return False, str(e)
+
+    except ImportError as e:
+        import_error_info = {
+            'error_type': 'ImportError',
+            'error_message': str(e),
+            'calculation_method': calculation_method,
+            'diagnosis': 'Python module import failure',
+            'suggestion': 'Check PySCF installation and dependencies'
+        }
+
+        if 'mcscf' in str(e).lower():
+            import_error_info['diagnosis'] = 'PySCF mcscf module not found'
+            import_error_info['suggestion'] = 'Install complete PySCF package: conda install pyscf -c pyscf'
+
+        process_logger.error(f"Import error in calculation {calculation_id}: {e}")
+        process_logger.error(f"Import error diagnosis: {import_error_info}")
+        file_manager.save_calculation_status(calc_dir, 'error')
+        file_manager.save_calculation_results(calc_dir, {'error': str(e), 'diagnosis': import_error_info})
         return False, str(e)
 
     except Exception as e:
+        # Enhanced general error handling
+        general_error_info = {
+            'error_type': type(e).__name__,
+            'error_message': str(e),
+            'calculation_method': calculation_method,
+            'memory_mb': memory_mb,
+            'cpu_cores': cpu_cores,
+            'diagnosis': 'Unexpected error during calculation',
+            'suggestion': 'Check logs for more details'
+        }
+
+        # Add specific diagnoses for common error patterns
+        error_str = str(e).lower()
+        if 'pyscf' in error_str:
+            general_error_info['diagnosis'] = 'PySCF library error'
+            general_error_info['suggestion'] = 'Check PySCF installation and system compatibility'
+        elif 'memory' in error_str or 'malloc' in error_str:
+            general_error_info['diagnosis'] = 'Memory allocation error'
+            general_error_info['suggestion'] = f'Increase available system memory or reduce memory_mb (current: {memory_mb} MB)'
+        elif 'thread' in error_str or 'lock' in error_str:
+            general_error_info['diagnosis'] = 'Threading/concurrency error'
+            general_error_info['suggestion'] = 'Check system threading configuration'
+
         process_logger.error(f"Unexpected error in calculation {calculation_id}: {e}", exc_info=True)
+        process_logger.error(f"General error diagnosis: {general_error_info}")
         file_manager.save_calculation_status(calc_dir, 'error')
-        file_manager.save_calculation_results(calc_dir, {'error': 'An unexpected internal server error occurred.'})
-        return False, 'An unexpected internal server error occurred.'
+        file_manager.save_calculation_results(calc_dir, {'error': str(e), 'diagnosis': general_error_info})
+        return False, str(e)
     
     finally:
         # Restore original PySCF thread count
@@ -355,21 +477,25 @@ class CalculationProcessManager:
     def submit_calculation(self, calculation_id: str, parameters: dict) -> tuple[bool, str, Optional[str]]:
         """
         Submit a calculation to the process pool or queue with resource checking.
-        
+
         Args:
             calculation_id: Unique identifier for the calculation
             parameters: Calculation parameters
-            
+
         Returns:
-            Tuple of (success: bool, status: str, waiting_reason: Optional[str]) 
+            Tuple of (success: bool, status: str, waiting_reason: Optional[str])
             where status is 'running', 'waiting', or 'error'
         """
+
+
         if self._shutdown:
             logger.error("Cannot submit calculation: process manager is shut down")
+
             return False, 'error', None
-        
+
         if self.executor is None:
             logger.error("Process pool executor is not available")
+
             return False, 'error', None
         
         user_cpu_cores = parameters.get('cpu_cores') or 1
@@ -429,6 +555,8 @@ class CalculationProcessManager:
         if len(self.active_futures) < self.max_parallel_instances:
             # Start calculation immediately
             try:
+                logger.info(f"About to submit calculation {calculation_id} to executor")
+
                 # Register resources with the resource manager (if available)
                 if self.resource_manager is not None:
                     try:
@@ -441,7 +569,7 @@ class CalculationProcessManager:
                     except Exception as e:
                         logger.warning(f"Failed to register calculation resources: {e}")
                         # Continue without resource registration
-                
+
                 future = self.executor.submit(calculation_worker, calculation_id, parameters)
                 self.active_futures[calculation_id] = future
                 
@@ -453,6 +581,9 @@ class CalculationProcessManager:
                 
             except Exception as e:
                 logger.error(f"Failed to submit calculation {calculation_id}: {e}")
+                import traceback
+                logger.error(f"Full traceback:\n{traceback.format_exc()}")
+
                 # Unregister resources on failure (if resource manager is available)
                 if self.resource_manager is not None:
                     try:

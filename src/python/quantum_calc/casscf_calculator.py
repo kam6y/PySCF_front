@@ -28,9 +28,13 @@ class CASSCFCalculator(BaseCalculator):
         self.mycas: Optional[mcscf.casscf.CASSCF] = None
         self.keep_files = keep_files
         self.molecule_name = molecule_name
+        # Set calculation method for memory management
+        self.calculation_method = 'CASSCF'
         
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:
         """Setup CASSCF calculation with molecular geometry and parameters."""
+        logger.info("Starting CASSCF calculation setup...")
+        logger.info(f"Received parameters: {list(kwargs.keys())}")
         try:
             # Extract basic calculation parameters
             basis = kwargs.get('basis', '6-31G(d)')
@@ -39,11 +43,11 @@ class CASSCFCalculator(BaseCalculator):
             max_cycle = kwargs.get('max_cycle', 150)
             solvent_method = kwargs.get('solvent_method', 'none')
             solvent = kwargs.get('solvent', '-')
-            memory_mb = kwargs.get('memory_mb', 4000)  # Default 4GB
+            memory_mb = kwargs.get('memory_mb', 6000)  # Default 6GB for CASSCF
             
             # CASSCF-specific parameters
-            ncas = kwargs.get('ncas', 6)  # Number of active space orbitals
-            nelecas = kwargs.get('nelecas', 6)  # Number of active space electrons
+            ncas = kwargs.get('ncas', 4)  # Number of active space orbitals
+            nelecas = kwargs.get('nelecas', 4)  # Number of active space electrons
             max_cycle_macro = kwargs.get('max_cycle_macro', 50)  # CASSCF macro iterations
             max_cycle_micro = kwargs.get('max_cycle_micro', 3)  # CI solver micro iterations
             analyze_nto = kwargs.get('analyze_nto', False)  # Natural transition orbitals
@@ -56,20 +60,35 @@ class CASSCFCalculator(BaseCalculator):
             ah_max_cycle = kwargs.get('ah_max_cycle', 30)  # AH solver max iterations
             ah_lindep = kwargs.get('ah_lindep', 1e-14)  # AH linear dependence threshold
             
-            # Validate CASSCF parameters
+            # Validate and adjust CASSCF parameters with improved defaults
             if ncas <= 0:
-                raise InputError(f"Number of active space orbitals (ncas={ncas}) must be positive")
+                logger.warning(f"Invalid ncas={ncas}, adjusting to default ncas=4")
+                ncas = 4
             if nelecas <= 0:
-                raise InputError(f"Number of active space electrons (nelecas={nelecas}) must be positive")
+                logger.warning(f"Invalid nelecas={nelecas}, adjusting to default nelecas=4")
+                nelecas = 4
             if nelecas > 2 * ncas:
-                raise InputError(f"Too many electrons ({nelecas}) for active space size ({ncas} orbitals)")
+                logger.warning(f"Too many electrons ({nelecas}) for active space size ({ncas} orbitals)")
+                # Adjust nelecas to maximum possible for the given ncas
+                nelecas = 2 * ncas
+                logger.info(f"Adjusted nelecas to maximum possible: {nelecas}")
             if max_cycle_macro <= 0:
-                raise InputError(f"CASSCF macro cycles (max_cycle_macro={max_cycle_macro}) must be positive")
+                logger.warning(f"Invalid max_cycle_macro={max_cycle_macro}, adjusting to default 50")
+                max_cycle_macro = 50
+
+            # Additional sanity checks with warnings instead of errors
+            if ncas > 20:
+                logger.warning(f"Large active space (ncas={ncas}) may require substantial computational resources")
+            if nelecas > 20:
+                logger.warning(f"Many active electrons (nelecas={nelecas}) may require substantial computational resources")
+            if max_cycle_macro > 100:
+                logger.warning(f"Many CASSCF macro cycles ({max_cycle_macro}) may require long computation time")
             
             # Convert atoms list to PySCF format
             atom_string = self._atoms_to_string(atoms)
             
             # Create molecular object
+            logger.info(f"Creating PySCF molecular object with {len(atoms)} atoms, basis={basis}, charge={charge}, spin={spin}")
             self.mol = gto.M(
                 atom=atom_string,
                 basis=basis,
@@ -77,12 +96,13 @@ class CASSCFCalculator(BaseCalculator):
                 spin=spin,
                 verbose=0
             )
+            logger.info("PySCF molecular object created successfully")
             
             # Apply memory settings
             if memory_mb and memory_mb > 0:
                 self.mol.max_memory = memory_mb
             else:
-                self.mol.max_memory = 4000  # CASSCF needs substantial memory
+                self.mol.max_memory = 6000  # CASSCF needs substantial memory (6GB default)
             
             # Setup SCF calculation (prerequisite for CASSCF)
             # For closed-shell systems (spin=0), use RHF
@@ -99,20 +119,20 @@ class CASSCFCalculator(BaseCalculator):
             self.mf.chkfile = self.get_checkpoint_path()
             self.mf.max_cycle = max_cycle
             
-            # Store parameters for template method
+            # Store parameters for template method (use adjusted values)
             self.max_cycle = max_cycle
             self.solvent_method = solvent_method
             self.solvent = solvent
-            self.ncas = ncas
-            self.nelecas = nelecas
-            self.max_cycle_macro = max_cycle_macro
+            self.ncas = ncas  # This now contains the adjusted value
+            self.nelecas = nelecas  # This now contains the adjusted value
+            self.max_cycle_macro = max_cycle_macro  # This now contains the adjusted value
             self.max_cycle_micro = max_cycle_micro
             self.analyze_nto = analyze_nto
             self.natorb = natorb
             self.conv_tol = conv_tol
             self.conv_tol_grad = conv_tol_grad
             
-            # Store parameters in results for reference
+            # Store parameters in results for reference (use adjusted values)
             self.results.update({
                 'basis': basis,
                 'charge': charge,
@@ -121,9 +141,9 @@ class CASSCFCalculator(BaseCalculator):
                 'solvent_method': solvent_method,
                 'solvent': solvent,
                 'atom_count': len(atoms),
-                'ncas': ncas,
-                'nelecas': nelecas,
-                'max_cycle_macro': max_cycle_macro,
+                'ncas': ncas,  # Adjusted value
+                'nelecas': nelecas,  # Adjusted value
+                'max_cycle_macro': max_cycle_macro,  # Adjusted value
                 'max_cycle_micro': max_cycle_micro,
                 'analyze_nto': analyze_nto,
                 'natorb': natorb,
@@ -156,8 +176,8 @@ class CASSCFCalculator(BaseCalculator):
         
         # CASSCF calculation
         logger.info("Starting CASSCF calculation...")
-        ncas = getattr(self, 'ncas', 6)
-        nelecas = getattr(self, 'nelecas', 6)
+        ncas = getattr(self, 'ncas', 4)
+        nelecas = getattr(self, 'nelecas', 4)
         natorb = getattr(self, 'natorb', True)
         max_cycle_macro = getattr(self, 'max_cycle_macro', 50)
         max_cycle_micro = getattr(self, 'max_cycle_micro', 3)
@@ -204,15 +224,50 @@ class CASSCFCalculator(BaseCalculator):
         try:
             casscf_result = self.mycas.kernel()
         except Exception as e:
-            error_msg = str(e).lower()
-            if "singular" in error_msg or "convergence" in error_msg:
-                raise ConvergenceError(f"CASSCF calculation failed to converge: {str(e)}")
-            elif "memory" in error_msg:
-                raise CalculationError(f"CASSCF calculation failed due to insufficient memory: {str(e)}")
-            elif "maximum" in error_msg and "cycle" in error_msg:
-                raise ConvergenceError(f"CASSCF reached maximum cycles without convergence: {str(e)}")
+            import traceback
+            logger.error(f"CASSCF kernel() failed with exception type: {type(e).__name__}")
+            logger.error(f"CASSCF kernel() exception message: '{str(e)}'")
+            logger.error(f"CASSCF kernel() full traceback:\n{traceback.format_exc()}")
+            
+            error_msg = str(e)
+            error_msg_lower = error_msg.lower()
+            
+            # Handle empty error messages
+            if not error_msg.strip():
+                error_msg = f"CASSCF kernel() failed with {type(e).__name__} (empty error message)"
+                logger.error(f"Empty error message detected in CASSCF kernel(), using: {error_msg}")
+            
+            if "singular" in error_msg_lower or "convergence" in error_msg_lower:
+                raise ConvergenceError(f"CASSCF calculation failed to converge: {error_msg}")
+            elif "memory" in error_msg_lower:
+                raise CalculationError(f"CASSCF calculation failed due to insufficient memory: {error_msg}")
+            elif "maximum" in error_msg_lower and "cycle" in error_msg_lower:
+                raise ConvergenceError(f"CASSCF reached maximum cycles without convergence: {error_msg}")
+            elif isinstance(e, AssertionError):
+                # AssertionError in PySCF often indicates active space parameter or convergence issues
+                detailed_msg = f"CASSCF calculation failed with AssertionError: {error_msg}"
+                suggestions = []
+                suggestions.append(f"Current active space: ncas={ncas}, nelecas={nelecas}")
+
+                # Check if parameters are reasonable
+                if ncas > 8:
+                    suggestions.append("Large active space may be too demanding - try reducing ncas")
+                if nelecas > ncas * 2:
+                    suggestions.append("Too many electrons for active space size - check nelecas")
+                if max_cycle_macro < 30:
+                    suggestions.append("Low macro cycle limit may prevent convergence - try increasing max_cycle_macro")
+                if hasattr(self.mf, 'mo_energy') and self.mf.mo_energy is not None:
+                    n_orb = len(self.mf.mo_energy)
+                    if ncas > n_orb // 2:
+                        suggestions.append("Active space too large relative to basis set - reduce ncas")
+
+                if suggestions:
+                    detailed_msg += f". Suggestions: {'; '.join(suggestions)}"
+
+                logger.error(f"AssertionError diagnosis: {detailed_msg}")
+                raise CalculationError(detailed_msg)
             else:
-                raise CalculationError(f"CASSCF calculation failed: {str(e)}")
+                raise CalculationError(f"CASSCF calculation failed: {error_msg}")
         
         # Validate results
         if casscf_result is None:
@@ -576,7 +631,7 @@ class CASSCFCalculator(BaseCalculator):
                 
                 # Analyze rotation for different orbital spaces
                 ncore = self.mycas.ncore
-                ncas = self.results.get('ncas', 6)
+                ncas = self.results.get('ncas', 4)
                 
                 # Core orbital rotations
                 if ncore > 0:
@@ -739,7 +794,7 @@ class CASSCFCalculator(BaseCalculator):
             overlap_matrix = np.dot(casscf_orbs.T, np.dot(S, scf_orbs))
             
             # Analyze overlap for active space orbitals
-            ncas = self.results.get('ncas', 6)
+            ncas = self.results.get('ncas', 4)
             active_start = self.mycas.ncore  # Core orbitals
             active_end = active_start + ncas
             

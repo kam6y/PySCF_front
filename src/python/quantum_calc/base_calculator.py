@@ -60,9 +60,17 @@ class BaseCalculator(ABC):
             mol.max_memory = int(memory_mb)
             print(f"Set PySCF max_memory to {memory_mb} MB")
         else:
-            # デフォルトメモリ設定を適用
-            mol.max_memory = 2000
-            print("Using default PySCF max_memory: 2000 MB")
+            # Use calculation-specific default memory settings
+            calculation_method = getattr(self, 'calculation_method', 'DFT')
+            if calculation_method in ['CASCI', 'CASSCF']:
+                mol.max_memory = 6000  # 6GB for CASCI/CASSCF
+                print("Using default PySCF max_memory: 6000 MB (CASCI/CASSCF)")
+            elif calculation_method in ['CCSD', 'CCSD_T']:
+                mol.max_memory = 4000  # 4GB for coupled cluster
+                print("Using default PySCF max_memory: 4000 MB (CCSD)")
+            else:
+                mol.max_memory = 2000  # 2GB for other methods
+                print("Using default PySCF max_memory: 2000 MB")
         
         # CPU cores are now configured at the process level in process_manager.py
         # This avoids conflicts and ensures proper timing of environment variable setup
@@ -120,10 +128,25 @@ class BaseCalculator(ABC):
             return self._prepare_final_results(specific_results)
             
         except Exception as e:
+            import traceback
             from .exceptions import CalculationError
+            
+            # Enhanced error logging for CASCI/CASSCF
+            calculation_method = getattr(self, 'calculation_method', 'Unknown')
+            logger.error(f"Calculation failed in {calculation_method} run_calculation:")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception message: '{str(e)}'")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
+            
+            # Handle empty error messages specifically for CASCI/CASSCF
+            error_message = str(e)
+            if not error_message.strip():
+                error_message = f"Unknown error in {calculation_method} calculation (empty error message)"
+                logger.error(f"Empty error message detected, using: {error_message}")
+            
             if isinstance(e, (CalculationError,)):
                 raise
-            raise CalculationError(f"Calculation failed: {str(e)}")
+            raise CalculationError(f"{calculation_method} calculation failed: {error_message}")
     
     def cleanup(self, keep_files: bool = False) -> None:
         """Clean up temporary files."""

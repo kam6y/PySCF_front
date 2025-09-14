@@ -485,6 +485,8 @@ def quantum_calculate(body: QuantumCalculationRequest):
     Starts a quantum chemistry calculation in the background.
     Immediately returns a calculation ID to track the job.
     """
+
+
     try:
         # Validate calculation parameters for compatibility and theoretical correctness
         validation_error = validate_calculation_parameters(body)
@@ -560,8 +562,17 @@ def quantum_calculate(body: QuantumCalculationRequest):
 
         # Get process manager with enhanced error handling
         try:
+            # DEBUG: Log process manager retrieval
+            try:
+                with open(f"/tmp/debug_app_{calculation_id}.log", "w") as f:
+                    f.write(f"DEBUG: Getting process manager for {calculation_id}\n")
+            except:
+                pass
+
             process_manager = get_process_manager()
-            
+
+
+
             # Apply current settings to process manager if not already done
             try:
                 from quantum_calc import update_process_manager_settings
@@ -569,7 +580,7 @@ def quantum_calculate(body: QuantumCalculationRequest):
             except Exception as settings_error:
                 logger.warning(f"Failed to update process manager settings: {settings_error}")
                 # Continue without settings update
-                
+
         except Exception as pm_error:
             logger.error(f"Failed to initialize process manager: {pm_error}")
             # Clean up created directory on process manager failure
@@ -582,7 +593,17 @@ def quantum_calculate(body: QuantumCalculationRequest):
 
         # Submit calculation to process pool or queue with enhanced error handling
         try:
+            # Debug logging for troubleshooting
+            logger.info(f"About to submit calculation {calculation_id}")
+            logger.info(f"Process manager state: shutdown={process_manager._shutdown}")
+            if hasattr(process_manager, 'executor') and process_manager.executor:
+                logger.info(f"Executor state: shutdown={getattr(process_manager.executor, '_shutdown', 'unknown')}")
+
             success, initial_status, waiting_reason = process_manager.submit_calculation(calculation_id, parameters)
+
+            # Debug logging for submit result
+            logger.info(f"Submit result: success={success}, status={initial_status}, reason={waiting_reason}")
+
         except Exception as submit_error:
             logger.error(f"Unexpected error during calculation submission: {submit_error}")
             # Update status to error and save error information

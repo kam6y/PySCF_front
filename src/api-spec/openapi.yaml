@@ -734,13 +734,13 @@ components:
           type: integer
           minimum: 1
           maximum: 50
-          default: 6
+          default: 4
           description: Number of active space orbitals (CASCI/CASSCF only)
         nelecas:
           type: integer
           minimum: 1
           maximum: 100
-          default: 6
+          default: 4
           description: Number of active space electrons (CASCI/CASSCF only)
         max_cycle_macro:
           type: integer

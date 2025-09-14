@@ -198,8 +198,8 @@ export const CalculationSettingsPage = ({
             adjustedParams.basis_function || '6-31G(d)';
           adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
           // Preserve existing CASCI/CASSCF parameters or use defaults
-          (adjustedParams as any).ncas = getValidNumberParam((adjustedParams as any).ncas, 6, 1);
-          (adjustedParams as any).nelecas = getValidNumberParam((adjustedParams as any).nelecas, 6, 1);
+          (adjustedParams as any).ncas = getValidNumberParam((adjustedParams as any).ncas, 4, 1);
+          (adjustedParams as any).nelecas = getValidNumberParam((adjustedParams as any).nelecas, 4, 1);
           (adjustedParams as any).max_cycle_macro = getValidNumberParam((adjustedParams as any).max_cycle_macro, 50, 1);
           (adjustedParams as any).max_cycle_micro = getValidNumberParam((adjustedParams as any).max_cycle_micro, 3, 1);
           (adjustedParams as any).natorb = getValidBooleanParam((adjustedParams as any).natorb, true);
@@ -241,8 +241,8 @@ export const CalculationSettingsPage = ({
             : false,
         frozen_core: (adjustedParams as any).frozen_core !== false, // Default to true
         // CASCI/CASSCF parameters - preserve current values or use defaults
-        ncas: getValidNumberParam((adjustedParams as any).ncas, 6, 1),
-        nelecas: getValidNumberParam((adjustedParams as any).nelecas, 6, 1),
+        ncas: getValidNumberParam((adjustedParams as any).ncas, 4, 1),
+        nelecas: getValidNumberParam((adjustedParams as any).nelecas, 4, 1),
         max_cycle_macro: getValidNumberParam((adjustedParams as any).max_cycle_macro, 50, 1),
         max_cycle_micro: getValidNumberParam((adjustedParams as any).max_cycle_micro, 3, 1),
         natorb: getValidBooleanParam((adjustedParams as any).natorb, true),
@@ -316,8 +316,8 @@ export const CalculationSettingsPage = ({
               : false,
           frozen_core: (currentParams as any).frozen_core !== false, // Default to true
           // CASCI/CASSCF parameters - preserve current values or use defaults
-          ncas: getValidNumberParam((currentParams as any).ncas, 6, 1),
-          nelecas: getValidNumberParam((currentParams as any).nelecas, 8, 1),
+          ncas: getValidNumberParam((currentParams as any).ncas, 4, 1),
+          nelecas: getValidNumberParam((currentParams as any).nelecas, 4, 1),
           max_cycle_macro: getValidNumberParam((currentParams as any).max_cycle_macro, 50, 1),
           max_cycle_micro: getValidNumberParam((currentParams as any).max_cycle_micro, 3, 1),
           natorb: getValidBooleanParam((currentParams as any).natorb, true),
@@ -441,8 +441,8 @@ export const CalculationSettingsPage = ({
           : false,
       frozen_core: (currentParams as any).frozen_core !== false, // Default to true
       // CASCI/CASSCF parameters - preserve current values or use defaults
-      ncas: getValidNumberParam((currentParams as any).ncas, 6, 1),
-      nelecas: getValidNumberParam((currentParams as any).nelecas, 8, 1),
+      ncas: getValidNumberParam((currentParams as any).ncas, 4, 1),
+      nelecas: getValidNumberParam((currentParams as any).nelecas, 4, 1),
       max_cycle_macro: getValidNumberParam((currentParams as any).max_cycle_macro, 50, 1),
       max_cycle_micro: getValidNumberParam((currentParams as any).max_cycle_micro, 3, 1),
       natorb: getValidBooleanParam((currentParams as any).natorb, true),
@@ -531,8 +531,8 @@ export const CalculationSettingsPage = ({
             : false,
         frozen_core: (params as any).frozen_core !== false, // Default to true
         // CASCI/CASSCF parameters - preserve current values or use defaults
-        ncas: getValidNumberParam((params as any).ncas, 6, 1),
-        nelecas: getValidNumberParam((params as any).nelecas, 8, 1),
+        ncas: getValidNumberParam((params as any).ncas, 4, 1),
+        nelecas: getValidNumberParam((params as any).nelecas, 4, 1),
         max_cycle_macro: getValidNumberParam((params as any).max_cycle_macro, 50, 1),
         max_cycle_micro: getValidNumberParam((params as any).max_cycle_micro, 3, 1),
         natorb: getValidBooleanParam((params as any).natorb, true),
@@ -867,7 +867,7 @@ export const CalculationSettingsPage = ({
                   <label>Number of Active Orbitals (ncas)</label>
                   <input
                     type="number"
-                    value={getValidNumberParam((params as any).ncas, 6, 1)}
+                    value={getValidNumberParam((params as any).ncas, 4, 1)}
                     onChange={e =>
                       handleParamChange(
                         'ncas' as any,
@@ -885,7 +885,7 @@ export const CalculationSettingsPage = ({
                   <label>Number of Active Electrons (nelecas)</label>
                   <input
                     type="number"
-                    value={getValidNumberParam((params as any).nelecas, 8, 1)}
+                    value={getValidNumberParam((params as any).nelecas, 4, 1)}
                     onChange={e =>
                       handleParamChange(
                         'nelecas' as any,

@@ -400,12 +400,12 @@ export interface components {
             tddft_analyze_nto: boolean;
             /**
              * @description Number of active space orbitals (CASCI/CASSCF only)
-             * @default 6
+             * @default 4
              */
             ncas: number;
             /**
              * @description Number of active space electrons (CASCI/CASSCF only)
-             * @default 6
+             * @default 4
              */
             nelecas: number;
             /**
