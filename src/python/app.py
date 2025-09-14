@@ -546,6 +546,9 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'conv_tol_grad': body.conv_tol_grad
         })
         
+        # Add geometry optimization parameter
+        parameters['optimize_geometry'] = body.optimize_geometry
+        
         # Initialize file manager and create directory with error handling
         try:
             file_manager = CalculationFileManager()

@@ -17,12 +17,12 @@ logger = logging.getLogger(__name__)
 class CASSCFCalculator(BaseCalculator):
     """CASSCF calculator using PySCF for multi-configurational self-consistent field calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir)
+        super().__init__(working_dir, optimize_geometry)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None  # Can be RHF or UHF
         self.mycas: Optional[mcscf.casscf.CASSCF] = None

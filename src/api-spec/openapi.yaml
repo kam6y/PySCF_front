@@ -772,6 +772,10 @@ components:
           maximum: 1e-2
           default: 0.0001
           description: Gradient convergence tolerance (CASSCF only)
+        optimize_geometry:
+          type: boolean
+          default: true
+          description: Whether to perform geometry optimization before the main calculation
 
     CalculationUpdateRequest:
       type: object

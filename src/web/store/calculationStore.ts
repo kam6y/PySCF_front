@@ -80,6 +80,7 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       natorb: true,
       conv_tol: 1e-6,
       conv_tol_grad: 1e-4,
+      optimize_geometry: true,
     };
 
     const newId = `new-calculation-${Date.now()}`;

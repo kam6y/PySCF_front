@@ -248,6 +248,12 @@ export const CalculationSettingsPage = ({
         natorb: getValidBooleanParam((adjustedParams as any).natorb, true),
         conv_tol: getValidFloatParam((adjustedParams as any).conv_tol, 1e-6, 1e-12),
         conv_tol_grad: getValidFloatParam((adjustedParams as any).conv_tol_grad, 1e-4, 1e-8),
+        optimize_geometry: getValidBooleanParam((adjustedParams as any).optimize_geometry, 
+          !(adjustedParams.calculation_method === 'TDDFT' || 
+            adjustedParams.calculation_method === 'CASCI' || 
+            adjustedParams.calculation_method === 'CASSCF' ||
+            adjustedParams.calculation_method === 'CCSD' ||
+            adjustedParams.calculation_method === 'CCSD_T')),
       };
 
       if (isCompleted && isParamChange) {
@@ -323,6 +329,12 @@ export const CalculationSettingsPage = ({
           natorb: getValidBooleanParam((currentParams as any).natorb, true),
           conv_tol: getValidFloatParam((currentParams as any).conv_tol, 1e-6, 1e-12),
           conv_tol_grad: getValidFloatParam((currentParams as any).conv_tol_grad, 1e-4, 1e-8),
+          optimize_geometry: getValidBooleanParam((currentParams as any).optimize_geometry, 
+            !(currentParams.calculation_method === 'TDDFT' || 
+              currentParams.calculation_method === 'CASCI' || 
+              currentParams.calculation_method === 'CASSCF' ||
+              currentParams.calculation_method === 'CCSD' ||
+              currentParams.calculation_method === 'CCSD_T')),
         };
 
         if (isCompleted) {
@@ -448,6 +460,12 @@ export const CalculationSettingsPage = ({
       natorb: getValidBooleanParam((currentParams as any).natorb, true),
       conv_tol: getValidFloatParam((currentParams as any).conv_tol, 1e-6, 1e-12),
       conv_tol_grad: getValidFloatParam((currentParams as any).conv_tol_grad, 1e-4, 1e-8),
+      optimize_geometry: getValidBooleanParam((currentParams as any).optimize_geometry, 
+        !(currentParams.calculation_method === 'TDDFT' || 
+          currentParams.calculation_method === 'CASCI' || 
+          currentParams.calculation_method === 'CASSCF' ||
+          currentParams.calculation_method === 'CCSD' ||
+          currentParams.calculation_method === 'CCSD_T')),
     };
 
     try {
@@ -538,6 +556,12 @@ export const CalculationSettingsPage = ({
         natorb: getValidBooleanParam((params as any).natorb, true),
         conv_tol: getValidFloatParam((params as any).conv_tol, 1e-6, 1e-12),
         conv_tol_grad: getValidFloatParam((params as any).conv_tol_grad, 1e-4, 1e-8),
+        optimize_geometry: getValidBooleanParam((params as any).optimize_geometry, 
+          !(params.calculation_method === 'TDDFT' || 
+            params.calculation_method === 'CASCI' || 
+            params.calculation_method === 'CASSCF' ||
+            params.calculation_method === 'CCSD' ||
+            params.calculation_method === 'CCSD_T')),
       };
 
       if (isCompleted) {
@@ -858,6 +882,40 @@ export const CalculationSettingsPage = ({
                   className={`${styles.numberInput} ${styles.withSpinner}`}
                   disabled={calculationStatus === 'running'}
                 />
+              </div>
+              <div className={styles.settingRow}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={getValidBooleanParam((params as any).optimize_geometry, 
+                      !(params.calculation_method === 'TDDFT' || 
+                        params.calculation_method === 'CASCI' || 
+                        params.calculation_method === 'CASSCF' ||
+                        params.calculation_method === 'CCSD' ||
+                        params.calculation_method === 'CCSD_T'))}
+                    onChange={e =>
+                      handleParamChange('optimize_geometry' as any, e.target.checked)
+                    }
+                    disabled={
+                      calculationStatus === 'running' ||
+                      params.calculation_method === 'TDDFT' ||
+                      params.calculation_method === 'CASCI' ||
+                      params.calculation_method === 'CASSCF' ||
+                      params.calculation_method === 'CCSD' ||
+                      params.calculation_method === 'CCSD_T'
+                    }
+                  />
+                  Perform Geometry Optimization
+                </label>
+                {(params.calculation_method === 'TDDFT' || 
+                  params.calculation_method === 'CASCI' || 
+                  params.calculation_method === 'CASSCF' ||
+                  params.calculation_method === 'CCSD' ||
+                  params.calculation_method === 'CCSD_T') && (
+                  <div className={styles.frozenCoreHelp}>
+                    Geometry optimization is not available for this calculation method
+                  </div>
+                )}
               </div>
             </section>
             {(params.calculation_method === 'CASCI' ||

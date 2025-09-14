@@ -435,6 +435,11 @@ export interface components {
              * @default 0.0001
              */
             conv_tol_grad: number;
+            /**
+             * @description Whether to perform geometry optimization before the main calculation
+             * @default true
+             */
+            optimize_geometry: boolean;
         };
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */

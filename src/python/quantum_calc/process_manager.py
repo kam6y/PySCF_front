@@ -147,28 +147,30 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         
         # Initialize calculator based on calculation method
         calculation_method = parameters.get('calculation_method', 'DFT')
+        optimize_geometry = parameters.get('optimize_geometry', True)
+        
         if calculation_method == 'HF':
-            calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         elif calculation_method == 'MP2':
-            calculator = MP2Calculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = MP2Calculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         elif calculation_method == 'CCSD':
-            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         elif calculation_method == 'CCSD_T':
-            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         elif calculation_method == 'TDDFT':
-            calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         elif calculation_method == 'CASCI':
             if CASCICalculator is None:
                 process_logger.error(f"CASCI calculator not available due to import failure")
                 raise ImportError("CASCI calculator is not available. Please check PySCF mcscf module installation.")
-            calculator = CASCICalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = CASCICalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         elif calculation_method == 'CASSCF':
             if CASSCFCalculator is None:
                 process_logger.error(f"CASSCF calculator not available due to import failure")
                 raise ImportError("CASSCF calculator is not available. Please check PySCF mcscf module installation.")
-            calculator = CASSCFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = CASSCFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         else:  # Default to DFT
-            calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'])
+            calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
         
         # Parse XYZ and setup calculation
         atoms = calculator.parse_xyz(parameters['xyz'])

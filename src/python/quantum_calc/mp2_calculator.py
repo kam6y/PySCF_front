@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 class MP2Calculator(BaseCalculator):
     """MP2 calculator using PySCF for structure optimization and MP2 energy calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir)
+        super().__init__(working_dir, optimize_geometry)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None
         self.mp2: Optional[mp.MP2] = None
@@ -170,4 +170,37 @@ class MP2Calculator(BaseCalculator):
         """Get description of base method for logging."""
         spin = self.results.get('spin', 0)
         return f"{'UHF' if spin > 0 else 'RHF'} (MP2 reference)"
+    
+    def _perform_geometry_optimization(self) -> None:
+        """Perform geometry optimization using MP2 level of theory."""
+        from pyscf.geomopt import geometric_solver
+        from pyscf import mp
+        
+        logger.info("Starting MP2 geometry optimization...")
+        
+        # First, run initial HF calculation to get reference
+        logger.info("Running initial HF calculation for MP2 reference...")
+        hf_energy = self.mf.kernel()
+        
+        if not self.mf.converged:
+            from .exceptions import ConvergenceError
+            raise ConvergenceError("Initial HF calculation failed to converge for MP2 geometry optimization")
+        
+        logger.info(f"Initial HF energy: {hf_energy} Hartree")
+        
+        # Create MP2 object for geometry optimization
+        logger.info("Creating MP2 object for geometry optimization...")
+        mp2_obj = mp.MP2(self.mf)
+        
+        # Perform MP2 geometry optimization
+        logger.info("Performing geometry optimization at MP2 level...")
+        optimized_mol = geometric_solver.optimize(mp2_obj)
+        self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
+        logger.info("MP2 geometry optimization completed")
+        
+        # Apply coordinate alignment after optimization
+        self._align_optimized_geometry()
+        
+        # Store the MP2 object for later use if needed
+        self.mp2 = mp2_obj
     

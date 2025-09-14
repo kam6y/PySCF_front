@@ -14,10 +14,11 @@ logger = logging.getLogger(__name__)
 class BaseCalculator(ABC):
     """Abstract base class for quantum chemistry calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None):
-        """Initialize calculator with optional working directory."""
+    def __init__(self, working_dir: Optional[str] = None, optimize_geometry: bool = True):
+        """Initialize calculator with optional working directory and geometry optimization flag."""
         self.working_dir = working_dir or tempfile.mkdtemp(prefix="pyscf_calc_")
         self.results: Dict[str, Any] = {}
+        self.optimize_geometry = optimize_geometry
         
     def parse_xyz(self, xyz_string: str) -> List[List]:
         """Parse XYZ format string into atom list."""
@@ -831,7 +832,7 @@ class BaseCalculator(ABC):
     
     def _requires_geometry_optimization(self) -> bool:
         """Whether this calculation requires geometry optimization."""
-        return True
+        return self.optimize_geometry
     
     def _requires_orbital_analysis(self) -> bool:
         """Whether this calculation requires orbital analysis."""
