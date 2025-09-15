@@ -602,7 +602,8 @@ H 0.74 0.0 0.0`,
           max_cycle_micro: 4,
           natorb: true,
           conv_tol: 0.000001,
-          conv_tol_grad: 0.0001
+          conv_tol_grad: 0.0001,
+          optimize_geometry: false
         };
         
         const startResult = await client.startCalculation(testRequest);

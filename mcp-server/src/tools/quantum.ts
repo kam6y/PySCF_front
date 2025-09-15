@@ -135,6 +135,11 @@ export const startCalculationTool: Tool = {
         description: 'Gradient convergence tolerance (CASSCF only)',
         default: 0.0001,
       },
+      optimize_geometry: {
+        type: 'boolean',
+        description: 'Whether to perform geometry optimization before the main calculation',
+        default: true,
+      },
     },
     required: ['xyz'],
   },
@@ -171,6 +176,7 @@ export async function handleStartCalculation(
 - **電荷:** ${params.charges}
 - **スピン:** ${params.spin}
 - **溶媒効果:** ${params.solvent_method}${params.solvent !== '-' ? ` (${params.solvent})` : ''}
+- **構造最適化:** ${args.optimize_geometry !== false ? '有効' : '無効'}
 
 ${params.calculation_method === 'TDDFT' ? `**TDDFT設定:**
 - **励起状態数:** ${params.tddft_nstates}
@@ -905,6 +911,358 @@ ${mainPeaks}
 - 無効な計算ID
 
 ${specificAdvice}${debugInfo}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+export const getOptimizedGeometryTool: Tool = {
+  name: 'getOptimizedGeometry',
+  description: 'Get optimized molecular geometry from a completed calculation for use in stepwise calculations',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      calculationId: {
+        type: 'string',
+        description: 'Unique calculation ID',
+      },
+    },
+    required: ['calculationId'],
+  },
+};
+
+export async function handleGetOptimizedGeometry(
+  args: { calculationId: string },
+  client: PySCFApiClient
+) {
+  try {
+    const response = await client.getCalculationDetails(args.calculationId);
+
+    if (!response.success) {
+      throw new Error(`計算詳細の取得に失敗しました`);
+    }
+
+    const { calculation } = response.data;
+    const params = calculation.parameters;
+    const results = calculation.results;
+
+    // Check if calculation is completed
+    if (calculation.status !== 'completed') {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ **最適化座標の取得エラー**
+
+計算がまだ完了していません。
+
+**計算ID:** \`${calculation.id}\`
+**現在のステータス:** ${calculation.status}
+
+計算が完了してから再試行してください。進行状況は \`getCalculationDetails\` で確認できます。`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Check if optimization was performed
+    const hasOptimizedGeometry = results?.optimized_geometry;
+    if (!hasOptimizedGeometry) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ **最適化座標が利用できません**
+
+**計算ID:** \`${calculation.id}\`
+**計算名:** ${calculation.name}
+
+この計算では構造最適化が実行されていないか、最適化座標が保存されていません。
+
+**可能な原因:**
+- 構造最適化が無効化されていた
+- 計算が構造最適化前にエラーで停止した
+- 単点計算のみが実行された
+
+**解決方法:**
+構造最適化を有効にした新しい計算を実行してください：
+\`startCalculation(optimize_geometry=true, ...)\``,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Check if geometry optimization was actually performed
+    const geometryOptimized = results?.frequency_analysis_performed ||
+                             (results?.imaginary_frequencies_count !== undefined);
+    const optimizationStatus = geometryOptimized
+      ? (results?.imaginary_frequencies_count === 0 ? '完全最適化' : '要追加最適化')
+      : '最適化状況不明';
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `✅ **最適化座標を取得しました**
+
+**元の計算情報:**
+- **計算ID:** \`${calculation.id}\`
+- **計算名:** ${calculation.name}
+- **手法:** ${params.calculation_method}
+- **基底関数:** ${params.basis_function}
+- **最適化状況:** ${optimizationStatus}
+
+**最適化座標 (XYZ形式):**
+\`\`\`
+${results.optimized_geometry}
+\`\`\`
+
+**使用方法:**
+この座標を使用して次の計算を開始できます：
+\`\`\`
+startCalculation({
+  xyz: "${results.optimized_geometry?.replace(/\n/g, '\\n')}",
+  calculation_method: "CASSCF",
+  optimize_geometry: false,
+  // その他のパラメータ...
+})
+\`\`\`
+
+**注意:** 段階的計算では、通常は最適化座標で単点計算（optimize_geometry=false）を実行します。`,
+        },
+      ],
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ 最適化座標の取得でエラーが発生しました: ${errorMessage}
+
+計算IDを確認してください。利用可能な計算は \`listCalculations\` で確認できます。`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+export const startStepwiseCalculationTool: Tool = {
+  name: 'startStepwiseCalculation',
+  description: 'Start a stepwise calculation where the first step optimizes geometry and the second step performs single-point calculation with that optimized geometry',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      xyz: {
+        type: 'string',
+        description: 'Initial XYZ format molecular structure data',
+        minLength: 1,
+      },
+      name: {
+        type: 'string',
+        description: 'Base name for the calculations',
+        default: 'Stepwise Calculation',
+      },
+      step1_method: {
+        type: 'string',
+        enum: ['DFT', 'HF', 'MP2'],
+        description: 'First step calculation method (with optimization)',
+        default: 'DFT',
+      },
+      step2_method: {
+        type: 'string',
+        enum: ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT', 'CASCI', 'CASSCF'],
+        description: 'Second step calculation method (single-point)',
+        default: 'CASSCF',
+      },
+      basis_function: {
+        type: 'string',
+        description: 'Basis set for both calculations',
+        default: '6-31G(d)',
+      },
+      exchange_correlation: {
+        type: 'string',
+        description: 'Exchange-correlation functional (for DFT methods)',
+        default: 'B3LYP',
+      },
+      charges: {
+        type: 'integer',
+        minimum: -10,
+        maximum: 10,
+        description: 'Molecular charge',
+        default: 0,
+      },
+      spin: {
+        type: 'integer',
+        minimum: 0,
+        maximum: 10,
+        description: 'Spin (2S), number of unpaired electrons',
+        default: 0,
+      },
+      // CASCI/CASSCF specific parameters for step 2
+      ncas: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 50,
+        description: 'Number of active space orbitals (CASCI/CASSCF only)',
+        default: 6,
+      },
+      nelecas: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 100,
+        description: 'Number of active space electrons (CASCI/CASSCF only)',
+        default: 8,
+      },
+    },
+    required: ['xyz', 'step1_method', 'step2_method'],
+  },
+};
+
+export async function handleStartStepwiseCalculation(
+  args: {
+    xyz: string;
+    name?: string;
+    step1_method: string;
+    step2_method: string;
+    basis_function?: string;
+    exchange_correlation?: string;
+    charges?: number;
+    spin?: number;
+    ncas?: number;
+    nelecas?: number;
+  },
+  client: PySCFApiClient
+) {
+  try {
+    const baseName = args.name || 'Stepwise Calculation';
+    const step1Name = `${baseName} - Step1 (${args.step1_method} Optimization)`;
+
+    // Start the first calculation (with optimization)
+    const step1Request: QuantumCalculationRequest = {
+      xyz: args.xyz,
+      name: step1Name,
+      calculation_method: args.step1_method as any,
+      basis_function: args.basis_function || '6-31G(d)',
+      exchange_correlation: args.exchange_correlation || 'B3LYP',
+      charges: args.charges || 0,
+      spin: args.spin || 0,
+      optimize_geometry: true,
+      solvent_method: 'none' as any,
+      solvent: '-',
+      tddft_nstates: 10,
+      tddft_method: 'TDDFT' as any,
+      tddft_analyze_nto: false,
+      ncas: args.ncas || 6,
+      nelecas: args.nelecas || 8,
+      max_cycle_macro: 50,
+      max_cycle_micro: 3,
+      natorb: true,
+      conv_tol: 0.0000001,
+      conv_tol_grad: 0.0001,
+    };
+
+    const step1Response = await client.startCalculation(step1Request);
+
+    if (!step1Response.success) {
+      throw new Error(`最初の計算（${args.step1_method}最適化）の開始に失敗しました`);
+    }
+
+    const step1Calc = step1Response.data.calculation;
+    const step2Name = `${baseName} - Step2 (${args.step2_method} Single-Point)`;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `🔄 **段階的計算を開始しました**
+
+**計算フロー:** ${args.step1_method}最適化 → ${args.step2_method}単点計算
+
+**Step 1 - 構造最適化**
+✅ **開始済み**
+- **計算ID:** \`${step1Calc.id}\`
+- **計算名:** ${step1Calc.name}
+- **手法:** ${args.step1_method}
+- **基底関数:** ${args.basis_function || '6-31G(d)'}
+- **構造最適化:** 有効
+
+**Step 2 - 単点計算**
+⏳ **待機中**
+- **計画された手法:** ${args.step2_method}
+- **計画された名前:** ${step2Name}
+- **構造最適化:** 無効（Step1の最適化座標を使用）
+
+**次のステップ:**
+1. Step1の完了を待ってください：\`getCalculationDetails("${step1Calc.id}")\`
+2. Step1が完了したら、最適化座標を取得：\`getOptimizedGeometry("${step1Calc.id}")\`
+3. その座標を使ってStep2を開始：
+
+\`\`\`
+startCalculation({
+  xyz: "[Step1から取得した最適化座標]",
+  name: "${step2Name}",
+  calculation_method: "${args.step2_method}",
+  basis_function: "${args.basis_function || '6-31G(d)'}",
+  optimize_geometry: false,${args.step2_method === 'CASCI' || args.step2_method === 'CASSCF' ? `
+  ncas: ${args.ncas || 6},
+  nelecas: ${args.nelecas || 8},` : ''}
+  // その他のパラメータ...
+})
+\`\`\`
+
+**自動化されたコマンド例:**
+Step1完了後に以下を実行：
+1. \`getOptimizedGeometry("${step1Calc.id}")\`
+2. 座標をコピーして上記のstartCalculationで使用
+
+段階的計算により、${args.step1_method}で最適化された構造で${args.step2_method}計算を実行できます。`,
+        },
+      ],
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+    // Enhanced error details for debugging using PySCFApiError
+    let debugInfo = '';
+    if (error instanceof PySCFApiError) {
+      const details = error.details;
+      debugInfo = `
+**デバッグ情報:**
+- HTTPステータス: ${details.status || 'N/A'}
+- ステータステキスト: ${details.statusText || 'N/A'}
+- URL: ${details.url || 'N/A'}
+- メソッド: ${details.method || 'N/A'}
+- タイムスタンプ: ${details.timestamp}
+- レスポンスデータ: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}`;
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ 段階的計算の開始でエラーが発生しました: ${errorMessage}
+
+**計画された計算フロー:** ${args.step1_method}最適化 → ${args.step2_method}単点計算
+
+**可能な原因:**
+- 無効なXYZ形式
+- 理論的に不適切なパラメータの組み合わせ
+- リソース不足
+- サーバー内部エラー
+
+**解決方法:**
+1. XYZ形式を \`validateXYZ\` で確認してください
+2. \`getSupportedParameters\` で利用可能なパラメータを確認してください
+3. 個別に各計算を実行してみてください：
+   - まず \`startCalculation\` で${args.step1_method}最適化を実行
+   - 完了後に \`getOptimizedGeometry\` で座標を取得
+   - その座標で${args.step2_method}単点計算を実行${debugInfo}`,
         },
       ],
       isError: true,

@@ -4,8 +4,9 @@
   "description": "A quantum chemical calculation app using Electron, React, and Python.",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "rimraf dist && npm run codegen && run-p dev:webpack dev:electron",
-    "dev:clean": "rimraf dist node_modules/.cache && npm run codegen && run-p dev:webpack dev:electron",
+    "dev": "rimraf dist && npm run codegen && npm run dev:mcp && run-p dev:webpack dev:electron",
+    "dev:clean": "rimraf dist node_modules/.cache && npm run codegen && npm run dev:mcp && run-p dev:webpack dev:electron",
+    "dev:mcp": "cd mcp-server && npm run build",
     "dev:webpack": "cross-env NODE_ENV=\"development\" webpack --progress",
     "dev:electron": "wait-on --delay 1000 --interval 100 --timeout 30000 ./dist/index.html ./dist/main.js && electronmon .",
     "build": "npm run verify-env && npm run codegen && npm run build:webpack && npm run build:conda-pack && npm run build:python && npm run validate-build",
