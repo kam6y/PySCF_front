@@ -323,7 +323,8 @@
 }
 
 .statusSectionIcon {
-  font-size: 16px;
+  height: 20px;
+  margin: auto;
 }
 
 .statusSectionTitle {
@@ -533,5 +534,19 @@
   }
   100% {
     opacity: 1;
+  }
+}
+
+/* Spinner animation for running status */
+.animateSpin {
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
   }
 }

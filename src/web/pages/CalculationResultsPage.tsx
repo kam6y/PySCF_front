@@ -1645,60 +1645,11 @@ export const CalculationResultsPage = ({
           }}
         >
           {(() => {
-          // Check if geometry optimization was performed
-          const optimizeGeometry = (parameters as any).optimize_geometry !== false;
-          
-          if (!optimizeGeometry) {
-            return (
-              <>
-                <h2>Initial Geometry</h2>
-                <div
-                  style={{
-                    fontSize: '14px',
-                    color: '#666',
-                    marginBottom: '15px',
-                  }}
-                >
-                  ℹ️ No geometry optimization performed - using initial structure
-                </div>
-              </>
-            );
-          }
-          
-          // Determine optimization method based on calculation method
-          switch (parameters.calculation_method) {
-            case 'MP2':
-              return (
-                <>
-                  <h2>MP2-Optimized Geometry</h2>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      color: '#666',
-                      marginBottom: '15px',
-                    }}
-                  >
-                    ℹ️ Geometry optimized using MP2 method
-                  </div>
-                </>
-              );
-            case 'HF':
-              return (
-                <>
-                  <h2>HF-Optimized Geometry</h2>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      color: '#666',
-                      marginBottom: '15px',
-                    }}
-                  >
-                    ℹ️ Geometry optimized using Hartree-Fock method
-                  </div>
-                </>
-              );
-            case 'CCSD':
-            case 'CCSD_T':
+            // Check if geometry optimization was performed
+            const optimizeGeometry =
+              (parameters as any).optimize_geometry !== false;
+
+            if (!optimizeGeometry) {
               return (
                 <>
                   <h2>Initial Geometry</h2>
@@ -1709,59 +1660,113 @@ export const CalculationResultsPage = ({
                       marginBottom: '15px',
                     }}
                   >
-                    ℹ️ CCSD calculations use initial geometry (no optimization)
+                    ℹ️ No geometry optimization performed - using initial
+                    structure
                   </div>
                 </>
               );
-            case 'CASCI':
-            case 'CASSCF':
-              return (
-                <>
-                  <h2>Initial Geometry</h2>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      color: '#666',
-                      marginBottom: '15px',
-                    }}
-                  >
-                    ℹ️ CASCI/CASSCF calculations use initial geometry (no optimization)
-                  </div>
-                </>
-              );
-            case 'TDDFT':
-              return (
-                <>
-                  <h2>Initial Geometry</h2>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      color: '#666',
-                      marginBottom: '15px',
-                    }}
-                  >
-                    ℹ️ TDDFT calculations use initial geometry (no optimization)
-                  </div>
-                </>
-              );
-            default:
-              // DFT and other methods
-              return (
-                <>
-                  <h2>DFT-Optimized Geometry</h2>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      color: '#666',
-                      marginBottom: '15px',
-                    }}
-                  >
-                    ℹ️ Geometry optimized using DFT method
-                  </div>
-                </>
-              );
-          }
-        })()}
+            }
+
+            // Determine optimization method based on calculation method
+            switch (parameters.calculation_method) {
+              case 'MP2':
+                return (
+                  <>
+                    <h2>MP2-Optimized Geometry</h2>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        marginBottom: '15px',
+                      }}
+                    >
+                      ℹ️ Geometry optimized using MP2 method
+                    </div>
+                  </>
+                );
+              case 'HF':
+                return (
+                  <>
+                    <h2>HF-Optimized Geometry</h2>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        marginBottom: '15px',
+                      }}
+                    >
+                      ℹ️ Geometry optimized using Hartree-Fock method
+                    </div>
+                  </>
+                );
+              case 'CCSD':
+              case 'CCSD_T':
+                return (
+                  <>
+                    <h2>Initial Geometry</h2>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        marginBottom: '15px',
+                      }}
+                    >
+                      ℹ️ CCSD calculations use initial geometry (no
+                      optimization)
+                    </div>
+                  </>
+                );
+              case 'CASCI':
+              case 'CASSCF':
+                return (
+                  <>
+                    <h2>Initial Geometry</h2>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        marginBottom: '15px',
+                      }}
+                    >
+                      ℹ️ CASCI/CASSCF calculations use initial geometry (no
+                      optimization)
+                    </div>
+                  </>
+                );
+              case 'TDDFT':
+                return (
+                  <>
+                    <h2>Initial Geometry</h2>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        marginBottom: '15px',
+                      }}
+                    >
+                      ℹ️ TDDFT calculations use initial geometry (no
+                      optimization)
+                    </div>
+                  </>
+                );
+              default:
+                // DFT and other methods
+                return (
+                  <>
+                    <h2>DFT-Optimized Geometry</h2>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        color: '#666',
+                        marginBottom: '15px',
+                      }}
+                    >
+                      ℹ️ Geometry optimized using DFT method
+                    </div>
+                  </>
+                );
+            }
+          })()}
           <div>
             <strong>Number of Atoms:</strong> {results.atom_count}
           </div>

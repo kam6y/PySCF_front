@@ -37,19 +37,27 @@ export const CalculationSettingsPage = ({
   createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
   // Helper functions for safely getting parameters with defaults
-  const getValidNumberParam = (value: any, defaultValue: number, minValue: number = 0): number => {
-    return (typeof value === 'number' && !isNaN(value) && value >= minValue) 
-      ? value 
+  const getValidNumberParam = (
+    value: any,
+    defaultValue: number,
+    minValue: number = 0
+  ): number => {
+    return typeof value === 'number' && !isNaN(value) && value >= minValue
+      ? value
       : defaultValue;
   };
 
   const getValidBooleanParam = (value: any, defaultValue: boolean): boolean => {
-    return (typeof value === 'boolean') ? value : defaultValue;
+    return typeof value === 'boolean' ? value : defaultValue;
   };
 
-  const getValidFloatParam = (value: any, defaultValue: number, minValue: number = 0): number => {
-    return (typeof value === 'number' && !isNaN(value) && value >= minValue) 
-      ? value 
+  const getValidFloatParam = (
+    value: any,
+    defaultValue: number,
+    minValue: number = 0
+  ): number => {
+    return typeof value === 'number' && !isNaN(value) && value >= minValue
+      ? value
       : defaultValue;
   };
   const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
@@ -198,13 +206,40 @@ export const CalculationSettingsPage = ({
             adjustedParams.basis_function || '6-31G(d)';
           adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
           // Preserve existing CASCI/CASSCF parameters or use defaults
-          (adjustedParams as any).ncas = getValidNumberParam((adjustedParams as any).ncas, 4, 1);
-          (adjustedParams as any).nelecas = getValidNumberParam((adjustedParams as any).nelecas, 4, 1);
-          (adjustedParams as any).max_cycle_macro = getValidNumberParam((adjustedParams as any).max_cycle_macro, 50, 1);
-          (adjustedParams as any).max_cycle_micro = getValidNumberParam((adjustedParams as any).max_cycle_micro, 3, 1);
-          (adjustedParams as any).natorb = getValidBooleanParam((adjustedParams as any).natorb, true);
-          (adjustedParams as any).conv_tol = getValidFloatParam((adjustedParams as any).conv_tol, 1e-6, 1e-12);
-          (adjustedParams as any).conv_tol_grad = getValidFloatParam((adjustedParams as any).conv_tol_grad, 1e-4, 1e-8);
+          (adjustedParams as any).ncas = getValidNumberParam(
+            (adjustedParams as any).ncas,
+            4,
+            1
+          );
+          (adjustedParams as any).nelecas = getValidNumberParam(
+            (adjustedParams as any).nelecas,
+            4,
+            1
+          );
+          (adjustedParams as any).max_cycle_macro = getValidNumberParam(
+            (adjustedParams as any).max_cycle_macro,
+            50,
+            1
+          );
+          (adjustedParams as any).max_cycle_micro = getValidNumberParam(
+            (adjustedParams as any).max_cycle_micro,
+            3,
+            1
+          );
+          (adjustedParams as any).natorb = getValidBooleanParam(
+            (adjustedParams as any).natorb,
+            true
+          );
+          (adjustedParams as any).conv_tol = getValidFloatParam(
+            (adjustedParams as any).conv_tol,
+            1e-6,
+            1e-12
+          );
+          (adjustedParams as any).conv_tol_grad = getValidFloatParam(
+            (adjustedParams as any).conv_tol_grad,
+            1e-4,
+            1e-8
+          );
         } else {
           // DFT/HF defaults
           adjustedParams.basis_function =
@@ -219,7 +254,9 @@ export const CalculationSettingsPage = ({
         xyz: adjustedParams.xyz || '',
         calculation_method: adjustedParams.calculation_method || 'DFT',
         basis_function: adjustedParams.basis_function || '6-31G(d)',
-        exchange_correlation: adjustedParams.exchange_correlation || 'B3LYP',
+        exchange_correlation: adjustedParams.calculation_method === 'DFT' || adjustedParams.calculation_method === 'TDDFT' 
+          ? adjustedParams.exchange_correlation || 'B3LYP' 
+          : null,
         charges: adjustedParams.charges || 0,
         spin: adjustedParams.spin || 0,
         solvent_method: adjustedParams.solvent_method || 'none',
@@ -243,17 +280,37 @@ export const CalculationSettingsPage = ({
         // CASCI/CASSCF parameters - preserve current values or use defaults
         ncas: getValidNumberParam((adjustedParams as any).ncas, 4, 1),
         nelecas: getValidNumberParam((adjustedParams as any).nelecas, 4, 1),
-        max_cycle_macro: getValidNumberParam((adjustedParams as any).max_cycle_macro, 50, 1),
-        max_cycle_micro: getValidNumberParam((adjustedParams as any).max_cycle_micro, 3, 1),
+        max_cycle_macro: getValidNumberParam(
+          (adjustedParams as any).max_cycle_macro,
+          50,
+          1
+        ),
+        max_cycle_micro: getValidNumberParam(
+          (adjustedParams as any).max_cycle_micro,
+          3,
+          1
+        ),
         natorb: getValidBooleanParam((adjustedParams as any).natorb, true),
-        conv_tol: getValidFloatParam((adjustedParams as any).conv_tol, 1e-6, 1e-12),
-        conv_tol_grad: getValidFloatParam((adjustedParams as any).conv_tol_grad, 1e-4, 1e-8),
-        optimize_geometry: getValidBooleanParam((adjustedParams as any).optimize_geometry, 
-          !(adjustedParams.calculation_method === 'TDDFT' || 
-            adjustedParams.calculation_method === 'CASCI' || 
+        conv_tol: getValidFloatParam(
+          (adjustedParams as any).conv_tol,
+          1e-6,
+          1e-12
+        ),
+        conv_tol_grad: getValidFloatParam(
+          (adjustedParams as any).conv_tol_grad,
+          1e-4,
+          1e-8
+        ),
+        optimize_geometry: getValidBooleanParam(
+          (adjustedParams as any).optimize_geometry,
+          !(
+            adjustedParams.calculation_method === 'TDDFT' ||
+            adjustedParams.calculation_method === 'CASCI' ||
             adjustedParams.calculation_method === 'CASSCF' ||
             adjustedParams.calculation_method === 'CCSD' ||
-            adjustedParams.calculation_method === 'CCSD_T')),
+            adjustedParams.calculation_method === 'CCSD_T'
+          )
+        ),
       };
 
       if (isCompleted && isParamChange) {
@@ -300,7 +357,9 @@ export const CalculationSettingsPage = ({
           xyz: xyzData,
           calculation_method: currentParams.calculation_method || 'DFT',
           basis_function: currentParams.basis_function || '6-31G(d)',
-          exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
+          exchange_correlation: currentParams.calculation_method === 'DFT' || currentParams.calculation_method === 'TDDFT'
+            ? currentParams.exchange_correlation || 'B3LYP'
+            : null,
           charges: currentParams.charges || 0,
           spin: currentParams.spin || 0,
           solvent_method: currentParams.solvent_method || 'none',
@@ -324,17 +383,37 @@ export const CalculationSettingsPage = ({
           // CASCI/CASSCF parameters - preserve current values or use defaults
           ncas: getValidNumberParam((currentParams as any).ncas, 4, 1),
           nelecas: getValidNumberParam((currentParams as any).nelecas, 4, 1),
-          max_cycle_macro: getValidNumberParam((currentParams as any).max_cycle_macro, 50, 1),
-          max_cycle_micro: getValidNumberParam((currentParams as any).max_cycle_micro, 3, 1),
+          max_cycle_macro: getValidNumberParam(
+            (currentParams as any).max_cycle_macro,
+            50,
+            1
+          ),
+          max_cycle_micro: getValidNumberParam(
+            (currentParams as any).max_cycle_micro,
+            3,
+            1
+          ),
           natorb: getValidBooleanParam((currentParams as any).natorb, true),
-          conv_tol: getValidFloatParam((currentParams as any).conv_tol, 1e-6, 1e-12),
-          conv_tol_grad: getValidFloatParam((currentParams as any).conv_tol_grad, 1e-4, 1e-8),
-          optimize_geometry: getValidBooleanParam((currentParams as any).optimize_geometry, 
-            !(currentParams.calculation_method === 'TDDFT' || 
-              currentParams.calculation_method === 'CASCI' || 
+          conv_tol: getValidFloatParam(
+            (currentParams as any).conv_tol,
+            1e-6,
+            1e-12
+          ),
+          conv_tol_grad: getValidFloatParam(
+            (currentParams as any).conv_tol_grad,
+            1e-4,
+            1e-8
+          ),
+          optimize_geometry: getValidBooleanParam(
+            (currentParams as any).optimize_geometry,
+            !(
+              currentParams.calculation_method === 'TDDFT' ||
+              currentParams.calculation_method === 'CASCI' ||
               currentParams.calculation_method === 'CASSCF' ||
               currentParams.calculation_method === 'CCSD' ||
-              currentParams.calculation_method === 'CCSD_T')),
+              currentParams.calculation_method === 'CCSD_T'
+            )
+          ),
         };
 
         if (isCompleted) {
@@ -434,7 +513,9 @@ export const CalculationSettingsPage = ({
       xyz: currentParams.xyz || '',
       calculation_method: currentParams.calculation_method || 'DFT',
       basis_function: currentParams.basis_function || '6-31G(d)',
-      exchange_correlation: currentParams.exchange_correlation || 'B3LYP',
+      exchange_correlation: currentParams.calculation_method === 'DFT' || currentParams.calculation_method === 'TDDFT'
+        ? currentParams.exchange_correlation || 'B3LYP'
+        : null,
       charges: currentParams.charges || 0,
       spin: currentParams.spin || 0,
       solvent_method: currentParams.solvent_method || 'none',
@@ -455,17 +536,37 @@ export const CalculationSettingsPage = ({
       // CASCI/CASSCF parameters - preserve current values or use defaults
       ncas: getValidNumberParam((currentParams as any).ncas, 4, 1),
       nelecas: getValidNumberParam((currentParams as any).nelecas, 4, 1),
-      max_cycle_macro: getValidNumberParam((currentParams as any).max_cycle_macro, 50, 1),
-      max_cycle_micro: getValidNumberParam((currentParams as any).max_cycle_micro, 3, 1),
+      max_cycle_macro: getValidNumberParam(
+        (currentParams as any).max_cycle_macro,
+        50,
+        1
+      ),
+      max_cycle_micro: getValidNumberParam(
+        (currentParams as any).max_cycle_micro,
+        3,
+        1
+      ),
       natorb: getValidBooleanParam((currentParams as any).natorb, true),
-      conv_tol: getValidFloatParam((currentParams as any).conv_tol, 1e-6, 1e-12),
-      conv_tol_grad: getValidFloatParam((currentParams as any).conv_tol_grad, 1e-4, 1e-8),
-      optimize_geometry: getValidBooleanParam((currentParams as any).optimize_geometry, 
-        !(currentParams.calculation_method === 'TDDFT' || 
-          currentParams.calculation_method === 'CASCI' || 
+      conv_tol: getValidFloatParam(
+        (currentParams as any).conv_tol,
+        1e-6,
+        1e-12
+      ),
+      conv_tol_grad: getValidFloatParam(
+        (currentParams as any).conv_tol_grad,
+        1e-4,
+        1e-8
+      ),
+      optimize_geometry: getValidBooleanParam(
+        (currentParams as any).optimize_geometry,
+        !(
+          currentParams.calculation_method === 'TDDFT' ||
+          currentParams.calculation_method === 'CASCI' ||
           currentParams.calculation_method === 'CASSCF' ||
           currentParams.calculation_method === 'CCSD' ||
-          currentParams.calculation_method === 'CCSD_T')),
+          currentParams.calculation_method === 'CCSD_T'
+        )
+      ),
     };
 
     try {
@@ -530,7 +631,9 @@ export const CalculationSettingsPage = ({
         xyz: data.xyz,
         calculation_method: params.calculation_method || 'DFT',
         basis_function: params.basis_function || '6-31G(d)',
-        exchange_correlation: params.exchange_correlation || 'B3LYP',
+        exchange_correlation: params.calculation_method === 'DFT' || params.calculation_method === 'TDDFT'
+          ? params.exchange_correlation || 'B3LYP'
+          : null,
         charges: params.charges || 0,
         spin: params.spin || 0,
         solvent_method: params.solvent_method || 'none',
@@ -551,17 +654,33 @@ export const CalculationSettingsPage = ({
         // CASCI/CASSCF parameters - preserve current values or use defaults
         ncas: getValidNumberParam((params as any).ncas, 4, 1),
         nelecas: getValidNumberParam((params as any).nelecas, 4, 1),
-        max_cycle_macro: getValidNumberParam((params as any).max_cycle_macro, 50, 1),
-        max_cycle_micro: getValidNumberParam((params as any).max_cycle_micro, 3, 1),
+        max_cycle_macro: getValidNumberParam(
+          (params as any).max_cycle_macro,
+          50,
+          1
+        ),
+        max_cycle_micro: getValidNumberParam(
+          (params as any).max_cycle_micro,
+          3,
+          1
+        ),
         natorb: getValidBooleanParam((params as any).natorb, true),
         conv_tol: getValidFloatParam((params as any).conv_tol, 1e-6, 1e-12),
-        conv_tol_grad: getValidFloatParam((params as any).conv_tol_grad, 1e-4, 1e-8),
-        optimize_geometry: getValidBooleanParam((params as any).optimize_geometry, 
-          !(params.calculation_method === 'TDDFT' || 
-            params.calculation_method === 'CASCI' || 
+        conv_tol_grad: getValidFloatParam(
+          (params as any).conv_tol_grad,
+          1e-4,
+          1e-8
+        ),
+        optimize_geometry: getValidBooleanParam(
+          (params as any).optimize_geometry,
+          !(
+            params.calculation_method === 'TDDFT' ||
+            params.calculation_method === 'CASCI' ||
             params.calculation_method === 'CASSCF' ||
             params.calculation_method === 'CCSD' ||
-            params.calculation_method === 'CCSD_T')),
+            params.calculation_method === 'CCSD_T'
+          )
+        ),
       };
 
       if (isCompleted) {
@@ -887,14 +1006,21 @@ export const CalculationSettingsPage = ({
                 <label>
                   <input
                     type="checkbox"
-                    checked={getValidBooleanParam((params as any).optimize_geometry, 
-                      !(params.calculation_method === 'TDDFT' || 
-                        params.calculation_method === 'CASCI' || 
+                    checked={getValidBooleanParam(
+                      (params as any).optimize_geometry,
+                      !(
+                        params.calculation_method === 'TDDFT' ||
+                        params.calculation_method === 'CASCI' ||
                         params.calculation_method === 'CASSCF' ||
                         params.calculation_method === 'CCSD' ||
-                        params.calculation_method === 'CCSD_T'))}
+                        params.calculation_method === 'CCSD_T'
+                      )
+                    )}
                     onChange={e =>
-                      handleParamChange('optimize_geometry' as any, e.target.checked)
+                      handleParamChange(
+                        'optimize_geometry' as any,
+                        e.target.checked
+                      )
                     }
                     disabled={
                       calculationStatus === 'running' ||
@@ -907,13 +1033,14 @@ export const CalculationSettingsPage = ({
                   />
                   Perform Geometry Optimization
                 </label>
-                {(params.calculation_method === 'TDDFT' || 
-                  params.calculation_method === 'CASCI' || 
+                {(params.calculation_method === 'TDDFT' ||
+                  params.calculation_method === 'CASCI' ||
                   params.calculation_method === 'CASSCF' ||
                   params.calculation_method === 'CCSD' ||
                   params.calculation_method === 'CCSD_T') && (
                   <div className={styles.frozenCoreHelp}>
-                    Geometry optimization is not available for this calculation method
+                    Geometry optimization is not available for this calculation
+                    method
                   </div>
                 )}
               </div>
@@ -1021,7 +1148,11 @@ export const CalculationSettingsPage = ({
                     <div className={styles.settingRow}>
                       <label>Energy Convergence Tolerance</label>
                       <select
-                        value={getValidFloatParam((params as any).conv_tol, 1e-6, 1e-12)}
+                        value={getValidFloatParam(
+                          (params as any).conv_tol,
+                          1e-6,
+                          1e-12
+                        )}
                         onChange={e =>
                           handleParamChange(
                             'conv_tol' as any,
@@ -1039,7 +1170,11 @@ export const CalculationSettingsPage = ({
                     <div className={styles.settingRow}>
                       <label>Gradient Convergence Tolerance</label>
                       <select
-                        value={getValidFloatParam((params as any).conv_tol_grad, 1e-4, 1e-8)}
+                        value={getValidFloatParam(
+                          (params as any).conv_tol_grad,
+                          1e-4,
+                          1e-8
+                        )}
                         onChange={e =>
                           handleParamChange(
                             'conv_tol_grad' as any,
