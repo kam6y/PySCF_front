@@ -56,7 +56,7 @@ def load_server_config():
         return {
             "server": {"host": "127.0.0.1", "port": {"default": 5000, "auto_detect": True}},
             "gunicorn": {"workers": 1, "threads": 4, "timeout": 0, "worker_class": "sync"},
-            "socketio": {"cors_allowed_origins": "*", "async_mode": "threading"},
+            "socketio": {"cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*"], "async_mode": "threading"},
             "development": {"debug": False},
             "production": {"use_gunicorn": True},
             "logging": {"level": "INFO"}
@@ -83,7 +83,7 @@ CORS(app)  # Enable CORS for cross-origin requests
 socketio_config = SERVER_CONFIG.get('socketio', {})
 socketio = SocketIO(
     app, 
-    cors_allowed_origins=socketio_config.get('cors_allowed_origins', "*"),
+    cors_allowed_origins=socketio_config.get('cors_allowed_origins', ["http://127.0.0.1:*", "ws://127.0.0.1:*"]),
     async_mode=socketio_config.get('async_mode', 'threading'),
     ping_timeout=socketio_config.get('ping_timeout', 60),
     ping_interval=socketio_config.get('ping_interval', 25)
