@@ -2,7 +2,7 @@
   "mcpServers": {
     "pyscf-native": {
       "command": "node",
-      "args": ["/Users/goodapple/workspace/PySCF_native_app/mcp-server/dist/index.js"],
+      "args": ["{{PROJECT_PATH}}/mcp-server/dist/index.js"],
       "env": {}
     }
   }

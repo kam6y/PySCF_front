@@ -47,21 +47,40 @@ npm run build
 
 ### 4. Claude Desktop設定
 
-Claude Desktopの設定ファイル（通常は`~/Library/Application Support/Claude/claude_desktop_config.json`）に以下を追加:
+最も簡単な設定方法（推奨）：
+
+```bash
+cd mcp-server
+npm run setup-config
+```
+
+このスクリプトが以下を自動実行します：
+- プロジェクトパスを自動検出
+- Claude Desktop設定ファイルを生成
+- コピー＆ペーストして使用する設定内容を表示
+
+生成された設定をClaude Desktopの設定ファイル（`~/Library/Application Support/Claude/claude_desktop_config.json`）に追加し、Claude Desktopを再起動してください。
+
+<details>
+<summary>手動設定方法（上級者向け）</summary>
+
+Claude Desktopの設定ファイルに以下の形式で追加:
 
 ```json
 {
   "mcpServers": {
     "pyscf-native": {
       "command": "node",
-      "args": ["/Users/goodapple/workspace/PySCF_native_app/mcp-server/dist/index.js"],
+      "args": ["{{PROJECT_PATH}}/mcp-server/dist/index.js"],
       "env": {}
     }
   }
 }
 ```
 
-**重要**: `args`のパスを実際のインストールパスに合わせて変更してください。
+**注意**: `{{PROJECT_PATH}}`部分を実際のプロジェクトパスに置換してください。
+
+</details>
 
 ## 使用方法
 
