@@ -158,15 +158,25 @@ export class PySCFApiClient {
   }
 
   async listCalculations(): Promise<CalculationListResponse> {
-    const response: AxiosResponse<CalculationListResponse> = await this.client.get('/api/quantum/calculations');
-    return response.data;
+    try {
+      const response: AxiosResponse<CalculationListResponse> = await this.client.get('/api/quantum/calculations');
+      return response.data;
+    } catch (error) {
+      const errorDetails = this.extractErrorDetails(error);
+      throw new PySCFApiError(errorDetails);
+    }
   }
 
   async getCalculationDetails(calculationId: string): Promise<CalculationDetailsResponse> {
-    const response: AxiosResponse<CalculationDetailsResponse> = await this.client.get(
-      `/api/quantum/calculations/${calculationId}`
-    );
-    return response.data;
+    try {
+      const response: AxiosResponse<CalculationDetailsResponse> = await this.client.get(
+        `/api/quantum/calculations/${calculationId}`
+      );
+      return response.data;
+    } catch (error) {
+      const errorDetails = this.extractErrorDetails(error, { calculationId });
+      throw new PySCFApiError(errorDetails);
+    }
   }
 
   async updateCalculation(calculationId: string, request: CalculationUpdateRequest): Promise<CalculationUpdateResponse> {

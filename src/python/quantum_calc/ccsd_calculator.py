@@ -181,7 +181,7 @@ class CCSDCalculator(BaseCalculator):
         results = {
             'hf_energy': hf_energy_float,
             'ccsd_correlation_energy': ccsd_corr_energy_float,
-            'scf_energy': ccsd_total_energy_float,  # For consistency with other calculators
+            'scf_energy': ccsd_t_total_energy_float if self.calculate_ccsd_t else ccsd_total_energy_float,  # Use CCSD(T) energy if calculated
             'ccsd_total_energy': ccsd_total_energy_float
         }
         

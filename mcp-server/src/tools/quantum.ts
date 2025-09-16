@@ -30,7 +30,7 @@ export const startCalculationTool: Tool = {
       },
       exchange_correlation: {
         type: 'string',
-        description: 'Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X). Required for DFT and TDDFT methods, automatically ignored for HF, MP2, CCSD, CCSD(T), CASCI, and CASSCF methods.',
+        description: 'Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X). ONLY used for DFT and TDDFT methods. This parameter is automatically filtered out and NOT sent to the backend for HF, MP2, CCSD, CCSD(T), CASCI, and CASSCF methods as these methods do not use exchange-correlation functionals.',
         default: 'B3LYP',
       },
       charges: {
@@ -152,25 +152,48 @@ function filterParametersForCalculationMethod(args: QuantumCalculationRequest): 
   const filteredArgs = { ...args };
   const method = args.calculation_method;
 
-  // DFT and TDDFT methods require exchange-correlation functional
-  if (method === 'DFT' || method === 'TDDFT') {
+  // Log the original parameters for debugging
+  console.error(`[MCP] Filtering parameters for calculation method: ${method}`);
+  console.error(`[MCP] Original exchange_correlation: ${args.exchange_correlation || 'undefined'}`);
+
+  // Define methods that require exchange-correlation functional
+  const METHODS_REQUIRING_XC = ['DFT', 'TDDFT'];
+  
+  // Define methods that do NOT use exchange-correlation functional
+  const METHODS_NOT_USING_XC = ['HF', 'MP2', 'CCSD', 'CCSD_T', 'CASCI', 'CASSCF'];
+
+  if (METHODS_REQUIRING_XC.includes(method)) {
+    // DFT and TDDFT methods require exchange-correlation functional
+    console.error(`[MCP] Method ${method} requires exchange-correlation functional - keeping parameter`);
     // Keep exchange_correlation parameter (already provided)
-  }
-
-  // HF, MP2, CCSD, and CCSD_T methods do not use exchange-correlation functional
-  else if (method === 'HF' || method === 'MP2' || method === 'CCSD' || method === 'CCSD_T') {
-    // Remove exchange_correlation to avoid theoretical incompatibility
+  } else if (METHODS_NOT_USING_XC.includes(method)) {
+    // These methods do not use exchange-correlation functional
+    console.error(`[MCP] Method ${method} does not use exchange-correlation functional - removing parameter`);
+    
+    // Explicitly remove exchange_correlation from all possible locations
     if ('exchange_correlation' in filteredArgs) {
       delete (filteredArgs as any).exchange_correlation;
     }
+    
+    // Also ensure it's not present even if added later
+    Object.defineProperty(filteredArgs, 'exchange_correlation', {
+      value: undefined,
+      writable: false,
+      enumerable: false,
+      configurable: true
+    });
+    
+    console.error(`[MCP] exchange_correlation parameter removed for method ${method}`);
+  } else {
+    // Unknown method - log warning but keep parameter for safety
+    console.error(`[MCP] Unknown calculation method: ${method}. Keeping exchange_correlation parameter for safety.`);
   }
 
-  // CASCI and CASSCF methods do not use exchange-correlation functional
-  else if (method === 'CASCI' || method === 'CASSCF') {
-    // Remove exchange_correlation to avoid theoretical incompatibility
-    if ('exchange_correlation' in filteredArgs) {
-      delete (filteredArgs as any).exchange_correlation;
-    }
+  // Final verification
+  const hasXcAfterFilter = 'exchange_correlation' in filteredArgs && filteredArgs.exchange_correlation !== undefined;
+  console.error(`[MCP] After filtering - exchange_correlation present: ${hasXcAfterFilter}`);
+  if (hasXcAfterFilter) {
+    console.error(`[MCP] Final exchange_correlation value: ${filteredArgs.exchange_correlation}`);
   }
 
   return filteredArgs;
@@ -180,8 +203,19 @@ export async function handleStartCalculation(
   args: QuantumCalculationRequest,
   client: PySCFApiClient
 ) {
+  // Log original request for debugging
+  console.error(`[MCP] Starting calculation with method: ${args.calculation_method}`);
+  
   // Filter parameters based on calculation method to avoid theoretical incompatibility
   const filteredArgs = filterParametersForCalculationMethod(args);
+  
+  // Log filtering results
+  const originalHasXc = 'exchange_correlation' in args && args.exchange_correlation !== undefined;
+  const filteredHasXc = 'exchange_correlation' in filteredArgs && filteredArgs.exchange_correlation !== undefined;
+  console.error(`[MCP] Parameter filtering complete:`);
+  console.error(`[MCP] - Original had exchange_correlation: ${originalHasXc} (${args.exchange_correlation || 'undefined'})`);
+  console.error(`[MCP] - Filtered has exchange_correlation: ${filteredHasXc} (${filteredArgs.exchange_correlation || 'undefined'})`);
+  console.error(`[MCP] - Sending to backend:`, JSON.stringify(filteredArgs, null, 2));
 
   try {
     const response = await client.startCalculation(filteredArgs);
@@ -206,7 +240,8 @@ export async function handleStartCalculation(
 **Calculation Parameters:**
 - **Method:** ${params.calculation_method}
 - **Basis Set:** ${params.basis_function}${params.exchange_correlation ? `
-- **Exchange-Correlation Functional:** ${params.exchange_correlation}` : ''}
+- **Exchange-Correlation Functional:** ${params.exchange_correlation}` : `
+- **Exchange-Correlation Functional:** Not used (automatically filtered out for ${params.calculation_method} method)`}
 - **Charge:** ${params.charges}
 - **Spin:** ${params.spin}
 - **Solvent Effect:** ${params.solvent_method}${params.solvent !== '-' ? ` (${params.solvent})` : ''}
@@ -268,7 +303,8 @@ The calculation is running in the background. Use \`getCalculationDetails\` to c
 - Calculation Name: "${args.name || 'Unnamed Calculation'}"
 - Method: ${args.calculation_method || 'DFT'}
 - Basis Set: ${args.basis_function || '6-31G(d)'}${filteredArgs.exchange_correlation ? `
-- Exchange-Correlation Functional: ${filteredArgs.exchange_correlation}` : ' (Exchange-correlation functional automatically filtered out for this method)'}
+- Exchange-Correlation Functional: ${filteredArgs.exchange_correlation}` : `
+- Exchange-Correlation Functional: Not sent to backend (automatically filtered out for ${args.calculation_method} method)`}
 - Charge: ${args.charges || 0}
 - Spin: ${args.spin || 0}
 - CPU Cores: ${args.cpu_cores || 'auto'}
@@ -449,7 +485,7 @@ export async function handleGetCalculationDetails(
       resultText = `
 
 **Calculation Results:**
-- **SCF Energy:** ${results.scf_energy?.toFixed(8)} Hartree
+- **${params.calculation_method === 'CCSD_T' ? 'CCSD(T) Total Energy' : params.calculation_method === 'CCSD' ? 'CCSD Total Energy' : params.calculation_method === 'MP2' ? 'MP2 Total Energy' : 'SCF Energy'}:** ${results.scf_energy?.toFixed(8)} Hartree
 - **Convergence:** ${results.converged ? 'Success' : 'Failed'}
 - **Number of Atoms:** ${results.atom_count}
 - **Occupied Orbitals:** ${results.num_occupied_orbitals}
@@ -565,7 +601,8 @@ ${results.excitation_energies.slice(0, 5)
 **Calculation Parameters:**
 - **Method:** ${params.calculation_method}
 - **Basis Set:** ${params.basis_function}${params.exchange_correlation ? `
-- **Exchange-Correlation Functional:** ${params.exchange_correlation}` : ''}
+- **Exchange-Correlation Functional:** ${params.exchange_correlation}` : `
+- **Exchange-Correlation Functional:** Not used (automatically filtered out for ${params.calculation_method} method)`}
 - **Charge:** ${params.charges}
 - **Spin:** ${params.spin}
 - **Solvent Effect:** ${params.solvent_method}${params.solvent !== '-' ? ` (${params.solvent})` : ''}
