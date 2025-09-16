@@ -21,7 +21,6 @@ import {
   getOrbitalCubeTool,
   getIRSpectrumTool,
   getOptimizedGeometryTool,
-  startStepwiseCalculationTool,
   handleStartCalculation,
   handleListCalculations,
   handleGetCalculationDetails,
@@ -29,7 +28,6 @@ import {
   handleGetOrbitalCube,
   handleGetIRSpectrum,
   handleGetOptimizedGeometry,
-  handleStartStepwiseCalculation,
 } from './quantum.js';
 
 import {
@@ -76,7 +74,6 @@ export const tools: Tool[] = [
   getOrbitalCubeTool,
   getIRSpectrumTool,
   getOptimizedGeometryTool,
-  startStepwiseCalculationTool,
   
   // System management tools
   getSupportedParametersTool,
@@ -108,7 +105,6 @@ export const toolHandlers: Record<string, (args: any, client: PySCFApiClient) =>
   getOrbitalCube: handleGetOrbitalCube,
   getIRSpectrum: handleGetIRSpectrum,
   getOptimizedGeometry: handleGetOptimizedGeometry,
-  startStepwiseCalculation: handleStartStepwiseCalculation,
   
   // System management handlers
   getSupportedParameters: handleGetSupportedParameters,

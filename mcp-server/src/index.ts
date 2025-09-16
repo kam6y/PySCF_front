@@ -106,7 +106,7 @@ class PySCFMCPServer {
         if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
           throw new McpError(
             ErrorCode.InternalError,
-            `PySCF Native Appサーバーに接続できません。アプリが起動していることを確認してください。\n\nエラー: ${error.message}`
+            `Cannot connect to PySCF Native App server. Please ensure the app is running.\n\nError: ${error.message}`
           );
         }
 
@@ -120,7 +120,7 @@ class PySCFMCPServer {
 
   private async initializeClient(): Promise<void> {
     try {
-      console.error('PySCF Native Appサーバーに接続中...');
+      console.error('Connecting to PySCF Native App server...');
       
       // Try auto-detection first
       this.client = await PySCFApiClient.createWithAutoDetect('127.0.0.1', {
@@ -130,27 +130,27 @@ class PySCFMCPServer {
 
       const connection = await this.client.testConnection();
       if (connection.connected) {
-        console.error(`✅ PySCF Native Appに接続成功: ${this.client.getBaseUrl()}`);
-        console.error(`   サーバーバージョン: ${connection.version || 'N/A'}`);
+        console.error(`✅ Successfully connected to PySCF Native App: ${this.client.getBaseUrl()}`);
+        console.error(`   Server version: ${connection.version || 'N/A'}`);
       } else {
         throw new Error(connection.error || 'Connection test failed');
       }
 
     } catch (error) {
-      console.error('❌ PySCF Native Appサーバーへの接続に失敗しました');
+      console.error('❌ Failed to connect to PySCF Native App server');
       console.error('');
-      console.error('解決方法:');
-      console.error('1. PySCF Native Appが起動していることを確認してください');
-      console.error('2. ターミナルで以下のコマンドを実行してアプリを起動:');
+      console.error('Solutions:');
+      console.error('1. Ensure PySCF Native App is running');
+      console.error('2. Run the following command in terminal to start the app:');
       console.error('   cd /path/to/PySCF_native_app');
       console.error('   npm run dev');
-      console.error('3. アプリが http://127.0.0.1:5000 で起動していることを確認');
+      console.error('3. Verify the app is running at http://127.0.0.1:5000');
       console.error('');
       
       throw new Error(
-        `PySCF Native Appサーバーが見つかりません。\n` +
-        `アプリを起動してから再試行してください。\n\n` +
-        `詳細: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `PySCF Native App server not found.\n` +
+        `Please start the app and retry.\n\n` +
+        `Details: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
     }
   }

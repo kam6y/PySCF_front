@@ -15,7 +15,7 @@ export async function handleGetSupportedParameters(_args: object, client: PySCFA
     const response = await client.getSupportedParameters();
 
     if (!response.success) {
-      throw new Error(`サポートパラメータの取得に失敗しました`);
+      throw new Error(`Failed to get supported parameters`);
     }
 
     const data = response.data;
@@ -41,27 +41,27 @@ export async function handleGetSupportedParameters(_args: object, client: PySCFA
       content: [
         {
           type: 'text',
-          text: `⚙️ **サポートされる計算パラメータ**
+          text: `⚙️ **Supported Calculation Parameters**
 
-**計算手法:**
+**Calculation Methods:**
 ${data.calculation_methods.map(method => `- ${method}`).join('\n')}
 
-**基底関数:**
+**Basis Functions:**
 ${basisText}
 
-**交換相関汎関数:**
+**Exchange-Correlation Functionals:**
 ${xcText}
 
-**溶媒効果手法:**
+**Solvent Effect Methods:**
 ${data.solvent_methods.map(method => `- ${method}`).join('\n')}
 
-**溶媒:**
+**Solvents:**
 ${solventText}
 
-**TDDFT手法:**
+**TDDFT Methods:**
 ${data.tddft_methods.map(method => `- ${method}`).join('\n')}
 
-これらのパラメータは \`startCalculation\` で使用できます。`,
+These parameters can be used with \`startCalculation\`.`,
         },
       ],
     };
@@ -71,9 +71,9 @@ ${data.tddft_methods.map(method => `- ${method}`).join('\n')}
       content: [
         {
           type: 'text',
-          text: `❌ サポートパラメータの取得でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while getting supported parameters: ${errorMessage}
 
-サーバーが起動していることを確認してください。`,
+Please ensure the server is running.`,
         },
       ],
       isError: true,
@@ -95,7 +95,7 @@ export async function handleGetSettings(_args: object, client: PySCFApiClient) {
     const response = await client.getSettings();
 
     if (!response.success) {
-      throw new Error(`設定の取得に失敗しました`);
+      throw new Error(`Failed to get settings`);
     }
 
     const settings = response.data.settings;
@@ -113,22 +113,22 @@ export async function handleGetSettings(_args: object, client: PySCFApiClient) {
       content: [
         {
           type: 'text',
-          text: `⚙️ **アプリケーション設定**
+          text: `⚙️ **Application Settings**
 
-**並列処理設定:**
-- **最大並列インスタンス数:** ${safeSettings.max_parallel_instances}
-- **最大CPU使用率:** ${safeSettings.max_cpu_utilization_percent}%
-- **最大メモリ使用率:** ${safeSettings.max_memory_utilization_percent}%
+**Parallel Processing Settings:**
+- **Max Parallel Instances:** ${safeSettings.max_parallel_instances}
+- **Max CPU Utilization:** ${safeSettings.max_cpu_utilization_percent}%
+- **Max Memory Utilization:** ${safeSettings.max_memory_utilization_percent}%
 
-**システム情報:**
-- **総CPUコア数:** ${safeSettings.system_total_cores}
-- **総メモリ:** ${(safeSettings.system_total_memory_mb / 1024).toFixed(1)} GB (${safeSettings.system_total_memory_mb} MB)
+**System Information:**
+- **Total CPU Cores:** ${safeSettings.system_total_cores}
+- **Total Memory:** ${(safeSettings.system_total_memory_mb / 1024).toFixed(1)} GB (${safeSettings.system_total_memory_mb} MB)
 
-**実効制限:**
-- **利用可能CPUコア:** ${Math.floor(safeSettings.system_total_cores * safeSettings.max_cpu_utilization_percent / 100)}コア
-- **利用可能メモリ:** ${(safeSettings.system_total_memory_mb * safeSettings.max_memory_utilization_percent / 100 / 1024).toFixed(1)} GB
+**Effective Limits:**
+- **Available CPU Cores:** ${Math.floor(safeSettings.system_total_cores * safeSettings.max_cpu_utilization_percent / 100)} cores
+- **Available Memory:** ${(safeSettings.system_total_memory_mb * safeSettings.max_memory_utilization_percent / 100 / 1024).toFixed(1)} GB
 
-設定を変更するには \`updateSettings\` を使用してください。`,
+Use \`updateSettings\` to change these settings.`,
         },
       ],
     };
@@ -138,7 +138,7 @@ export async function handleGetSettings(_args: object, client: PySCFApiClient) {
       content: [
         {
           type: 'text',
-          text: `❌ 設定の取得でエラーが発生しました: ${errorMessage}`,
+          text: `❌ Error occurred while getting settings: ${errorMessage}`,
         },
       ],
       isError: true,
@@ -187,7 +187,7 @@ export async function handleUpdateSettings(
     // First get current settings
     const currentResponse = await client.getSettings();
     if (!currentResponse.success) {
-      throw new Error('現在の設定取得に失敗しました');
+      throw new Error('Failed to get current settings');
     }
 
     const currentSettings = currentResponse.data.settings;
@@ -204,7 +204,7 @@ export async function handleUpdateSettings(
     const response = await client.updateSettings(newSettings);
 
     if (!response.success) {
-      throw new Error(`設定の更新に失敗しました`);
+      throw new Error(`Failed to update settings`);
     }
 
     const updatedSettings = response.data.settings;
@@ -213,18 +213,18 @@ export async function handleUpdateSettings(
       content: [
         {
           type: 'text',
-          text: `✅ **設定を更新しました**
+          text: `✅ **Settings Updated Successfully**
 
-**更新された設定:**
-- **最大並列インスタンス数:** ${updatedSettings.max_parallel_instances}
-- **最大CPU使用率:** ${updatedSettings.max_cpu_utilization_percent}%
-- **最大メモリ使用率:** ${updatedSettings.max_memory_utilization_percent}%
+**Updated Settings:**
+- **Max Parallel Instances:** ${updatedSettings.max_parallel_instances}
+- **Max CPU Utilization:** ${updatedSettings.max_cpu_utilization_percent}%
+- **Max Memory Utilization:** ${updatedSettings.max_memory_utilization_percent}%
 
-**実効制限:**
-- **利用可能CPUコア:** ${Math.floor(updatedSettings.system_total_cores * updatedSettings.max_cpu_utilization_percent / 100)}コア
-- **利用可能メモリ:** ${(updatedSettings.system_total_memory_mb * updatedSettings.max_memory_utilization_percent / 100 / 1024).toFixed(1)} GB
+**Effective Limits:**
+- **Available CPU Cores:** ${Math.floor(updatedSettings.system_total_cores * updatedSettings.max_cpu_utilization_percent / 100)} cores
+- **Available Memory:** ${(updatedSettings.system_total_memory_mb * updatedSettings.max_memory_utilization_percent / 100 / 1024).toFixed(1)} GB
 
-新しい設定は既に有効になっています。`,
+The new settings are now active.`,
         },
       ],
     };
@@ -234,14 +234,14 @@ export async function handleUpdateSettings(
       content: [
         {
           type: 'text',
-          text: `❌ 設定の更新でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while updating settings: ${errorMessage}
 
-**可能な原因:**
-- 無効な設定値
-- サーバーエラー
-- 権限不足
+**Possible Causes:**
+- Invalid setting values
+- Server error
+- Insufficient permissions
 
-設定値が有効範囲内であることを確認してください。`,
+Please ensure the setting values are within valid ranges.`,
         },
       ],
       isError: true,
@@ -263,7 +263,7 @@ export async function handleGetResourceStatus(_args: object, client: PySCFApiCli
     const response = await client.getResourceStatus();
 
     if (!response.success) {
-      throw new Error(`リソース状況の取得に失敗しました`);
+      throw new Error(`Failed to get resource status`);
     }
 
     const data = response.data;
@@ -289,29 +289,29 @@ export async function handleGetResourceStatus(_args: object, client: PySCFApiCli
       content: [
         {
           type: 'text',
-          text: `📊 **システムリソース状況**
+          text: `📊 **System Resource Status**
 
-**現在のシステム使用状況:**
-- **CPU使用率:** ${createProgressBar(cpuUsagePercent)} (${cpuUsagePercent.toFixed(1)}%)
-- **メモリ使用率:** ${createProgressBar(memoryUsagePercent)} (${memoryUsagePercent.toFixed(1)}%)
-- **利用可能メモリ:** ${(system.available_memory_mb / 1024).toFixed(1)} GB / ${(system.total_memory_mb / 1024).toFixed(1)} GB
+**Current System Usage:**
+- **CPU Usage:** ${createProgressBar(cpuUsagePercent)} (${cpuUsagePercent.toFixed(1)}%)
+- **Memory Usage:** ${createProgressBar(memoryUsagePercent)} (${memoryUsagePercent.toFixed(1)}%)
+- **Available Memory:** ${(system.available_memory_mb / 1024).toFixed(1)} GB / ${(system.total_memory_mb / 1024).toFixed(1)} GB
 
-**計算リソース制約:**
-- **最大CPU利用率:** ${constraints.max_cpu_utilization_percent}%
-- **最大メモリ利用率:** ${constraints.max_memory_utilization_percent}%
-- **最大許可CPUコア:** ${constraints.max_allowed_cpu_cores}コア
-- **最大許可メモリ:** ${(constraints.max_allowed_memory_mb / 1024).toFixed(1)} GB
+**Calculation Resource Constraints:**
+- **Max CPU Utilization:** ${constraints.max_cpu_utilization_percent}%
+- **Max Memory Utilization:** ${constraints.max_memory_utilization_percent}%
+- **Max Allowed CPU Cores:** ${constraints.max_allowed_cpu_cores} cores
+- **Max Allowed Memory:** ${(constraints.max_allowed_memory_mb / 1024).toFixed(1)} GB
 
-**計算リソース割り当て:**
-- **割り当て済みCPU:** ${createProgressBar(allocatedCpuPercent)} (${allocated.total_allocated_cpu_cores}/${system.total_cpu_cores}コア)
-- **割り当て済みメモリ:** ${createProgressBar(allocatedMemoryPercent)} (${(allocated.total_allocated_memory_mb / 1024).toFixed(1)} GB)
-- **利用可能CPUコア:** ${allocated.available_cpu_cores}コア
-- **利用可能メモリ:** ${(allocated.available_memory_mb / 1024).toFixed(1)} GB
-- **アクティブ計算数:** ${allocated.active_calculations_count}個
+**Calculation Resource Allocation:**
+- **Allocated CPU:** ${createProgressBar(allocatedCpuPercent)} (${allocated.total_allocated_cpu_cores}/${system.total_cpu_cores} cores)
+- **Allocated Memory:** ${createProgressBar(allocatedMemoryPercent)} (${(allocated.total_allocated_memory_mb / 1024).toFixed(1)} GB)
+- **Available CPU Cores:** ${allocated.available_cpu_cores} cores
+- **Available Memory:** ${(allocated.available_memory_mb / 1024).toFixed(1)} GB
+- **Active Calculations:** ${allocated.active_calculations_count}
 
-**更新時刻:** ${new Date(system.timestamp).toLocaleString()}
+**Last Updated:** ${new Date(system.timestamp).toLocaleString()}
 
-${allocated.active_calculations_count > 0 ? '現在実行中の計算があります。' : '現在実行中の計算はありません。'}`,
+${allocated.active_calculations_count > 0 ? 'There are currently running calculations.' : 'No calculations are currently running.'}`,
         },
       ],
     };
@@ -323,31 +323,31 @@ ${allocated.active_calculations_count > 0 ? '現在実行中の計算があり�
     if (error instanceof PySCFApiError) {
       const details = error.details;
       debugInfo = `
-**デバッグ情報:**
-- HTTPステータス: ${details.status || 'N/A'}
-- ステータステキスト: ${details.statusText || 'N/A'}
+**Debug Information:**
+- HTTP Status: ${details.status || 'N/A'}
+- Status Text: ${details.statusText || 'N/A'}
 - URL: ${details.url || 'N/A'}
-- メソッド: ${details.method || 'N/A'}
-- タイムスタンプ: ${details.timestamp}
-- レスポンスデータ: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}
+- Method: ${details.method || 'N/A'}
+- Timestamp: ${details.timestamp}
+- Response Data: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}
 
-**考えられる原因:**
-- サーバーが起動していない
-- リソース管理モジュールの初期化エラー
-- システム権限の問題
-- ネットワーク接続の問題`;
+**Possible Causes:**
+- Server is not running
+- Resource management module initialization error
+- System permission issues
+- Network connection problems`;
     }
     
     return {
       content: [
         {
           type: 'text',
-          text: `❌ リソース状況の取得でエラーが発生しました: ${errorMessage}${debugInfo}
+          text: `❌ Error occurred while getting resource status: ${errorMessage}${debugInfo}
 
-**解決方法:**
-- PySCF Native Appが正常に起動していることを確認してください
-- \`testConnection\` ツールでサーバーとの接続を確認してください
-- アプリケーションを再起動してください`,
+**Solutions:**
+- Ensure PySCF Native App is running properly
+- Use \`testConnection\` tool to verify server connection
+- Restart the application`,
         },
       ],
       isError: true,
@@ -373,14 +373,14 @@ export async function handleTestConnection(_args: object, client: PySCFApiClient
         content: [
           {
             type: 'text',
-            text: `✅ **PySCF Native Appサーバーに接続成功**
+            text: `✅ **Successfully connected to PySCF Native App server**
 
-**サーバー情報:**
+**Server Information:**
 - **URL:** ${client.getBaseUrl()}
-- **バージョン:** ${result.version || 'N/A'}
-- **ステータス:** 正常稼働中
+- **Version:** ${result.version || 'N/A'}
+- **Status:** Running normally
 
-サーバーは正常に動作しており、全ての機能が利用可能です。`,
+The server is operating properly and all features are available.`,
           },
         ],
       };
@@ -389,16 +389,16 @@ export async function handleTestConnection(_args: object, client: PySCFApiClient
         content: [
           {
             type: 'text',
-            text: `❌ **PySCF Native Appサーバーに接続できません**
+            text: `❌ **Cannot connect to PySCF Native App server**
 
-**エラー:** ${result.error}
-**試行URL:** ${client.getBaseUrl()}
+**Error:** ${result.error}
+**Attempted URL:** ${client.getBaseUrl()}
 
-**解決方法:**
-1. PySCF Native Appが起動していることを確認
-2. \`npm run dev\` でアプリを起動
-3. ポート番号が正しいことを確認 (通常5000-5100)
-4. ファイアウォール設定を確認`,
+**Solutions:**
+1. Ensure PySCF Native App is running
+2. Start the app with \`npm run dev\`
+3. Verify the port number is correct (usually 5000-5100)
+4. Check firewall settings`,
           },
         ],
         isError: true,
@@ -410,9 +410,9 @@ export async function handleTestConnection(_args: object, client: PySCFApiClient
       content: [
         {
           type: 'text',
-          text: `❌ 接続テストでエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred during connection test: ${errorMessage}
 
-サーバーの状態とネットワーク接続を確認してください。`,
+Please check server status and network connection.`,
         },
       ],
       isError: true,
@@ -451,38 +451,38 @@ export async function handleDiagnosticsServer(
     recommendations: [] as string[]
   };
 
-  let reportText = '🔍 **PySCF Native App サーバー診断レポート**\n\n';
+  let reportText = '🔍 **PySCF Native App Server Diagnostic Report**\n\n';
 
   try {
     // 1. Basic connection test
-    reportText += '**1. 基本接続テスト**\n';
+    reportText += '**1. Basic Connection Test**\n';
     try {
       const connectionTest = await client.testConnection();
       results.server.connected = connectionTest.connected;
       results.server.version = connectionTest.version || 'Unknown';
       
       if (connectionTest.connected) {
-        reportText += '✅ サーバー接続: 正常\n';
-        reportText += `📍 サーバーURL: ${client.getBaseUrl()}\n`;
-        reportText += `📋 サーバーバージョン: ${results.server.version}\n\n`;
+        reportText += '✅ Server connection: Normal\n';
+        reportText += `📍 Server URL: ${client.getBaseUrl()}\n`;
+        reportText += `📋 Server version: ${results.server.version}\n\n`;
       } else {
-        reportText += '❌ サーバー接続: 失敗\n';
-        reportText += `⚠️ エラー: ${connectionTest.error}\n\n`;
-        results.recommendations.push('PySCF Native App が起動していることを確認してください');
-        results.recommendations.push('npm run dev コマンドでアプリケーションを起動してください');
+        reportText += '❌ Server connection: Failed\n';
+        reportText += `⚠️ Error: ${connectionTest.error}\n\n`;
+        results.recommendations.push('Ensure PySCF Native App is running');
+        results.recommendations.push('Start the application with npm run dev command');
       }
     } catch (error) {
-      reportText += '❌ サーバー接続: 失敗\n';
-      reportText += `⚠️ エラー: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`;
-      results.recommendations.push('サーバーの起動状況を確認してください');
+      reportText += '❌ Server connection: Failed\n';
+      reportText += `⚠️ Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`;
+      results.recommendations.push('Check server startup status');
     }
 
     // 2. Critical endpoints testing (always performed)
-    reportText += '**2. 重要エンドポイント診断**\n';
+    reportText += '**2. Critical Endpoint Diagnostics**\n';
     
     // Test critical endpoints that were previously failing
     const criticalTests = [
-      { name: 'getResourceStatus', test: () => client.getResourceStatus(), critical: true, description: '(以前404エラー)' },
+      { name: 'getResourceStatus', test: () => client.getResourceStatus(), critical: true, description: '(previously 404 error)' },
       { name: 'getSupportedParameters', test: () => client.getSupportedParameters(), critical: false, description: '' },
     ];
 
@@ -492,7 +492,7 @@ export async function handleDiagnosticsServer(
         const result = await endpoint.test();
         results.endpoints.passed++;
         results.endpoints.results.push({ name: endpoint.name, status: 'PASS', error: null });
-        reportText += `✅ ${endpoint.name}: 正常 ${endpoint.description}\n`;
+        reportText += `✅ ${endpoint.name}: Normal ${endpoint.description}\n`;
         
         // Special handling for resource status to show CPU availability fix
         if (endpoint.name === 'getResourceStatus' && result.success) {
@@ -502,8 +502,8 @@ export async function handleDiagnosticsServer(
           if (data && data.allocated_resources && data.system_info) {
             const availableCpu = data.allocated_resources.available_cpu_cores;
             const totalCpu = data.system_info.total_cpu_cores;
-            reportText += `   📊 CPU利用可能数: ${availableCpu}/${totalCpu}コア ${availableCpu > 0 ? '✅ 修正完了' : '❌ まだ問題'}\n`;
-            reportText += `   🧠 メモリ利用可能: ${(data.allocated_resources.available_memory_mb / 1024).toFixed(1)} GB\n`;
+            reportText += `   📊 Available CPU cores: ${availableCpu}/${totalCpu} cores ${availableCpu > 0 ? '✅ Fixed' : '❌ Still problematic'}\n`;
+            reportText += `   🧠 Available memory: ${(data.allocated_resources.available_memory_mb / 1024).toFixed(1)} GB\n`;
           }
         }
       } catch (error) {
@@ -512,10 +512,10 @@ export async function handleDiagnosticsServer(
           `${error.details.status} - ${error.details.statusText}` : 
           (error instanceof Error ? error.message : 'Unknown error');
         results.endpoints.results.push({ name: endpoint.name, status: 'FAIL', error: errorMsg });
-        reportText += `❌ ${endpoint.name}: 失敗 ${endpoint.description} (${errorMsg})\n`;
+        reportText += `❌ ${endpoint.name}: Failed ${endpoint.description} (${errorMsg})\n`;
         
         if (endpoint.name === 'getResourceStatus' && error instanceof PySCFApiError && error.details.status === 404) {
-          results.recommendations.push('リソース管理モジュールの初期化に問題があります');
+          results.recommendations.push('Resource management module initialization issue');
         }
       }
     }
@@ -523,7 +523,7 @@ export async function handleDiagnosticsServer(
 
     // 3. Detailed endpoint testing (only if detailed flag is set)
     if (results.server.connected && detailed) {
-      reportText += '**3. 詳細エンドポイント診断**\n';
+      reportText += '**3. Detailed Endpoint Diagnostics**\n';
       
       const additionalTests = [
         { name: 'getSettings', test: () => client.getSettings() },
@@ -536,14 +536,14 @@ export async function handleDiagnosticsServer(
           await endpoint.test();
           results.endpoints.passed++;
           results.endpoints.results.push({ name: endpoint.name, status: 'PASS', error: null });
-          reportText += `✅ ${endpoint.name}: 正常\n`;
+          reportText += `✅ ${endpoint.name}: Normal\n`;
         } catch (error) {
           results.endpoints.failed++;
           const errorMsg = error instanceof PySCFApiError ? 
             `${error.details.status} - ${error.details.statusText}` : 
             (error instanceof Error ? error.message : 'Unknown error');
           results.endpoints.results.push({ name: endpoint.name, status: 'FAIL', error: errorMsg });
-          reportText += `❌ ${endpoint.name}: 失敗 (${errorMsg})\n`;
+          reportText += `❌ ${endpoint.name}: Failed (${errorMsg})\n`;
         }
       }
       reportText += '\n';
@@ -551,29 +551,29 @@ export async function handleDiagnosticsServer(
 
     // 4. Parameter availability test
     if (results.server.connected) {
-      reportText += '**4. パラメータ可用性テスト**\n';
+      reportText += '**4. Parameter Availability Test**\n';
       try {
         const params = await client.getSupportedParameters();
         if (params.success) {
           const data = params.data;
-          reportText += `✅ 計算手法: ${data.calculation_methods.length}種類\n`;
-          reportText += `✅ 基底関数: ${Object.values(data.basis_functions).flat().length}種類\n`;
-          reportText += `✅ 交換相関汎関数: ${Object.values(data.exchange_correlation).flat().length}種類\n`;
-          reportText += `✅ 溶媒: ${Object.values(data.solvents).flat().length}種類\n\n`;
+          reportText += `✅ Calculation methods: ${data.calculation_methods.length} types\n`;
+          reportText += `✅ Basis functions: ${Object.values(data.basis_functions).flat().length} types\n`;
+          reportText += `✅ Exchange-correlation functionals: ${Object.values(data.exchange_correlation).flat().length} types\n`;
+          reportText += `✅ Solvents: ${Object.values(data.solvents).flat().length} types\n\n`;
           
-          results.dependencies.available.push('計算パラメータ');
+          results.dependencies.available.push('Calculation parameters');
         }
       } catch (error) {
-        reportText += '❌ パラメータ取得: 失敗\n';
-        reportText += `⚠️ エラー: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`;
-        results.dependencies.missing.push('計算パラメータ');
-        results.recommendations.push('量子化学ライブラリ（PySCF）の初期化を確認してください');
+        reportText += '❌ Parameter retrieval: Failed\n';
+        reportText += `⚠️ Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\n`;
+        results.dependencies.missing.push('Calculation parameters');
+        results.recommendations.push('Check quantum chemistry library (PySCF) initialization');
       }
     }
 
     // 5. StartCalculation test (only for detailed diagnostics)
     if (results.server.connected && detailed) {
-      reportText += '**5. 計算開始機能テスト** (以前500エラー)\n';
+      reportText += '**5. Calculation Start Function Test** (previously 500 error)\n';
       
       try {
         // Simple test molecule (hydrogen molecule)
@@ -610,54 +610,54 @@ H 0.74 0.0 0.0`,
         
         if (startResult.success) {
           const calc = startResult.data.calculation;
-          reportText += `✅ 計算開始: 正常 (ID: ${calc.id})\n`;
-          reportText += `   📋 ステータス: ${calc.status}\n`;
+          reportText += `✅ Calculation start: Normal (ID: ${calc.id})\n`;
+          reportText += `   📋 Status: ${calc.status}\n`;
           
           // Try to immediately cancel the test calculation to avoid resource waste
           try {
             // Note: Cancel function not implemented in current client, so we skip this
-            reportText += `   🔄 テスト計算のため、手動でキャンセルしてください\n`;
+            reportText += `   🔄 This is a test calculation, please cancel manually\n`;
           } catch (e) {
             // Ignore cancel errors
           }
           
-          results.dependencies.available.push('量子化学計算エンジン');
+          results.dependencies.available.push('Quantum chemistry calculation engine');
         } else {
-          reportText += `❌ 計算開始: 失敗\n`;
-          results.dependencies.missing.push('量子化学計算エンジン');
-          results.recommendations.push('量子化学計算の初期化に問題があります');
+          reportText += `❌ Calculation start: Failed\n`;
+          results.dependencies.missing.push('Quantum chemistry calculation engine');
+          results.recommendations.push('Issue with quantum chemistry calculation initialization');
         }
       } catch (error) {
         const errorMsg = error instanceof PySCFApiError ? 
           `${error.details.status} - ${error.details.statusText}` : 
           (error instanceof Error ? error.message : 'Unknown error');
-        reportText += `❌ 計算開始: 失敗 (${errorMsg})\n`;
+        reportText += `❌ Calculation start: Failed (${errorMsg})\n`;
         
         if (error instanceof PySCFApiError && error.details.status === 500) {
-          results.recommendations.push('サーバー内部エラー: 量子化学ライブラリまたはリソース管理に問題があります');
+          results.recommendations.push('Server internal error: issue with quantum chemistry library or resource management');
         }
-        
-        results.dependencies.missing.push('量子化学計算エンジン');
+
+        results.dependencies.missing.push('Quantum chemistry calculation engine');
       }
       reportText += '\n';
     }
 
     // 6. Summary and recommendations
     const elapsedTime = Date.now() - startTime;
-    reportText += '**📊 診断サマリー**\n';
-    reportText += `⏱️ 診断時間: ${elapsedTime}ms\n`;
-    reportText += `🔗 サーバー状態: ${results.server.connected ? '接続済み' : '未接続'}\n`;
+    reportText += '**📊 Diagnostic Summary**\n';
+    reportText += `⏱️ Diagnostic time: ${elapsedTime}ms\n`;
+    reportText += `🔗 Server status: ${results.server.connected ? 'Connected' : 'Disconnected'}\n`;
     
     if (detailed) {
-      reportText += `🎯 エンドポイントテスト: ${results.endpoints.passed}/${results.endpoints.tested} 成功\n`;
+      reportText += `🎯 Endpoint tests: ${results.endpoints.passed}/${results.endpoints.tested} succeeded\n`;
     }
     
-    reportText += `📦 利用可能な依存関係: ${results.dependencies.available.length}\n`;
-    reportText += `⚠️ 不足している依存関係: ${results.dependencies.missing.length}\n\n`;
+    reportText += `📦 Available dependencies: ${results.dependencies.available.length}\n`;
+    reportText += `⚠️ Missing dependencies: ${results.dependencies.missing.length}\n\n`;
 
     // 7. Recommendations
     if (results.recommendations.length > 0) {
-      reportText += '**🔧 推奨事項**\n';
+      reportText += '**🔧 Recommendations**\n';
       results.recommendations.forEach((rec, i) => {
         reportText += `${i + 1}. ${rec}\n`;
       });
@@ -666,12 +666,12 @@ H 0.74 0.0 0.0`,
 
     // 8. Overall health status
     const overallHealth = results.server.connected && results.endpoints.failed === 0;
-    reportText += `**🏥 総合ヘルス状態: ${overallHealth ? '健全' : '要注意'}**\n`;
+    reportText += `**🏥 Overall Health Status: ${overallHealth ? 'Healthy' : 'Needs attention'}**\n`;
     
     if (overallHealth) {
-      reportText += '✅ システムは正常に動作しています。';
+      reportText += '✅ System is operating normally.';
     } else {
-      reportText += '⚠️ 一部機能に問題があります。上記の推奨事項をご確認ください。';
+      reportText += '⚠️ Some features have issues. Please check the recommendations above.';
     }
 
     return {
@@ -689,15 +689,15 @@ H 0.74 0.0 0.0`,
       content: [
         {
           type: 'text',
-          text: `❌ 診断実行でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred during diagnostic execution: ${errorMessage}
 
-**問題:**
-診断プロセス自体でエラーが発生しました。
+**Problem:**
+An error occurred in the diagnostic process itself.
 
-**解決方法:**
-1. ネットワーク接続を確認してください
-2. PySCF Native App の起動状況を確認してください
-3. しばらく待ってから再試行してください`,
+**Solutions:**
+1. Check network connection
+2. Verify PySCF Native App startup status
+3. Wait a moment and try again`,
         },
       ],
       isError: true,

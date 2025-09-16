@@ -57,23 +57,23 @@ export async function handleSearchPubChem(
       content: [
         {
           type: 'text',
-          text: `**化合物検索結果**
+          text: `**Compound Search Results**
 
-**化合物情報:**
-- **名前:** ${compound.iupac_name || 'N/A'}
-- **分子式:** ${compound.molecular_formula || 'N/A'}
-- **分子量:** ${formatMolecularWeight(compound.molecular_weight)} g/mol
+**Compound Information:**
+- **Name:** ${compound.iupac_name || 'N/A'}
+- **Molecular Formula:** ${compound.molecular_formula || 'N/A'}
+- **Molecular Weight:** ${formatMolecularWeight(compound.molecular_weight)} g/mol
 - **PubChem CID:** ${compound.cid}
-- **原子数:** ${atomCount}
+- **Number of Atoms:** ${atomCount}
 
-**同義語:** ${compound.synonyms.slice(0, 5).join(', ')}${compound.synonyms.length > 5 ? '...' : ''}
+**Synonyms:** ${compound.synonyms.slice(0, 5).join(', ')}${compound.synonyms.length > 5 ? '...' : ''}
 
-**XYZ構造データ:**
+**XYZ Structure Data:**
 \`\`\`
 ${response.data.xyz}
 \`\`\`
 
-この3D構造データは量子化学計算で使用できます。`,
+This 3D structure data can be used for quantum chemistry calculations.`,
         },
       ],
     };
@@ -85,31 +85,31 @@ ${response.data.xyz}
     if (error instanceof Error && 'response' in error) {
       const axiosError = error as any;
       debugInfo = `
-**デバッグ情報:**
-- HTTPステータス: ${axiosError.response?.status || 'N/A'}
-- レスポンスデータ: ${JSON.stringify(axiosError.response?.data, null, 2) || 'N/A'}`;
+**Debug Information:**
+- HTTP Status: ${axiosError.response?.status || 'N/A'}
+- Response Data: ${JSON.stringify(axiosError.response?.data, null, 2) || 'N/A'}`;
     }
     
     return {
       content: [
         {
           type: 'text',
-          text: `❌ PubChem検索でエラーが発生しました: ${errorMessage}
+          text: `❌ PubChem search error occurred: ${errorMessage}
 
-**入力パラメータ:**
-- クエリ: "${args.query}"
-- 検索タイプ: "${args.search_type || 'name'}"${debugInfo}
+**Input Parameters:**
+- Query: "${args.query}"
+- Search Type: "${args.search_type || 'name'}"${debugInfo}
 
-**可能な原因:**
-- 化合物名の入力ミス
-- PubChemに登録されていない化合物
-- ネットワーク接続の問題
-- サーバーエラー
+**Possible Causes:**
+- Misspelled compound name
+- Compound not registered in PubChem
+- Network connection issues
+- Server error
 
-**解決方法:**
-- 化合物名のスペルを確認してください
-- 同義語やIUPAC名を試してください  
-- CIDが分かる場合はsearch_typeを'cid'に設定してください`,
+**Solutions:**
+- Check the spelling of the compound name
+- Try synonyms or IUPAC names
+- If you know the CID, set search_type to 'cid'`,
         },
       ],
       isError: true,
@@ -149,16 +149,16 @@ export async function handleConvertSmiles(args: { smiles: string }, client: PySC
       content: [
         {
           type: 'text',
-          text: `**SMILES変換結果**
+          text: `**SMILES Conversion Results**
 
-**入力SMILES:** \`${args.smiles}\`
+**Input SMILES:** \`${args.smiles}\`
 
-**生成された3D XYZ構造:**
+**Generated 3D XYZ Structure:**
 \`\`\`
 ${response.data.xyz}
 \`\`\`
 
-この3D構造データは量子化学計算で使用できます。構造最適化を行うとより正確な分子形状が得られます。`,
+This 3D structure data can be used for quantum chemistry calculations. Performing geometry optimization will provide more accurate molecular geometry.`,
         },
       ],
     };
@@ -168,23 +168,23 @@ ${response.data.xyz}
       content: [
         {
           type: 'text',
-          text: `❌ SMILES変換でエラーが発生しました: ${errorMessage}
+          text: `❌ SMILES conversion error occurred: ${errorMessage}
 
-**可能な原因:**
-- 無効なSMILES文字列
-- サポートされていない分子構造
-- 3D座標生成の失敗
+**Possible Causes:**
+- Invalid SMILES string
+- Unsupported molecular structure
+- Failed 3D coordinate generation
 
-**解決方法:**
-- SMILES文字列の構文を確認してください
-- より単純な分子構造から試してください
-- 立体化学が明示的でない場合は、異なるSMILES表記を試してください
+**Solutions:**
+- Check the syntax of the SMILES string
+- Try with simpler molecular structures first
+- If stereochemistry is not explicit, try different SMILES notation
 
-**SMILES例:**
-- 水: O
-- メタン: C
-- ベンゼン: c1ccccc1
-- エタノール: CCO`,
+**SMILES Examples:**
+- Water: O
+- Methane: C
+- Benzene: c1ccccc1
+- Ethanol: CCO`,
         },
       ],
       isError: true,
@@ -227,20 +227,20 @@ export async function handleValidateXYZ(args: { xyz: string }, client: PySCFApiC
         content: [
           {
             type: 'text',
-            text: `❌ **XYZ形式が無効です**
+            text: `❌ **Invalid XYZ format**
 
-**エラー:** ${data.error || '不明なエラー'}
+**Error:** ${data.error || 'Unknown error'}
 
-**正しいXYZ形式:**
+**Correct XYZ format:**
 \`\`\`
-[原子数]
-[タイトル行（省略可能）]
-[元素記号] [X座標] [Y座標] [Z座標]
-[元素記号] [X座標] [Y座標] [Z座標]
+[Number of atoms]
+[Title line (optional)]
+[Element symbol] [X coordinate] [Y coordinate] [Z coordinate]
+[Element symbol] [X coordinate] [Y coordinate] [Z coordinate]
 ...
 \`\`\`
 
-**例（水分子）:**
+**Example (Water molecule):**
 \`\`\`
 3
 Water molecule
@@ -269,26 +269,26 @@ H -0.757000  0.587000  0.000000
       content: [
         {
           type: 'text',
-          text: `✅ **XYZ形式は有効です**
+          text: `✅ **XYZ format is valid**
 
-**分子情報:**
-- **原子数:** ${data.num_atoms}
-- **分子式:** ${formulaText}
-- **タイトル:** ${data.title || '(なし)'}
+**Molecular Information:**
+- **Number of atoms:** ${data.num_atoms}
+- **Molecular formula:** ${formulaText}
+- **Title:** ${data.title || '(none)'}
 
-**原子構成:**
+**Atomic composition:**
 ${Object.entries(elementCounts)
-  .map(([element, count]) => `- ${element}: ${count}個`)
+  .map(([element, count]) => `- ${element}: ${count} atoms`)
   .join('\n')}
 
-**原子座標:**
+**Atomic coordinates:**
 \`\`\`
-${data.atoms?.map((atom, i) => 
+${data.atoms?.map((atom, i) =>
   `${(i + 1).toString().padStart(2)} ${atom.element.padEnd(2)} ${atom.x.toFixed(6).padStart(10)} ${atom.y.toFixed(6).padStart(10)} ${atom.z.toFixed(6).padStart(10)}`
 ).join('\n') || ''}
 \`\`\`
 
-この分子構造は量子化学計算で使用できます。`,
+This molecular structure can be used for quantum chemistry calculations.`,
         },
       ],
     };
@@ -298,9 +298,9 @@ ${data.atoms?.map((atom, i) =>
       content: [
         {
           type: 'text',
-          text: `❌ XYZ検証でエラーが発生しました: ${errorMessage}
+          text: `❌ XYZ validation error occurred: ${errorMessage}
 
-XYZ形式の検証中にサーバーエラーが発生しました。サーバーが起動していることを確認してください。`,
+A server error occurred during XYZ format validation. Please ensure the server is running.`,
         },
       ],
       isError: true,

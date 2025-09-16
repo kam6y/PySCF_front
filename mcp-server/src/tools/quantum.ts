@@ -30,7 +30,7 @@ export const startCalculationTool: Tool = {
       },
       exchange_correlation: {
         type: 'string',
-        description: 'Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X)',
+        description: 'Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X). Required for DFT and TDDFT methods, automatically ignored for HF, MP2, CCSD, CCSD(T), CASCI, and CASSCF methods.',
         default: 'B3LYP',
       },
       charges: {
@@ -145,15 +145,49 @@ export const startCalculationTool: Tool = {
   },
 };
 
+/**
+ * Filter parameters based on calculation method to ensure theoretical compatibility
+ */
+function filterParametersForCalculationMethod(args: QuantumCalculationRequest): QuantumCalculationRequest {
+  const filteredArgs = { ...args };
+  const method = args.calculation_method;
+
+  // DFT and TDDFT methods require exchange-correlation functional
+  if (method === 'DFT' || method === 'TDDFT') {
+    // Keep exchange_correlation parameter (already provided)
+  }
+
+  // HF, MP2, CCSD, and CCSD_T methods do not use exchange-correlation functional
+  else if (method === 'HF' || method === 'MP2' || method === 'CCSD' || method === 'CCSD_T') {
+    // Remove exchange_correlation to avoid theoretical incompatibility
+    if ('exchange_correlation' in filteredArgs) {
+      delete (filteredArgs as any).exchange_correlation;
+    }
+  }
+
+  // CASCI and CASSCF methods do not use exchange-correlation functional
+  else if (method === 'CASCI' || method === 'CASSCF') {
+    // Remove exchange_correlation to avoid theoretical incompatibility
+    if ('exchange_correlation' in filteredArgs) {
+      delete (filteredArgs as any).exchange_correlation;
+    }
+  }
+
+  return filteredArgs;
+}
+
 export async function handleStartCalculation(
   args: QuantumCalculationRequest,
   client: PySCFApiClient
 ) {
+  // Filter parameters based on calculation method to avoid theoretical incompatibility
+  const filteredArgs = filterParametersForCalculationMethod(args);
+
   try {
-    const response = await client.startCalculation(args);
+    const response = await client.startCalculation(filteredArgs);
 
     if (!response.success) {
-      throw new Error(`計算開始に失敗しました`);
+      throw new Error(`Failed to start calculation`);
     }
 
     const calc = response.data.calculation;
@@ -163,41 +197,41 @@ export async function handleStartCalculation(
       content: [
         {
           type: 'text',
-          text: `✅ **量子化学計算を開始しました**
+          text: `✅ **Quantum chemistry calculation started**
 
-**計算ID:** \`${calc.id}\`
-**計算名:** ${calc.name}
-**ステータス:** ${calc.status}
+**Calculation ID:** \`${calc.id}\`
+**Calculation Name:** ${calc.name}
+**Status:** ${calc.status}
 
-**計算パラメータ:**
-- **手法:** ${params.calculation_method}
-- **基底関数:** ${params.basis_function}
-- **交換相関汎関数:** ${params.exchange_correlation}
-- **電荷:** ${params.charges}
-- **スピン:** ${params.spin}
-- **溶媒効果:** ${params.solvent_method}${params.solvent !== '-' ? ` (${params.solvent})` : ''}
-- **構造最適化:** ${args.optimize_geometry !== false ? '有効' : '無効'}
+**Calculation Parameters:**
+- **Method:** ${params.calculation_method}
+- **Basis Set:** ${params.basis_function}${params.exchange_correlation ? `
+- **Exchange-Correlation Functional:** ${params.exchange_correlation}` : ''}
+- **Charge:** ${params.charges}
+- **Spin:** ${params.spin}
+- **Solvent Effect:** ${params.solvent_method}${params.solvent !== '-' ? ` (${params.solvent})` : ''}
+- **Geometry Optimization:** ${args.optimize_geometry !== false ? 'Enabled' : 'Disabled'}
 
-${params.calculation_method === 'TDDFT' ? `**TDDFT設定:**
-- **励起状態数:** ${params.tddft_nstates}
-- **手法:** ${params.tddft_method}
-- **NTO解析:** ${params.tddft_analyze_nto ? '有効' : '無効'}
+${params.calculation_method === 'TDDFT' ? `**TDDFT Settings:**
+- **Number of Excited States:** ${params.tddft_nstates}
+- **Method:** ${params.tddft_method}
+- **NTO Analysis:** ${params.tddft_analyze_nto ? 'Enabled' : 'Disabled'}
 
-` : ''}${(params.calculation_method === 'CASCI' || params.calculation_method === 'CASSCF') ? `**${params.calculation_method}設定:**
-- **アクティブ空間軌道数:** ${params.ncas || 6}
-- **アクティブ空間電子数:** ${params.nelecas || 6}
-- **自然軌道変換:** ${params.natorb !== false ? '有効' : '無効'}
-${params.calculation_method === 'CASSCF' ? `- **最大マクロイテレーション:** ${params.max_cycle_macro || 50}
-- **エネルギー収束許容値:** ${params.conv_tol || '1e-6'}
-- **勾配収束許容値:** ${params.conv_tol_grad || '1e-4'}` : ''}
+` : ''}${(params.calculation_method === 'CASCI' || params.calculation_method === 'CASSCF') ? `**${params.calculation_method} Settings:**
+- **Active Space Orbitals:** ${params.ncas || 6}
+- **Active Space Electrons:** ${params.nelecas || 6}
+- **Natural Orbital Transformation:** ${params.natorb !== false ? 'Enabled' : 'Disabled'}
+${params.calculation_method === 'CASSCF' ? `- **Max Macro Iterations:** ${params.max_cycle_macro || 50}
+- **Energy Convergence Tolerance:** ${params.conv_tol || '1e-6'}
+- **Gradient Convergence Tolerance:** ${params.conv_tol_grad || '1e-4'}` : ''}
 
-` : ''}**リソース:**
-- **CPUコア:** ${params.cpu_cores || 'システム設定'}
-- **メモリ:** ${params.memory_mb ? `${params.memory_mb} MB` : 'システム設定'}
+` : ''}**Resources:**
+- **CPU Cores:** ${params.cpu_cores || 'System Default'}
+- **Memory:** ${params.memory_mb ? `${params.memory_mb} MB` : 'System Default'}
 
-**作業ディレクトリ:** \`${calc.workingDirectory || 'N/A'}\`
+**Working Directory:** \`${calc.workingDirectory || 'N/A'}\`
 
-計算は背景で実行されています。進行状況を確認するには \`getCalculationDetails\` を使用してください。`,
+The calculation is running in the background. Use \`getCalculationDetails\` to check progress.`,
         },
       ],
     };
@@ -209,57 +243,66 @@ ${params.calculation_method === 'CASSCF' ? `- **最大マクロイテレーシ�
     if (error instanceof PySCFApiError) {
       const details = error.details;
       debugInfo = `
-**デバッグ情報:**
-- HTTPステータス: ${details.status || 'N/A'}
-- ステータステキスト: ${details.statusText || 'N/A'}
+**Debug Information:**
+- HTTP Status: ${details.status || 'N/A'}
+- Status Text: ${details.statusText || 'N/A'}
 - URL: ${details.url || 'N/A'}
-- メソッド: ${details.method || 'N/A'}
-- タイムスタンプ: ${details.timestamp}
-- レスポンスデータ: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}`;
+- Method: ${details.method || 'N/A'}
+- Timestamp: ${details.timestamp}
+- Response Data: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}`;
     } else if (error instanceof Error && 'response' in error) {
       const axiosError = error as any;
       debugInfo = `
-**デバッグ情報:**
-- HTTPステータス: ${axiosError.response?.status || 'N/A'}
-- レスポンスデータ: ${JSON.stringify(axiosError.response?.data, null, 2) || 'N/A'}`;
+**Debug Information:**
+- HTTP Status: ${axiosError.response?.status || 'N/A'}
+- Response Data: ${JSON.stringify(axiosError.response?.data, null, 2) || 'N/A'}`;
     }
     
     return {
       content: [
         {
           type: 'text',
-          text: `❌ 計算開始でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while starting calculation: ${errorMessage}
 
-**入力パラメータ:**
-- 計算名: "${args.name || 'Unnamed Calculation'}"
-- 手法: ${args.calculation_method || 'DFT'}
-- 基底関数: ${args.basis_function || '6-31G(d)'}
-- 交換相関汎関数: ${args.exchange_correlation || 'B3LYP'}
-- 電荷: ${args.charges || 0}
-- スピン: ${args.spin || 0}
-- CPUコア: ${args.cpu_cores || 'auto'}
-- メモリ: ${args.memory_mb || 'auto'} MB${debugInfo}
+**Input Parameters:**
+- Calculation Name: "${args.name || 'Unnamed Calculation'}"
+- Method: ${args.calculation_method || 'DFT'}
+- Basis Set: ${args.basis_function || '6-31G(d)'}${filteredArgs.exchange_correlation ? `
+- Exchange-Correlation Functional: ${filteredArgs.exchange_correlation}` : ' (Exchange-correlation functional automatically filtered out for this method)'}
+- Charge: ${args.charges || 0}
+- Spin: ${args.spin || 0}
+- CPU Cores: ${args.cpu_cores || 'auto'}
+- Memory: ${args.memory_mb || 'auto'} MB${debugInfo}
 
-**可能な原因:**
-- 無効なXYZ形式
-- **理論的に不適切なパラメータの組み合わせ**
-  - HF法で交換相関汎関数が指定されている（HF法には交換相関汎関数は不要です）
-  - TDDFT法で励起状態数が指定されていない
-  - CASCI/CASSCF法でアクティブ空間パラメータが不適切
-- リソース不足（CPU/メモリ）
-- サーバー内部エラー
-- 既存の計算との競合
+**Possible Causes:**
+- Invalid XYZ format or molecular structure
+- **Theoretical parameter incompatibilities (automatically resolved in this version):**
+  - HF, MP2, CCSD, CCSD(T): Exchange-correlation functionals not applicable (now automatically excluded)
+  - CASCI, CASSCF: Exchange-correlation functionals not applicable (now automatically excluded)
+  - DFT, TDDFT: Exchange-correlation functional required (kept when specified)
+- **Method-specific issues:**
+  - TDDFT: Number of excited states not specified
+  - CASCI/CASSCF: Inappropriate active space parameters (ncas/nelecas)
+  - CCSD(T): Requires significant computational resources
+- Insufficient computational resources (CPU/Memory)
+- Server internal error or temporary unavailability
+- Conflict with existing calculations
 
-**解決方法:**
-1. **パラメータの理論的適合性を確認:**
-   - HF法: 交換相関汎関数は不要（自動的に無視されます）
-   - DFT/TDDFT法: 適切な交換相関汎関数（B3LYP, PBE0等）を指定
-   - CASCI/CASSCF法: ncas（軌道数）とnelecas（電子数）を適切に設定
-2. XYZ形式を\`validateXYZ\`で確認してください
-3. \`getSupportedParameters\`で利用可能なパラメータを確認してください
-4. \`getResourceStatus\`でシステムリソースを確認してください
-5. より軽量な設定（STO-3G基底関数など）で試してください
-6. 既存の計算が完了してから再試行してください`,
+**Solutions:**
+1. **Verify molecular structure and format:**
+   - Use \`validateXYZ\` to check XYZ format
+   - Ensure reasonable molecular geometry
+2. **Check method-specific requirements:**
+   - **CCSD(T)**: Use correlation-consistent basis sets (cc-pVDZ, cc-pVTZ), ensure sufficient memory (>4GB)
+   - **TDDFT**: Specify appropriate number of excited states (tddft_nstates)
+   - **CASCI/CASSCF**: Set reasonable active space (ncas=6-12, nelecas=6-12 typically)
+3. **System resources:**
+   - Check available resources: \`getResourceStatus\`
+   - Try lighter settings for testing (STO-3G basis, fewer cores)
+4. **Retry and debugging:**
+   - Check supported parameters: \`getSupportedParameters\`
+   - Retry after existing calculations complete
+   - Consider splitting large calculations into smaller steps`,
         },
       ],
       isError: true,
@@ -281,7 +324,7 @@ export async function handleListCalculations(_args: object, client: PySCFApiClie
     const response = await client.listCalculations();
 
     if (!response.success) {
-      throw new Error(`計算一覧の取得に失敗しました`);
+      throw new Error(`Failed to retrieve calculation list`);
     }
 
     const { calculations, count, base_directory } = response.data;
@@ -291,11 +334,11 @@ export async function handleListCalculations(_args: object, client: PySCFApiClie
         content: [
           {
             type: 'text',
-            text: `📝 **計算履歴**
+            text: `📝 **Calculation History**
 
-現在保存されている計算はありません。
+No calculations are currently saved.
 
-新しい計算を開始するには \`startCalculation\` を使用してください。`,
+Use \`startCalculation\` to start a new calculation.`,
           },
         ],
       };
@@ -315,10 +358,10 @@ export async function handleListCalculations(_args: object, client: PySCFApiClie
     const calculationsList = calculations
       .map((calc, index) => 
         `${index + 1}. ${statusEmoji(calc.status)} **${calc.name}** (ID: \`${calc.id}\`)
-   - ステータス: ${calc.status}
-   - 日付: ${calc.date}
-   - チェックポイント: ${calc.has_checkpoint ? '有' : '無'}
-   - パス: \`${calc.path}\``
+   - Status: ${calc.status}
+   - Date: ${calc.date}
+   - Checkpoint: ${calc.has_checkpoint ? 'Available' : 'None'}
+   - Path: \`${calc.path}\``
       )
       .join('\n\n');
 
@@ -326,13 +369,13 @@ export async function handleListCalculations(_args: object, client: PySCFApiClie
       content: [
         {
           type: 'text',
-          text: `📝 **計算履歴** (${count}件)
+          text: `📝 **Calculation History** (${count} items)
 
-**ベースディレクトリ:** \`${base_directory}\`
+**Base Directory:** \`${base_directory}\`
 
 ${calculationsList}
 
-特定の計算の詳細を確認するには \`getCalculationDetails\` を使用してください。`,
+Use \`getCalculationDetails\` to view details for a specific calculation.`,
         },
       ],
     };
@@ -342,7 +385,7 @@ ${calculationsList}
       content: [
         {
           type: 'text',
-          text: `❌ 計算一覧の取得でエラーが発生しました: ${errorMessage}`,
+          text: `❌ Error occurred while retrieving calculation list: ${errorMessage}`,
         },
       ],
       isError: true,
@@ -373,7 +416,7 @@ export async function handleGetCalculationDetails(
     const response = await client.getCalculationDetails(args.calculationId);
 
     if (!response.success) {
-      throw new Error(`計算詳細の取得に失敗しました`);
+      throw new Error(`Failed to retrieve calculation details`);
     }
 
     const { calculation, files } = response.data;
@@ -383,19 +426,19 @@ export async function handleGetCalculationDetails(
     let statusText = '';
     switch (calculation.status) {
       case 'completed':
-        statusText = '✅ 完了';
+        statusText = '✅ Completed';
         break;
       case 'running':
-        statusText = '🔄 実行中';
+        statusText = '🔄 Running';
         break;
       case 'error':
-        statusText = `❌ エラー${calculation.errorMessage ? `: ${calculation.errorMessage}` : ''}`;
+        statusText = `❌ Error${calculation.errorMessage ? `: ${calculation.errorMessage}` : ''}`;
         break;
       case 'pending':
-        statusText = '⏳ 待機中';
+        statusText = '⏳ Pending';
         break;
       case 'waiting':
-        statusText = `⏸️ 待機中${calculation.waitingReason ? `: ${calculation.waitingReason}` : ''}`;
+        statusText = `⏸️ Waiting${calculation.waitingReason ? `: ${calculation.waitingReason}` : ''}`;
         break;
       default:
         statusText = `❓ ${calculation.status}`;
@@ -405,25 +448,25 @@ export async function handleGetCalculationDetails(
     if (results && calculation.status === 'completed') {
       resultText = `
 
-**計算結果:**
-- **SCFエネルギー:** ${results.scf_energy?.toFixed(8)} Hartree
-- **収束:** ${results.converged ? '成功' : '失敗'}
-- **原子数:** ${results.atom_count}
-- **占有軌道数:** ${results.num_occupied_orbitals}
-- **仮想軌道数:** ${results.num_virtual_orbitals}
-- **HOMO指数:** ${results.homo_index}
-- **LUMO指数:** ${results.lumo_index}
+**Calculation Results:**
+- **SCF Energy:** ${results.scf_energy?.toFixed(8)} Hartree
+- **Convergence:** ${results.converged ? 'Success' : 'Failed'}
+- **Number of Atoms:** ${results.atom_count}
+- **Occupied Orbitals:** ${results.num_occupied_orbitals}
+- **Virtual Orbitals:** ${results.num_virtual_orbitals}
+- **HOMO Index:** ${results.homo_index}
+- **LUMO Index:** ${results.lumo_index}
 
-**ファイル状況:**
-- **チェックポイント:** ${files.checkpoint_exists ? '✅' : '❌'}
-- **パラメータファイル:** ${files.parameters_file_exists ? '✅' : '❌'}
-- **結果ファイル:** ${files.results_file_exists ? '✅' : '❌'}`;
+**File Status:**
+- **Checkpoint:** ${files.checkpoint_exists ? '✅' : '❌'}
+- **Parameters File:** ${files.parameters_file_exists ? '✅' : '❌'}
+- **Results File:** ${files.results_file_exists ? '✅' : '❌'}`;
 
       // Add TDDFT results if available
       if (results.excitation_energies && results.excitation_energies.length > 0) {
         resultText += `
 
-**TDDFT励起状態 (上位5状態):**
+**TDDFT Excited States (Top 5):**
 ${results.excitation_energies.slice(0, 5)
   .map((energy, i) => {
     const wavelength = results.excitation_wavelengths?.[i];
@@ -439,11 +482,11 @@ ${results.excitation_energies.slice(0, 5)
         const imagCount = results.imaginary_frequencies_count || 0;
         resultText += `
 
-**振動解析:**
-- **実振動数:** ${freqCount}個
-- **虚振動数:** ${imagCount}個 ${imagCount === 0 ? '(最適化済み構造)' : '(要最適化)'}
-- **零点エネルギー:** ${results.zero_point_energy?.toFixed(6)} Hartree
-- **自由エネルギー (298K):** ${results.gibbs_free_energy_298K?.toFixed(6)} Hartree`;
+**Vibrational Analysis:**
+- **Real Frequencies:** ${freqCount} modes
+- **Imaginary Frequencies:** ${imagCount} modes ${imagCount === 0 ? '(Optimized structure)' : '(Requires optimization)'}
+- **Zero-Point Energy:** ${results.zero_point_energy?.toFixed(6)} Hartree
+- **Gibbs Free Energy (298K):** ${results.gibbs_free_energy_298K?.toFixed(6)} Hartree`;
       }
 
       // Add CASCI/CASSCF results if available
@@ -451,24 +494,24 @@ ${results.excitation_energies.slice(0, 5)
         if (results.casci_energy) {
           resultText += `
 
-**CASCI結果:**
-- **CASCIエネルギー:** ${results.casci_energy.toFixed(8)} Hartree`;
+**CASCI Results:**
+- **CASCI Energy:** ${results.casci_energy.toFixed(8)} Hartree`;
         }
         
         if (results.casscf_energy) {
           resultText += `
 
-**CASSCF結果:**
-- **CASSCFエネルギー:** ${results.casscf_energy.toFixed(8)} Hartree`;
+**CASSCF Results:**
+- **CASSCF Energy:** ${results.casscf_energy.toFixed(8)} Hartree`;
           if (results.macro_iterations) {
             resultText += `
-- **マクロイテレーション数:** ${results.macro_iterations}`;
+- **Macro Iterations:** ${results.macro_iterations}`;
           }
         }
         
         if (results.correlation_energy) {
           resultText += `
-- **相関エネルギー:** ${results.correlation_energy.toFixed(8)} Hartree`;
+- **Correlation Energy:** ${results.correlation_energy.toFixed(8)} Hartree`;
         }
 
         // Natural orbital analysis
@@ -476,12 +519,12 @@ ${results.excitation_energies.slice(0, 5)
           const noa = results.natural_orbital_analysis;
           resultText += `
 
-**自然軌道解析:**
-- **強占有軌道:** ${noa.strongly_occupied_count}個
-- **弱占有軌道:** ${noa.weakly_occupied_count}個  
-- **仮想軌道:** ${noa.virtual_count}個
-- **有効電子対数:** ${noa.effective_electron_pairs?.toFixed(2) || 'N/A'}
-- **有効不対電子数:** ${noa.effective_unpaired_electrons?.toFixed(2) || 'N/A'}`;
+**Natural Orbital Analysis:**
+- **Strongly Occupied Orbitals:** ${noa.strongly_occupied_count} orbitals
+- **Weakly Occupied Orbitals:** ${noa.weakly_occupied_count} orbitals
+- **Virtual Orbitals:** ${noa.virtual_count} orbitals
+- **Effective Electron Pairs:** ${noa.effective_electron_pairs?.toFixed(2) || 'N/A'}
+- **Effective Unpaired Electrons:** ${noa.effective_unpaired_electrons?.toFixed(2) || 'N/A'}`;
         }
 
         // CI coefficient analysis
@@ -489,10 +532,10 @@ ${results.excitation_energies.slice(0, 5)
           const cia = results.ci_coefficient_analysis;
           resultText += `
 
-**CI係数解析:**
-- **主要配置:** ${cia.leading_contribution_percent?.toFixed(1) || 'N/A'}%
-- **多配置性:** ${cia.multiconfigurational_character?.toFixed(1) || 'N/A'}%
-- **有効配置数:** ${cia.major_configurations?.length || 'N/A'}`;
+**CI Coefficient Analysis:**
+- **Leading Configuration:** ${cia.leading_contribution_percent?.toFixed(1) || 'N/A'}%
+- **Multiconfigurational Character:** ${cia.multiconfigurational_character?.toFixed(1) || 'N/A'}%
+- **Number of Major Configurations:** ${cia.major_configurations?.length || 'N/A'}`;
         }
 
         // Mulliken spin analysis (for open-shell systems)
@@ -500,9 +543,9 @@ ${results.excitation_energies.slice(0, 5)
           const msa = results.mulliken_spin_analysis;
           resultText += `
 
-**Mulliken スピン解析:**
-- **総スピン密度:** ${msa.total_spin_density?.toFixed(4) || 'N/A'}
-- **期待スピン:** ${msa.expected_spin || 'N/A'}`;
+**Mulliken Spin Analysis:**
+- **Total Spin Density:** ${msa.total_spin_density?.toFixed(4) || 'N/A'}
+- **Expected Spin:** ${msa.expected_spin || 'N/A'}`;
         }
       }
     }
@@ -511,25 +554,25 @@ ${results.excitation_energies.slice(0, 5)
       content: [
         {
           type: 'text',
-          text: `📊 **計算詳細: ${calculation.name}**
+          text: `📊 **Calculation Details: ${calculation.name}**
 
-**基本情報:**
+**Basic Information:**
 - **ID:** \`${calculation.id}\`
-- **ステータス:** ${statusText}
-- **作成日時:** ${new Date(calculation.createdAt).toLocaleString()}
-- **更新日時:** ${new Date(calculation.updatedAt).toLocaleString()}
+- **Status:** ${statusText}
+- **Created:** ${new Date(calculation.createdAt).toLocaleString()}
+- **Updated:** ${new Date(calculation.updatedAt).toLocaleString()}
 
-**計算パラメータ:**
-- **手法:** ${params.calculation_method}
-- **基底関数:** ${params.basis_function}
-- **交換相関汎関数:** ${params.exchange_correlation}
-- **電荷:** ${params.charges}
-- **スピン:** ${params.spin}
-- **溶媒効果:** ${params.solvent_method}${params.solvent !== '-' ? ` (${params.solvent})` : ''}
+**Calculation Parameters:**
+- **Method:** ${params.calculation_method}
+- **Basis Set:** ${params.basis_function}${params.exchange_correlation ? `
+- **Exchange-Correlation Functional:** ${params.exchange_correlation}` : ''}
+- **Charge:** ${params.charges}
+- **Spin:** ${params.spin}
+- **Solvent Effect:** ${params.solvent_method}${params.solvent !== '-' ? ` (${params.solvent})` : ''}
 
-**作業ディレクトリ:** \`${calculation.workingDirectory || 'N/A'}\`${resultText}
+**Working Directory:** \`${calculation.workingDirectory || 'N/A'}\`${resultText}
 
-${calculation.status === 'completed' ? '**利用可能な解析:**\n- 分子軌道情報: `getOrbitals`\n- 軌道可視化: `getOrbitalCube`\n- 振動スペクトラム: `getIRSpectrum`' : ''}`,
+${calculation.status === 'completed' ? '**Available Analysis:**\n- Molecular orbital information: `getOrbitals`\n- Orbital visualization: `getOrbitalCube`\n- Vibrational spectrum: `getIRSpectrum`' : ''}`,
         },
       ],
     };
@@ -539,9 +582,9 @@ ${calculation.status === 'completed' ? '**利用可能な解析:**\n- 分子軌�
       content: [
         {
           type: 'text',
-          text: `❌ 計算詳細の取得でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while retrieving calculation details: ${errorMessage}
 
-計算IDを確認してください。利用可能な計算は \`listCalculations\` で確認できます。`,
+Please verify the calculation ID. Available calculations can be checked with \`listCalculations\`.`,
         },
       ],
       isError: true,
@@ -569,7 +612,7 @@ export async function handleGetOrbitals(args: { calculationId: string }, client:
     const response = await client.getOrbitals(args.calculationId);
 
     if (!response.success) {
-      throw new Error(`軌道情報の取得に失敗しました`);
+      throw new Error(`Failed to retrieve orbital information`);
     }
 
     const { orbitals, homo_index, lumo_index, total_orbitals, num_occupied, num_virtual } = response.data;
@@ -587,7 +630,7 @@ export async function handleGetOrbitals(args: { calculationId: string }, client:
         const typeIcon = orbital.orbital_type === 'homo' ? '🔴' : 
                         orbital.orbital_type === 'lumo' ? '🔵' : 
                         orbital.occupancy > 0 ? '⚫' : '⚪';
-        return `${typeIcon} ${orbital.label}: ${energy_ev} eV (占有: ${occupancy})`;
+        return `${typeIcon} ${orbital.label}: ${energy_ev} eV (Occupancy: ${occupancy})`;
       })
       .join('\n');
 
@@ -597,24 +640,24 @@ export async function handleGetOrbitals(args: { calculationId: string }, client:
       content: [
         {
           type: 'text',
-          text: `🎯 **分子軌道情報**
+          text: `🎯 **Molecular Orbital Information**
 
-**計算ID:** \`${args.calculationId}\`
+**Calculation ID:** \`${args.calculationId}\`
 
-**軌道統計:**
-- **総軌道数:** ${total_orbitals}
-- **占有軌道数:** ${num_occupied}
-- **仮想軌道数:** ${num_virtual}
-- **HOMO指数:** ${homo_index}
-- **LUMO指数:** ${lumo_index}
-- **HOMO-LUMOギャップ:** ${gapEnergy.toFixed(4)} eV (${(gapEnergy * 27.211).toFixed(1)} kcal/mol)
+**Orbital Statistics:**
+- **Total Orbitals:** ${total_orbitals}
+- **Occupied Orbitals:** ${num_occupied}
+- **Virtual Orbitals:** ${num_virtual}
+- **HOMO Index:** ${homo_index}
+- **LUMO Index:** ${lumo_index}
+- **HOMO-LUMO Gap:** ${gapEnergy.toFixed(4)} eV (${(gapEnergy * 27.211).toFixed(1)} kcal/mol)
 
-**主要軌道 (HOMO周辺):**
+**Key Orbitals (around HOMO):**
 ${orbitalList}
 
-**軌道可視化:**
-特定の軌道のCUBEファイルを生成するには \`getOrbitalCube\` を使用してください。
-例: \`getOrbitalCube\` で HOMO (軌道${homo_index}) や LUMO (軌道${lumo_index}) を可視化`,
+**Orbital Visualization:**
+Use \`getOrbitalCube\` to generate CUBE files for specific orbitals.
+Example: Use \`getOrbitalCube\` to visualize HOMO (orbital ${homo_index}) or LUMO (orbital ${lumo_index})`,
         },
       ],
     };
@@ -624,14 +667,14 @@ ${orbitalList}
       content: [
         {
           type: 'text',
-          text: `❌ 軌道情報の取得でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while retrieving orbital information: ${errorMessage}
 
-**可能な原因:**
-- 計算が完了していない
-- 軌道データが利用できない
-- 計算IDが無効
+**Possible Causes:**
+- Calculation not completed
+- Orbital data not available
+- Invalid calculation ID
 
-計算のステータスを \`getCalculationDetails\` で確認してください。`,
+Check the calculation status with \`getCalculationDetails\`.`,
         },
       ],
       isError: true,
@@ -699,7 +742,7 @@ export async function handleGetOrbitalCube(
     const response = await client.getOrbitalCube(args.calculationId, args.orbitalIndex, options);
 
     if (!response.success) {
-      throw new Error(`CUBEファイル生成に失敗しました`);
+      throw new Error(`Failed to generate CUBE file`);
     }
 
     const { cube_data, orbital_info, generation_params, file_path, cached } = response.data;
@@ -710,31 +753,31 @@ export async function handleGetOrbitalCube(
       content: [
         {
           type: 'text',
-          text: `📦 **軌道CUBEファイル生成完了**
+          text: `📦 **Orbital CUBE File Generation Complete**
 
-**軌道情報:**
-- **軌道:** ${orbital_info.label} (指数: ${orbital_info.index})
-- **エネルギー:** ${orbital_info.energy_ev.toFixed(4)} eV
-- **占有度:** ${orbital_info.occupancy}
-- **軌道種別:** ${orbital_info.orbital_type}
+**Orbital Information:**
+- **Orbital:** ${orbital_info.label} (Index: ${orbital_info.index})
+- **Energy:** ${orbital_info.energy_ev.toFixed(4)} eV
+- **Occupancy:** ${orbital_info.occupancy}
+- **Orbital Type:** ${orbital_info.orbital_type}
 
-**生成パラメータ:**
-- **グリッドサイズ:** ${generation_params.grid_size}³
-- **正のアイソ値:** ${generation_params.isovalue_positive}
-- **負のアイソ値:** ${generation_params.isovalue_negative}
-- **ファイルサイズ:** ${fileSizeKB} KB
-- **データ行数:** ${cubeLines}行
+**Generation Parameters:**
+- **Grid Size:** ${generation_params.grid_size}³
+- **Positive Isovalue:** ${generation_params.isovalue_positive}
+- **Negative Isovalue:** ${generation_params.isovalue_negative}
+- **File Size:** ${fileSizeKB} KB
+- **Data Lines:** ${cubeLines} lines
 
-**ファイル状況:**
-- **保存パス:** ${file_path || 'メモリ内'}
-- **キャッシュ:** ${cached ? 'キャッシュから読み込み' : '新規生成'}
+**File Status:**
+- **Save Path:** ${file_path || 'In Memory'}
+- **Cache:** ${cached ? 'Loaded from cache' : 'Newly generated'}
 
-**CUBEデータ (先頭200文字):**
+**CUBE Data (First 200 characters):**
 \`\`\`
 ${cube_data.substring(0, 200)}...
 \`\`\`
 
-このCUBEファイルは分子可視化ソフトウェア（VMD、ChemCraft、Gaussianなど）で開くことができます。`,
+This CUBE file can be opened with molecular visualization software (VMD, ChemCraft, Gaussian, etc.).`,
         },
       ],
     };
@@ -744,14 +787,14 @@ ${cube_data.substring(0, 200)}...
       content: [
         {
           type: 'text',
-          text: `❌ CUBEファイル生成でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while generating CUBE file: ${errorMessage}
 
-**可能な原因:**
-- 無効な軌道指数
-- 計算が完了していない
-- チェックポイントファイルが見つからない
+**Possible Causes:**
+- Invalid orbital index
+- Calculation not completed
+- Checkpoint file not found
 
-利用可能な軌道は \`getOrbitals\` で確認してください。`,
+Check available orbitals with \`getOrbitals\`.`,
         },
       ],
       isError: true,
@@ -818,7 +861,7 @@ export async function handleGetIRSpectrum(
     const response = await client.getIRSpectrum(args.calculationId, options);
 
     if (!response.success) {
-      throw new Error(`IRスペクトラム生成に失敗しました`);
+      throw new Error(`Failed to generate IR spectrum`);
     }
 
     const { spectrum, generation_info } = response.data;
@@ -829,7 +872,7 @@ export async function handleGetIRSpectrum(
       .sort((a, b) => b.intensity - a.intensity)
       .slice(0, 10)
       .map((peak, i) => 
-        `${(i + 1).toString().padStart(2)}. ${peak.frequency_cm.toFixed(1)} cm⁻¹ (強度: ${peak.intensity.toFixed(1)})`
+        `${(i + 1).toString().padStart(2)}. ${peak.frequency_cm.toFixed(1)} cm⁻¹ (Intensity: ${peak.intensity.toFixed(1)})`
       )
       .join('\n');
 
@@ -839,33 +882,33 @@ export async function handleGetIRSpectrum(
       content: [
         {
           type: 'text',
-          text: `📈 **理論IRスペクトラム**
+          text: `📈 **Theoretical IR Spectrum**
 
-**計算ID:** \`${args.calculationId}\`
+**Calculation ID:** \`${args.calculationId}\`
 
-**計算条件:**
-- **手法:** ${metadata.method}
-- **基底関数:** ${metadata.basis_set}
-- **スケール因子:** ${metadata.scale_factor} (${metadata.scale_message})
+**Calculation Conditions:**
+- **Method:** ${metadata.method}
+- **Basis Set:** ${metadata.basis_set}
+- **Scale Factor:** ${metadata.scale_factor} (${metadata.scale_message})
 
-**スペクトラム設定:**
-- **周波数範囲:** ${spectrumRange}
-- **ブロードニング (FWHM):** ${metadata.broadening_fwhm_cm} cm⁻¹
-- **データ点数:** ${metadata.num_points}
-- **ピーク表示:** ${generation_info.peaks_marked ? '有効' : '無効'}
+**Spectrum Settings:**
+- **Frequency Range:** ${spectrumRange}
+- **Broadening (FWHM):** ${metadata.broadening_fwhm_cm} cm⁻¹
+- **Number of Data Points:** ${metadata.num_points}
+- **Peak Display:** ${generation_info.peaks_marked ? 'Enabled' : 'Disabled'}
 
-**振動解析結果:**
-- **全振動数:** ${metadata.num_peaks_total}個
-- **範囲内振動数:** ${metadata.num_peaks_in_range}個
+**Vibrational Analysis Results:**
+- **Total Frequencies:** ${metadata.num_peaks_total} modes
+- **Frequencies in Range:** ${metadata.num_peaks_in_range} modes
 
-**主要ピーク (強度順):**
+**Major Peaks (by Intensity):**
 ${mainPeaks}
 
-**スペクトラムデータ:**
-- **X軸 (cm⁻¹):** ${spectrum.x_axis.length}点
-- **Y軸 (強度):** 最大値 ${Math.max(...spectrum.y_axis).toFixed(2)}
+**Spectrum Data:**
+- **X-axis (cm⁻¹):** ${spectrum.x_axis.length} points
+- **Y-axis (Intensity):** Maximum ${Math.max(...spectrum.y_axis).toFixed(2)}
 
-このスペクトラムは実験IRスペクトラムとの比較に使用できます。ピークの帰属には振動モード解析が有効です。`,
+This spectrum can be used for comparison with experimental IR spectra. Vibrational mode analysis is useful for peak assignment.`,
         },
       ],
     };
@@ -874,27 +917,27 @@ ${mainPeaks}
     
     // Enhanced error details for debugging using PySCFApiError
     let debugInfo = '';
-    let specificAdvice = '構造最適化と振動解析を含む計算を実行してください。';
+    let specificAdvice = 'Please run calculations that include geometry optimization and vibrational analysis.';
     
     if (error instanceof PySCFApiError) {
       const details = error.details;
       debugInfo = `
-**デバッグ情報:**
-- HTTPステータス: ${details.status || 'N/A'}
-- ステータステキスト: ${details.statusText || 'N/A'}
+**Debug Information:**
+- HTTP Status: ${details.status || 'N/A'}
+- Status Text: ${details.statusText || 'N/A'}
 - URL: ${details.url || 'N/A'}
-- メソッド: ${details.method || 'N/A'}
-- タイムスタンプ: ${details.timestamp}
-- 計算ID: ${args.calculationId}
-- レスポンスデータ: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}`;
+- Method: ${details.method || 'N/A'}
+- Timestamp: ${details.timestamp}
+- Calculation ID: ${args.calculationId}
+- Response Data: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}`;
 
       // Status-specific advice
       if (details.status === 404) {
-        specificAdvice = `計算ID "${args.calculationId}" が見つからないか、IRスペクトラムデータが存在しません。\n\n**次のステップ:**\n1. \`getCalculationDetails\` で計算の存在と完了状況を確認\n2. 振動解析を含む新しい計算を実行\n3. 計算設定に構造最適化と振動解析が含まれていることを確認`;
+        specificAdvice = `Calculation ID "${args.calculationId}" not found or IR spectrum data does not exist.\n\n**Next Steps:**\n1. Use \`getCalculationDetails\` to check calculation existence and completion status\n2. Run new calculation including vibrational analysis\n3. Ensure calculation settings include geometry optimization and vibrational analysis`;
       } else if (details.status === 400) {
-        specificAdvice = '無効なパラメータまたは計算が未完了です。計算の完了を待ってから再試行してください。';
+        specificAdvice = 'Invalid parameters or calculation not completed. Please wait for calculation completion and retry.';
       } else if (details.status === 500) {
-        specificAdvice = 'サーバー内部エラーが発生しました。計算データの破損または処理エラーの可能性があります。';
+        specificAdvice = 'Server internal error occurred. Possible calculation data corruption or processing error.';
       }
     }
     
@@ -902,13 +945,13 @@ ${mainPeaks}
       content: [
         {
           type: 'text',
-          text: `❌ IRスペクトラム生成でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while generating IR spectrum: ${errorMessage}
 
-**可能な原因:**
-- 振動解析が実行されていない
-- 計算が完了していない
-- 振動数データが利用できない
-- 無効な計算ID
+**Possible Causes:**
+- Vibrational analysis not performed
+- Calculation not completed
+- Vibrational frequency data not available
+- Invalid calculation ID
 
 ${specificAdvice}${debugInfo}`,
         },
@@ -941,7 +984,7 @@ export async function handleGetOptimizedGeometry(
     const response = await client.getCalculationDetails(args.calculationId);
 
     if (!response.success) {
-      throw new Error(`計算詳細の取得に失敗しました`);
+      throw new Error(`Failed to retrieve calculation details`);
     }
 
     const { calculation } = response.data;
@@ -954,14 +997,14 @@ export async function handleGetOptimizedGeometry(
         content: [
           {
             type: 'text',
-            text: `❌ **最適化座標の取得エラー**
+            text: `❌ **Optimized Coordinates Retrieval Error**
 
-計算がまだ完了していません。
+Calculation not yet completed.
 
-**計算ID:** \`${calculation.id}\`
-**現在のステータス:** ${calculation.status}
+**Calculation ID:** \`${calculation.id}\`
+**Current Status:** ${calculation.status}
 
-計算が完了してから再試行してください。進行状況は \`getCalculationDetails\` で確認できます。`,
+Please retry after calculation completion. Progress can be checked with \`getCalculationDetails\`.`,
           },
         ],
         isError: true,
@@ -975,20 +1018,20 @@ export async function handleGetOptimizedGeometry(
         content: [
           {
             type: 'text',
-            text: `❌ **最適化座標が利用できません**
+            text: `❌ **Optimized Coordinates Not Available**
 
-**計算ID:** \`${calculation.id}\`
-**計算名:** ${calculation.name}
+**Calculation ID:** \`${calculation.id}\`
+**Calculation Name:** ${calculation.name}
 
-この計算では構造最適化が実行されていないか、最適化座標が保存されていません。
+This calculation did not perform geometry optimization or optimized coordinates are not saved.
 
-**可能な原因:**
-- 構造最適化が無効化されていた
-- 計算が構造最適化前にエラーで停止した
-- 単点計算のみが実行された
+**Possible Causes:**
+- Geometry optimization was disabled
+- Calculation stopped with error before geometry optimization
+- Only single-point calculation was performed
 
-**解決方法:**
-構造最適化を有効にした新しい計算を実行してください：
+**Solution:**
+Run a new calculation with geometry optimization enabled:
 \`startCalculation(optimize_geometry=true, ...)\``,
           },
         ],
@@ -1000,39 +1043,39 @@ export async function handleGetOptimizedGeometry(
     const geometryOptimized = results?.frequency_analysis_performed ||
                              (results?.imaginary_frequencies_count !== undefined);
     const optimizationStatus = geometryOptimized
-      ? (results?.imaginary_frequencies_count === 0 ? '完全最適化' : '要追加最適化')
-      : '最適化状況不明';
+      ? (results?.imaginary_frequencies_count === 0 ? 'Fully Optimized' : 'Requires Additional Optimization')
+      : 'Optimization Status Unknown';
 
     return {
       content: [
         {
           type: 'text',
-          text: `✅ **最適化座標を取得しました**
+          text: `✅ **Retrieved Optimized Coordinates**
 
-**元の計算情報:**
-- **計算ID:** \`${calculation.id}\`
-- **計算名:** ${calculation.name}
-- **手法:** ${params.calculation_method}
-- **基底関数:** ${params.basis_function}
-- **最適化状況:** ${optimizationStatus}
+**Original Calculation Information:**
+- **Calculation ID:** \`${calculation.id}\`
+- **Calculation Name:** ${calculation.name}
+- **Method:** ${params.calculation_method}
+- **Basis Set:** ${params.basis_function}
+- **Optimization Status:** ${optimizationStatus}
 
-**最適化座標 (XYZ形式):**
+**Optimized Coordinates (XYZ format):**
 \`\`\`
 ${results.optimized_geometry}
 \`\`\`
 
-**使用方法:**
-この座標を使用して次の計算を開始できます：
+**Usage:**
+You can start the next calculation using these coordinates:
 \`\`\`
 startCalculation({
   xyz: "${results.optimized_geometry?.replace(/\n/g, '\\n')}",
   calculation_method: "CASSCF",
   optimize_geometry: false,
-  // その他のパラメータ...
+  // Other parameters...
 })
 \`\`\`
 
-**注意:** 段階的計算では、通常は最適化座標で単点計算（optimize_geometry=false）を実行します。`,
+**Note:** For stepwise calculations, single-point calculations (optimize_geometry=false) are typically performed with optimized coordinates.`,
         },
       ],
     };
@@ -1042,9 +1085,9 @@ startCalculation({
       content: [
         {
           type: 'text',
-          text: `❌ 最適化座標の取得でエラーが発生しました: ${errorMessage}
+          text: `❌ Error occurred while retrieving optimized coordinates: ${errorMessage}
 
-計算IDを確認してください。利用可能な計算は \`listCalculations\` で確認できます。`,
+Please verify the calculation ID. Available calculations can be checked with \`listCalculations\`.`,
         },
       ],
       isError: true,
@@ -1052,220 +1095,3 @@ startCalculation({
   }
 }
 
-export const startStepwiseCalculationTool: Tool = {
-  name: 'startStepwiseCalculation',
-  description: 'Start a stepwise calculation where the first step optimizes geometry and the second step performs single-point calculation with that optimized geometry',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      xyz: {
-        type: 'string',
-        description: 'Initial XYZ format molecular structure data',
-        minLength: 1,
-      },
-      name: {
-        type: 'string',
-        description: 'Base name for the calculations',
-        default: 'Stepwise Calculation',
-      },
-      step1_method: {
-        type: 'string',
-        enum: ['DFT', 'HF', 'MP2'],
-        description: 'First step calculation method (with optimization)',
-        default: 'DFT',
-      },
-      step2_method: {
-        type: 'string',
-        enum: ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT', 'CASCI', 'CASSCF'],
-        description: 'Second step calculation method (single-point)',
-        default: 'CASSCF',
-      },
-      basis_function: {
-        type: 'string',
-        description: 'Basis set for both calculations',
-        default: '6-31G(d)',
-      },
-      exchange_correlation: {
-        type: 'string',
-        description: 'Exchange-correlation functional (for DFT methods)',
-        default: 'B3LYP',
-      },
-      charges: {
-        type: 'integer',
-        minimum: -10,
-        maximum: 10,
-        description: 'Molecular charge',
-        default: 0,
-      },
-      spin: {
-        type: 'integer',
-        minimum: 0,
-        maximum: 10,
-        description: 'Spin (2S), number of unpaired electrons',
-        default: 0,
-      },
-      // CASCI/CASSCF specific parameters for step 2
-      ncas: {
-        type: 'integer',
-        minimum: 1,
-        maximum: 50,
-        description: 'Number of active space orbitals (CASCI/CASSCF only)',
-        default: 6,
-      },
-      nelecas: {
-        type: 'integer',
-        minimum: 1,
-        maximum: 100,
-        description: 'Number of active space electrons (CASCI/CASSCF only)',
-        default: 8,
-      },
-    },
-    required: ['xyz', 'step1_method', 'step2_method'],
-  },
-};
-
-export async function handleStartStepwiseCalculation(
-  args: {
-    xyz: string;
-    name?: string;
-    step1_method: string;
-    step2_method: string;
-    basis_function?: string;
-    exchange_correlation?: string;
-    charges?: number;
-    spin?: number;
-    ncas?: number;
-    nelecas?: number;
-  },
-  client: PySCFApiClient
-) {
-  try {
-    const baseName = args.name || 'Stepwise Calculation';
-    const step1Name = `${baseName} - Step1 (${args.step1_method} Optimization)`;
-
-    // Start the first calculation (with optimization)
-    const step1Request: QuantumCalculationRequest = {
-      xyz: args.xyz,
-      name: step1Name,
-      calculation_method: args.step1_method as any,
-      basis_function: args.basis_function || '6-31G(d)',
-      exchange_correlation: args.exchange_correlation || 'B3LYP',
-      charges: args.charges || 0,
-      spin: args.spin || 0,
-      optimize_geometry: true,
-      solvent_method: 'none' as any,
-      solvent: '-',
-      tddft_nstates: 10,
-      tddft_method: 'TDDFT' as any,
-      tddft_analyze_nto: false,
-      ncas: args.ncas || 6,
-      nelecas: args.nelecas || 8,
-      max_cycle_macro: 50,
-      max_cycle_micro: 3,
-      natorb: true,
-      conv_tol: 0.0000001,
-      conv_tol_grad: 0.0001,
-    };
-
-    const step1Response = await client.startCalculation(step1Request);
-
-    if (!step1Response.success) {
-      throw new Error(`最初の計算（${args.step1_method}最適化）の開始に失敗しました`);
-    }
-
-    const step1Calc = step1Response.data.calculation;
-    const step2Name = `${baseName} - Step2 (${args.step2_method} Single-Point)`;
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `🔄 **段階的計算を開始しました**
-
-**計算フロー:** ${args.step1_method}最適化 → ${args.step2_method}単点計算
-
-**Step 1 - 構造最適化**
-✅ **開始済み**
-- **計算ID:** \`${step1Calc.id}\`
-- **計算名:** ${step1Calc.name}
-- **手法:** ${args.step1_method}
-- **基底関数:** ${args.basis_function || '6-31G(d)'}
-- **構造最適化:** 有効
-
-**Step 2 - 単点計算**
-⏳ **待機中**
-- **計画された手法:** ${args.step2_method}
-- **計画された名前:** ${step2Name}
-- **構造最適化:** 無効（Step1の最適化座標を使用）
-
-**次のステップ:**
-1. Step1の完了を待ってください：\`getCalculationDetails("${step1Calc.id}")\`
-2. Step1が完了したら、最適化座標を取得：\`getOptimizedGeometry("${step1Calc.id}")\`
-3. その座標を使ってStep2を開始：
-
-\`\`\`
-startCalculation({
-  xyz: "[Step1から取得した最適化座標]",
-  name: "${step2Name}",
-  calculation_method: "${args.step2_method}",
-  basis_function: "${args.basis_function || '6-31G(d)'}",
-  optimize_geometry: false,${args.step2_method === 'CASCI' || args.step2_method === 'CASSCF' ? `
-  ncas: ${args.ncas || 6},
-  nelecas: ${args.nelecas || 8},` : ''}
-  // その他のパラメータ...
-})
-\`\`\`
-
-**自動化されたコマンド例:**
-Step1完了後に以下を実行：
-1. \`getOptimizedGeometry("${step1Calc.id}")\`
-2. 座標をコピーして上記のstartCalculationで使用
-
-段階的計算により、${args.step1_method}で最適化された構造で${args.step2_method}計算を実行できます。`,
-        },
-      ],
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-
-    // Enhanced error details for debugging using PySCFApiError
-    let debugInfo = '';
-    if (error instanceof PySCFApiError) {
-      const details = error.details;
-      debugInfo = `
-**デバッグ情報:**
-- HTTPステータス: ${details.status || 'N/A'}
-- ステータステキスト: ${details.statusText || 'N/A'}
-- URL: ${details.url || 'N/A'}
-- メソッド: ${details.method || 'N/A'}
-- タイムスタンプ: ${details.timestamp}
-- レスポンスデータ: ${JSON.stringify(details.responseData, null, 2) || 'N/A'}`;
-    }
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `❌ 段階的計算の開始でエラーが発生しました: ${errorMessage}
-
-**計画された計算フロー:** ${args.step1_method}最適化 → ${args.step2_method}単点計算
-
-**可能な原因:**
-- 無効なXYZ形式
-- 理論的に不適切なパラメータの組み合わせ
-- リソース不足
-- サーバー内部エラー
-
-**解決方法:**
-1. XYZ形式を \`validateXYZ\` で確認してください
-2. \`getSupportedParameters\` で利用可能なパラメータを確認してください
-3. 個別に各計算を実行してみてください：
-   - まず \`startCalculation\` で${args.step1_method}最適化を実行
-   - 完了後に \`getOptimizedGeometry\` で座標を取得
-   - その座標で${args.step2_method}単点計算を実行${debugInfo}`,
-        },
-      ],
-      isError: true,
-    };
-  }
-}

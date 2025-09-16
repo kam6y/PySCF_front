@@ -57,18 +57,18 @@ export async function handleDiagnostics(
 
   try {
     // 1. Connection Test
-    results.push('🔍 **診断結果レポート**\n');
+    results.push('🔍 **Diagnostic Results Report**\n');
     
     const connectionResult = await client.testConnection();
     const connectionTime = Date.now() - startTime;
     
     if (connectionResult.connected) {
-      results.push(`✅ **接続テスト**: 成功 (${connectionTime}ms)`);
-      results.push(`   - サーバーURL: ${client.getBaseUrl()}`);
-      results.push(`   - バージョン: ${connectionResult.version || 'N/A'}`);
+      results.push(`✅ **Connection Test**: Success (${connectionTime}ms)`);
+      results.push(`   - Server URL: ${client.getBaseUrl()}`);
+      results.push(`   - Version: ${connectionResult.version || 'N/A'}`);
     } else {
-      results.push(`❌ **接続テスト**: 失敗`);
-      results.push(`   - エラー: ${connectionResult.error}`);
+      results.push(`❌ **Connection Test**: Failed`);
+      results.push(`   - Error: ${connectionResult.error}`);
       
       MCPInspector.addLog({
         timestamp: new Date(),
@@ -89,21 +89,21 @@ export async function handleDiagnostics(
     if (connectionResult.connected) {
       try {
         const healthData = await client.healthCheck();
-        results.push(`   - ヘルスチェック: 正常`);
-        results.push(`   - サービス: ${healthData.service || 'N/A'}`);
-        results.push(`   - ステータス: ${healthData.status || 'N/A'}`);
+        results.push(`   - Health Check: Normal`);
+        results.push(`   - Service: ${healthData.service || 'N/A'}`);
+        results.push(`   - Status: ${healthData.status || 'N/A'}`);
       } catch (error) {
-        results.push(`   - ヘルスチェック: エラー (${error})`);
+        results.push(`   - Health Check: Error (${error})`);
       }
     }
 
     // 3. Endpoint Availability
-    results.push('\n📡 **エンドポイント可用性**');
+    results.push('\n📡 **Endpoint Availability**');
     const endpoints = [
-      { name: 'サポートパラメータ', method: 'getSupportedParameters' },
-      { name: '設定取得', method: 'getSettings' },
-      { name: 'リソース状況', method: 'getResourceStatus' },
-      { name: '計算リスト', method: 'listCalculations' },
+      { name: 'Supported Parameters', method: 'getSupportedParameters' },
+      { name: 'Get Settings', method: 'getSettings' },
+      { name: 'Resource Status', method: 'getResourceStatus' },
+      { name: 'Calculation List', method: 'listCalculations' },
     ];
 
     for (const endpoint of endpoints) {
@@ -111,40 +111,40 @@ export async function handleDiagnostics(
         const testStart = Date.now();
         await (client as any)[endpoint.method]();
         const testTime = Date.now() - testStart;
-        results.push(`✅ ${endpoint.name}: 利用可能 (${testTime}ms)`);
+        results.push(`✅ ${endpoint.name}: Available (${testTime}ms)`);
       } catch (error) {
-        results.push(`❌ ${endpoint.name}: エラー (${error})`);
+        results.push(`❌ ${endpoint.name}: Error (${error})`);
       }
     }
 
     // 4. Performance Metrics
     if (args.include_performance) {
-      results.push('\n📊 **パフォーマンス統計**');
+      results.push('\n📊 **Performance Statistics**');
       const stats = MCPInspector.getErrorStats();
-      results.push(`- 総リクエスト数: ${stats.total}`);
-      results.push(`- エラー数: ${stats.errors}`);
-      results.push(`- 成功率: ${stats.successRate}%`);
+      results.push(`- Total Requests: ${stats.total}`);
+      results.push(`- Errors: ${stats.errors}`);
+      results.push(`- Success Rate: ${stats.successRate}%`);
       
       const recentLogs = MCPInspector.getLogs(10);
       if (recentLogs.length > 0) {
         const avgResponseTime = recentLogs
           .filter(log => log.responseTime)
           .reduce((sum, log) => sum + (log.responseTime || 0), 0) / recentLogs.length;
-        results.push(`- 平均応答時間: ${avgResponseTime.toFixed(1)}ms`);
+        results.push(`- Average Response Time: ${avgResponseTime.toFixed(1)}ms`);
       }
     }
 
     // 5. Recent Errors
     const recentErrors = MCPInspector.getLogs(5).filter(log => !log.success);
     if (recentErrors.length > 0) {
-      results.push('\n⚠️ **最近のエラー**');
+      results.push('\n⚠️ **Recent Errors**');
       recentErrors.forEach((log, index) => {
         results.push(`${index + 1}. [${log.timestamp.toLocaleTimeString()}] ${log.tool}: ${log.error}`);
       });
     }
 
     const totalTime = Date.now() - startTime;
-    results.push(`\n診断完了 (総実行時間: ${totalTime}ms)`);
+    results.push(`\nDiagnostics completed (total execution time: ${totalTime}ms)`);
 
     MCPInspector.addLog({
       timestamp: new Date(),
@@ -173,7 +173,7 @@ export async function handleDiagnostics(
       content: [
         {
           type: 'text',
-          text: `❌ 診断中にエラーが発生しました: ${errorMessage}`,
+          text: `❌ Error occurred during diagnostics: ${errorMessage}`,
         },
       ],
       isError: true,
@@ -210,7 +210,7 @@ export async function handleTestApi(
   const results: string[] = [];
   const endpoint = args.endpoint || 'all';
 
-  results.push(`🧪 **API エンドポイントテスト** (${endpoint})\n`);
+  results.push(`🧪 **API Endpoint Test** (${endpoint})\n`);
 
   const testEndpoint = async (name: string, testFunc: () => Promise<any>) => {
     try {
@@ -218,43 +218,43 @@ export async function handleTestApi(
       const response = await testFunc();
       const responseTime = Date.now() - testStart;
       
-      results.push(`✅ **${name}**: 成功 (${responseTime}ms)`);
+      results.push(`✅ **${name}**: Success (${responseTime}ms)`);
       
       if (args.include_response_data && response) {
         const dataStructure = typeof response === 'object' 
           ? Object.keys(response).join(', ')
           : typeof response;
-        results.push(`   - レスポンス構造: ${dataStructure}`);
+        results.push(`   - Response structure: ${dataStructure}`);
       }
       
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      results.push(`❌ **${name}**: エラー - ${errorMessage}`);
+      results.push(`❌ **${name}**: Error - ${errorMessage}`);
       return false;
     }
   };
 
   try {
     if (endpoint === 'all' || endpoint === 'system') {
-      await testEndpoint('ヘルスチェック', () => client.healthCheck());
-      await testEndpoint('設定取得', () => client.getSettings());
-      await testEndpoint('リソース状況', () => client.getResourceStatus());
-      await testEndpoint('サポートパラメータ', () => client.getSupportedParameters());
+      await testEndpoint('Health Check', () => client.healthCheck());
+      await testEndpoint('Get Settings', () => client.getSettings());
+      await testEndpoint('Resource Status', () => client.getResourceStatus());
+      await testEndpoint('Supported Parameters', () => client.getSupportedParameters());
     }
 
     if (endpoint === 'all' || endpoint === 'quantum') {
-      await testEndpoint('計算リスト', () => client.listCalculations());
+      await testEndpoint('Calculation List', () => client.listCalculations());
     }
 
     if (endpoint === 'all' || endpoint === 'pubchem') {
-      await testEndpoint('XYZ検証', () => 
+      await testEndpoint('XYZ Validation', () =>
         client.validateXYZ({ xyz: '1\nTest\nH 0.0 0.0 0.0' })
       );
     }
 
     const totalTime = Date.now() - startTime;
-    results.push(`\nテスト完了 (総実行時間: ${totalTime}ms)`);
+    results.push(`\nTest completed (total execution time: ${totalTime}ms)`);
 
     MCPInspector.addLog({
       timestamp: new Date(),
@@ -283,7 +283,7 @@ export async function handleTestApi(
       content: [
         {
           type: 'text',
-          text: `❌ APIテスト中にエラーが発生しました: ${errorMessage}`,
+          text: `❌ Error occurred during API testing: ${errorMessage}`,
         },
       ],
       isError: true,
@@ -329,14 +329,14 @@ export async function handleGetDebugLogs(
         content: [
           {
             type: 'text',
-            text: `📝 **デバッグログ**\n\n${args.errors_only ? 'エラーログがありません。' : 'ログがありません。'}\n\n使用可能になり次第、操作履歴が表示されます。`,
+            text: `📝 **Debug Logs**\n\n${args.errors_only ? 'No error logs available.' : 'No logs available.'}\n\nOperation history will be displayed as it becomes available.`,
           },
         ],
       };
     }
 
     const results: string[] = [];
-    results.push(`📝 **デバッグログ** (最新 ${logs.length} 件)\n`);
+    results.push(`📝 **Debug Logs** (Latest ${logs.length} entries)\n`);
 
     logs.forEach((log, index) => {
       const status = log.success ? '✅' : '❌';
@@ -349,11 +349,11 @@ export async function handleGetDebugLogs(
         const argStr = Object.entries(log.args)
           .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
           .join(', ');
-        results.push(`   - 引数: {${argStr}}`);
+        results.push(`   - Arguments: {${argStr}}`);
       }
       
       if (log.error) {
-        results.push(`   - エラー: ${log.error}`);
+        results.push(`   - Error: ${log.error}`);
       }
       
       results.push('');
@@ -362,8 +362,8 @@ export async function handleGetDebugLogs(
     // Error pattern analysis
     const errorCount = logs.filter(log => !log.success).length;
     if (errorCount > 0) {
-      results.push('🔍 **エラーパターン分析**');
-      results.push(`- 総エラー数: ${errorCount}回`);
+      results.push('🔍 **Error Pattern Analysis**');
+      results.push(`- Total Errors: ${errorCount} times`);
     }
 
     return {
@@ -375,7 +375,7 @@ export async function handleGetDebugLogs(
       content: [
         {
           type: 'text',
-          text: `❌ ログ取得でエラーが発生しました: ${errorMessage}`,
+          text: `❌ Error occurred while retrieving logs: ${errorMessage}`,
         },
       ],
       isError: true,
@@ -404,17 +404,17 @@ export async function handleValidateConfig(
 ) {
   try {
     const results: string[] = [];
-    results.push('🔧 **MCP設定検証レポート**\n');
+    results.push('🔧 **MCP Configuration Validation Report**\n');
 
     // 1. Connection Configuration
-    results.push('**接続設定**');
+    results.push('**Connection Settings**');
     const baseUrl = client.getBaseUrl();
-    results.push(`- サーバーURL: ${baseUrl}`);
+    results.push(`- Server URL: ${baseUrl}`);
     
     if (baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost')) {
-      results.push('  ✅ ローカル開発環境として適切');
+      results.push('  ✅ Appropriate for local development environment');
     } else {
-      results.push('  ⚠️ リモートサーバーの場合、セキュリティ設定を確認してください');
+      results.push('  ⚠️ For remote servers, please verify security settings');
     }
 
     // 2. Server Settings Validation
@@ -422,16 +422,16 @@ export async function handleValidateConfig(
       const settingsResponse = await client.getSettings();
       if (settingsResponse.success) {
         const settings = settingsResponse.data.settings;
-        results.push('\n**サーバー設定検証**');
+        results.push('\n**Server Settings Validation**');
         
         // Validate parallel instances
         const maxInstances = settings.max_parallel_instances || 1;
         if (maxInstances >= 1 && maxInstances <= 8) {
-          results.push(`✅ 並列インスタンス数: ${maxInstances} (推奨範囲内)`);
+          results.push(`✅ Parallel instances: ${maxInstances} (within recommended range)`);
         } else if (maxInstances > 8) {
-          results.push(`⚠️ 並列インスタンス数: ${maxInstances} (多すぎる可能性があります)`);
+          results.push(`⚠️ Parallel instances: ${maxInstances} (may be too many)`);
         } else {
-          results.push(`❌ 並列インスタンス数: ${maxInstances} (無効な値)`);
+          results.push(`❌ Parallel instances: ${maxInstances} (invalid value)`);
         }
         
         // Validate resource limits
@@ -439,33 +439,33 @@ export async function handleValidateConfig(
         const memLimit = settings.max_memory_utilization_percent || 95;
         
         if (cpuLimit >= 50 && cpuLimit <= 95) {
-          results.push(`✅ CPU使用率制限: ${cpuLimit}% (適切)`);
+          results.push(`✅ CPU usage limit: ${cpuLimit}% (appropriate)`);
         } else {
-          results.push(`⚠️ CPU使用率制限: ${cpuLimit}% (50-95%を推奨)`);
+          results.push(`⚠️ CPU usage limit: ${cpuLimit}% (50-95% recommended)`);
         }
         
         if (memLimit >= 50 && memLimit <= 95) {
-          results.push(`✅ メモリ使用率制限: ${memLimit}% (適切)`);
+          results.push(`✅ Memory usage limit: ${memLimit}% (appropriate)`);
         } else {
-          results.push(`⚠️ メモリ使用率制限: ${memLimit}% (50-95%を推奨)`);
+          results.push(`⚠️ Memory usage limit: ${memLimit}% (50-95% recommended)`);
         }
       }
     } catch (error) {
-      results.push('\n❌ **サーバー設定の取得に失敗**');
-      results.push(`エラー: ${error}`);
+      results.push('\n❌ **Failed to retrieve server settings**');
+      results.push(`Error: ${error}`);
     }
 
     // 3. Performance Recommendations
     if (args.check_performance) {
-      results.push('\n**パフォーマンス最適化提案**');
+      results.push('\n**Performance Optimization Suggestions**');
       
       const stats = MCPInspector.getErrorStats();
       if (parseInt(stats.successRate) < 90) {
-        results.push('⚠️ 成功率が90%を下回っています');
-        results.push('  - ネットワーク接続を確認してください');
-        results.push('  - サーバーリソースを確認してください');
+        results.push('⚠️ Success rate is below 90%');
+        results.push('  - Check network connection');
+        results.push('  - Check server resources');
       } else {
-        results.push('✅ API成功率は良好です');
+        results.push('✅ API success rate is good');
       }
       
       // Response time analysis
@@ -477,21 +477,21 @@ export async function handleValidateConfig(
       if (responseTimes.length > 0) {
         const avgTime = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
         if (avgTime > 5000) {
-          results.push('⚠️ 平均応答時間が5秒を超えています');
-          results.push('  - タイムアウト設定を確認してください');
-          results.push('  - サーバーの負荷を確認してください');
+          results.push('⚠️ Average response time exceeds 5 seconds');
+          results.push('  - Check timeout settings');
+          results.push('  - Check server load');
         } else {
-          results.push('✅ 応答時間は良好です');
+          results.push('✅ Response time is good');
         }
       }
     }
 
     // 4. Recommendations
-    results.push('\n**推奨事項**');
-    results.push('1. 定期的に`diagnostics`を実行してサーバー状況を確認');
-    results.push('2. エラーが頻発する場合は`getDebugLogs`でパターンを分析');
-    results.push('3. 重い計算の前に`getResourceStatus`でリソースを確認');
-    results.push('4. `getSupportedParameters`で利用可能なパラメータを確認');
+    results.push('\n**Recommendations**');
+    results.push('1. Run `diagnostics` regularly to check server status');
+    results.push('2. If errors occur frequently, analyze patterns with `getDebugLogs`');
+    results.push('3. Check resources with `getResourceStatus` before heavy calculations');
+    results.push('4. Verify available parameters with `getSupportedParameters`');
 
     MCPInspector.addLog({
       timestamp: new Date(),
@@ -518,7 +518,7 @@ export async function handleValidateConfig(
       content: [
         {
           type: 'text',
-          text: `❌ 設定検証中にエラーが発生しました: ${errorMessage}`,
+          text: `❌ Error occurred during configuration validation: ${errorMessage}`,
         },
       ],
       isError: true,
