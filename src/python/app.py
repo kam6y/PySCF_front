@@ -83,10 +83,13 @@ CORS(app)  # Enable CORS for cross-origin requests
 socketio_config = SERVER_CONFIG.get('socketio', {})
 socketio = SocketIO(
     app, 
-    cors_allowed_origins=socketio_config.get('cors_allowed_origins', ["http://127.0.0.1:*", "ws://127.0.0.1:*"]),
+    cors_allowed_origins=socketio_config.get('cors_allowed_origins', ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"]),
     async_mode=socketio_config.get('async_mode', 'threading'),
     ping_timeout=socketio_config.get('ping_timeout', 60),
-    ping_interval=socketio_config.get('ping_interval', 25)
+    ping_interval=socketio_config.get('ping_interval', 25),
+    allow_unsafe_werkzeug=socketio_config.get('allow_unsafe_werkzeug', True),
+    logger=socketio_config.get('logger', True),
+    engineio_logger=socketio_config.get('engineio_logger', False)
 )
 
 # Initialize PubChem client

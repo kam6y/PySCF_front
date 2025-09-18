@@ -22,14 +22,18 @@
     "log_level": "info",
     "max_requests": 0,
     "max_requests_jitter": 0,
-    "worker_connections": 1000
+    "worker_connections": 1000,
+    "graceful_timeout": 30,
+    "worker_tmp_dir": "/tmp"
   },
   "socketio": {
-    "cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*"],
+    "cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"],
     "async_mode": "threading",
     "ping_timeout": 60,
     "ping_interval": 25,
-    "allow_unsafe_werkzeug": true
+    "allow_unsafe_werkzeug": true,
+    "logger": true,
+    "engineio_logger": false
   },
   "development": {
     "use_reloader": false,

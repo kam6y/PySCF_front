@@ -357,14 +357,25 @@ export const useGlobalCalculationWebSocket = (
         `[WebSocket] Connecting to global monitoring at ${serverUrl}`
       );
 
-      // Create Socket.IO connection with improved settings
+      // Create Socket.IO connection with enhanced settings for better stability
       const socket = io(serverUrl, {
         transports: ['websocket', 'polling'],
-        timeout: 10000, // 接続タイムアウトを延長
+        timeout: 15000, // 接続タイムアウトを延長
         reconnection: true, // 自動再接続を有効化
-        reconnectionDelay: 2000,
-        reconnectionAttempts: 3,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        reconnectionAttempts: 5,
+        randomizationFactor: 0.5,
         forceNew: true, // 新しい接続を強制
+        upgrade: true,
+        rememberUpgrade: false,
+        autoConnect: true,
+        // 追加の安定性向上設定
+        withCredentials: false,
+        extraHeaders: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
       });
 
       socketRef.current = socket;
@@ -423,9 +434,24 @@ export const useGlobalCalculationWebSocket = (
         } else if (error.message.includes('xhr poll error')) {
           errorMessage =
             'Global monitoring server communication was interrupted.';
+        } else if (error.message.includes('websocket error')) {
+          errorMessage =
+            'WebSocket connection failed. Falling back to polling mode.';
+        } else if (error.message.includes('400')) {
+          errorMessage =
+            'Server rejected WebSocket connection (HTTP 400). Check CORS settings.';
+        } else if (error.message.includes('403')) {
+          errorMessage =
+            'WebSocket connection forbidden (HTTP 403). Check server authentication.';
+        } else if (error.message.includes('502') || error.message.includes('503')) {
+          errorMessage =
+            'Server is temporarily unavailable. Retrying connection...';
         }
 
-        handleWebSocketError(errorMessage);
+        // 重大でないエラーの場合は通知を出さない
+        if (!error.message.includes('502') && !error.message.includes('503')) {
+          handleWebSocketError(errorMessage);
+        }
       });
 
       socket.on('disconnect', (reason: string) => {
