@@ -27,7 +27,11 @@
     "worker_tmp_dir": "/tmp"
   },
   "socketio": {
-    "cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"],
+    "cors_allowed_origins": [
+      "http://127.0.0.1:*",
+      "ws://127.0.0.1:*",
+      "file://"
+    ],
     "async_mode": "threading",
     "ping_timeout": 60,
     "ping_interval": 25,

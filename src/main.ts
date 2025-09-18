@@ -405,12 +405,18 @@ const startPythonServer = async (): Promise<void> => {
       });
 
       // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
+      // パッケージ環境では初期化に時間がかかるため、遅延とタイムアウトを延長
+      const initialDelay = app.isPackaged ? 5000 : 2000;
+      const healthCheckRetries = app.isPackaged ? 60 : 20; // パッケージ環境: 30秒, 開発環境: 10秒
+
       setTimeout(() => {
         console.log(
           `Starting health check for Gunicorn server on port ${flaskPort}`
         );
-        checkServerHealth(flaskPort!).then(resolve).catch(reject);
-      }, 2000);
+        checkServerHealth(flaskPort!, healthCheckRetries)
+          .then(resolve)
+          .catch(reject);
+      }, initialDelay);
     } else {
       // フォールバック: 直接実行（設定でGunicorn無効時のみ）
       console.log('Starting server with direct execution (fallback mode)');
@@ -418,8 +424,6 @@ const startPythonServer = async (): Promise<void> => {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
-      // 直接実行時は実行時ポート検出を使用
-      // （startPythonServer関数の残りの部分で処理）
     }
 
     // stdout/stderrのログ出力
@@ -548,7 +552,33 @@ const stopPythonServer = (): void => {
   }
 };
 
+/**
+ * 既存のウィンドウをフォーカス・表示する関数
+ */
+const focusExistingWindow = (): boolean => {
+  const existingWindows = BrowserWindow.getAllWindows();
+  if (existingWindows.length > 0) {
+    const window = existingWindows[0];
+    if (window.isMinimized()) {
+      window.restore();
+    }
+    window.focus();
+    window.show();
+    console.log('Focused existing window instead of creating new one');
+    return true;
+  }
+  return false;
+};
+
 const createWindow = async () => {
+  // パッケージ環境でのシングルウィンドウ制限
+  if (app.isPackaged) {
+    if (focusExistingWindow()) {
+      console.log('Single window restriction active - using existing window');
+      return;
+    }
+  }
+
   try {
     await startPythonServer();
     if (!flaskPort) {
@@ -629,8 +659,17 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+  if (app.isPackaged) {
+    // パッケージ環境ではシングルウィンドウ制限により、既存ウィンドウをフォーカスするか何もしない
+    if (!focusExistingWindow()) {
+      // 既存ウィンドウがない場合のみ新しいウィンドウを作成
+      createWindow();
+    }
+  } else {
+    // 開発環境では従来通りの動作
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    }
   }
 });
 

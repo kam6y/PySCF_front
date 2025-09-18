@@ -254,9 +254,11 @@ export const CalculationSettingsPage = ({
         xyz: adjustedParams.xyz || '',
         calculation_method: adjustedParams.calculation_method || 'DFT',
         basis_function: adjustedParams.basis_function || '6-31G(d)',
-        exchange_correlation: adjustedParams.calculation_method === 'DFT' || adjustedParams.calculation_method === 'TDDFT' 
-          ? adjustedParams.exchange_correlation || 'B3LYP' 
-          : null,
+        exchange_correlation:
+          adjustedParams.calculation_method === 'DFT' ||
+          adjustedParams.calculation_method === 'TDDFT'
+            ? adjustedParams.exchange_correlation || 'B3LYP'
+            : null,
         charges: adjustedParams.charges || 0,
         spin: adjustedParams.spin || 0,
         solvent_method: adjustedParams.solvent_method || 'none',
@@ -357,9 +359,11 @@ export const CalculationSettingsPage = ({
           xyz: xyzData,
           calculation_method: currentParams.calculation_method || 'DFT',
           basis_function: currentParams.basis_function || '6-31G(d)',
-          exchange_correlation: currentParams.calculation_method === 'DFT' || currentParams.calculation_method === 'TDDFT'
-            ? currentParams.exchange_correlation || 'B3LYP'
-            : null,
+          exchange_correlation:
+            currentParams.calculation_method === 'DFT' ||
+            currentParams.calculation_method === 'TDDFT'
+              ? currentParams.exchange_correlation || 'B3LYP'
+              : null,
           charges: currentParams.charges || 0,
           spin: currentParams.spin || 0,
           solvent_method: currentParams.solvent_method || 'none',
@@ -513,9 +517,11 @@ export const CalculationSettingsPage = ({
       xyz: currentParams.xyz || '',
       calculation_method: currentParams.calculation_method || 'DFT',
       basis_function: currentParams.basis_function || '6-31G(d)',
-      exchange_correlation: currentParams.calculation_method === 'DFT' || currentParams.calculation_method === 'TDDFT'
-        ? currentParams.exchange_correlation || 'B3LYP'
-        : null,
+      exchange_correlation:
+        currentParams.calculation_method === 'DFT' ||
+        currentParams.calculation_method === 'TDDFT'
+          ? currentParams.exchange_correlation || 'B3LYP'
+          : null,
       charges: currentParams.charges || 0,
       spin: currentParams.spin || 0,
       solvent_method: currentParams.solvent_method || 'none',
@@ -631,9 +637,11 @@ export const CalculationSettingsPage = ({
         xyz: data.xyz,
         calculation_method: params.calculation_method || 'DFT',
         basis_function: params.basis_function || '6-31G(d)',
-        exchange_correlation: params.calculation_method === 'DFT' || params.calculation_method === 'TDDFT'
-          ? params.exchange_correlation || 'B3LYP'
-          : null,
+        exchange_correlation:
+          params.calculation_method === 'DFT' ||
+          params.calculation_method === 'TDDFT'
+            ? params.exchange_correlation || 'B3LYP'
+            : null,
         charges: params.charges || 0,
         spin: params.spin || 0,
         solvent_method: params.solvent_method || 'none',

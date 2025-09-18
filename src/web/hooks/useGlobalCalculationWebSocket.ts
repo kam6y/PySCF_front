@@ -373,9 +373,9 @@ export const useGlobalCalculationWebSocket = (
         // 追加の安定性向上設定
         withCredentials: false,
         extraHeaders: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        }
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+        },
       });
 
       socketRef.current = socket;
@@ -443,7 +443,10 @@ export const useGlobalCalculationWebSocket = (
         } else if (error.message.includes('403')) {
           errorMessage =
             'WebSocket connection forbidden (HTTP 403). Check server authentication.';
-        } else if (error.message.includes('502') || error.message.includes('503')) {
+        } else if (
+          error.message.includes('502') ||
+          error.message.includes('503')
+        ) {
           errorMessage =
             'Server is temporarily unavailable. Retrying connection...';
         }
