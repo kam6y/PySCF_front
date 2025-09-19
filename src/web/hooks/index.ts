@@ -1,9 +1,8 @@
 // React Query ベースのフック
 export * from './useCalculationQueries';
-export { useCalculationSubscription } from './useCalculationSubscription';
-export type { UseCalculationSubscriptionOptions } from './useCalculationSubscription';
-export { useCalculationWebSocket } from './useCalculationWebSocket';
-export { useGlobalCalculationWebSocket } from './useGlobalCalculationWebSocket';
+
+export { useUnifiedWebSocket } from './useUnifiedWebSocket';
+export type { UseUnifiedWebSocketOptions } from './useUnifiedWebSocket';
 
 // 新しい状態管理フック（Zustandベース）
 export { useAppState } from './useAppState';

@@ -423,7 +423,6 @@ const startPythonServer = async (): Promise<void> => {
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
-
     }
 
     // stdout/stderrのログ出力

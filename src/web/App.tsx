@@ -13,7 +13,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { useAppState } from './hooks/useAppState';
 import { useCalculationData } from './hooks/useCalculationData';
 import { useCalculationActions } from './hooks/useCalculationActions';
-import { useGlobalCalculationWebSocket } from './hooks/useGlobalCalculationWebSocket';
+import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
 
 export const App = () => {
   // 統合された状態管理
@@ -21,8 +21,10 @@ export const App = () => {
   const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
 
-  // グローバルWebSocketによるリアルタイム更新（全ての計算を監視）
-  useGlobalCalculationWebSocket(calculationData.activeCalculation?.id || null);
+  // 統合WebSocketによるリアルタイム更新（グローバル + アクティブ計算監視）
+  useUnifiedWebSocket({
+    activeCalculationId: calculationData.activeCalculation?.id || null,
+  });
 
   // 検索機能によるフィルタリング
   const filteredCalculations = useMemo(() => {
