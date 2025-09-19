@@ -20,17 +20,6 @@ Focus on the best solution - Don't compromise design quality for compatibility w
 
 This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
 
-MCP Server Integration
-This project includes an MCP (Model Context Protocol) server located in the mcp-server/ directory. This server allows Claude Desktop to interact with the PySCF Native App's backend, enabling features like PubChem searches, SMILES conversions, and quantum chemistry calculations directly from the Claude Desktop interface.
-
-Key Features of the MCP Server:
-Molecular Search & Conversion: searchPubChem, convertSmiles, validateXYZ
-
-Quantum Chemistry Calculations: startCalculation, listCalculations, getCalculationDetails, getOrbitals, getOrbitalCube, getIRSpectrum
-
-System Management: getSupportedParameters, getSettings, updateSettings, getResourceStatus, testConnection
-
-For setup and usage instructions, please refer to mcp-server/README.md.
 
 Development Commands
 Initial Setup
@@ -279,22 +268,6 @@ File Structure
 ├── README.md
 ├── config
     └── server-config.json
-├── mcp-server
-    ├── README.md
-    ├── claude_desktop_config.json
-    ├── package-lock.json
-    ├── package.json
-    ├── src
-    │   ├── client.ts
-    │   ├── index.ts
-    │   ├── tools
-    │   │   ├── index.ts
-    │   │   ├── inspector.ts
-    │   │   ├── pubchem.ts
-    │   │   ├── quantum.ts
-    │   │   └── system.ts
-    │   └── types.ts
-    └── tsconfig.json
 ├── package-lock.json
 ├── package.json
 ├── scripts

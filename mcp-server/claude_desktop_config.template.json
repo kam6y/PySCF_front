@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "pyscf-native": {
-      "command": "node",
-      "args": ["{{PROJECT_PATH}}/mcp-server/dist/index.js"],
-      "env": {}
-    }
-  }
-}
