@@ -105,41 +105,8 @@ conda activate "$ENV_NAME"
 
 # 環境の検証
 log_info "環境の検証を実行中..."
-# conda環境のPythonを直接使用してpyenvの干渉を回避
-$(conda info --base)/envs/$ENV_NAME/bin/python -c "
-import sys
-print(f'Python version: {sys.version}')
-
-try:
-    import pyscf
-    print(f'PySCF version: {pyscf.__version__}')
-except ImportError as e:
-    print(f'PySCF import failed: {e}')
-    sys.exit(1)
-
-try:
-    import rdkit
-    print(f'RDKit version: {rdkit.__version__}')
-except ImportError as e:
-    print(f'RDKit import failed: {e}')
-    sys.exit(1)
-
-try:
-    import flask
-    print(f'Flask version: {flask.__version__}')
-except ImportError as e:
-    print(f'Flask import failed: {e}')
-    sys.exit(1)
-
-try:
-    import conda_pack
-    print(f'conda-pack version: {conda_pack.__version__}')
-except ImportError as e:
-    print(f'conda-pack import failed: {e}')
-    sys.exit(1)
-
-print('All critical dependencies are available!')
-"
+# conda環境のPythonを直接使用して、新しく作成した環境を検証
+"$(conda info --base)/envs/$ENV_NAME/bin/python" "$PROJECT_ROOT/scripts/verify-environment.py"
 
 if [[ $? -eq 0 ]]; then
     log_success "環境の検証が成功しました"

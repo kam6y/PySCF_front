@@ -3,6 +3,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 /**
  * Test script to verify Python executable functionality outside of Electron
@@ -11,8 +12,27 @@ const fs = require('fs');
 
 console.log('=== Python Executable Standalone Test ===');
 
+// Determine platform and architecture
+const platform = os.platform(); // 'darwin' (macOS), 'win32' (Windows), 'linux'
+const arch = os.arch(); // 'arm64', 'x64'
+
+// Generate platform-specific directory names
+let platformArch;
+if (platform === 'darwin') {
+    platformArch = `mac-${arch}`;
+} else if (platform === 'win32') {
+    platformArch = `win-unpacked`; // Windows の場合の一般的なディレクトリ名
+} else {
+    platformArch = `linux-unpacked`; // Linux の場合
+}
+
 // Determine paths
-const isPackaged = fs.existsSync('./dist/mac-arm64/Pyscf_front.app');
+const appPath = platform === 'darwin' 
+    ? `./dist/${platformArch}/Pyscf_front.app`
+    : `./dist/${platformArch}`;
+
+const isPackaged = fs.existsSync(appPath);
+console.log(`Platform: ${platform}-${arch}`);
 console.log(`Packaged mode: ${isPackaged}`);
 
 let pythonExecutablePath;
@@ -20,12 +40,16 @@ let pythonWorkingDir;
 
 if (isPackaged) {
   // Test packaged conda environment first
-  const condaPythonPath = './dist/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin/python';
-  const condaGunicornPath = './dist/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin/gunicorn';
+  const resourcesPath = platform === 'darwin'
+    ? path.join(appPath, 'Contents/Resources')
+    : path.resolve(`./dist/${platformArch}/resources`); // Windows/Linux の場合
+
+  const condaPythonPath = path.join(resourcesPath, 'conda_env', 'bin', 'python');
+  const condaGunicornPath = path.join(resourcesPath, 'conda_env', 'bin', 'gunicorn');
   
   if (fs.existsSync(condaPythonPath) && fs.existsSync(condaGunicornPath)) {
     pythonExecutablePath = path.resolve(condaPythonPath);
-    pythonWorkingDir = path.resolve('./dist/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin');
+    pythonWorkingDir = path.resolve(path.join(resourcesPath, 'conda_env', 'bin'));
     console.log('✓ Using packaged conda environment');
   } else {
     // Fallback to PyInstaller executable
@@ -43,25 +67,21 @@ console.log(`Working directory: ${pythonWorkingDir}`);
 console.log(`Executable exists: ${fs.existsSync(pythonExecutablePath)}`);
 console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
 
-// Test 1: Basic Python version check
-console.log('\n=== Test 1: Python Version Check ===');
-testPythonCommand([pythonExecutablePath, '--version'])
-  .then(() => {
-    // Test 2: Import test
+// Main test execution using async/await
+(async () => {
+  try {
+    console.log('\n=== Test 1: Python Version Check ===');
+    await testPythonCommand([pythonExecutablePath, '--version']);
+
     console.log('\n=== Test 2: Basic Import Test ===');
-    return testPythonCommand([pythonExecutablePath, '-c', 'import sys; print("Python executable test successful"); print("Python version:", sys.version)']);
-  })
-  .then(() => {
-    // Test 3: Gunicorn import test
+    await testPythonCommand([pythonExecutablePath, '-c', 'import sys; print("Python executable test successful"); print("Python version:", sys.version)']);
+
     console.log('\n=== Test 3: Gunicorn Import Test ===');
-    return testPythonCommand([pythonExecutablePath, '-c', 'import gunicorn; print("Gunicorn version:", gunicorn.__version__)']);
-  })
-  .then(() => {
-    // Test 4: Flask import test
+    await testPythonCommand([pythonExecutablePath, '-c', 'import gunicorn; print("Gunicorn version:", gunicorn.__version__)']);
+    
     console.log('\n=== Test 4: Flask Import Test ===');
-    return testPythonCommand([pythonExecutablePath, '-c', 'import flask; print("Flask import successful")']);
-  })
-  .then(() => {
+    await testPythonCommand([pythonExecutablePath, '-c', 'import flask; print("Flask import successful")']);
+
     // Test 5: App import test (if conda environment)
     if (pythonExecutablePath.includes('conda_env')) {
       console.log('\n=== Test 5: App Import Test ===');
@@ -69,14 +89,11 @@ testPythonCommand([pythonExecutablePath, '--version'])
       const appWorkingDir = pythonExecutablePath.includes('conda_env') 
         ? './src/python'  // Development app.py location
         : pythonWorkingDir;  // PyInstaller includes app.py in the executable
-      return testPythonCommand([pythonExecutablePath, '-c', 'import app; print("App import successful")'], appWorkingDir);
+      await testPythonCommand([pythonExecutablePath, '-c', 'import app; print("App import successful")'], appWorkingDir);
     } else {
       console.log('\n=== Test 5: Skipped (PyInstaller executable) ===');
-      return Promise.resolve();
     }
-  })
-  .then(() => {
-    // Test 6: Simulate Gunicorn startup
+
     console.log('\n=== Test 6: Gunicorn Startup Simulation ===');
     const gunicornArgs = [
       '-m', 'gunicorn',
@@ -99,15 +116,15 @@ testPythonCommand([pythonExecutablePath, '--version'])
     console.log(`Command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`);
     console.log(`Working directory: ${workDir}`);
     
-    return testPythonCommand([pythonExecutablePath, ...gunicornArgs], workDir, 5000);  // 5 second timeout
-  })
-  .then(() => {
+    await testPythonCommand([pythonExecutablePath, ...gunicornArgs], workDir, 5000);  // 5 second timeout
+
     console.log('\n✓ All tests passed! The Python executable should work correctly.');
-  })
-  .catch(error => {
+
+  } catch (error) {
     console.error('\n✗ Test failed:', error.message);
     process.exit(1);
-  });
+  }
+})();
 
 function testPythonCommand(command, cwd = null, timeout = 10000) {
   return new Promise((resolve, reject) => {

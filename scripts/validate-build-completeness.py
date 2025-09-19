@@ -39,12 +39,9 @@ def log_error(message: str) -> None:
     """エラーログを出力"""
     print(f"{Colors.RED}[ERROR]{Colors.NC} {message}")
 
-def check_conda_environment() -> bool:
+def check_conda_environment(project_root: Path) -> bool:
     """bundled conda環境の完全性をチェック"""
     log_info("bundled conda環境をチェック中...")
-    
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent
     conda_env_path = project_root / "conda_env"
     
     if not conda_env_path.exists():
@@ -52,11 +49,16 @@ def check_conda_environment() -> bool:
         log_info("conda-pack がまだ実行されていないか、失敗している可能性があります")
         return False
     
-    # 重要なファイルの存在確認
+    # 重要なファイルの存在確認 (Windows対応)
+    # Windowsの場合、実行ファイルは Scripts ディレクトリ配下にあり、.exe が付く
+    is_windows = os.name == 'nt'
+    bin_dir = "Scripts" if is_windows else "bin"
+    exe_suffix = ".exe" if is_windows else ""
+
     required_files = [
-        "bin/python",
-        "bin/gunicorn", 
-        "bin/pip",
+        Path(bin_dir) / f"python{exe_suffix}",
+        Path(bin_dir) / f"gunicorn{exe_suffix}",
+        Path(bin_dir) / f"pip{exe_suffix}",
     ]
     
     all_exist = True
@@ -94,12 +96,9 @@ def check_conda_environment() -> bool:
     
     return all_exist
 
-def check_python_dist() -> bool:
+def check_python_dist(project_root: Path) -> bool:
     """PyInstaller実行ファイルをチェック"""
     log_info("PyInstaller実行ファイルをチェック中...")
-    
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent
     python_dist_path = project_root / "python_dist" / "pyscf_front_api"
     
     if not python_dist_path.exists():
@@ -127,12 +126,9 @@ def check_python_dist() -> bool:
         log_error(f"✗ {executable_name} が見つかりません")
         return False
 
-def check_config_files() -> bool:
+def check_config_files(project_root: Path) -> bool:
     """設定ファイルの存在確認"""
     log_info("設定ファイルをチェック中...")
-    
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent
     
     required_configs = [
         "config/server-config.json",
@@ -150,12 +146,9 @@ def check_config_files() -> bool:
     
     return all_exist
 
-def check_frontend_build() -> bool:
+def check_frontend_build(project_root: Path) -> bool:
     """フロントエンドビルドの確認"""
     log_info("フロントエンドビルドをチェック中...")
-    
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent
     dist_path = project_root / "dist"
     
     if not dist_path.exists():
@@ -180,12 +173,9 @@ def check_frontend_build() -> bool:
     
     return all_exist
 
-def validate_conda_functionality() -> bool:
+def validate_conda_functionality(project_root: Path) -> bool:
     """conda環境の機能テスト"""
     log_info("conda環境の機能をテスト中...")
-
-    script_dir = Path(__file__).parent
-    project_root = script_dir.parent
     python_exe = project_root / "conda_env" / "bin" / "python"
 
     if not python_exe.exists():
@@ -255,12 +245,16 @@ def main() -> None:
     print(f"{Colors.CYAN}=== PySCF Native App ビルド完全性検証 ==={Colors.NC}")
     print()
     
+    # プロジェクトルートを一度だけ取得
+    script_dir = Path(__file__).parent
+    project_root = script_dir.parent
+    
     tests = [
-        ("bundled conda環境", check_conda_environment),
-        ("PyInstaller実行ファイル", check_python_dist),
-        ("設定ファイル", check_config_files),
-        ("フロントエンドビルド", check_frontend_build),
-        ("conda環境機能", validate_conda_functionality),
+        ("bundled conda環境", lambda: check_conda_environment(project_root)),
+        ("PyInstaller実行ファイル", lambda: check_python_dist(project_root)),
+        ("設定ファイル", lambda: check_config_files(project_root)),
+        ("フロントエンドビルド", lambda: check_frontend_build(project_root)),
+        ("conda環境機能", lambda: validate_conda_functionality(project_root)),
     ]
     
     results = []
