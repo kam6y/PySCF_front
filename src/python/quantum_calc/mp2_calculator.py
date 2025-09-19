@@ -32,69 +32,25 @@ class MP2Calculator(BaseCalculator):
         self.molecule_name = molecule_name
         
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup MP2 calculation with molecular geometry and parameters."""
-        try:
-            # Extract calculation parameters
-            basis = kwargs.get('basis', '6-31G(d)')
-            charge = kwargs.get('charge', 0)
-            spin = kwargs.get('spin', 0)
-            max_cycle = kwargs.get('max_cycle', 150)
-            solvent_method = kwargs.get('solvent_method', 'none')
-            solvent = kwargs.get('solvent', '-')
-            memory_mb = kwargs.get('memory_mb', 2000)  # Default 2GB
-
-            # Convert atoms list to PySCF format
-            atom_string = self._atoms_to_string(atoms)
-            
-            # Create molecular object
-            self.mol = gto.M(
-                atom=atom_string,
-                basis=basis,
-                charge=charge,
-                spin=spin,
-                verbose=0
-            )
-            # 安全なメモリ設定を適用
-            if memory_mb and memory_mb > 0:
-                self.mol.max_memory = memory_mb
-            else:
-                self.mol.max_memory = 3000  # MP2はより多くのメモリが必要
-            
-            # Setup HF calculation first (MP2 requires HF reference)
-            # For closed-shell systems (spin=0), use RHF
-            # For open-shell systems (spin>0), use UHF
-            if spin == 0:
-                self.mf = scf.RHF(self.mol)
-                logger.info("Using Restricted Hartree-Fock (RHF) reference for RMP2")
-            else:
-                self.mf = scf.UHF(self.mol)
-                logger.info("Using Unrestricted Hartree-Fock (UHF) reference for UMP2")
-            
-            # Apply solvent effects if requested
-            self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
-            
-            self.mf.chkfile = self.get_checkpoint_path()
-            self.mf.max_cycle = max_cycle
-            
-            # Store parameters for template method
-            self.max_cycle = max_cycle
-            self.solvent_method = solvent_method
-            self.solvent = solvent
-            
-            # Store parameters
-            self.results.update({
-                'basis': basis,
-                'charge': charge,
-                'spin': spin,
-                'max_cycle': max_cycle,
-                'solvent_method': solvent_method,
-                'solvent': solvent,
-                'atom_count': len(atoms),
-                'method': 'UMP2' if spin > 0 else 'RMP2'
-            })
-            
-        except Exception as e:
-            raise InputError(f"Failed to setup MP2 calculation: {str(e)}")
+        """Setup MP2 calculation using the base template method."""
+        # Call the base template method which handles common setup
+        super().setup_calculation(atoms, **kwargs)
+    
+    def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
+        """Validate MP2-specific parameters."""
+        # MP2-specific parameters (MP2 has no method-specific parameters beyond common ones)
+        # MP2 uses HF as reference, so method is based on spin
+        return {
+            'method': 'UMP2' if kwargs.get('spin', 0) > 0 else 'RMP2'
+        }
+    
+    def _get_default_memory_mb(self) -> int:
+        """Get default memory setting for MP2 calculations."""
+        return 3000  # MP2 needs more memory than HF (3GB default)
+    
+    def _get_calculation_method_name(self) -> str:
+        """Get the name of the calculation method for logging."""
+        return 'MP2'
     
     # ===== Template Method Pattern Implementation =====
     

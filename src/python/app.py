@@ -93,7 +93,7 @@ socketio = SocketIO(
 )
 
 # Initialize PubChem client
-pubchem_client = PubChemClient(timeout=30)
+pubchem_client = PubChemClient(timeout=SERVER_CONFIG.get('external_services', {}).get('pubchem_timeout', 30))
 
 # Global WebSocket connection registry for immediate notifications  
 # calculation_id -> set of session IDs
@@ -185,7 +185,7 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'service': 'pyscf-front-api',
-        'version': '0.3.0'
+        'version': SERVER_CONFIG.get('app_info', {}).get('version', 'unknown')
     })
 
 
@@ -787,7 +787,7 @@ def get_system_diagnostics():
             'timestamp': datetime.now().isoformat(),
             'service_info': {
                 'service': 'pyscf-front-api',
-                'version': '0.3.0',
+                'version': SERVER_CONFIG.get('app_info', {}).get('version', 'unknown'),
                 'pid': os.getpid(),
                 'working_directory': os.getcwd()
             },

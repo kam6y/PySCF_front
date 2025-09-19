@@ -51,6 +51,12 @@
     "timeout_calculation": 0,
     "memory_limit_mb": 0
   },
+  "app_info": {
+    "version": "0.3.0"
+  },
+  "external_services": {
+    "pubchem_timeout": 30
+  },
   "logging": {
     "level": "INFO",
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
