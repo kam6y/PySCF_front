@@ -136,11 +136,7 @@ export interface paths {
          * @description Get detailed information about a specific calculation
          */
         get: operations["getCalculationDetails"];
-        /**
-         * Update calculation metadata
-         * @description Update calculation name and other metadata
-         */
-        put: operations["updateCalculation"];
+        put?: never;
         post?: never;
         /**
          * Delete calculation
@@ -149,7 +145,11 @@ export interface paths {
         delete: operations["deleteCalculation"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update calculation metadata
+         * @description Update calculation name and other metadata
+         */
+        patch: operations["patchCalculation"];
         trace?: never;
     };
     "/api/quantum/calculations/{calculationId}/orbitals": {
@@ -328,7 +328,7 @@ export interface components {
             /** @description Search query for PubChem */
             query: string;
             /** @default name */
-            search_type: components["schemas"]["SearchType"];
+            searchType: components["schemas"]["SearchType"];
         };
         SMILESConvertRequest: {
             /** @description SMILES string to convert to XYZ format */
@@ -1718,7 +1718,48 @@ export interface operations {
             };
         };
     };
-    updateCalculation: {
+    deleteCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculation deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationDeleteResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patchCalculation: {
         parameters: {
             query?: never;
             header?: never;
@@ -1762,47 +1803,6 @@ export interface operations {
                 };
             };
             /** @description Failed to update calculation */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    deleteCalculation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Unique calculation ID */
-                calculationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Calculation deleted successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalculationDeleteResponse"];
-                };
-            };
-            /** @description Calculation not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to delete calculation */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1949,7 +1949,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Specific orbital index to delete (if not provided, deletes all) */
-                orbital_index?: number;
+                orbitalIndex?: number;
             };
             header?: never;
             path: {
@@ -1993,13 +1993,13 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Full width at half maximum for Lorentzian broadening in cm⁻¹ */
-                broadening_fwhm?: number;
+                broadeningFwhm?: number;
                 /** @description Minimum wavenumber for spectrum range in cm⁻¹ */
-                x_min?: number;
+                xMin?: number;
                 /** @description Maximum wavenumber for spectrum range in cm⁻¹ */
-                x_max?: number;
+                xMax?: number;
                 /** @description Whether to mark individual peaks in the plot */
-                show_peaks?: boolean;
+                showPeaks?: boolean;
             };
             header?: never;
             path: {

@@ -200,10 +200,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    put:
+    patch:
       summary: Update calculation metadata
       description: Update calculation name and other metadata
-      operationId: updateCalculation
+      operationId: patchCalculation
       parameters:
         - name: calculationId
           in: path
@@ -415,7 +415,7 @@ paths:
           description: Unique calculation ID
           schema:
             type: string
-        - name: orbital_index
+        - name: orbitalIndex
           in: query
           required: false
           description: Specific orbital index to delete (if not provided, deletes all)
@@ -453,7 +453,7 @@ paths:
           description: Unique calculation ID
           schema:
             type: string
-        - name: broadening_fwhm
+        - name: broadeningFwhm
           in: query
           required: false
           description: Full width at half maximum for Lorentzian broadening in cm⁻¹
@@ -463,7 +463,7 @@ paths:
             default: 100.0
             minimum: 0.1
             maximum: 1000.0
-        - name: x_min
+        - name: xMin
           in: query
           required: false
           description: Minimum wavenumber for spectrum range in cm⁻¹
@@ -472,7 +472,7 @@ paths:
             format: float
             default: 400.0
             minimum: 0.0
-        - name: x_max
+        - name: xMax
           in: query
           required: false
           description: Maximum wavenumber for spectrum range in cm⁻¹
@@ -481,7 +481,7 @@ paths:
             format: float
             default: 4000.0
             maximum: 10000.0
-        - name: show_peaks
+        - name: showPeaks
           in: query
           required: false
           description: Whether to mark individual peaks in the plot
@@ -633,7 +633,7 @@ components:
           type: string
           minLength: 1
           description: Search query for PubChem
-        search_type:
+        searchType:
           $ref: '#/components/schemas/SearchType'
           default: name
 

@@ -229,7 +229,7 @@ export const updateCalculationName = (
   return request<CalculationUpdateResponseData>(
     `/api/quantum/calculations/${id}`,
     {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify({ name: newName }),
     }
   );
