@@ -96,35 +96,6 @@ def check_conda_environment(project_root: Path) -> bool:
     
     return all_exist
 
-def check_python_dist(project_root: Path) -> bool:
-    """PyInstaller実行ファイルをチェック"""
-    log_info("PyInstaller実行ファイルをチェック中...")
-    python_dist_path = project_root / "python_dist" / "pyscf_front_api"
-    
-    if not python_dist_path.exists():
-        log_error("python_dist ディレクトリが見つかりません")
-        log_info("PyInstaller がまだ実行されていないか、失敗している可能性があります")
-        return False
-    
-    # 実行ファイルの存在確認
-    executable_name = "pyscf_front_api.exe" if os.name == 'nt' else "pyscf_front_api"
-    executable_path = python_dist_path / executable_name
-    
-    if executable_path.exists():
-        log_success(f"✓ {executable_name}")
-        
-        # 実行ファイルのサイズチェック
-        size_mb = executable_path.stat().st_size / (1024 * 1024)
-        if size_mb < 20:  # 20MB未満は異常に小さい（科学計算ライブラリに適用）
-            log_warning(f"実行ファイルが小さすぎます: {size_mb:.1f} MB")
-            return False
-        else:
-            log_success(f"実行ファイルサイズ: {size_mb:.1f} MB")
-        
-        return True
-    else:
-        log_error(f"✗ {executable_name} が見つかりません")
-        return False
 
 def check_config_files(project_root: Path) -> bool:
     """設定ファイルの存在確認"""
@@ -251,7 +222,6 @@ def main() -> None:
     
     tests = [
         ("bundled conda環境", lambda: check_conda_environment(project_root)),
-        ("PyInstaller実行ファイル", lambda: check_python_dist(project_root)),
         ("設定ファイル", lambda: check_config_files(project_root)),
         ("フロントエンドビルド", lambda: check_frontend_build(project_root)),
         ("conda環境機能", lambda: validate_conda_functionality(project_root)),
@@ -287,7 +257,7 @@ def main() -> None:
         print("1. 失敗したコンポーネントを確認")
         print("2. 該当するビルドステップを再実行:")
         print("   - conda環境: npm run build:conda-pack")
-        print("   - PyInstaller: npm run build:python")  
+  
         print("   - フロントエンド: npm run build:webpack")
         print("3. 再度検証: npm run validate-build")
         sys.exit(1)

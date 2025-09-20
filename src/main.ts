@@ -31,16 +31,6 @@ const loadServerConfig = (): any => {
         'config',
         'server-config.json'
       );
-      // フォールバック: python_distディレクトリ内の設定
-      if (!fs.existsSync(configPath)) {
-        configPath = path.join(
-          process.resourcesPath,
-          'python_dist',
-          'pyscf_front_api',
-          'config',
-          'server-config.json'
-        );
-      }
     }
 
     if (fs.existsSync(configPath)) {

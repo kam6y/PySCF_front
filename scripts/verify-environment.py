@@ -65,7 +65,6 @@ def check_required_packages() -> bool:
         ('requests', 'Requests - HTTP クライアント'),
         ('conda_pack', 'conda-pack - 環境パッケージ化'),
         ('datamodel_code_generator', 'datamodel-code-generator - コード生成'),
-        ('PyInstaller', 'PyInstaller - Python実行ファイル作成'),
     ]
     
     log_info("必須パッケージをチェック中...")

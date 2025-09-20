@@ -8,17 +8,16 @@
     "dev:clean": "rimraf dist node_modules/.cache && npm run codegen && run-p dev:webpack dev:electron",
     "dev:webpack": "cross-env NODE_ENV=\"development\" webpack --progress",
     "dev:electron": "wait-on --delay 1000 --interval 100 --timeout 30000 ./dist/index.html ./dist/main.js && electronmon .",
-    "build": "npm run verify-env && npm run codegen && npm run build:webpack && npm run build:conda-pack && npm run build:python && npm run validate-build",
+    "build": "npm run verify-env && npm run codegen && npm run build:webpack && npm run build:conda-pack && npm run validate-build",
     "build:webpack": "cross-env NODE_ENV=\"production\" webpack --progress",
     "build:conda-pack": "npm run verify-build-env && rimraf conda_env && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && conda-pack -o conda_env.tar.gz && mkdir -p conda_env && tar -xzf conda_env.tar.gz -C conda_env && rm conda_env.tar.gz'",
-    "build:python": "npm run verify-build-env && rimraf python_dist && cd src/python && bash -c 'export PATH=\"$HOME/miniforge3/envs/pyscf-env/bin:$PATH\" && export CONDA_DEFAULT_ENV=pyscf-env && echo \"=== Python Environment Verification ===\" && which python && python --version && echo \"=== Checking critical dependencies ===\" && python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && python -c \"import watchdog; print(\\\"Watchdog: Available\\\")\" && python -c \"import flask; print(f\\\"Flask: {flask.__version__}\\\")\" && python -c \"import pyscf; print(f\\\"PySCF: {pyscf.__version__}\\\")\" && echo \"=== Dependencies verified, starting PyInstaller ===\" && pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec'",
     "package": "npm run build && electron-builder",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
     "codegen:python": "cd src/python && bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description'",
     "python-exec": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && \"$@\"' --",
     "setup-env": "./scripts/setup-environment.sh",
     "verify-env": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/verify-environment.py'",
-    "verify-build-env": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && echo \"=== Build Environment Verification ===\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import conda_pack; print(f\\\"conda-pack: {conda_pack.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import PyInstaller; print(f\\\"PyInstaller: {PyInstaller.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && echo \"✓ All build tools verified\"'",
+    "verify-build-env": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && echo \"=== Build Environment Verification ===\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import conda_pack; print(f\\\"conda-pack: {conda_pack.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && echo \"✓ All build tools verified\"'",
     "validate-build": "bash -c 'source $HOME/miniforge3/etc/profile.d/conda.sh && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/validate-build-completeness.py'",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
@@ -95,13 +94,6 @@
       "dist/**/*"
     ],
     "extraResources": [
-      {
-        "from": "python_dist",
-        "to": "python_dist",
-        "filter": [
-          "**/*"
-        ]
-      },
       {
         "from": "conda_env",
         "to": "conda_env",

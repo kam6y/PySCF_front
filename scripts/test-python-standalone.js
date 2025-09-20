@@ -52,10 +52,8 @@ if (isPackaged) {
     pythonWorkingDir = path.resolve(path.join(resourcesPath, 'conda_env', 'bin'));
     console.log('✓ Using packaged conda environment');
   } else {
-    // Fallback to PyInstaller executable
-    pythonExecutablePath = path.resolve('./python_dist/pyscf_front_api/pyscf_front_api');
-    pythonWorkingDir = path.resolve('./python_dist/pyscf_front_api');
-    console.log('⚠️  Using PyInstaller executable (conda not available)');
+    console.log('✗ No packaged conda environment found.');
+    process.exit(1);
   }
 } else {
   console.log('✗ No packaged app found. Please run `npm run package` first.');
@@ -88,10 +86,8 @@ console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
       // Need to change working directory to where app.py is located
       const appWorkingDir = pythonExecutablePath.includes('conda_env') 
         ? './src/python'  // Development app.py location
-        : pythonWorkingDir;  // PyInstaller includes app.py in the executable
+        : './src/python';  // Development app.py location
       await testPythonCommand([pythonExecutablePath, '-c', 'import app; print("App import successful")'], appWorkingDir);
-    } else {
-      console.log('\n=== Test 5: Skipped (PyInstaller executable) ===');
     }
 
     console.log('\n=== Test 6: Gunicorn Startup Simulation ===');
@@ -111,7 +107,7 @@ console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
     
     const workDir = pythonExecutablePath.includes('conda_env') 
       ? './src/python'  // Development app.py location
-      : pythonWorkingDir;  // PyInstaller working directory
+      : './src/python';  // Development app.py location
       
     console.log(`Command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`);
     console.log(`Working directory: ${workDir}`);
