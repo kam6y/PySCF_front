@@ -255,7 +255,7 @@ export const searchPubChem = (
 ): Promise<PubChemSearchResponseData> => {
   return request<PubChemSearchResponseData>('/api/pubchem/search', {
     method: 'POST',
-    body: JSON.stringify({ query, search_type: searchType }),
+    body: JSON.stringify({ query, searchType }),
   });
 };
 
