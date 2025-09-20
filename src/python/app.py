@@ -36,11 +36,8 @@ from generated_models import (
 def load_server_config():
     """Load server configuration from JSON file."""
     try:
-        # Try to load from config directory first
-        config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'server-config.json')
-        if not os.path.exists(config_path):
-            # Fallback to bundled config for packaged applications
-            config_path = os.path.join(os.path.dirname(__file__), 'config', 'server-config.json')
+        # Load from config directory (single source of truth)
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', 'server-config.json')
         
         if not os.path.exists(config_path):
             raise FileNotFoundError(f"Server configuration file not found at {config_path}")
@@ -52,14 +49,50 @@ def load_server_config():
         return config
     except Exception as e:
         print(f"WARNING: Failed to load server configuration: {e}. Using defaults.")
-        # Return default configuration
+        # Return default configuration that matches config/server-config.json structure
         return {
-            "server": {"host": "127.0.0.1", "port": {"default": 5000, "auto_detect": True}},
-            "gunicorn": {"workers": 1, "threads": 4, "timeout": 0, "worker_class": "sync"},
-            "socketio": {"cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*"], "async_mode": "threading"},
-            "development": {"debug": False},
-            "production": {"use_gunicorn": True},
-            "logging": {"level": "INFO"}
+            "server": {
+                "host": "127.0.0.1",
+                "port": {
+                    "default": 5000,
+                    "auto_detect": True,
+                    "range": {"start": 5000, "end": 5100}
+                },
+                "debug": False
+            },
+            "gunicorn": {
+                "workers": 1,
+                "threads": 4,
+                "worker_class": "sync",
+                "timeout": 0,
+                "keep_alive": 30,
+                "preload_app": True,
+                "access_logfile": "-",
+                "log_level": "info"
+            },
+            "socketio": {
+                "cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"],
+                "async_mode": "threading",
+                "ping_timeout": 60,
+                "ping_interval": 25,
+                "allow_unsafe_werkzeug": True,
+                "logger": True,
+                "engineio_logger": False
+            },
+            "development": {"use_reloader": False, "debug": False, "enable_dev_tools": True},
+            "production": {"use_gunicorn": True, "optimize_performance": True, "enable_logging": True},
+            "quantum_calculations": {
+                "max_concurrent_calculations": "auto",
+                "process_pool_size": "auto",
+                "timeout_calculation": 0,
+                "memory_limit_mb": 0
+            },
+            "logging": {
+                "level": "INFO",
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                "enable_access_log": True,
+                "enable_error_log": True
+            }
         }
 
 # Global configuration
