@@ -184,6 +184,20 @@ const request = async <T>(
   }
 };
 
+/**
+ * ヘルパー関数: calculationId のバリデーション
+ */
+const validateCalculationId = (id: string | null, endpoint: string) => {
+  if (!id || id === 'undefined' || id === 'null') {
+    throw new ApiError(
+      'Invalid calculation ID provided.',
+      400,
+      'Bad Request',
+      endpoint
+    );
+  }
+};
+
 // --- API Functions ---
 
 export const getCalculations = (): Promise<CalculationListResponseData> => {
@@ -195,18 +209,7 @@ export const getCalculations = (): Promise<CalculationListResponseData> => {
 export const getCalculationDetails = (
   id: string
 ): Promise<CalculationDetailsResponseData> => {
-  if (!id || id === 'undefined' || id === 'null') {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        `/api/quantum/calculations/${id}`,
-        null,
-        false
-      )
-    );
-  }
+  validateCalculationId(id, `/api/quantum/calculations/${id}`);
   return request<CalculationDetailsResponseData>(
     `/api/quantum/calculations/${id}`,
     { method: 'GET' }
@@ -229,7 +232,7 @@ export const updateCalculationName = (
   return request<CalculationUpdateResponseData>(
     `/api/quantum/calculations/${id}`,
     {
-      method: 'PATCH',
+      method: 'PUT',
       body: JSON.stringify({ name: newName }),
     }
   );
@@ -271,22 +274,7 @@ export const convertSmilesToXyz = (
 export const getOrbitals = (
   calculationId: string
 ): Promise<OrbitalsResponseData> => {
-  if (
-    !calculationId ||
-    calculationId === 'undefined' ||
-    calculationId === 'null'
-  ) {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        `/api/quantum/calculations/${calculationId}/orbitals`,
-        null,
-        false
-      )
-    );
-  }
+  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals`);
   return request<OrbitalsResponseData>(
     `/api/quantum/calculations/${calculationId}/orbitals`,
     { method: 'GET' }
@@ -305,22 +293,7 @@ export const getOrbitalCube = (
     isovalueNeg?: number;
   }
 ): Promise<OrbitalCubeResponseData> => {
-  if (
-    !calculationId ||
-    calculationId === 'undefined' ||
-    calculationId === 'null'
-  ) {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube`,
-        null,
-        false
-      )
-    );
-  }
+  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube`);
 
   if (orbitalIndex < 0 || !Number.isInteger(orbitalIndex)) {
     return Promise.reject(
@@ -361,22 +334,7 @@ export const getOrbitalCube = (
 export const listCubeFiles = (
   calculationId: string
 ): Promise<CubeFilesListResponseData> => {
-  if (
-    !calculationId ||
-    calculationId === 'undefined' ||
-    calculationId === 'null'
-  ) {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
-        null,
-        false
-      )
-    );
-  }
+  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals/cube-files`);
 
   return request<CubeFilesListResponseData>(
     `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
@@ -391,22 +349,7 @@ export const deleteCubeFiles = (
   calculationId: string,
   orbitalIndex?: number
 ): Promise<CubeFilesDeleteResponseData> => {
-  if (
-    !calculationId ||
-    calculationId === 'undefined' ||
-    calculationId === 'null'
-  ) {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
-        null,
-        false
-      )
-    );
-  }
+  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals/cube-files`);
 
   // Build query parameters
   const queryParams = new URLSearchParams();
@@ -445,22 +388,7 @@ export const getIRSpectrum = (
     show_peaks?: boolean;
   }
 ): Promise<IRSpectrumResponseData> => {
-  if (
-    !calculationId ||
-    calculationId === 'undefined' ||
-    calculationId === 'null'
-  ) {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        `/api/quantum/calculations/${calculationId}/ir-spectrum`,
-        null,
-        false
-      )
-    );
-  }
+  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/ir-spectrum`);
 
   // Build query parameters
   const queryParams = new URLSearchParams();
