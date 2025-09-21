@@ -10,6 +10,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +63,8 @@ class CASCICalculator(BaseCalculator):
         }
     
     def _get_default_memory_mb(self) -> int:
-        """Get default memory setting for CASCI calculations."""
-        return 6000  # CASCI needs substantial memory (6GB default)
+        """Get default memory setting for CASCI calculations from config."""
+        return get_memory_for_method('CASCI')
     
     def _get_calculation_method_name(self) -> str:
         """Get the name of the calculation method for logging."""

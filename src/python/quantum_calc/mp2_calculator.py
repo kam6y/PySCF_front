@@ -11,6 +11,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +46,8 @@ class MP2Calculator(BaseCalculator):
         }
     
     def _get_default_memory_mb(self) -> int:
-        """Get default memory setting for MP2 calculations."""
-        return 3000  # MP2 needs more memory than HF (3GB default)
+        """Get default memory setting for MP2 calculations from config."""
+        return get_memory_for_method('MP2')
     
     def _get_calculation_method_name(self) -> str:
         """Get the name of the calculation method for logging."""

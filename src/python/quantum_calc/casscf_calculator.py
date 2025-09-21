@@ -10,6 +10,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method, get_max_cycle_macro, get_max_cycle_micro, get_ah_max_cycle
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,8 @@ class CASSCFCalculator(BaseCalculator):
         # CASSCF-specific parameters
         ncas = kwargs.get('ncas', 4)  # Number of active space orbitals
         nelecas = kwargs.get('nelecas', 4)  # Number of active space electrons
-        max_cycle_macro = kwargs.get('max_cycle_macro', 50)  # CASSCF macro iterations
-        max_cycle_micro = kwargs.get('max_cycle_micro', 3)  # CI solver micro iterations
+        max_cycle_macro = kwargs.get('max_cycle_macro', get_max_cycle_macro())  # CASSCF macro iterations
+        max_cycle_micro = kwargs.get('max_cycle_micro', get_max_cycle_micro())  # CI solver micro iterations
         analyze_nto = kwargs.get('analyze_nto', False)  # Natural transition orbitals
         natorb = kwargs.get('natorb', True)  # Transform to natural orbitals
         conv_tol = kwargs.get('conv_tol', 1e-6)  # Convergence tolerance
@@ -50,7 +51,7 @@ class CASSCFCalculator(BaseCalculator):
         
         # AH solver parameters for improved convergence
         ah_conv_tol = kwargs.get('ah_conv_tol', 1e-12)  # AH solver convergence tolerance
-        ah_max_cycle = kwargs.get('ah_max_cycle', 30)  # AH solver max iterations
+        ah_max_cycle = kwargs.get('ah_max_cycle', get_ah_max_cycle())  # AH solver max iterations
         ah_lindep = kwargs.get('ah_lindep', 1e-14)  # AH linear dependence threshold
         
         # Validate and adjust CASSCF parameters using base class method
@@ -93,7 +94,7 @@ class CASSCFCalculator(BaseCalculator):
     
     def _get_default_memory_mb(self) -> int:
         """Get default memory setting for CASSCF calculations."""
-        return 6000  # CASSCF needs substantial memory (6GB default)
+        return get_memory_for_method('CASSCF')
     
     def _get_calculation_method_name(self) -> str:
         """Get the name of the calculation method for logging."""

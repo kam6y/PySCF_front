@@ -10,6 +10,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +60,8 @@ class TDDFTCalculator(BaseCalculator):
         }
     
     def _get_default_memory_mb(self) -> int:
-        """Get default memory setting for TDDFT calculations."""
-        return 4000  # TDDFT needs more memory (4GB default)
+        """Get default memory setting for TDDFT calculations from config."""
+        return get_memory_for_method('TDDFT')
     
     def _get_calculation_method_name(self) -> str:
         """Get the name of the calculation method for logging."""

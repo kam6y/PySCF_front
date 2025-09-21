@@ -12,6 +12,7 @@ from datetime import datetime
 from threadpoolctl import threadpool_limits
 from queue import Queue
 from dataclasses import dataclass
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -52,14 +53,9 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     os.environ['VECLIB_MAXIMUM_THREADS'] = cpu_cores_str # macOS Accelerate Framework
     os.environ['NUMEXPR_NUM_THREADS'] = cpu_cores_str   # NumExpr
     
-    # Set appropriate memory defaults based on calculation method
+    # Set appropriate memory defaults based on calculation method from config
     calculation_method = parameters.get('calculation_method', 'DFT')
-    if calculation_method in ['CASCI', 'CASSCF']:
-        default_memory = 6000  # 6GB for CASCI/CASSCF calculations
-    elif calculation_method in ['CCSD', 'CCSD_T']:
-        default_memory = 4000  # 4GB for coupled cluster methods
-    else:
-        default_memory = 2000  # 2GB for DFT, HF, MP2, TDDFT
+    default_memory = get_memory_for_method(calculation_method)
 
     memory_mb = parameters.get('memory_mb') or default_memory
 
@@ -501,7 +497,7 @@ class CalculationProcessManager:
             return False, 'error', None
         
         user_cpu_cores = parameters.get('cpu_cores') or 1
-        user_memory_mb = parameters.get('memory_mb') or 2000
+        user_memory_mb = parameters.get('memory_mb') or get_memory_for_method(parameters.get('calculation_method', 'DFT'))
         calculation_method = parameters.get('calculation_method', 'DFT')
         
         # Check resource availability (skip if resource manager is not available)
@@ -675,7 +671,7 @@ class CalculationProcessManager:
                 calc_found = False
                 for i, queued_calc in enumerate(self.calculation_queue):
                     user_cpu_cores = queued_calc.parameters.get('cpu_cores') or 1
-                    user_memory_mb = queued_calc.parameters.get('memory_mb') or 2000
+                    user_memory_mb = queued_calc.parameters.get('memory_mb') or get_memory_for_method(queued_calc.parameters.get('calculation_method', 'DFT'))
                     calculation_method = queued_calc.parameters.get('calculation_method', 'DFT')
                     
                     # Check if resources are available for this calculation (if resource manager is available)

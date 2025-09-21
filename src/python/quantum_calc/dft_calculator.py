@@ -11,6 +11,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +51,8 @@ class DFTCalculator(BaseCalculator):
         }
     
     def _get_default_memory_mb(self) -> int:
-        """Get default memory setting for DFT calculations."""
-        return 2000  # DFT typically needs less memory (2GB default)
+        """Get default memory setting for DFT calculations from config."""
+        return get_memory_for_method('DFT')
     
     def _get_calculation_method_name(self) -> str:
         """Get the name of the calculation method for logging."""

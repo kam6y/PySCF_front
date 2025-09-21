@@ -7,6 +7,7 @@ import tempfile
 import logging
 from contextlib import contextmanager
 import numpy as np
+from .config_manager import get_memory_for_method, get_max_cycle
 
 logger = logging.getLogger(__name__)
 
@@ -61,17 +62,11 @@ class BaseCalculator(ABC):
             mol.max_memory = int(memory_mb)
             print(f"Set PySCF max_memory to {memory_mb} MB")
         else:
-            # Use calculation-specific default memory settings
+            # Use calculation-specific default memory settings from config
             calculation_method = getattr(self, 'calculation_method', 'DFT')
-            if calculation_method in ['CASCI', 'CASSCF']:
-                mol.max_memory = 6000  # 6GB for CASCI/CASSCF
-                print("Using default PySCF max_memory: 6000 MB (CASCI/CASSCF)")
-            elif calculation_method in ['CCSD', 'CCSD_T']:
-                mol.max_memory = 4000  # 4GB for coupled cluster
-                print("Using default PySCF max_memory: 4000 MB (CCSD)")
-            else:
-                mol.max_memory = 2000  # 2GB for other methods
-                print("Using default PySCF max_memory: 2000 MB")
+            default_memory = get_memory_for_method(calculation_method)
+            mol.max_memory = default_memory
+            print(f"Using config-based PySCF max_memory: {default_memory} MB ({calculation_method})")
         
         # CPU cores are now configured at the process level in process_manager.py
         # This avoids conflicts and ensures proper timing of environment variable setup
@@ -143,7 +138,7 @@ class BaseCalculator(ABC):
             'basis': kwargs.get('basis', '6-31G(d)'),
             'charge': kwargs.get('charge', 0),
             'spin': kwargs.get('spin', 0),
-            'max_cycle': kwargs.get('max_cycle', 150),
+            'max_cycle': kwargs.get('max_cycle', get_max_cycle()),
             'solvent_method': kwargs.get('solvent_method', 'none'),
             'solvent': kwargs.get('solvent', '-'),
             'memory_mb': kwargs.get('memory_mb', self._get_default_memory_mb())
@@ -228,9 +223,10 @@ class BaseCalculator(ABC):
     def _get_default_memory_mb(self) -> int:
         """
         Get default memory setting for this calculation method.
-        Subclasses should override this for method-specific defaults.
+        Uses configuration file or falls back to hardcoded values.
         """
-        return 2000  # Default 2GB
+        calculation_method = getattr(self, 'calculation_method', 'default')
+        return get_memory_for_method(calculation_method)
     
     def _get_calculation_method_name(self) -> str:
         """

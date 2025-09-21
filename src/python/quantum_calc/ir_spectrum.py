@@ -12,6 +12,7 @@ import numpy as np
 from typing import List, Dict, Any, Optional, Tuple
 import logging
 from data.scale_factors import get_recommended_scale_factor
+from .config_manager import get_spectrum_setting
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class IRSpectrumCalculator:
                             frequencies: List[float],
                             intensities: Optional[List[float]] = None,
                             broadening_fwhm: float = 100.0,
-                            x_range: Tuple[float, float] = (400, 4000),
+                            x_range: Optional[Tuple[float, float]] = None,
                             num_points: int = 3000) -> Dict[str, Any]:
         """
         Calculate IR spectrum from vibrational frequencies and intensities.
@@ -56,6 +57,10 @@ class IRSpectrumCalculator:
             Dictionary containing spectrum data and metadata
         """
         try:
+            # Use default frequency range from config if not provided
+            if x_range is None:
+                x_range = tuple(get_spectrum_setting('ir_frequency_range'))
+            
             # Input validation
             if not frequencies:
                 raise ValueError("No frequencies provided")
