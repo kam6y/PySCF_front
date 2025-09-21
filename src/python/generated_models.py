@@ -176,6 +176,27 @@ class CalculationUpdateRequest(BaseModel):
     )
 
 
+class OrbitalCubeRequest(BaseModel):
+    gridSize: Optional[int] = Field(
+        80,
+        description='Grid size for CUBE file generation',
+        ge=40,
+        le=120
+    )
+    isovaluePos: Optional[float] = Field(
+        0.02,
+        description='Positive isovalue for orbital visualization',
+        ge=0.001,
+        le=0.1
+    )
+    isovalueNeg: Optional[float] = Field(
+        -0.02,
+        description='Negative isovalue for orbital visualization',
+        ge=-0.1,
+        le=-0.001
+    )
+
+
 class HealthResponse(BaseModel):
     status: str = Field(..., examples=['ok'])
     service: str = Field(..., examples=['pyscf-front-api'])

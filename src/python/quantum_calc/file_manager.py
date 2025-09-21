@@ -185,6 +185,43 @@ class CalculationFileManager:
         except (json.JSONDecodeError, OSError):
             return 'pending', None
 
+    def _parse_cube_filename(self, filename: str) -> Optional[tuple[int, int]]:
+        """
+        Parse CUBE filename to extract orbital index and grid size.
+        
+        Args:
+            filename: CUBE filename (e.g., "orbital_5_grid80.cube")
+        
+        Returns:
+            Tuple of (orbital_index, grid_size) if parsing succeeds, None otherwise
+        """
+        try:
+            # Remove .cube extension and split
+            parts = filename.replace('.cube', '').split('_')
+            if len(parts) >= 3 and parts[0] == 'orbital' and parts[2].startswith('grid'):
+                orbital_index = int(parts[1])
+                grid_size = int(parts[2].replace('grid', ''))
+                return orbital_index, grid_size
+        except (ValueError, IndexError):
+            pass
+        return None
+
+    def _get_cube_file_pattern(self, orbital_dir: Path, orbital_index: Optional[int] = None) -> str:
+        """
+        Generate CUBE file pattern for glob matching.
+        
+        Args:
+            orbital_dir: Directory containing CUBE files
+            orbital_index: Specific orbital index, or None for all orbitals
+        
+        Returns:
+            Glob pattern string
+        """
+        if orbital_index is not None:
+            return str(orbital_dir / f"orbital_{orbital_index}_grid*.cube")
+        else:
+            return str(orbital_dir / "orbital_*_grid*.cube")
+
     def get_cube_files_info(self, calc_dir: str) -> List[Dict[str, Any]]:
         """Get information about CUBE files in a calculation directory."""
         cube_files = []
@@ -196,31 +233,26 @@ class CalculationFileManager:
         
         # Find all cube files matching our naming pattern
         import glob
-        pattern = str(orbital_dir / "orbital_*_grid*.cube")
+        pattern = self._get_cube_file_pattern(orbital_dir)
         
         for file_path in glob.glob(pattern):
             filename = os.path.basename(file_path)
             
-            try:
-                # Parse filename: orbital_{index}_grid{size}.cube
-                parts = filename.replace('.cube', '').split('_')
-                if len(parts) >= 3 and parts[0] == 'orbital' and parts[2].startswith('grid'):
-                    orbital_index = int(parts[1])
-                    grid_size = int(parts[2].replace('grid', ''))
+            parsed_result = self._parse_cube_filename(filename)
+            if parsed_result is not None:
+                orbital_index, grid_size = parsed_result
                     
-                    file_size_kb = os.path.getsize(file_path) / 1024.0
-                    modified_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-                    
-                    cube_files.append({
-                        "filename": filename,
-                        "file_path": file_path,
-                        "orbital_index": orbital_index,
-                        "grid_size": grid_size,
-                        "file_size_kb": file_size_kb,
-                        "modified": modified_time.isoformat()
-                    })
-            except (ValueError, IndexError):
-                continue
+                file_size_kb = os.path.getsize(file_path) / 1024.0
+                modified_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                
+                cube_files.append({
+                    "filename": filename,
+                    "file_path": file_path,
+                    "orbital_index": orbital_index,
+                    "grid_size": grid_size,
+                    "file_size_kb": file_size_kb,
+                    "modified": modified_time.isoformat()
+                })
         
         return sorted(cube_files, key=lambda x: x["orbital_index"])
 
@@ -243,10 +275,7 @@ class CalculationFileManager:
             return deleted_count
         
         import glob
-        if orbital_index is not None:
-            pattern = str(orbital_dir / f"orbital_{orbital_index}_grid*.cube")
-        else:
-            pattern = str(orbital_dir / "orbital_*_grid*.cube")
+        pattern = self._get_cube_file_pattern(orbital_dir, orbital_index)
         
         for file_path in glob.glob(pattern):
             try:

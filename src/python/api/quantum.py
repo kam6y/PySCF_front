@@ -20,7 +20,7 @@ from quantum_calc import (
 from quantum_calc.ir_spectrum import create_ir_spectrum_from_calculation_results
 from quantum_calc.exceptions import XYZValidationError, FileManagerError, ProcessManagerError
 from quantum_calc.file_manager import CalculationFileManager
-from generated_models import QuantumCalculationRequest, CalculationUpdateRequest
+from generated_models import QuantumCalculationRequest, CalculationUpdateRequest, OrbitalCubeRequest
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -611,7 +611,8 @@ def get_orbitals(calculation_id):
 
 
 @quantum_bp.route('/api/quantum/calculations/<calculation_id>/orbitals/<int:orbital_index>/cube', methods=['GET'])
-def get_orbital_cube(calculation_id, orbital_index):
+@validate()
+def get_orbital_cube(calculation_id, orbital_index, query: OrbitalCubeRequest):
     """Generate and return CUBE file for specific molecular orbital."""
     try:
         file_manager = CalculationFileManager()
@@ -628,18 +629,10 @@ def get_orbital_cube(calculation_id, orbital_index):
                 'error': f'Calculation "{calculation_id}" is not completed. Status: {status}'
             }), 400
         
-        # Get query parameters with defaults
-        grid_size = request.args.get('gridSize', 80, type=int)
-        isovalue_pos = request.args.get('isovaluePos', 0.02, type=float)
-        isovalue_neg = request.args.get('isovalueNeg', -0.02, type=float)
-        
-        # Validate parameters
-        if grid_size < 40 or grid_size > 120:
-            return jsonify({'success': False, 'error': 'Grid size must be between 40 and 120.'}), 400
-        if isovalue_pos < 0.001 or isovalue_pos > 0.1:
-            return jsonify({'success': False, 'error': 'Positive isovalue must be between 0.001 and 0.1.'}), 400
-        if isovalue_neg > -0.001 or isovalue_neg < -0.1:
-            return jsonify({'success': False, 'error': 'Negative isovalue must be between -0.1 and -0.001.'}), 400
+        # Get parameters from Pydantic model with validation already applied
+        grid_size = query.gridSize
+        isovalue_pos = query.isovaluePos
+        isovalue_neg = query.isovalueNeg
         
         # Initialize orbital generator
         orbital_generator = MolecularOrbitalGenerator(calc_path)
