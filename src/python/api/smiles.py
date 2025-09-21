@@ -3,9 +3,6 @@ SMILES conversion API endpoints.
 Handles conversion of SMILES strings to XYZ format.
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 from flask import Blueprint, jsonify

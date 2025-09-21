@@ -4,10 +4,6 @@ Handles all quantum chemistry calculation operations including job submission,
 monitoring, results retrieval, and orbital/spectrum analysis.
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import logging
 import os
 import time

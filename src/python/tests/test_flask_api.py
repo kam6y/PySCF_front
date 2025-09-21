@@ -4,10 +4,6 @@ import pytest
 import json
 from unittest.mock import Mock, patch
 
-# Add the parent directory to the path for imports
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app import app
 from pubchem.client import PubChemError, CompoundData

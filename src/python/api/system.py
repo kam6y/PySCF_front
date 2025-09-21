@@ -3,10 +3,6 @@ System and debug API endpoints.
 Handles system resource monitoring and diagnostic information.
 """
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import logging
 import os
 import sys

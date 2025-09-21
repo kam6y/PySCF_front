@@ -5,12 +5,8 @@
 このスクリプトはpytestを使わずに直接テストを実行します。
 """
 import sys
-import os
 import numpy as np
 from typing import List, Tuple, Dict
-
-# パッケージのパスを追加
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 class GeometryAnalyzer:
