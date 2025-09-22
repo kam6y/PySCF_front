@@ -137,7 +137,7 @@ export const useUnifiedWebSocket = ({
         calculationId === currentActiveCalculationId.current;
       const molecularName = updatedCalculation.name || 'Unknown';
       const currentErrorMessage =
-        updatedCalculation.errorMessage || updatedCalculation.results?.error;
+        updatedCalculation.error || updatedCalculation.results?.error;
 
       // 計算完了通知: running -> completed
       if (
@@ -264,10 +264,10 @@ export const useUnifiedWebSocket = ({
 
       // 前のエラーメッセージを取得
       const previousErrorMessage =
-        previousDetailData?.calculation?.errorMessage ||
+        previousDetailData?.calculation?.error ||
         previousDetailData?.calculation?.results?.error;
       const currentErrorMessage =
-        updatedCalculation.errorMessage || updatedCalculation.results?.error;
+        updatedCalculation.error || updatedCalculation.results?.error;
 
       // 変更があった場合のみ処理
       const hasStatusChanged = previousStatus !== updatedCalculation.status;

@@ -118,7 +118,7 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       parameters: newParams,
       results: undefined,
       workingDirectory: undefined,
-      errorMessage: undefined,
+      error: undefined,
     };
 
     set({

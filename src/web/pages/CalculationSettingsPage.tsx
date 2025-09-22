@@ -455,7 +455,6 @@ export const CalculationSettingsPage = ({
           name: newName,
           parameters: {
             ...activeCalculation.parameters,
-            molecule_name: newName,
           },
         });
       } catch (error) {
@@ -697,7 +696,6 @@ export const CalculationSettingsPage = ({
         const updatedParams = {
           ...params,
           xyz: data.xyz,
-          molecule_name: moleculeName,
         };
         onCalculationUpdate({
           ...activeCalculation,

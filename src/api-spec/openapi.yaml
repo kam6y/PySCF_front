@@ -702,7 +702,7 @@ components:
           minLength: 1
           maxLength: 100
           default: "Unnamed Calculation"
-          description: Name for the calculation
+          description: Display name for the calculation instance (distinct from molecule_name which is the chemical name)
         cpu_cores:
           type: integer
           minimum: 1
@@ -932,6 +932,7 @@ components:
         molecule_name:
           type: string
           nullable: true
+          description: Chemical name of the molecule (distinct from calculation display name)
         cpu_cores:
           type: integer
           nullable: true
@@ -1269,7 +1270,7 @@ components:
           type: string
           nullable: true
           description: Path to calculation files
-        errorMessage:
+        error:
           type: string
           nullable: true
           description: Error details if status is error

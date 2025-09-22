@@ -70,7 +70,7 @@ export const useCalculationActions = () => {
       } else if (runningCalculation.status === 'error') {
         // エラーステータスの場合はエラーメッセージを確認してリソース不足エラーかを判定
         const errorMessage =
-          runningCalculation.errorMessage || runningCalculation.results?.error;
+          runningCalculation.error || runningCalculation.results?.error;
 
         if (errorMessage) {
           // リソース不足エラーの判定

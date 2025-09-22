@@ -374,7 +374,7 @@ export interface components {
              */
             solvent: string;
             /**
-             * @description Name for the calculation
+             * @description Display name for the calculation instance (distinct from molecule_name which is the chemical name)
              * @default Unnamed Calculation
              */
             name: string;
@@ -530,6 +530,7 @@ export interface components {
             solvent_method: components["schemas"]["SolventMethod"];
             solvent: string;
             xyz: string;
+            /** @description Chemical name of the molecule (distinct from calculation display name) */
             molecule_name?: string | null;
             cpu_cores?: number | null;
             memory_mb?: number | null;
@@ -724,7 +725,7 @@ export interface components {
             /** @description Path to calculation files */
             workingDirectory?: string | null;
             /** @description Error details if status is error */
-            errorMessage?: string | null;
+            error?: string | null;
             /** @description Reason why calculation is waiting (if status is waiting) */
             waitingReason?: string | null;
         };
