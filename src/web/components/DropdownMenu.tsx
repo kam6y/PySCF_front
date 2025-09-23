@@ -4,7 +4,8 @@ import styles from './DropdownMenu.module.css';
 export type DropdownOption =
   | 'calculation-settings'
   | 'calculation-results'
-  | 'draw-molecule';
+  | 'draw-molecule'
+  | 'agent-design';
 
 interface DropdownMenuProps {
   isOpen: boolean;
@@ -128,6 +129,30 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
             />
           </svg>
           <span>Draw molecule</span>
+        </div>
+
+        <div
+          className={`${styles.dropdownItem} ${selectedOption === 'agent-design' ? styles.selected : ''}`}
+          onClick={() => handleOptionClick('agent-design')}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className={styles.dropdownIcon}
+          >
+            <path
+              d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"
+              fill="currentColor"
+            />
+            <path
+              d="M6.271 5.055a.5.5 0 0 1 .52.444L7 7.5h2l.209-2.001a.5.5 0 0 1 .52-.444c.193.017.33.17.33.363 0 .14-.045.236-.123.344C9.765 6.05 9.5 6.5 9.5 7.5c0 1-.265 1.45-.436 1.738-.078.108-.123.204-.123.344 0 .192-.137.346-.33.363a.5.5 0 0 1-.52-.444L8 7.5H6l-.091 2.001a.5.5 0 0 1-.52.444c-.193-.017-.33-.17-.33-.363 0-.14.045-.236.123-.344C5.235 9.05 5.5 8.5 5.5 7.5c0-1 .265-1.45.436-1.738.078-.108.123-.204.123-.344 0-.192.137-.346.33-.363a.5.5 0 0 1 .52.444z"
+              fill="currentColor"
+            />
+          </svg>
+          <span>AI Agent</span>
         </div>
       </div>
     </>

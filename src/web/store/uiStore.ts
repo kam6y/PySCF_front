@@ -41,6 +41,7 @@ const getPageTitle = (page: DropdownOption): string => {
     'calculation-settings': 'Calculation Settings',
     'calculation-results': 'Calculation Results',
     'draw-molecule': 'Draw Molecule',
+    'agent-design': 'AI Agent',
   };
   return titles[page] || 'PySCF_front';
 };

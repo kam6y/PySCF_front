@@ -21,10 +21,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [maxMemoryUtilization, setMaxMemoryUtilization] = useState<
     number | undefined
   >(undefined);
+  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
     maxCpuUtilization?: number;
     maxMemoryUtilization?: number;
+    geminiApiKey?: string;
   }>({});
 
   const { settings, isLoading, isUpdating, error, updateSettings } =
@@ -52,6 +54,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         maxMemoryUtilization: !isNaN(maxMemoryUtilizationValue)
           ? maxMemoryUtilizationValue
           : DEFAULT_MAX_MEMORY_UTILIZATION,
+        geminiApiKey: settings.gemini_api_key || '',
       };
 
       if (process.env.NODE_ENV === 'development') {
@@ -61,6 +64,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxParallelInstances(newValues.maxParallelInstances);
       setMaxCpuUtilization(newValues.maxCpuUtilization);
       setMaxMemoryUtilization(newValues.maxMemoryUtilization);
+      setGeminiApiKey(newValues.geminiApiKey);
       setOriginalValues(newValues);
 
       if (process.env.NODE_ENV === 'development') {
@@ -82,12 +86,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
+        gemini_api_key: geminiApiKey || null,
       });
 
       const newValues = {
         maxParallelInstances,
         maxCpuUtilization,
         maxMemoryUtilization,
+        geminiApiKey,
       };
       setOriginalValues(newValues);
     } catch (error) {
@@ -96,6 +102,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxParallelInstances(originalValues.maxParallelInstances);
       setMaxCpuUtilization(originalValues.maxCpuUtilization);
       setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
+      setGeminiApiKey(originalValues.geminiApiKey || '');
     }
   };
 
@@ -103,6 +110,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setMaxParallelInstances(originalValues.maxParallelInstances);
     setMaxCpuUtilization(originalValues.maxCpuUtilization);
     setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
+    setGeminiApiKey(originalValues.geminiApiKey || '');
   };
 
   const hasUnsavedChanges = useMemo(() => {
@@ -117,6 +125,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const currentCpu = maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
     const currentMemory =
       maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
+    const currentApiKey = geminiApiKey;
 
     const originalParallel =
       originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
@@ -124,19 +133,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       originalValues.maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
     const originalMemory =
       originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
+    const originalApiKey = originalValues.geminiApiKey || '';
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
     const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
+    const apiKeyChanged = currentApiKey !== originalApiKey;
 
-    const hasChanges = parallelChanged || cpuChanged || memoryChanged;
+    const hasChanges = parallelChanged || cpuChanged || memoryChanged || apiKeyChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
       console.log('SettingsPage: hasUnsavedChanges check', {
-        current: { currentParallel, currentCpu, currentMemory },
-        original: { originalParallel, originalCpu, originalMemory },
-        changes: { parallelChanged, cpuChanged, memoryChanged },
+        current: { currentParallel, currentCpu, currentMemory, currentApiKey },
+        original: { originalParallel, originalCpu, originalMemory, originalApiKey },
+        changes: { parallelChanged, cpuChanged, memoryChanged, apiKeyChanged },
         hasChanges,
       });
     }
@@ -146,9 +157,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     maxParallelInstances,
     maxCpuUtilization,
     maxMemoryUtilization,
+    geminiApiKey,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
     originalValues?.maxMemoryUtilization,
+    originalValues?.geminiApiKey,
   ]);
 
   if (isLoading) {
@@ -372,8 +385,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </div>
           </div>
-
-          {settings && (
+                    {settings && (
             <div className={styles.systemInfoSection}>
               <h4>System Information</h4>
               <div className={styles.systemInfoGrid}>
@@ -392,6 +404,50 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </div>
           )}
+
+        </div>
+
+        <div className={styles.settingsSection}>
+          <h3>AI Agent</h3>
+
+          <div className={styles.settingItem}>
+            <div className={styles.settingLabel}>
+              <label htmlFor="geminiApiKey">
+                Google Gemini API Key
+              </label>
+              <p className={styles.settingHelp}>
+                API key for Google Gemini AI to enable intelligent molecular analysis and assistance. 
+                Leave empty to use fallback responses without AI features.
+              </p>
+            </div>
+
+            <div className={styles.settingControl}>
+              <div className={styles.textInputContainer}>
+                <input
+                  id="geminiApiKey"
+                  type="password"
+                  placeholder="Enter your Gemini API key..."
+                  value={geminiApiKey}
+                  onChange={e => {
+                    const newValue = e.target.value;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('SettingsPage: geminiApiKey changed (length)', newValue.length);
+                    }
+                    setGeminiApiKey(newValue);
+                  }}
+                  className={styles.textInput}
+                  disabled={isUpdating}
+                />
+                <div className={styles.inputStatus}>
+                  {geminiApiKey ? (
+                    <span className={styles.statusConfigured}>✓ API Key Configured</span>
+                  ) : (
+                    <span className={styles.statusNotConfigured}>⚠ API Key Not Set</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

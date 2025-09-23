@@ -300,6 +300,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agent/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat with AI agent
+         * @description Send a message to the AI agent and receive a response
+         */
+        post: operations["chatWithAgent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -953,6 +973,11 @@ export interface components {
              * @example 16384
              */
             system_total_memory_mb: number;
+            /**
+             * @description Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
+             * @example null
+             */
+            gemini_api_key?: string | null;
         };
         SettingsResponse: {
             /** @example true */
@@ -1451,6 +1476,26 @@ export interface components {
             reason?: string | null;
             /** @description Error message if analysis failed */
             error?: string | null;
+        };
+        AgentChatRequest: {
+            /** @description New message from the user */
+            message: string;
+            /** @description Previous conversation history */
+            history: {
+                /** @enum {string} */
+                role?: "user" | "model";
+                parts?: {
+                    text?: string;
+                }[];
+            }[];
+        };
+        AgentChatResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description Response message from the AI agent */
+                reply: string;
+            };
         };
     };
     responses: never;
@@ -2168,6 +2213,39 @@ export interface operations {
                 };
             };
             /** @description Failed to retrieve system resource status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    chatWithAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful response from AI agent */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentChatResponse"];
+                };
+            };
+            /** @description Server error during agent processing */
             500: {
                 headers: {
                     [name: string]: unknown;

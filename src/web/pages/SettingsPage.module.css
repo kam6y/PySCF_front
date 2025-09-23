@@ -3,8 +3,8 @@
 .settingsPage {
   padding: 2rem;
   max-width: 800px;
-  margin: 0 auto;
   height: 100vh;
+  margin: 0 auto;
   overflow-y: auto;
 }
 
@@ -67,6 +67,7 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  margin-bottom: 20vh;
 }
 
 /* Error Display */
@@ -393,4 +394,54 @@
   font-size: 0.875rem;
   color: #1f2937;
   font-weight: 600;
+}
+
+/* Text Input Styles */
+.textInputContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.textInput {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  background-color: white;
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.textInput:disabled {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.textInput::placeholder {
+  color: #9ca3af;
+}
+
+.inputStatus {
+  display: flex;
+  align-items: center;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.statusConfigured {
+  color: #10b981;
+}
+
+.statusNotConfigured {
+  color: #f59e0b;
 }

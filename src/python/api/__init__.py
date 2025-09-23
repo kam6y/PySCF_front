@@ -10,6 +10,7 @@ from .smiles import smiles_bp
 from .settings import settings_bp
 from .system import system_bp
 from .quantum import quantum_bp
+from .agent import agent_bp
 
 # List of all blueprints to register with the main app
 all_blueprints = [
@@ -18,7 +19,8 @@ all_blueprints = [
     smiles_bp,
     settings_bp,
     system_bp,
-    quantum_bp
+    quantum_bp,
+    agent_bp
 ]
 
 

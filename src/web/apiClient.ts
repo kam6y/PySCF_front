@@ -28,6 +28,10 @@ export const setApiBaseUrl = (port: number) => {
 // Re-export the generated type for backward compatibility
 export type StartCalculationResponse = StartCalculationResponseData;
 
+// Agent API types
+type AgentChatRequest = components['schemas']['AgentChatRequest'];
+type AgentChatResponse = components['schemas']['AgentChatResponse'];
+
 // Settings API types
 type AppSettings = components['schemas']['AppSettings'];
 type SettingsResponse = components['schemas']['SettingsResponse'];
@@ -438,5 +442,18 @@ export const updateSettings = (
 export const getSystemResourceStatus = (): Promise<SystemResourceResponse> => {
   return request<SystemResourceResponse>('/api/system/resource-status', {
     method: 'GET',
+  });
+};
+
+/**
+ * Chat with AI agent for molecular analysis and assistance
+ */
+export const chatWithAgent = (
+  message: string,
+  history: AgentChatRequest['history']
+): Promise<AgentChatResponse['data']> => {
+  return request<AgentChatResponse['data']>('/api/agent/chat', {
+    method: 'POST',
+    body: JSON.stringify({ message, history }),
   });
 };
