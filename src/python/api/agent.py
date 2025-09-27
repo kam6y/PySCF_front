@@ -56,22 +56,30 @@ def chat_with_agent(body: AgentChatRequest):
 
         def stream():
             """エージェントからの応答をSSE形式でストリーミングするジェネレータ"""
+            chunks_count = 0
             try:
+                logger.debug(f"Starting stream for message: {body.message[:100]}{'...' if len(body.message) > 100 else ''}")
+                
                 # ジェネレータ版のchatメソッドを呼び出す
                 chunks_iterator = molecular_agent.chat(body.message, body.history or [])
                 for chunk in chunks_iterator:
+                    chunks_count += 1
+                    logger.debug(f"Streaming chunk #{chunks_count}, length: {len(chunk)}")
+                    
                     # SSE形式でデータをフォーマットしてyield
                     sse_data = json.dumps({"type": "chunk", "payload": {"text": chunk}})
                     yield f"data: {sse_data}\n\n"
+                logger.debug(f"Stream completed successfully with {chunks_count} chunks")
+                
             except Exception as e:
-                logger.error(f"Error during streaming: {e}", exc_info=True)
+                logger.error(f"Error during streaming after {chunks_count} chunks: {e}", exc_info=True)
                 error_data = json.dumps({"type": "error", "payload": {"message": "An error occurred during the stream."}})
                 yield f"data: {error_data}\n\n"
             finally:
                 # ストリームの終了を通知するイベント
+                logger.debug("Sending stream completion event")
                 done_data = json.dumps({"type": "done"})
                 yield f"data: {done_data}\n\n"
-
         # Responseオブジェクトをストリームとして返す
         return Response(stream_with_context(stream()), content_type='text/event-stream')
 

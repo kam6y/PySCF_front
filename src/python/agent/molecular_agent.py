@@ -6,7 +6,8 @@ Integrates with Google Gemini API to provide intelligent responses for quantum c
 import os
 import logging
 from typing import List, Dict, Any, Optional, Iterator
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from quantum_calc.settings_manager import get_current_settings
 
 # Set up logging
@@ -20,20 +21,16 @@ class MolecularAgent:
         """Initialize the Molecular Agent with Gemini API."""
         # Get API key with priority: environment variable -> settings file -> fallback
         self.api_key = self._get_api_key()
+        self.client = None
         if not self.api_key:
             logger.warning("Gemini API key not found in environment variable or settings. Agent will use fallback responses.")
-            self.model = None
         else:
             try:
-                genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel(
-                    'gemini-2.5-pro',
-                    system_instruction=self._get_system_prompt()
-                )
-                logger.info("Gemini API initialized successfully with system instruction")
+                self.client = genai.Client(api_key=self.api_key)
+                logger.info("Gemini API client initialized successfully")
             except Exception as e:
-                logger.error(f"Failed to initialize Gemini API: {e}")
-                self.model = None
+                logger.error(f"Failed to initialize Gemini API client: {e}")
+                self.client = None
     
     def _get_api_key(self) -> Optional[str]:
         """Get Gemini API key from environment variable or settings file."""
@@ -106,21 +103,20 @@ Please provide clear, accurate, and helpful responses while being concise and fo
             
             if not self.api_key:
                 logger.warning("Gemini API key not found after reload. Agent will use fallback responses.")
-                self.model = None
+                self.client = None
                 return False
             else:
                 try:
-                    genai.configure(api_key=self.api_key)
-                    self.model = genai.GenerativeModel('gemini-2.5-pro')
-                    logger.info("Gemini API reinitialized successfully after settings update")
+                    self.client = genai.Client(api_key=self.api_key)
+                    logger.info("Gemini API client reinitialized successfully after settings update")
                     return True
                 except Exception as e:
-                    logger.error(f"Failed to reinitialize Gemini API after reload: {e}")
-                    self.model = None
+                    logger.error(f"Failed to reinitialize Gemini API client after reload: {e}")
+                    self.client = None
                     return False
-        
+
         # No change needed, return current status
-        return self.model is not None
+        return self.client is not None
 
     def chat(self, message: str, history: List[Dict[str, Any]]) -> Iterator[str]:
         """
@@ -134,27 +130,47 @@ Please provide clear, accurate, and helpful responses while being concise and fo
             str: AI agent's response chunks
         """
         try:
+            logger.debug(f"Starting chat with message length: {len(message)}, history entries: {len(history)}")
+            
             # If Gemini API is not available, provide fallback response
-            if not self.model:
+            if not self.client:
+                logger.warning("Gemini client not available, using fallback response")
                 yield self._get_fallback_response(message)
                 return
             
             # Convert history to Gemini format
             gemini_history = self._convert_history_to_gemini_format(history)
+            logger.debug(f"Converted history to Gemini format: {len(gemini_history)} entries")
             
             # Add new user message in proper format
             full_conversation = gemini_history + [{"role": "user", "parts": [{"text": message}]}]
             
-            # Use generate_content for all turns (unified approach)
-            response_stream = self.model.generate_content(
-                full_conversation,
-                stream=True
+            # Use system_instruction parameter for system prompt instead of conversation history
+            # This prevents the system prompt from appearing in the actual conversation
+            system_instruction = self._get_system_prompt()
+            
+            # Use only the actual conversation without system prompt in history
+            final_conversation = full_conversation
+            
+            logger.debug(f"Calling Gemini API with {len(final_conversation)} conversation entries")
+            
+            response_stream = self.client.models.generate_content_stream(
+                model='gemini-2.5-pro',
+                contents=final_conversation,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction
+                )
             )
             
             # Stream response chunks
+            chunk_count = 0
             for chunk in response_stream:
                 if chunk.text:
+                    chunk_count += 1
+                    logger.debug(f"Yielding chunk #{chunk_count}, length: {len(chunk.text)}")
                     yield chunk.text
+                    
+            logger.debug(f"Completed streaming with {chunk_count} chunks")
                 
         except Exception as e:
             logger.error(f"Error during Gemini API stream call: {e}", exc_info=True)
@@ -178,22 +194,35 @@ Please provide clear, accurate, and helpful responses while being concise and fo
         """Provide an appropriate error response based on the type of error."""
         error_str = str(error).lower()
         
-        if "api key" in error_str or "authentication" in error_str:
+        # Handle specific TypeError cases (like API method signature changes)
+        if isinstance(error, TypeError) and "unexpected keyword argument" in error_str:
+            logger.error(f"API method signature error: {error}")
+            return (
+                "There was an issue with the AI service API. This may be due to "
+                "a version compatibility problem. Please contact support if this persists."
+            )
+        elif "api key" in error_str or "authentication" in error_str:
             return (
                 "There was an authentication issue with the AI service. "
                 "Please check that your API key is correctly configured."
             )
-        elif "quota" in error_str or "limit" in error_str:
+        elif "quota" in error_str or "limit" in error_str or "rate" in error_str:
             return (
-                "The AI service is currently experiencing high demand. "
+                "The AI service is currently experiencing high demand or rate limits. "
                 "Please try again in a few moments."
             )
-        elif "network" in error_str or "connection" in error_str:
+        elif "network" in error_str or "connection" in error_str or "timeout" in error_str:
             return (
                 "There was a network connectivity issue. "
                 "Please check your internet connection and try again."
             )
+        elif "model" in error_str and ("not found" in error_str or "unavailable" in error_str):
+            return (
+                "The requested AI model is currently unavailable. "
+                "Please try again later or contact support."
+            )
         else:
+            logger.error(f"Unexpected error in AI agent: {error}", exc_info=True)
             return (
                 "I'm experiencing a temporary issue and cannot process your request right now. "
                 "Please try again later."

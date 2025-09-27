@@ -37,4 +37,4 @@ dependencies:
     # Testing framework for Flask
     - pytest-flask==1.3.0
     # AI/ML API integration
-    - google-generativeai==0.8.5
+    - google-genai>=1.39.1

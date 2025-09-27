@@ -487,6 +487,16 @@ export const streamChatWithAgent = (
   }
 ) => {
   const ctrl = new AbortController();
+  let isStreamClosed = false; // 重複イベント防止フラグ
+
+  // デバッグ用ログ（開発環境のみ）
+  const debug = (message: string, data?: any) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[SSE Debug] ${message}`, data || '');
+    }
+  };
+
+  debug('Starting SSE stream', { messageLength: message.length, historyLength: history?.length || 0 });
 
   fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
     method: 'POST',
@@ -498,8 +508,10 @@ export const streamChatWithAgent = (
     signal: ctrl.signal,
 
     onopen: async response => {
+      debug('SSE connection opened', { status: response.status });
       if (!response.ok) {
         const errorText = await response.text();
+        debug('SSE connection failed', { status: response.status, error: errorText });
         callbacks.onError(
           new Error(`Failed to connect: ${response.status} ${errorText}`)
         );
@@ -508,24 +520,41 @@ export const streamChatWithAgent = (
     },
 
     onmessage(event) {
+      if (isStreamClosed) {
+        debug('Received message after stream closed, ignoring');
+        return;
+      }
+
       try {
         const parsedData = JSON.parse(event.data);
-        if (parsedData.type === 'chunk' && parsedData.payload.text) {
+        debug('Received SSE message', { type: parsedData.type, hasText: !!parsedData.payload?.text });
+        
+        if (parsedData.type === 'chunk' && parsedData.payload?.text) {
           callbacks.onMessage(parsedData.payload.text);
         } else if (parsedData.type === 'done') {
+          debug('Stream completed');
+          isStreamClosed = true;
           callbacks.onClose();
           ctrl.abort(); // End the connection
         } else if (parsedData.type === 'error') {
+          debug('Stream error received', { error: parsedData.payload?.message });
+          isStreamClosed = true;
           callbacks.onError(
             new Error(
-              parsedData.payload.message || 'An unknown stream error occurred.'
+              parsedData.payload?.message || 'An unknown stream error occurred.'
             )
           );
           ctrl.abort();
+        } else {
+          debug('Unknown message type received', parsedData);
         }
       } catch (e) {
-        callbacks.onError(new Error('Failed to parse message from stream.'));
-        ctrl.abort();
+        debug('Failed to parse SSE message', { error: e, rawData: event.data });
+        if (!isStreamClosed) {
+          isStreamClosed = true;
+          callbacks.onError(new Error('Failed to parse message from stream.'));
+          ctrl.abort();
+        }
       }
     },
 

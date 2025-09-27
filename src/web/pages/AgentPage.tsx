@@ -8,6 +8,7 @@ type ChatHistory = {
   role: 'user' | 'model';
   parts: { text: string }[];
   isStreaming?: boolean; // ストリーミング中かを示すフラグ
+  tempId?: number; // 一意識別子（ストリーミング中のメッセージ管理用）
 };
 
 export const AgentPage = () => {
@@ -29,12 +30,17 @@ export const AgentPage = () => {
       parts: [{ text: trimmedMessage }],
     };
 
+    // ユニークIDを使用してメッセージを識別
+    const tempMessageId = Date.now();
+    const aiPlaceholder: ChatHistory = {
+      role: 'model',
+      parts: [{ text: '' }],
+      isStreaming: true,
+      tempId: tempMessageId, // 一意識別子を追加
+    };
+
     // ユーザーメッセージとAIのプレースホルダーを履歴に追加
-    setHistory(prev => [
-      ...prev,
-      userMessage,
-      { role: 'model', parts: [{ text: '' }], isStreaming: true },
-    ]);
+    setHistory(prev => [...prev, userMessage, aiPlaceholder]);
     setCurrentMessage('');
     setIsLoading(true);
     setError(null);
@@ -46,9 +52,19 @@ export const AgentPage = () => {
         onMessage: chunk => {
           setHistory(prev => {
             const newHistory = [...prev];
-            const lastMessage = newHistory[newHistory.length - 1];
-            if (lastMessage && lastMessage.role === 'model') {
-              lastMessage.parts[0].text += chunk;
+            // 最後のメッセージを安全に取得し、tempIdで確認
+            const lastIndex = newHistory.length - 1;
+            const lastMessage = newHistory[lastIndex];
+            
+            if (lastMessage && 
+                lastMessage.role === 'model' && 
+                lastMessage.tempId === tempMessageId &&
+                lastMessage.isStreaming) {
+              // 新しいオブジェクトを作成して状態を更新（不変性を保持）
+              newHistory[lastIndex] = {
+                ...lastMessage,
+                parts: [{ text: lastMessage.parts[0].text + chunk }]
+              };
             }
             return newHistory;
           });
@@ -57,9 +73,18 @@ export const AgentPage = () => {
           setIsLoading(false);
           setHistory(prev => {
             const newHistory = [...prev];
-            const lastMessage = newHistory[newHistory.length - 1];
-            if (lastMessage) {
-              lastMessage.isStreaming = false;
+            const lastIndex = newHistory.length - 1;
+            const lastMessage = newHistory[lastIndex];
+            
+            if (lastMessage && 
+                lastMessage.role === 'model' && 
+                lastMessage.tempId === tempMessageId) {
+              // ストリーミング終了時にtempIdを削除し、新しいオブジェクトを作成
+              newHistory[lastIndex] = {
+                role: lastMessage.role,
+                parts: lastMessage.parts,
+                isStreaming: false
+              };
             }
             return newHistory;
           });
@@ -69,10 +94,18 @@ export const AgentPage = () => {
           setError(err.message);
           setHistory(prev => {
             const newHistory = [...prev];
-            const lastMessage = newHistory[newHistory.length - 1];
-            if (lastMessage) {
-              lastMessage.isStreaming = false;
-              lastMessage.parts[0].text = `Error: ${err.message}`;
+            const lastIndex = newHistory.length - 1;
+            const lastMessage = newHistory[lastIndex];
+            
+            if (lastMessage && 
+                lastMessage.role === 'model' && 
+                lastMessage.tempId === tempMessageId) {
+              // エラー時も新しいオブジェクトを作成
+              newHistory[lastIndex] = {
+                role: lastMessage.role,
+                parts: [{ text: `Error: ${err.message}` }],
+                isStreaming: false
+              };
             }
             return newHistory;
           });
