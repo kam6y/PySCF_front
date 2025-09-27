@@ -26,8 +26,11 @@ class MolecularAgent:
         else:
             try:
                 genai.configure(api_key=self.api_key)
-                self.model = genai.GenerativeModel('gemini-2.5-pro')
-                logger.info("Gemini API initialized successfully")
+                self.model = genai.GenerativeModel(
+                    'gemini-2.5-pro',
+                    system_instruction=self._get_system_prompt()
+                )
+                logger.info("Gemini API initialized successfully with system instruction")
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini API: {e}")
                 self.model = None
@@ -139,29 +142,19 @@ Please provide clear, accurate, and helpful responses while being concise and fo
             # Convert history to Gemini format
             gemini_history = self._convert_history_to_gemini_format(history)
             
-            # Add system context if this is the first message
-            if not gemini_history:
-                system_message = {
-                    "role": "user",
-                    "parts": [{"text": f"{self._get_system_prompt()}\n\nUser question: {message}"}]
-                }
-                
-                # stream=True を指定してストリーミング応答を開始
-                response_stream = self.model.generate_content([system_message], stream=True)
-                
-                # ストリームからチャンクを一つずつyieldする
-                for chunk in response_stream:
-                    if chunk.text:
-                        yield chunk.text
-            else:
-                # Start chat with history and enable streaming
-                chat_session = self.model.start_chat(history=gemini_history)
-                response_stream = chat_session.send_message(message, stream=True)
-                
-                # ストリームからチャンクを一つずつyieldする
-                for chunk in response_stream:
-                    if chunk.text:
-                        yield chunk.text
+            # Add new user message in proper format
+            full_conversation = gemini_history + [{"role": "user", "parts": [{"text": message}]}]
+            
+            # Use generate_content for all turns (unified approach)
+            response_stream = self.model.generate_content(
+                full_conversation,
+                stream=True
+            )
+            
+            # Stream response chunks
+            for chunk in response_stream:
+                if chunk.text:
+                    yield chunk.text
                 
         except Exception as e:
             logger.error(f"Error during Gemini API stream call: {e}", exc_info=True)
