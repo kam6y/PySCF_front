@@ -357,8 +357,9 @@ const startPythonServer = async (): Promise<void> => {
         String(gunicornSettings.timeout),
         '--keep-alive',
         String(gunicornSettings.keep_alive),
-        '--access-logfile',
-        '-',
+        // access_logfileがnullまたは存在しない場合は引数を追加しない
+        ...(gunicornSettings.access_logfile !== null && gunicornSettings.access_logfile !== undefined ? 
+          ['--access-logfile', gunicornSettings.access_logfile] : []),
         '--log-level',
         gunicornSettings.log_level,
         '--preload',

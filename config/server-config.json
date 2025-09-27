@@ -18,7 +18,7 @@
     "timeout": 0,
     "keep_alive": 30,
     "preload_app": true,
-    "access_logfile": "-",
+    "access_logfile": null,
     "log_level": "info",
     "max_requests": 0,
     "max_requests_jitter": 0,
