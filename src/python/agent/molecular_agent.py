@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional, Iterator
 from google import genai
 from google.genai import types
 from quantum_calc.settings_manager import get_current_settings
+from generated_models import HistoryItem, Role, Part
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -52,13 +53,13 @@ class MolecularAgent:
         # Priority 3: None (fallback)
         return None
     
-    def _convert_history_to_gemini_format(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _convert_history_to_gemini_format(self, history: List[HistoryItem]) -> List[Dict[str, Any]]:
         """Convert frontend chat history to Gemini API format."""
         gemini_history = []
         
         for item in history:
-            role = item.get('role', 'user')
-            parts = item.get('parts', [])
+            role = item.role.value if item.role else 'user'
+            parts = item.parts or []
             
             # Convert role mapping: 'model' -> 'model', 'user' -> 'user'
             gemini_role = 'model' if role == 'model' else 'user'
@@ -66,7 +67,7 @@ class MolecularAgent:
             # Extract text from parts
             text_content = ""
             if parts and len(parts) > 0:
-                text_content = parts[0].get('text', '')
+                text_content = parts[0].text or ""
             
             if text_content.strip():  # Only add non-empty messages
                 gemini_history.append({
