@@ -9,6 +9,9 @@ interface UIState {
   // Page navigation状態
   currentPage: DropdownOption;
 
+  // AI Agent状態
+  isAIAgentEnabled: boolean;
+
   // Search状態
   searchQuery: string;
 
@@ -26,6 +29,10 @@ interface UIState {
   setCurrentPage: (page: DropdownOption) => void;
   getCurrentPageTitle: () => string;
 
+  // AI Agent actions
+  toggleAIAgent: () => void;
+  setAIAgentEnabled: (enabled: boolean) => void;
+
   // Search actions
   setSearchQuery: (query: string) => void;
 
@@ -41,7 +48,6 @@ const getPageTitle = (page: DropdownOption): string => {
     'calculation-settings': 'Calculation Settings',
     'calculation-results': 'Calculation Results',
     'draw-molecule': 'Draw Molecule',
-    'agent-design': 'AI Agent',
   };
   return titles[page] || 'PySCF_front';
 };
@@ -51,6 +57,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   isSidebarOpen: false,
   isDropdownOpen: false,
   currentPage: 'calculation-settings',
+  isAIAgentEnabled: false,
   searchQuery: '',
   isUserMenuOpen: false,
   isSettingsOpen: false,
@@ -65,6 +72,10 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Page navigation actions
   setCurrentPage: (page: DropdownOption) => set({ currentPage: page }),
   getCurrentPageTitle: () => getPageTitle(get().currentPage),
+
+  // AI Agent actions
+  toggleAIAgent: () => set(state => ({ isAIAgentEnabled: !state.isAIAgentEnabled })),
+  setAIAgentEnabled: (enabled: boolean) => set({ isAIAgentEnabled: enabled }),
 
   // Search actions
   setSearchQuery: (query: string) => set({ searchQuery: query }),

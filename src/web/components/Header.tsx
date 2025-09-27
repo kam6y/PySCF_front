@@ -1,5 +1,6 @@
 import React from 'react';
 import { DropdownMenu, DropdownOption } from './DropdownMenu';
+import { AIAgentSwitch } from './AIAgentSwitch';
 import styles from './Header.module.css';
 
 interface HeaderProps {
@@ -11,6 +12,8 @@ interface HeaderProps {
   currentPage: DropdownOption;
   onDropdownOptionSelect: (option: DropdownOption) => void;
   onDropdownClose: () => void;
+  isAIAgentEnabled: boolean;
+  onAIAgentToggle: (enabled: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +25,8 @@ export const Header: React.FC<HeaderProps> = ({
   currentPage,
   onDropdownOptionSelect,
   onDropdownClose,
+  isAIAgentEnabled,
+  onAIAgentToggle,
 }) => {
   // Get page icon based on current page
   const getPageIcon = (page: DropdownOption) => {
@@ -136,6 +141,12 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </svg>
           </button>
+          
+          <AIAgentSwitch
+            isEnabled={isAIAgentEnabled}
+            onChange={onAIAgentToggle}
+          />
+          
           <button
             className={styles.plusButton}
             onClick={onPlusClick}

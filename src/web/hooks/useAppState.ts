@@ -27,6 +27,10 @@ export const useAppState = () => {
       currentPageTitle: uiState.getCurrentPageTitle(),
       setCurrentPage: uiState.setCurrentPage,
 
+      // AI Agent
+      isAIAgentEnabled: uiState.isAIAgentEnabled,
+      setAIAgentEnabled: uiState.setAIAgentEnabled,
+
       // Search
       searchQuery: uiState.searchQuery,
       setSearchQuery: uiState.setSearchQuery,

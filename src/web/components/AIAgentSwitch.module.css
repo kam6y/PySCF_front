@@ -1,0 +1,122 @@
+/* AI Agent Switch Component Styles */
+
+.switchContainer {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.switchContainer:focus-visible {
+  outline: 2px solid #007acc;
+  outline-offset: 2px;
+  border-radius: 20px;
+}
+
+.switchContainer.disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.switchBackground {
+  position: relative;
+  width: 60px;
+  height: 32px;
+  border-radius: 16px;
+  background: #e0e0e0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.switchContainer.enabled .switchBackground {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.switchToggle {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(0);
+}
+
+.switchContainer.enabled .switchToggle {
+  transform: translateX(28px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.aiText {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.5px;
+  user-select: none;
+  transition: color 0.3s ease;
+}
+
+.switchContainer.enabled .aiText {
+  color: #4f46e5;
+}
+
+/* Hover effects */
+.switchContainer:hover:not(.disabled) .switchBackground {
+  transform: scale(1.02);
+}
+
+.switchContainer:hover:not(.disabled) .switchToggle {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.switchContainer.enabled:hover:not(.disabled) .switchBackground {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+}
+
+/* Active/pressed state */
+.switchContainer:active:not(.disabled) .switchToggle {
+  transform: scale(0.95);
+  transition-duration: 0.1s;
+}
+
+.switchContainer.enabled:active:not(.disabled) .switchToggle {
+  transform: translateX(28px) scale(0.95);
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  .switchBackground,
+  .switchToggle,
+  .aiText {
+    transition: none;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .switchBackground {
+    border: 2px solid #000;
+  }
+  
+  .switchContainer.enabled .switchBackground {
+    background: #0066cc;
+    border-color: #000;
+  }
+  
+  .switchToggle {
+    border: 1px solid #000;
+  }
+}

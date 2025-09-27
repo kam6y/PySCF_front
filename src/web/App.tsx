@@ -56,6 +56,11 @@ export const App = () => {
   };
 
   const renderCurrentPage = () => {
+    // AI Agentが有効な場合はAgentPageを表示
+    if (appState.ui.isAIAgentEnabled) {
+      return <AgentPage />;
+    }
+
     switch (appState.ui.currentPage) {
       case 'calculation-settings':
         return (
@@ -84,8 +89,6 @@ export const App = () => {
         );
       case 'draw-molecule':
         return <DrawMoleculePage />;
-      case 'agent-design':
-        return <AgentPage />;
       default:
         return (
           <CalculationSettingsPage
@@ -148,6 +151,8 @@ export const App = () => {
         currentPage={appState.ui.currentPage}
         onDropdownOptionSelect={appState.ui.setCurrentPage}
         onDropdownClose={appState.ui.closeDropdown}
+        isAIAgentEnabled={appState.ui.isAIAgentEnabled}
+        onAIAgentToggle={appState.ui.setAIAgentEnabled}
       />
 
       <Sidebar
