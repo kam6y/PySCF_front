@@ -4,7 +4,8 @@ Handles chat interactions with the AI agent for molecular analysis and assistanc
 """
 
 import logging
-from flask import Blueprint, jsonify
+import json
+from flask import Blueprint, jsonify, Response, stream_with_context
 from flask_pydantic import validate
 
 from generated_models import AgentChatRequest, AgentChatResponse
@@ -28,7 +29,7 @@ except Exception as e:
 @agent_bp.route('/api/agent/chat', methods=['POST'])
 @validate()
 def chat_with_agent(body: AgentChatRequest):
-    """Chat with AI agent for molecular analysis and assistance."""
+    """Chat with AI agent for molecular analysis and assistance using Server-Sent Events."""
     try:
         # Input validation
         if not body.message or not body.message.strip():
@@ -43,24 +44,36 @@ def chat_with_agent(body: AgentChatRequest):
         # Check if molecular agent is available
         if not molecular_agent:
             logger.warning("MolecularAgent not available, returning fallback response")
-            reply = "The AI agent service is currently not available. Please check the server configuration."
-            response = AgentChatResponse(
-                success=True,
-                data={"reply": reply}
-            )
-            return jsonify(response.model_dump()), 200
-        
-        # Use the molecular agent to generate response
-        reply = molecular_agent.chat(body.message, body.history or [])
-        
-        logger.info(f"Agent chat completed successfully - Response length: {len(reply)}")
-        logger.debug(f"Response preview: {reply[:100]}{'...' if len(reply) > 100 else ''}")
-        
-        response = AgentChatResponse(
-            success=True,
-            data={"reply": reply}
-        )
-        return jsonify(response.model_dump()), 200
+            
+            def fallback_stream():
+                fallback_message = "The AI agent service is currently not available. Please check the server configuration."
+                sse_data = json.dumps({"type": "chunk", "payload": {"text": fallback_message}})
+                yield f"data: {sse_data}\n\n"
+                done_data = json.dumps({"type": "done"})
+                yield f"data: {done_data}\n\n"
+            
+            return Response(stream_with_context(fallback_stream()), content_type='text/event-stream')
+
+        def stream():
+            """エージェントからの応答をSSE形式でストリーミングするジェネレータ"""
+            try:
+                # ジェネレータ版のchatメソッドを呼び出す
+                chunks_iterator = molecular_agent.chat(body.message, body.history or [])
+                for chunk in chunks_iterator:
+                    # SSE形式でデータをフォーマットしてyield
+                    sse_data = json.dumps({"type": "chunk", "payload": {"text": chunk}})
+                    yield f"data: {sse_data}\n\n"
+            except Exception as e:
+                logger.error(f"Error during streaming: {e}", exc_info=True)
+                error_data = json.dumps({"type": "error", "payload": {"message": "An error occurred during the stream."}})
+                yield f"data: {error_data}\n\n"
+            finally:
+                # ストリームの終了を通知するイベント
+                done_data = json.dumps({"type": "done"})
+                yield f"data: {done_data}\n\n"
+
+        # Responseオブジェクトをストリームとして返す
+        return Response(stream_with_context(stream()), content_type='text/event-stream')
 
     except ValueError as e:
         logger.warning(f"Validation error in agent chat: {e}")
@@ -68,13 +81,6 @@ def chat_with_agent(body: AgentChatRequest):
             'success': False, 
             'error': f'Invalid input: {str(e)}'
         }), 400
-    
-    except ConnectionError as e:
-        logger.error(f"Connection error in agent chat: {e}")
-        return jsonify({
-            'success': False, 
-            'error': 'Unable to connect to AI service. Please try again later.'
-        }), 503
     
     except Exception as e:
         logger.error(f"Unexpected error in agent chat endpoint: {e}", exc_info=True)

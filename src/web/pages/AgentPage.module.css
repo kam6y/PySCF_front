@@ -216,3 +216,17 @@
     opacity: 1;
   }
 }
+
+/* ストリーミング時のカーソル */
+.cursor {
+  color: #3b82f6;
+  opacity: 1;
+  animation: blink 1s linear infinite;
+  margin-left: 2px;
+  font-weight: bold;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}

@@ -5,7 +5,7 @@ Integrates with Google Gemini API to provide intelligent responses for quantum c
 
 import os
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Iterator
 import google.generativeai as genai
 from quantum_calc.settings_manager import get_current_settings
 
@@ -119,21 +119,22 @@ Please provide clear, accurate, and helpful responses while being concise and fo
         # No change needed, return current status
         return self.model is not None
 
-    def chat(self, message: str, history: List[Dict[str, Any]]) -> str:
+    def chat(self, message: str, history: List[Dict[str, Any]]) -> Iterator[str]:
         """
-        Chat with the AI agent for molecular analysis and assistance.
+        AIエージェントとストリーミングでチャットを行うジェネレータ関数。
         
         Args:
             message (str): User's message
             history (List[Dict[str, Any]]): Chat history in frontend format
             
-        Returns:
-            str: AI agent's response
+        Yields:
+            str: AI agent's response chunks
         """
         try:
             # If Gemini API is not available, provide fallback response
             if not self.model:
-                return self._get_fallback_response(message)
+                yield self._get_fallback_response(message)
+                return
             
             # Convert history to Gemini format
             gemini_history = self._convert_history_to_gemini_format(history)
@@ -145,22 +146,31 @@ Please provide clear, accurate, and helpful responses while being concise and fo
                     "parts": [{"text": f"{self._get_system_prompt()}\n\nUser question: {message}"}]
                 }
                 
-                response = self.model.generate_content([system_message])
-                return response.text
+                # stream=True を指定してストリーミング応答を開始
+                response_stream = self.model.generate_content([system_message], stream=True)
+                
+                # ストリームからチャンクを一つずつyieldする
+                for chunk in response_stream:
+                    if chunk.text:
+                        yield chunk.text
             else:
-                # Start chat with history
+                # Start chat with history and enable streaming
                 chat_session = self.model.start_chat(history=gemini_history)
-                response = chat_session.send_message(message)
-                return response.text
+                response_stream = chat_session.send_message(message, stream=True)
+                
+                # ストリームからチャンクを一つずつyieldする
+                for chunk in response_stream:
+                    if chunk.text:
+                        yield chunk.text
                 
         except Exception as e:
-            logger.error(f"Error during Gemini API call: {e}", exc_info=True)
+            logger.error(f"Error during Gemini API stream call: {e}", exc_info=True)
             
             # Log additional context for debugging
             logger.debug(f"Message that caused error: {message}")
             logger.debug(f"History length: {len(history)}")
             
-            return self._get_error_response(e)
+            yield self._get_error_response(e)
     
     def _get_fallback_response(self, message: str) -> str:
         """Provide a fallback response when Gemini API is not available."""

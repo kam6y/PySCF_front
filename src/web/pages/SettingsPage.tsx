@@ -140,13 +140,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
     const apiKeyChanged = currentApiKey !== originalApiKey;
 
-    const hasChanges = parallelChanged || cpuChanged || memoryChanged || apiKeyChanged;
+    const hasChanges =
+      parallelChanged || cpuChanged || memoryChanged || apiKeyChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
       console.log('SettingsPage: hasUnsavedChanges check', {
         current: { currentParallel, currentCpu, currentMemory, currentApiKey },
-        original: { originalParallel, originalCpu, originalMemory, originalApiKey },
+        original: {
+          originalParallel,
+          originalCpu,
+          originalMemory,
+          originalApiKey,
+        },
         changes: { parallelChanged, cpuChanged, memoryChanged, apiKeyChanged },
         hasChanges,
       });
@@ -385,7 +391,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </div>
           </div>
-                    {settings && (
+          {settings && (
             <div className={styles.systemInfoSection}>
               <h4>System Information</h4>
               <div className={styles.systemInfoGrid}>
@@ -404,7 +410,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </div>
           )}
-
         </div>
 
         <div className={styles.settingsSection}>
@@ -412,12 +417,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
           <div className={styles.settingItem}>
             <div className={styles.settingLabel}>
-              <label htmlFor="geminiApiKey">
-                Google Gemini API Key
-              </label>
+              <label htmlFor="geminiApiKey">Google Gemini API Key</label>
               <p className={styles.settingHelp}>
-                API key for Google Gemini AI to enable intelligent molecular analysis and assistance. 
-                Leave empty to use fallback responses without AI features.
+                API key for Google Gemini AI to enable intelligent molecular
+                analysis and assistance. Leave empty to use fallback responses
+                without AI features.
               </p>
             </div>
 
@@ -431,7 +435,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   onChange={e => {
                     const newValue = e.target.value;
                     if (process.env.NODE_ENV === 'development') {
-                      console.log('SettingsPage: geminiApiKey changed (length)', newValue.length);
+                      console.log(
+                        'SettingsPage: geminiApiKey changed (length)',
+                        newValue.length
+                      );
                     }
                     setGeminiApiKey(newValue);
                   }}
@@ -440,9 +447,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 />
                 <div className={styles.inputStatus}>
                   {geminiApiKey ? (
-                    <span className={styles.statusConfigured}>✓ API Key Configured</span>
+                    <span className={styles.statusConfigured}>
+                      ✓ API Key Configured
+                    </span>
                   ) : (
-                    <span className={styles.statusNotConfigured}>⚠ API Key Not Set</span>
+                    <span className={styles.statusNotConfigured}>
+                      ⚠ API Key Not Set
+                    </span>
                   )}
                 </div>
               </div>

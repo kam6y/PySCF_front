@@ -1,5 +1,6 @@
 // src/web/apiClient.ts
 
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 import {
   CalculationDetailsResponseData,
   CalculationListResponseData,
@@ -278,7 +279,10 @@ export const convertSmilesToXyz = (
 export const getOrbitals = (
   calculationId: string
 ): Promise<OrbitalsResponseData> => {
-  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals`);
+  validateCalculationId(
+    calculationId,
+    `/api/quantum/calculations/${calculationId}/orbitals`
+  );
   return request<OrbitalsResponseData>(
     `/api/quantum/calculations/${calculationId}/orbitals`,
     { method: 'GET' }
@@ -297,7 +301,10 @@ export const getOrbitalCube = (
     isovalueNeg?: number;
   }
 ): Promise<OrbitalCubeResponseData> => {
-  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube`);
+  validateCalculationId(
+    calculationId,
+    `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube`
+  );
 
   if (orbitalIndex < 0 || !Number.isInteger(orbitalIndex)) {
     return Promise.reject(
@@ -338,7 +345,10 @@ export const getOrbitalCube = (
 export const listCubeFiles = (
   calculationId: string
 ): Promise<CubeFilesListResponseData> => {
-  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals/cube-files`);
+  validateCalculationId(
+    calculationId,
+    `/api/quantum/calculations/${calculationId}/orbitals/cube-files`
+  );
 
   return request<CubeFilesListResponseData>(
     `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
@@ -353,7 +363,10 @@ export const deleteCubeFiles = (
   calculationId: string,
   orbitalIndex?: number
 ): Promise<CubeFilesDeleteResponseData> => {
-  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/orbitals/cube-files`);
+  validateCalculationId(
+    calculationId,
+    `/api/quantum/calculations/${calculationId}/orbitals/cube-files`
+  );
 
   // Build query parameters
   const queryParams = new URLSearchParams();
@@ -392,7 +405,10 @@ export const getIRSpectrum = (
     show_peaks?: boolean;
   }
 ): Promise<IRSpectrumResponseData> => {
-  validateCalculationId(calculationId, `/api/quantum/calculations/${calculationId}/ir-spectrum`);
+  validateCalculationId(
+    calculationId,
+    `/api/quantum/calculations/${calculationId}/ir-spectrum`
+  );
 
   // Build query parameters
   const queryParams = new URLSearchParams();
@@ -456,4 +472,74 @@ export const chatWithAgent = (
     method: 'POST',
     body: JSON.stringify({ message, history }),
   });
+};
+
+/**
+ * Stream chat with AI agent for molecular analysis and assistance using Server-Sent Events
+ */
+export const streamChatWithAgent = (
+  message: string,
+  history: AgentChatRequest['history'],
+  callbacks: {
+    onMessage: (chunk: string) => void;
+    onClose: () => void;
+    onError: (error: Error) => void;
+  }
+) => {
+  const ctrl = new AbortController();
+
+  fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    },
+    body: JSON.stringify({ message, history }),
+    signal: ctrl.signal,
+
+    onopen: async response => {
+      if (!response.ok) {
+        const errorText = await response.text();
+        callbacks.onError(
+          new Error(`Failed to connect: ${response.status} ${errorText}`)
+        );
+        ctrl.abort(); // Stop further processing
+      }
+    },
+
+    onmessage(event) {
+      try {
+        const parsedData = JSON.parse(event.data);
+        if (parsedData.type === 'chunk' && parsedData.payload.text) {
+          callbacks.onMessage(parsedData.payload.text);
+        } else if (parsedData.type === 'done') {
+          callbacks.onClose();
+          ctrl.abort(); // End the connection
+        } else if (parsedData.type === 'error') {
+          callbacks.onError(
+            new Error(
+              parsedData.payload.message || 'An unknown stream error occurred.'
+            )
+          );
+          ctrl.abort();
+        }
+      } catch (e) {
+        callbacks.onError(new Error('Failed to parse message from stream.'));
+        ctrl.abort();
+      }
+    },
+
+    onclose() {
+      callbacks.onClose();
+    },
+
+    onerror(err) {
+      callbacks.onError(err);
+      // fetchEventSource will automatically retry, which is usually desired.
+      // To stop retrying, you must throw the error.
+      throw err;
+    },
+  });
+
+  return () => ctrl.abort(); // Return a function to abort the stream
 };

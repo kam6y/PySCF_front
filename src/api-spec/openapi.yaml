@@ -604,8 +604,10 @@ paths:
   /api/agent/chat:
     post:
       summary: Chat with AI agent
-      description: Send a message to the AI agent and receive a response
-      operationId: chatWithAgent
+      description: >
+        Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE).
+        The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
+      operationId: streamChatWithAgent
       requestBody:
         required: true
         content:
@@ -614,11 +616,31 @@ paths:
               $ref: '#/components/schemas/AgentChatRequest'
       responses:
         '200':
-          description: Successful response from AI agent
+          description: >
+            Successfully initiated a streaming connection.
+            The response is a Server-Sent Event (SSE) stream with a `text/event-stream` content type.
+            Each event is a JSON object containing either a text chunk, error message, or stream completion signal.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: >
+                  Server-Sent Events stream where each event contains JSON data.
+                  Event types include 'chunk' (text data), 'error' (error message), and 'done' (stream completion).
+                example: |
+                  data: {"type": "chunk", "payload": {"text": "Hello, "}}
+
+                  data: {"type": "chunk", "payload": {"text": "how can I "}}
+
+                  data: {"type": "chunk", "payload": {"text": "help you?"}}
+
+                  data: {"type": "done"}
+        '400':
+          description: Invalid request (empty message, message too long, etc.)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentChatResponse'
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Server error during agent processing
           content:

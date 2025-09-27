@@ -129,16 +129,21 @@ export const showResourceInsufficientErrorNotification = (
 ) => {
   // エラーメッセージの内容からエラーコードを判定
   let errorCode = 'RESOURCE_INSUFFICIENT';
-  
+
   if (errorMessage.toLowerCase().includes('cpu')) {
-    errorCode = errorMessage.includes('no active calculations') 
-      ? 'CPU_INSUFFICIENT_SYSTEM' 
+    errorCode = errorMessage.includes('no active calculations')
+      ? 'CPU_INSUFFICIENT_SYSTEM'
       : 'CPU_INSUFFICIENT_LIMIT';
   } else if (errorMessage.toLowerCase().includes('memory')) {
-    errorCode = errorMessage.includes('no active calculations') 
-      ? 'MEMORY_INSUFFICIENT_SYSTEM' 
+    errorCode = errorMessage.includes('no active calculations')
+      ? 'MEMORY_INSUFFICIENT_SYSTEM'
       : 'MEMORY_INSUFFICIENT_LIMIT';
   }
 
-  return showErrorWithCodeNotification(errorCode, errorMessage, 'Resource Insufficient', calculationId);
+  return showErrorWithCodeNotification(
+    errorCode,
+    errorMessage,
+    'Resource Insufficient',
+    calculationId
+  );
 };

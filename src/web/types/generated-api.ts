@@ -311,9 +311,10 @@ export interface paths {
         put?: never;
         /**
          * Chat with AI agent
-         * @description Send a message to the AI agent and receive a response
+         * @description Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
+         *
          */
-        post: operations["chatWithAgent"];
+        post: operations["streamChatWithAgent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2223,7 +2224,7 @@ export interface operations {
             };
         };
     };
-    chatWithAgent: {
+    streamChatWithAgent: {
         parameters: {
             query?: never;
             header?: never;
@@ -2236,13 +2237,23 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Successful response from AI agent */
+            /** @description Successfully initiated a streaming connection. The response is a Server-Sent Event (SSE) stream with a `text/event-stream` content type. Each event is a JSON object containing either a text chunk, error message, or stream completion signal.
+             *      */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AgentChatResponse"];
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Invalid request (empty message, message too long, etc.) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Server error during agent processing */

@@ -18,27 +18,33 @@ const getDisplayContent = (notification: Notification) => {
     case 'CPU_INSUFFICIENT_SYSTEM':
       return {
         title: 'High CPU Usage',
-        message: 'System CPU usage exceeds the limit. Please close other programs to reduce CPU usage before retrying.'
+        message:
+          'System CPU usage exceeds the limit. Please close other programs to reduce CPU usage before retrying.',
       };
     case 'CPU_INSUFFICIENT_LIMIT':
       return {
         title: 'CPU Limit Reached',
-        message: 'Cannot start calculation due to CPU usage limit. Please wait for running calculations to complete.'
+        message:
+          'Cannot start calculation due to CPU usage limit. Please wait for running calculations to complete.',
       };
     case 'MEMORY_INSUFFICIENT_SYSTEM':
       return {
         title: 'High Memory Usage',
-        message: 'System memory usage exceeds the limit. Please close other programs to free up memory before retrying.'
+        message:
+          'System memory usage exceeds the limit. Please close other programs to free up memory before retrying.',
       };
     case 'MEMORY_INSUFFICIENT_LIMIT':
       return {
         title: 'Memory Limit Reached',
-        message: 'Cannot start calculation due to memory usage limit. Please wait for running calculations to complete.'
+        message:
+          'Cannot start calculation due to memory usage limit. Please wait for running calculations to complete.',
       };
     case 'RESOURCE_INSUFFICIENT':
       return {
         title: 'Insufficient Resources',
-        message: notification.message || 'Insufficient system resources to start calculation.'
+        message:
+          notification.message ||
+          'Insufficient system resources to start calculation.',
       };
     default:
       return { title: notification.title, message: notification.message };
@@ -52,7 +58,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
-  
+
   const displayContent = getDisplayContent(notification);
 
   useEffect(() => {

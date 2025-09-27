@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { chatWithAgent } from '../apiClient';
+import { streamChatWithAgent } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
 import styles from './AgentPage.module.css';
 
@@ -8,75 +7,99 @@ import styles from './AgentPage.module.css';
 type ChatHistory = {
   role: 'user' | 'model';
   parts: { text: string }[];
+  isStreaming?: boolean; // ストリーミング中かを示すフラグ
 };
 
 export const AgentPage = () => {
   const [history, setHistory] = useState<ChatHistory[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const addNotification = useNotificationStore(state => state.addNotification);
 
-  // チャットAPI呼び出し用mutation
-  const chatMutation = useMutation({
-    mutationFn: ({ message, history }: { message: string; history: ChatHistory[] }) =>
-      chatWithAgent(message, history),
-    onMutate: ({ message }) => {
-      // 楽観的更新: ユーザーメッセージを即座に追加
-      const newUserMessage: ChatHistory = {
-        role: 'user',
-        parts: [{ text: message }],
-      };
-      setHistory(prev => [...prev, newUserMessage]);
-      setCurrentMessage('');
-    },
-    onSuccess: (response) => {
-      // AIの応答を履歴に追加
-      const agentReply: ChatHistory = {
-        role: 'model',
-        parts: [{ text: response.reply }],
-      };
-      setHistory(prev => [...prev, agentReply]);
-    },
-    onError: (error) => {
-      console.error('Failed to send message to agent:', error);
-      
-      // エラーメッセージを履歴に追加
-      const errorReply: ChatHistory = {
-        role: 'model',
-        parts: [{ text: 'Sorry, an error occurred while processing your message. Please try again.' }],
-      };
-      setHistory(prev => [...prev, errorReply]);
-      
-      // 通知でエラーを表示
-      addNotification({
-        type: 'error',
-        title: 'AI Agent Error',
-        message: 'Failed to send message to AI agent. Please try again.',
-        autoClose: false,
-        duration: 0,
-      });
-    },
-  });
-
   // メッセージ送信処理
   const handleSendMessage = useCallback(() => {
     const trimmedMessage = currentMessage.trim();
-    if (!trimmedMessage || chatMutation.isPending) return;
+    if (!trimmedMessage || isLoading) return;
 
-    chatMutation.mutate({
-      message: trimmedMessage,
-      history: history,
-    });
-  }, [currentMessage, history, chatMutation]);
+    const userMessage: ChatHistory = {
+      role: 'user',
+      parts: [{ text: trimmedMessage }],
+    };
+
+    // ユーザーメッセージとAIのプレースホルダーを履歴に追加
+    setHistory(prev => [
+      ...prev,
+      userMessage,
+      { role: 'model', parts: [{ text: '' }], isStreaming: true },
+    ]);
+    setCurrentMessage('');
+    setIsLoading(true);
+    setError(null);
+
+    streamChatWithAgent(
+      trimmedMessage,
+      history, // ストリーム開始前の履歴を渡す
+      {
+        onMessage: chunk => {
+          setHistory(prev => {
+            const newHistory = [...prev];
+            const lastMessage = newHistory[newHistory.length - 1];
+            if (lastMessage && lastMessage.role === 'model') {
+              lastMessage.parts[0].text += chunk;
+            }
+            return newHistory;
+          });
+        },
+        onClose: () => {
+          setIsLoading(false);
+          setHistory(prev => {
+            const newHistory = [...prev];
+            const lastMessage = newHistory[newHistory.length - 1];
+            if (lastMessage) {
+              lastMessage.isStreaming = false;
+            }
+            return newHistory;
+          });
+        },
+        onError: err => {
+          setIsLoading(false);
+          setError(err.message);
+          setHistory(prev => {
+            const newHistory = [...prev];
+            const lastMessage = newHistory[newHistory.length - 1];
+            if (lastMessage) {
+              lastMessage.isStreaming = false;
+              lastMessage.parts[0].text = `Error: ${err.message}`;
+            }
+            return newHistory;
+          });
+
+          // 通知でエラーを表示
+          addNotification({
+            type: 'error',
+            title: 'AI Agent Error',
+            message: 'Failed to send message to AI agent. Please try again.',
+            autoClose: false,
+            duration: 0,
+          });
+        },
+      }
+    );
+  }, [currentMessage, history, isLoading, addNotification]);
 
   // Enter키で送信（Shift+Enterで改行）
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  }, [handleSendMessage]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
+      }
+    },
+    [handleSendMessage]
+  );
 
   // テキストエリアの高さを自動調整
   const adjustTextareaHeight = useCallback(() => {
@@ -96,7 +119,7 @@ export const AgentPage = () => {
     if (chatWindowRef.current) {
       chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
     }
-  }, [history, chatMutation.isPending]);
+  }, [history]);
 
   // 空の状態表示
   const renderEmptyState = () => (
@@ -117,9 +140,10 @@ export const AgentPage = () => {
       </svg>
       <div className={styles.emptyStateTitle}>Welcome to AI Agent</div>
       <div className={styles.emptyStateText}>
-        Start a conversation with the AI agent to get help with molecular design,
-        quantum chemistry calculations, and analysis. Ask questions about your molecules
-        or request assistance with computational chemistry tasks.
+        Start a conversation with the AI agent to get help with molecular
+        design, quantum chemistry calculations, and analysis. Ask questions
+        about your molecules or request assistance with computational chemistry
+        tasks.
       </div>
     </div>
   );
@@ -149,10 +173,12 @@ export const AgentPage = () => {
               >
                 <div className={styles.messageContent}>
                   {entry.parts[0].text}
+                  {entry.isStreaming && (
+                    <span className={styles.cursor}>|</span>
+                  )}
                 </div>
               </div>
             ))}
-            {chatMutation.isPending && renderTypingIndicator()}
           </>
         )}
       </div>
@@ -162,18 +188,18 @@ export const AgentPage = () => {
           ref={textareaRef}
           className={styles.inputBox}
           value={currentMessage}
-          onChange={(e) => setCurrentMessage(e.target.value)}
+          onChange={e => setCurrentMessage(e.target.value)}
           placeholder="Ask the AI agent about molecular design, calculations, or analysis..."
           onKeyDown={handleKeyDown}
-          disabled={chatMutation.isPending}
+          disabled={isLoading}
           rows={1}
         />
         <button
           className={styles.sendButton}
           onClick={handleSendMessage}
-          disabled={chatMutation.isPending || !currentMessage.trim()}
+          disabled={isLoading || !currentMessage.trim()}
         >
-          {chatMutation.isPending ? (
+          {isLoading ? (
             <>
               <svg
                 width="16"
