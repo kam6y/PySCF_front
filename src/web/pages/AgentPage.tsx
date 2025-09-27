@@ -1,4 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import { streamChatWithAgent } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
 import styles from './AgentPage.module.css';
@@ -205,9 +208,24 @@ export const AgentPage = () => {
                 className={`${styles.chatMessage} ${styles[entry.role]}`}
               >
                 <div className={styles.messageContent}>
-                  {entry.parts[0].text}
-                  {entry.isStreaming && (
-                    <span className={styles.cursor}>|</span>
+                  {entry.role === 'model' ? (
+                    <>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                        disallowedElements={['script', 'iframe', 'object', 'embed']}
+                        unwrapDisallowed={true}
+                        className={styles.markdown}
+                      >
+                        {entry.parts[0].text}
+                      </ReactMarkdown>
+                      {entry.isStreaming && (
+                        <span className={styles.cursor}>|</span>
+                      )}
+                    </>
+                  ) : (
+                    // ユーザーメッセージはプレーンテキストのまま
+                    entry.parts[0].text
                   )}
                 </div>
               </div>
