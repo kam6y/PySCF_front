@@ -15,7 +15,9 @@ import requests
 from agent.tools import (
     list_all_calculations,
     get_calculation_details,
-    get_supported_parameters
+    get_supported_parameters,
+    start_quantum_calculation,
+    search_pubchem_by_name
 )
 
 
@@ -303,6 +305,348 @@ class TestAgentTools:
                 
                 assert "Error:" in result
                 assert "予期しないエラーが発生しました" in result
+    
+    def test_start_quantum_calculation_success(self):
+        """start_quantum_calculation関数の正常系テスト"""
+        test_xyz = "3\nWater molecule\nO 0.0 0.0 0.0\nH 0.7570 0.5860 0.0\nH -0.7570 0.5860 0.0"
+        mock_response_data = {
+            "success": True,
+            "data": {
+                "calculation": {
+                    "id": "calc_20240101_120000_abcd1234",
+                    "name": "AI Generated Calculation",
+                    "status": "running",
+                    "parameters": {
+                        "calculation_method": "DFT",
+                        "basis_function": "6-31G(d)",
+                        "exchange_correlation": "B3LYP",
+                        "charges": 0,
+                        "spin": 0
+                    },
+                    "created_at": "2024-01-01T12:00:00Z"
+                }
+            }
+        }
+        
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.json.return_value = mock_response_data
+            mock_response.raise_for_status.return_value = None
+            mock_post.return_value = mock_response
+            
+            result = start_quantum_calculation(
+                xyz=test_xyz,
+                calculation_method="DFT",
+                basis_function="6-31G(d)",
+                charges=0,
+                spin=0,
+                exchange_correlation="B3LYP",
+                name="Test Calculation"
+            )
+            
+            assert isinstance(result, str)
+            parsed_result = json.loads(result)
+            assert parsed_result["success"] is True
+            assert parsed_result["data"]["calculation"]["status"] == "running"
+            
+            # API呼び出し確認
+            mock_post.assert_called_once()
+            call_args = mock_post.call_args
+            assert call_args[0][0] == "http://127.0.0.1:5000/api/quantum/calculate"
+            assert call_args[1]["json"]["xyz"] == test_xyz.strip()
+            assert call_args[1]["json"]["calculation_method"] == "DFT"
+    
+    def test_start_quantum_calculation_validation_errors(self):
+        """start_quantum_calculation関数のバリデーションエラーテスト"""
+        # XYZパラメータが空の場合
+        result = start_quantum_calculation(xyz="")
+        assert "Error:" in result
+        assert "xyz parameter is required" in result
+        
+        # XYZパラメータがNoneの場合
+        result = start_quantum_calculation(xyz=None)
+        assert "Error:" in result
+        assert "xyz parameter is required" in result
+        
+        # 無効な計算メソッドの場合
+        result = start_quantum_calculation(xyz="test", calculation_method="INVALID")
+        assert "Error:" in result
+        assert "calculation_method must be one of" in result
+        
+        # 無効な電荷の場合
+        result = start_quantum_calculation(xyz="test", charges=-20)
+        assert "Error:" in result
+        assert "charges must be an integer between -10 and 10" in result
+        
+        # 無効なスピンの場合
+        result = start_quantum_calculation(xyz="test", spin=-1)
+        assert "Error:" in result
+        assert "spin must be an integer between 0 and 10" in result
+        
+        # 無効な名前の場合
+        result = start_quantum_calculation(xyz="test", name="")
+        assert "Error:" in result
+        assert "name must be a non-empty string" in result
+    
+    def test_start_quantum_calculation_http_errors(self):
+        """start_quantum_calculation関数のHTTPエラーテスト"""
+        test_xyz = "3\nWater\nO 0.0 0.0 0.0\nH 1.0 0.0 0.0\nH 0.0 1.0 0.0"
+        
+        # 400エラー（バリデーションエラー）
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.status_code = 400
+            mock_response.json.return_value = {"message": "Invalid XYZ format"}
+            mock_post.return_value = mock_response
+            mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+            
+            result = start_quantum_calculation(xyz=test_xyz)
+            
+            assert "Error:" in result
+            assert "Invalid calculation parameters" in result
+        
+        # 500エラー（サーバーエラー）
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.status_code = 500
+            mock_post.return_value = mock_response
+            mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+            
+            result = start_quantum_calculation(xyz=test_xyz)
+            
+            assert "Error:" in result
+            assert "Internal server error occurred while starting calculation" in result
+    
+    def test_start_quantum_calculation_network_errors(self):
+        """start_quantum_calculation関数のネットワークエラーテスト"""
+        test_xyz = "3\nWater\nO 0.0 0.0 0.0\nH 1.0 0.0 0.0\nH 0.0 1.0 0.0"
+        
+        # 接続エラー
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_post.side_effect = requests.exceptions.ConnectionError("Connection failed")
+            
+            result = start_quantum_calculation(xyz=test_xyz)
+            
+            assert "Error:" in result
+            assert "Could not connect to API server" in result
+        
+        # タイムアウトエラー
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_post.side_effect = requests.exceptions.Timeout("Request timed out")
+            
+            result = start_quantum_calculation(xyz=test_xyz)
+            
+            assert "Error:" in result
+            assert "API request timed out" in result
+    
+    def test_search_pubchem_by_name_success(self):
+        """search_pubchem_by_name関数の正常系テスト"""
+        test_compound = "water"
+        mock_response_data = {
+            "success": True,
+            "data": {
+                "compound": {
+                    "name": "Water",
+                    "cid": 962,
+                    "molecular_formula": "H2O",
+                    "molecular_weight": 18.015,
+                    "xyz_structure": "3\nWater\nO 0.000000 0.000000 0.119159\nH 0.000000 0.757000 -0.476637\nH 0.000000 -0.757000 -0.476637",
+                    "structure_source": "PubChem 3D conformer"
+                }
+            }
+        }
+        
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.json.return_value = mock_response_data
+            mock_response.raise_for_status.return_value = None
+            mock_post.return_value = mock_response
+            
+            result = search_pubchem_by_name(compound_name=test_compound)
+            
+            assert isinstance(result, str)
+            parsed_result = json.loads(result)
+            assert parsed_result["success"] is True
+            assert parsed_result["data"]["compound"]["name"] == "Water"
+            assert parsed_result["data"]["compound"]["cid"] == 962
+            
+            # API呼び出し確認
+            mock_post.assert_called_once()
+            call_args = mock_post.call_args
+            assert call_args[0][0] == "http://127.0.0.1:5000/api/pubchem/search"
+            assert call_args[1]["json"]["query"] == test_compound
+            assert call_args[1]["json"]["searchType"] == "name"
+    
+    def test_search_pubchem_by_name_validation_errors(self):
+        """search_pubchem_by_name関数のバリデーションエラーテスト"""
+        # 空のcompound_nameの場合
+        result = search_pubchem_by_name(compound_name="")
+        assert "Error:" in result
+        assert "compound_name parameter is required" in result
+        
+        # Noneのcompound_nameの場合
+        result = search_pubchem_by_name(compound_name=None)
+        assert "Error:" in result
+        assert "compound_name parameter is required" in result
+        
+        # 無効なsearch_typeの場合
+        result = search_pubchem_by_name(compound_name="water", search_type="invalid")
+        assert "Error:" in result
+        assert "search_type must be one of" in result
+        
+        # 空白のみのcompound_nameの場合
+        result = search_pubchem_by_name(compound_name="   ")
+        assert "Error:" in result
+        assert "compound_name cannot be empty or contain only whitespace" in result
+    
+    def test_search_pubchem_by_name_not_found(self):
+        """search_pubchem_by_name関数の化合物が見つからないテスト"""
+        test_compound = "nonexistentcompound12345"
+        
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.status_code = 404
+            mock_post.return_value = mock_response
+            mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+            
+            result = search_pubchem_by_name(compound_name=test_compound)
+            
+            assert "Error:" in result
+            assert f"Compound '{test_compound}' not found in PubChem database" in result
+    
+    def test_search_pubchem_by_name_bad_request(self):
+        """search_pubchem_by_name関数の不正なリクエストテスト"""
+        test_compound = "invalid_search"
+        
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.status_code = 400
+            mock_response.json.return_value = {"message": "Invalid search query"}
+            mock_post.return_value = mock_response
+            mock_post.return_value.raise_for_status.side_effect = requests.exceptions.HTTPError(response=mock_response)
+            
+            result = search_pubchem_by_name(compound_name=test_compound)
+            
+            assert "Error:" in result
+            assert "Invalid search request" in result
+    
+    def test_search_pubchem_by_name_different_search_types(self):
+        """search_pubchem_by_name関数の異なる検索タイプテスト"""
+        search_types = ["name", "cid", "formula"]
+        
+        for search_type in search_types:
+            mock_response_data = {
+                "success": True,
+                "data": {"compound": {"name": "TestCompound"}}
+            }
+            
+            with patch('agent.tools.requests.post') as mock_post:
+                mock_response = Mock()
+                mock_response.json.return_value = mock_response_data
+                mock_response.raise_for_status.return_value = None
+                mock_post.return_value = mock_response
+                
+                result = search_pubchem_by_name(
+                    compound_name="test",
+                    search_type=search_type
+                )
+                
+                assert isinstance(result, str)
+                parsed_result = json.loads(result)
+                assert parsed_result["success"] is True
+                
+                # 正しい検索タイプが送信されているか確認
+                call_args = mock_post.call_args
+                assert call_args[1]["json"]["searchType"] == search_type
+    
+    def test_search_pubchem_by_name_network_errors(self):
+        """search_pubchem_by_name関数のネットワークエラーテスト"""
+        test_compound = "water"
+        
+        # 接続エラー
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_post.side_effect = requests.exceptions.ConnectionError("Connection failed")
+            
+            result = search_pubchem_by_name(compound_name=test_compound)
+            
+            assert "Error:" in result
+            assert "Could not connect to API server" in result
+        
+        # タイムアウトエラー
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_post.side_effect = requests.exceptions.Timeout("Request timed out")
+            
+            result = search_pubchem_by_name(compound_name=test_compound)
+            
+            assert "Error:" in result
+            assert "API request timed out" in result
+        
+        # JSON解析エラー
+        with patch('agent.tools.requests.post') as mock_post:
+            mock_response = Mock()
+            mock_response.raise_for_status.return_value = None
+            mock_response.json.side_effect = json.JSONDecodeError("Invalid JSON", "doc", 0)
+            mock_post.return_value = mock_response
+            
+            result = search_pubchem_by_name(compound_name=test_compound)
+            
+            assert "Error:" in result
+            assert "Failed to parse API response" in result
+    
+    def test_new_functions_integration_scenario(self):
+        """新しい関数の統合シナリオテスト（PubChem検索→計算開始）"""
+        # 1. PubChemで化合物を検索
+        compound_search_response = {
+            "success": True,
+            "data": {
+                "compound": {
+                    "name": "Benzene",
+                    "xyz_structure": "12\nBenzene\nC 1.4020 0.0000 0.0000\nC 0.7010 1.2135 0.0000\n..."
+                }
+            }
+        }
+        
+        # 2. 計算開始
+        calculation_start_response = {
+            "success": True,
+            "data": {
+                "calculation": {
+                    "id": "calc_20240101_120000_abcd1234",
+                    "status": "running"
+                }
+            }
+        }
+        
+        with patch('agent.tools.requests.post') as mock_post:
+            # モックレスポンスを順番に設定
+            mock_responses = [Mock(), Mock()]
+            mock_responses[0].json.return_value = compound_search_response
+            mock_responses[0].raise_for_status.return_value = None
+            mock_responses[1].json.return_value = calculation_start_response
+            mock_responses[1].raise_for_status.return_value = None
+            
+            mock_post.side_effect = mock_responses
+            
+            # 1. 化合物検索
+            search_result = search_pubchem_by_name("benzene")
+            search_data = json.loads(search_result)
+            
+            # 2. 検索結果から XYZ データを取得して計算開始
+            xyz_data = search_data["data"]["compound"]["xyz_structure"]
+            calc_result = start_quantum_calculation(
+                xyz=xyz_data,
+                calculation_method="DFT",
+                name="Benzene DFT Calculation"
+            )
+            calc_data = json.loads(calc_result)
+            
+            # 結果検証
+            assert search_data["success"] is True
+            assert calc_data["success"] is True
+            assert calc_data["data"]["calculation"]["status"] == "running"
+            
+            # 2回のAPI呼び出しが正しく行われたことを確認
+            assert mock_post.call_count == 2
 
 
 if __name__ == "__main__":

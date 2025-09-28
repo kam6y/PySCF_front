@@ -8,6 +8,7 @@ import logging
 from typing import List, Dict, Any, Optional, Iterator
 from google import genai
 from google.genai import types
+from google.genai.errors import ServerError, ClientError, APIError
 from quantum_calc.settings_manager import get_current_settings
 from generated_models import HistoryItem, Role, Part
 
@@ -38,12 +39,16 @@ class MolecularAgent:
                     tools.list_all_calculations,
                     tools.get_calculation_details,
                     tools.get_supported_parameters,
+                    tools.start_quantum_calculation,
+                    tools.search_pubchem_by_name,
                 ]
                 
                 logger.info("Gemini API client initialized successfully with tool integration")
                 logger.debug(f"Available tools: {[tool.__name__ for tool in self.available_tools]}")
             except Exception as e:
-                logger.error(f"Failed to initialize Gemini API client: {e}")
+                logger.error(f"Failed to initialize Gemini API client: {e}", exc_info=True)
+                logger.debug(f"API key length: {len(self.api_key) if self.api_key else 0}")
+                logger.debug(f"Error type: {type(e).__name__}")
                 self.client = None
                 self.available_tools = []
     
@@ -102,6 +107,8 @@ IMPORTANT: You have access to powerful tools that can interact with the PySCF ap
 - `list_all_calculations`: Retrieve all saved quantum chemistry calculations
 - `get_calculation_details`: Get detailed results for a specific calculation ID  
 - `get_supported_parameters`: Get available calculation methods, basis sets, functionals, and solvents
+- `start_quantum_calculation`: Start a new quantum chemistry calculation with molecular XYZ data
+- `search_pubchem_by_name`: Search PubChem database for molecular structures by compound name
 
 **ReAct Framework Instructions:**
 Before taking any action, you MUST follow this pattern:
@@ -147,15 +154,19 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
                     # Reinitialize tools
                     from . import tools
                     self.available_tools = [
-                        tools.list_all_calculations,
-                        tools.get_calculation_details,
-                        tools.get_supported_parameters,
-                    ]
+                    tools.list_all_calculations,
+                    tools.get_calculation_details,
+                    tools.get_supported_parameters,
+                    tools.start_quantum_calculation,
+                    tools.search_pubchem_by_name,
+                ]
                     
                     logger.info("Gemini API client reinitialized successfully after settings update")
                     return True
                 except Exception as e:
-                    logger.error(f"Failed to reinitialize Gemini API client after reload: {e}")
+                    logger.error(f"Failed to reinitialize Gemini API client after reload: {e}", exc_info=True)
+                    logger.debug(f"New API key length: {len(new_api_key) if new_api_key else 0}")
+                    logger.debug(f"Reload error type: {type(e).__name__}")
                     self.client = None
                     self.available_tools = []
                     return False
@@ -215,8 +226,23 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
                     
             logger.debug(f"Completed streaming with {chunk_count} chunks")
                 
+        except ServerError as e:
+            logger.error(f"Gemini API server error (HTTP {e.status_code}): {e}", exc_info=True)
+            logger.debug(f"Server error details: {e.response_json}")
+            logger.debug(f"Message that caused error: {message}")
+            yield self._get_error_response(e)
+        except ClientError as e:
+            logger.error(f"Gemini API client error: {e}", exc_info=True)
+            logger.debug(f"Client error details: {getattr(e, 'response_json', 'No details available')}")
+            logger.debug(f"Message that caused error: {message}")
+            yield self._get_error_response(e)
+        except APIError as e:
+            logger.error(f"Gemini API general error: {e}", exc_info=True)
+            logger.debug(f"API error details: {getattr(e, 'response_json', 'No details available')}")
+            logger.debug(f"Message that caused error: {message}")
+            yield self._get_error_response(e)
         except Exception as e:
-            logger.error(f"Error during Gemini API stream call: {e}", exc_info=True)
+            logger.error(f"Unexpected error during Gemini API stream call: {e}", exc_info=True)
             
             # Log additional context for debugging
             logger.debug(f"Message that caused error: {message}")
@@ -236,6 +262,40 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
     def _get_error_response(self, error: Exception) -> str:
         """Provide an appropriate error response based on the type of error."""
         error_str = str(error).lower()
+        
+        # Handle specific Google GenAI API errors
+        if isinstance(error, ServerError):
+            status_code = getattr(error, 'status_code', None)
+            if status_code == 503 or "503" in error_str or "service unavailable" in error_str:
+                return (
+                    "The AI service is temporarily unavailable due to high demand or maintenance. "
+                    "Please try again in a few minutes."
+                )
+            elif status_code == 502 or "502" in error_str or "bad gateway" in error_str:
+                return (
+                    "The AI service is experiencing connectivity issues. "
+                    "Please try again in a moment."
+                )
+            elif status_code == 500 or "500" in error_str or "internal server error" in error_str:
+                return (
+                    "The AI service is experiencing internal issues. "
+                    "Please try again later."
+                )
+            else:
+                return (
+                    f"The AI service returned an error (HTTP {status_code}). "
+                    "Please try again later."
+                )
+        elif isinstance(error, ClientError):
+            return (
+                "There was an issue with the request to the AI service. "
+                "Please check your input and try again."
+            )
+        elif isinstance(error, APIError):
+            return (
+                "There was an API communication error with the AI service. "
+                "Please try again later."
+            )
         
         # Handle specific TypeError cases (like API method signature changes)
         if isinstance(error, TypeError) and "unexpected keyword argument" in error_str:

@@ -392,7 +392,11 @@ const startPythonServer = async (): Promise<void> => {
       pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, CONDA_DEFAULT_ENV: 'pyscf-env' },
+        env: { 
+          ...process.env, 
+          CONDA_DEFAULT_ENV: 'pyscf-env',
+          PYSCF_SERVER_PORT: String(serverPort)
+        },
       });
 
       // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
@@ -413,6 +417,11 @@ const startPythonServer = async (): Promise<void> => {
       console.log('Starting server with direct execution (fallback mode)');
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: { 
+          ...process.env, 
+          CONDA_DEFAULT_ENV: 'pyscf-env',
+          PYSCF_SERVER_PORT: String(serverPort)
+        },
       });
     }
 
