@@ -19,19 +19,33 @@ class MolecularAgent:
     """AI agent for molecular analysis and quantum chemistry assistance."""
     
     def __init__(self):
-        """Initialize the Molecular Agent with Gemini API."""
+        """Initialize the Molecular Agent with Gemini API and tools."""
         # Get API key with priority: environment variable -> settings file -> fallback
         self.api_key = self._get_api_key()
         self.client = None
+        self.available_tools = []
+        
         if not self.api_key:
             logger.warning("Gemini API key not found in environment variable or settings. Agent will use fallback responses.")
         else:
             try:
+                # Initialize with latest google.genai SDK
                 self.client = genai.Client(api_key=self.api_key)
-                logger.info("Gemini API client initialized successfully")
+                
+                # Import and set up available tools
+                from . import tools
+                self.available_tools = [
+                    tools.list_all_calculations,
+                    tools.get_calculation_details,
+                    tools.get_supported_parameters,
+                ]
+                
+                logger.info("Gemini API client initialized successfully with tool integration")
+                logger.debug(f"Available tools: {[tool.__name__ for tool in self.available_tools]}")
             except Exception as e:
                 logger.error(f"Failed to initialize Gemini API client: {e}")
                 self.client = None
+                self.available_tools = []
     
     def _get_api_key(self) -> Optional[str]:
         """Get Gemini API key from environment variable or settings file."""
@@ -78,18 +92,37 @@ class MolecularAgent:
         return gemini_history
     
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for molecular analysis context."""
-        return """You are a helpful AI assistant specialized in molecular analysis and quantum chemistry. 
-You can help with:
-- Molecular structure analysis and interpretation
-- Quantum chemistry calculation guidance (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF)
-- Basis set and functional recommendations
-- Interpretation of calculation results
-- Molecular orbital analysis
-- IR spectrum interpretation
-- General chemistry and physics questions related to molecules
+        """Get the system prompt for molecular analysis context with ReAct framework and English responses."""
+        return """You are an intelligent AI assistant specialized in molecular analysis and quantum chemistry, called "PySCF Agent". 
+You can help users with quantum chemistry calculations, molecular structure analysis, and related scientific tasks.
 
-Please provide clear, accurate, and helpful responses while being concise and focused on the scientific aspects."""
+IMPORTANT: You have access to powerful tools that can interact with the PySCF application backend. Use these tools actively to help users achieve their goals.
+
+**Available Tools:**
+- `list_all_calculations`: Retrieve all saved quantum chemistry calculations
+- `get_calculation_details`: Get detailed results for a specific calculation ID  
+- `get_supported_parameters`: Get available calculation methods, basis sets, functionals, and solvents
+
+**ReAct Framework Instructions:**
+Before taking any action, you MUST follow this pattern:
+
+1. **[Thought]**: Analyze the user's request and plan your approach. Think step-by-step about what tools you need to use and why.
+
+2. **[Action]**: Use the appropriate tools to gather information or perform tasks.
+
+3. **[Observation]**: Analyze the results from your tool usage.
+
+4. **[Response]**: Provide a comprehensive answer to the user based on your observations.
+
+**Guidelines:**
+- Always respond in clear, professional English
+- Use tools proactively when they can help answer the user's question
+- If a tool returns an error, explain what happened and suggest alternatives
+- For calculation-related questions, always check the calculation list first
+- Provide scientific explanations when discussing quantum chemistry results
+- Be helpful, accurate, and educational in your responses
+
+Remember: You are not just a chatbot - you are an active assistant that can access real application data and functionality to help users with their molecular analysis workflows."""
     
     def reload_api_key(self) -> bool:
         """
@@ -105,15 +138,26 @@ Please provide clear, accurate, and helpful responses while being concise and fo
             if not self.api_key:
                 logger.warning("Gemini API key not found after reload. Agent will use fallback responses.")
                 self.client = None
+                self.available_tools = []
                 return False
             else:
                 try:
                     self.client = genai.Client(api_key=self.api_key)
+                    
+                    # Reinitialize tools
+                    from . import tools
+                    self.available_tools = [
+                        tools.list_all_calculations,
+                        tools.get_calculation_details,
+                        tools.get_supported_parameters,
+                    ]
+                    
                     logger.info("Gemini API client reinitialized successfully after settings update")
                     return True
                 except Exception as e:
                     logger.error(f"Failed to reinitialize Gemini API client after reload: {e}")
                     self.client = None
+                    self.available_tools = []
                     return False
 
         # No change needed, return current status
@@ -121,7 +165,7 @@ Please provide clear, accurate, and helpful responses while being concise and fo
 
     def chat(self, message: str, history: List[Dict[str, Any]]) -> Iterator[str]:
         """
-        AIエージェントとストリーミングでチャットを行うジェネレータ関数。
+        Chat with AI agent using streaming with Function Calling support.
         
         Args:
             message (str): User's message
@@ -131,11 +175,11 @@ Please provide clear, accurate, and helpful responses while being concise and fo
             str: AI agent's response chunks
         """
         try:
-            logger.debug(f"Starting chat with message length: {len(message)}, history entries: {len(history)}")
+            logger.debug(f"Starting Function Calling chat with message length: {len(message)}, history entries: {len(history)}")
             
             # If Gemini API is not available, provide fallback response
-            if not self.client:
-                logger.warning("Gemini client not available, using fallback response")
+            if not self.client or not self.available_tools:
+                logger.warning("Gemini client or tools not available, using fallback response")
                 yield self._get_fallback_response(message)
                 return
             
@@ -146,20 +190,18 @@ Please provide clear, accurate, and helpful responses while being concise and fo
             # Add new user message in proper format
             full_conversation = gemini_history + [{"role": "user", "parts": [{"text": message}]}]
             
-            # Use system_instruction parameter for system prompt instead of conversation history
-            # This prevents the system prompt from appearing in the actual conversation
+            # Use system_instruction parameter for system prompt
             system_instruction = self._get_system_prompt()
             
-            # Use only the actual conversation without system prompt in history
-            final_conversation = full_conversation
+            logger.debug(f"Calling Gemini API with {len(full_conversation)} conversation entries and {len(self.available_tools)} tools")
             
-            logger.debug(f"Calling Gemini API with {len(final_conversation)} conversation entries")
-            
+            # Use new SDK with Function Calling
             response_stream = self.client.models.generate_content_stream(
                 model='gemini-2.5-pro',
-                contents=final_conversation,
+                contents=full_conversation,
                 config=types.GenerateContentConfig(
-                    system_instruction=system_instruction
+                    system_instruction=system_instruction,
+                    tools=self.available_tools,  # Pass Python functions directly
                 )
             )
             
