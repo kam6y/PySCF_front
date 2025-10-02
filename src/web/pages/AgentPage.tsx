@@ -2,8 +2,9 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { streamChatWithAgent } from '../apiClient';
+import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 import styles from './AgentPage.module.css';
 
 // 履歴の型定義（生成されたAPI型を使用）
@@ -14,6 +15,15 @@ type ChatHistory = {
   tempId?: number; // 一意識別子（ストリーミング中のメッセージ管理用）
 };
 
+// 確認リクエストの型定義
+type ConfirmationRequest = {
+  requires_confirmation: boolean;
+  action: string;
+  calculation_id: string;
+  calculation_name: string;
+  message: string;
+};
+
 export const AgentPage = () => {
   const [history, setHistory] = useState<ChatHistory[]>([]);
   const [currentMessage, setCurrentMessage] = useState('');
@@ -22,6 +32,170 @@ export const AgentPage = () => {
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const addNotification = useNotificationStore(state => state.addNotification);
+
+  // Confirmation modal state
+  const [confirmationRequest, setConfirmationRequest] =
+    useState<ConfirmationRequest | null>(null);
+  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
+  const [isExecutingAction, setIsExecutingAction] = useState(false);
+
+  // Parse confirmation request from AI message
+  const parseConfirmationRequest = useCallback(
+    (text: string): ConfirmationRequest | null => {
+      try {
+        console.log('[ConfirmationParser] Parsing text for confirmation request');
+        console.log('[ConfirmationParser] Text length:', text.length);
+        console.log('[ConfirmationParser] Text preview:', text.substring(0, 500));
+
+        // Try to extract JSON from markdown code blocks first (```json ... ```)
+        const jsonBlockRegex = /```json\s*(\{[\s\S]*?\})\s*```/;
+        const jsonBlockMatch = text.match(jsonBlockRegex);
+        if (jsonBlockMatch?.[1]) {
+          console.log('[ConfirmationParser] Found JSON in code block');
+          const parsed = JSON.parse(jsonBlockMatch[1]);
+          if (
+            parsed.requires_confirmation === true &&
+            parsed.action &&
+            parsed.calculation_id
+          ) {
+            console.log('[ConfirmationParser] Valid confirmation request found in code block');
+            return parsed as ConfirmationRequest;
+          }
+        }
+
+        // Try to extract plain JSON object (more robust pattern)
+        // This pattern finds JSON objects that contain "requires_confirmation": true
+        // and handles multi-line structures with nested content
+        const jsonPatternRegex = /\{[^{}]*"requires_confirmation"\s*:\s*true[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+        const matches = text.match(jsonPatternRegex);
+        
+        if (matches) {
+          console.log('[ConfirmationParser] Found', matches.length, 'potential JSON matches');
+          
+          // Try to parse each match
+          for (const match of matches) {
+            try {
+              const parsed = JSON.parse(match);
+              if (
+                parsed.requires_confirmation === true &&
+                parsed.action &&
+                parsed.calculation_id
+              ) {
+                console.log('[ConfirmationParser] Valid confirmation request found');
+                return parsed as ConfirmationRequest;
+              }
+            } catch (parseError) {
+              console.debug('[ConfirmationParser] Failed to parse match:', parseError);
+              continue;
+            }
+          }
+        }
+
+        // Try to find JSON object with a more lenient approach
+        // Find all { ... } blocks and try to parse them
+        const allJsonRegex = /\{(?:[^{}]|\{[^{}]*\})*\}/g;
+        const allMatches = text.match(allJsonRegex);
+        
+        if (allMatches) {
+          console.log('[ConfirmationParser] Trying lenient parsing with', allMatches.length, 'matches');
+          
+          for (const match of allMatches) {
+            try {
+              const parsed = JSON.parse(match);
+              if (
+                parsed.requires_confirmation === true &&
+                parsed.action &&
+                parsed.calculation_id
+              ) {
+                console.log('[ConfirmationParser] Valid confirmation request found with lenient parsing');
+                return parsed as ConfirmationRequest;
+              }
+            } catch (parseError) {
+              // Silently skip invalid JSON
+              continue;
+            }
+          }
+        }
+
+        console.log('[ConfirmationParser] No valid confirmation request found');
+        return null;
+      } catch (e) {
+        console.error('[ConfirmationParser] Error parsing confirmation request:', e);
+        return null;
+      }
+    },
+    []
+  );;
+
+  // Handle confirmation modal confirm action
+  const handleConfirmAction = useCallback(async () => {
+    if (!confirmationRequest) return;
+
+    setIsExecutingAction(true);
+    try {
+      const result = await executeConfirmedAgentAction(
+        confirmationRequest.action as 'delete_calculation',
+        confirmationRequest.calculation_id
+      );
+
+      // Close modal
+      setIsConfirmationModalOpen(false);
+      setConfirmationRequest(null);
+
+      // Show success notification
+      addNotification({
+        type: 'success',
+        title: 'Action Completed',
+        message: result.message || 'The action was completed successfully.',
+        autoClose: true,
+        duration: 5000,
+      });
+
+      // Add AI response to history
+      const successMessage: ChatHistory = {
+        role: 'model',
+        parts: [
+          { text: `✅ ${result.message || 'Action completed successfully.'}` },
+        ],
+      };
+      setHistory(prev => [...prev, successMessage]);
+    } catch (err: any) {
+      // Show error notification
+      addNotification({
+        type: 'error',
+        title: 'Action Failed',
+        message: err.message || 'Failed to execute the action.',
+        autoClose: false,
+        duration: 0,
+      });
+
+      // Add error message to history
+      const errorMessage: ChatHistory = {
+        role: 'model',
+        parts: [
+          {
+            text: `❌ Failed to execute action: ${err.message || 'Unknown error'}`,
+          },
+        ],
+      };
+      setHistory(prev => [...prev, errorMessage]);
+    } finally {
+      setIsExecutingAction(false);
+    }
+  }, [confirmationRequest, addNotification]);
+
+  // Handle confirmation modal cancel action
+  const handleCancelAction = useCallback(() => {
+    setIsConfirmationModalOpen(false);
+    setConfirmationRequest(null);
+
+    // Add cancellation message to history
+    const cancelMessage: ChatHistory = {
+      role: 'model',
+      parts: [{ text: '❌ Action cancelled by user.' }],
+    };
+    setHistory(prev => [...prev, cancelMessage]);
+  }, []);
 
   // メッセージ送信処理
   const handleSendMessage = useCallback(() => {
@@ -58,15 +232,17 @@ export const AgentPage = () => {
             // 最後のメッセージを安全に取得し、tempIdで確認
             const lastIndex = newHistory.length - 1;
             const lastMessage = newHistory[lastIndex];
-            
-            if (lastMessage && 
-                lastMessage.role === 'model' && 
-                lastMessage.tempId === tempMessageId &&
-                lastMessage.isStreaming) {
+
+            if (
+              lastMessage &&
+              lastMessage.role === 'model' &&
+              lastMessage.tempId === tempMessageId &&
+              lastMessage.isStreaming
+            ) {
               // 新しいオブジェクトを作成して状態を更新（不変性を保持）
               newHistory[lastIndex] = {
                 ...lastMessage,
-                parts: [{ text: lastMessage.parts[0].text + chunk }]
+                parts: [{ text: lastMessage.parts[0].text + chunk }],
               };
             }
             return newHistory;
@@ -78,16 +254,27 @@ export const AgentPage = () => {
             const newHistory = [...prev];
             const lastIndex = newHistory.length - 1;
             const lastMessage = newHistory[lastIndex];
-            
-            if (lastMessage && 
-                lastMessage.role === 'model' && 
-                lastMessage.tempId === tempMessageId) {
+
+            if (
+              lastMessage &&
+              lastMessage.role === 'model' &&
+              lastMessage.tempId === tempMessageId
+            ) {
               // ストリーミング終了時にtempIdを削除し、新しいオブジェクトを作成
               newHistory[lastIndex] = {
                 role: lastMessage.role,
                 parts: lastMessage.parts,
-                isStreaming: false
+                isStreaming: false,
               };
+
+              // Check for confirmation request in the final message
+              const messageText = lastMessage.parts[0]?.text || '';
+              const confirmation = parseConfirmationRequest(messageText);
+              if (confirmation) {
+                // Show confirmation modal
+                setConfirmationRequest(confirmation);
+                setIsConfirmationModalOpen(true);
+              }
             }
             return newHistory;
           });
@@ -99,15 +286,17 @@ export const AgentPage = () => {
             const newHistory = [...prev];
             const lastIndex = newHistory.length - 1;
             const lastMessage = newHistory[lastIndex];
-            
-            if (lastMessage && 
-                lastMessage.role === 'model' && 
-                lastMessage.tempId === tempMessageId) {
+
+            if (
+              lastMessage &&
+              lastMessage.role === 'model' &&
+              lastMessage.tempId === tempMessageId
+            ) {
               // エラー時も新しいオブジェクトを作成
               newHistory[lastIndex] = {
                 role: lastMessage.role,
                 parts: [{ text: `Error: ${err.message}` }],
-                isStreaming: false
+                isStreaming: false,
               };
             }
             return newHistory;
@@ -213,7 +402,12 @@ export const AgentPage = () => {
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         rehypePlugins={[rehypeHighlight]}
-                        disallowedElements={['script', 'iframe', 'object', 'embed']}
+                        disallowedElements={[
+                          'script',
+                          'iframe',
+                          'object',
+                          'embed',
+                        ]}
                         unwrapDisallowed={true}
                         className={styles.markdown}
                       >
@@ -290,6 +484,20 @@ export const AgentPage = () => {
           )}
         </button>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isConfirmationModalOpen}
+        title="Confirm Destructive Action"
+        message={
+          confirmationRequest?.message || 'Are you sure you want to proceed?'
+        }
+        confirmButtonText="Confirm"
+        cancelButtonText="Cancel"
+        onConfirm={handleConfirmAction}
+        onCancel={handleCancelAction}
+        isLoading={isExecutingAction}
+      />
     </div>
   );
 };

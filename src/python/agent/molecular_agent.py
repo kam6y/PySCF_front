@@ -42,6 +42,7 @@ class MolecularAgent:
                     tools.get_supported_parameters,
                     tools.start_quantum_calculation,
                     tools.search_pubchem_by_name,
+                    tools.delete_calculation,  # HIL-enabled destructive tool
                 ]
                 
                 logger.info("Gemini API client initialized successfully with tool integration")
@@ -104,10 +105,11 @@ IMPORTANT: You have access to powerful tools that can interact with the PySCF ap
 
 **Available Tools:**
 - `list_all_calculations`: Retrieve all saved quantum chemistry calculations
-- `get_calculation_details`: Get detailed results for a specific calculation ID  
+- `get_calculation_details`: Get detailed results for a specific calculation ID
 - `get_supported_parameters`: Get available calculation methods, basis sets, functionals, and solvents
 - `start_quantum_calculation`: Start a new quantum chemistry calculation with molecular XYZ data
 - `search_pubchem_by_name`: Search PubChem database for molecular structures by compound name
+- `delete_calculation`: **[DESTRUCTIVE]** Request deletion of a calculation (requires user confirmation)
 
 **ReAct Framework Instructions:**
 Before taking any action, you MUST follow this pattern:
@@ -124,6 +126,27 @@ Before taking any action, you MUST follow this pattern:
 - For calculation-related questions, always check the calculation list first
 - Provide scientific explanations when discussing quantum chemistry results
 - Be helpful, accurate, and educational in your responses
+
+**CRITICAL - Destructive Operations:**
+- The `delete_calculation` tool returns a JSON confirmation request, NOT a deletion result
+- When you receive a confirmation request JSON (with "requires_confirmation": true), you MUST:
+  1. Include the COMPLETE JSON in your response as a ```json code block FIRST
+  2. Then provide a natural language explanation to the user
+  3. Example format:
+     ```json
+     {{
+       "requires_confirmation": true,
+       "action": "delete_calculation",
+       "calculation_id": "calc_id_here",
+       "calculation_name": "calc name here",
+       "message": "confirmation message here"
+     }}
+     ```
+     
+     [Your natural language explanation about the deletion request]
+- NEVER tell the user that you "deleted" something when you only requested confirmation
+- The actual deletion happens only after user approval through the UI confirmation modal
+- The frontend will automatically parse the JSON block and display the confirmation modal
 
 Remember: You are not just a chatbot - you are an active assistant that can access real application data and functionality to help users with their molecular analysis workflows."""
     
@@ -155,6 +178,7 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
                     tools.get_supported_parameters,
                     tools.start_quantum_calculation,
                     tools.search_pubchem_by_name,
+                    tools.delete_calculation,  # HIL-enabled destructive tool
                 ]
                     
                     logger.info("Gemini API client reinitialized successfully after settings update")

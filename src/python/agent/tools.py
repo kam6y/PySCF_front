@@ -289,3 +289,141 @@ def search_pubchem_by_name(
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as e:
         return _handle_request_error(e, f"search_pubchem_by_name(compound={compound_name})")
+
+
+def delete_calculation(calculation_id: str) -> str:
+    """
+    Request deletion of a calculation and all its associated files.
+
+    IMPORTANT: This is a DESTRUCTIVE operation that cannot be undone.
+    This tool does NOT directly delete the calculation. Instead, it returns
+    a confirmation request that must be approved by the user through the UI.
+
+    The actual deletion will only occur after explicit user confirmation.
+
+    Args:
+        calculation_id (str): Unique ID of the calculation to delete.
+                             Example: "calc_20240101_120000_abcd1234"
+
+    Returns:
+        str: JSON string containing confirmation request details.
+             This should be presented to the user for approval before deletion.
+    """
+    # Input validation
+    if not calculation_id or not isinstance(calculation_id, str):
+        return "Error: calculation_id is a required string parameter."
+
+    if len(calculation_id.strip()) == 0:
+        return "Error: calculation_id cannot be empty or contain only whitespace."
+
+    try:
+        # First, get calculation details to provide context for the confirmation
+        logger.debug(f"Fetching calculation details for deletion request: {calculation_id}")
+        response = requests.get(
+            f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}",
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+
+        calc_data = response.json()
+        calculation_name = calc_data.get('data', {}).get('calculation', {}).get('name', 'Unknown Calculation')
+
+        # Return a structured confirmation request instead of deleting directly
+        confirmation_request = {
+            "requires_confirmation": True,
+            "action": "delete_calculation",
+            "calculation_id": calculation_id.strip(),
+            "calculation_name": calculation_name,
+            "message": f"Are you sure you want to permanently delete the calculation '{calculation_name}' (ID: {calculation_id})? This action cannot be undone."
+        }
+
+        logger.info(f"Returning confirmation request for deletion of calculation: {calculation_id}")
+        return json.dumps(confirmation_request, ensure_ascii=False, indent=2)
+
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            return f"Error: Calculation with ID '{calculation_id}' not found. Please verify the calculation ID."
+        else:
+            return _handle_request_error(e, f"delete_calculation(id={calculation_id})")
+    except Exception as e:
+        return _handle_request_error(e, f"delete_calculation(id={calculation_id})")
+
+
+def _execute_confirmed_deletion(calculation_id: str) -> Dict[str, Any]:
+    """
+    Internal function to execute a confirmed calculation deletion.
+
+    This function should ONLY be called after user confirmation has been obtained
+    through the Human-in-the-Loop confirmation mechanism. It actually performs
+    the deletion by calling the DELETE API endpoint.
+
+    Args:
+        calculation_id (str): Unique ID of the calculation to delete.
+
+    Returns:
+        Dict[str, Any]: Result of the deletion operation.
+                       - success (bool): Whether deletion succeeded
+                       - message (str): Human-readable result message
+                       - calculation_id (str): ID of the deleted calculation
+
+    Raises:
+        requests.exceptions.HTTPError: If the API request fails
+        requests.exceptions.RequestException: If a network error occurs
+    """
+    if not calculation_id or not isinstance(calculation_id, str):
+        return {
+            "success": False,
+            "message": "Invalid calculation_id parameter.",
+            "calculation_id": None
+        }
+
+    try:
+        logger.info(f"Executing confirmed deletion for calculation: {calculation_id}")
+        response = requests.delete(
+            f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}",
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+
+        result = response.json()
+        logger.info(f"Successfully deleted calculation: {calculation_id}")
+
+        return {
+            "success": True,
+            "message": result.get('data', {}).get('message', 'Calculation deleted successfully'),
+            "calculation_id": calculation_id
+        }
+
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            error_msg = f"Calculation with ID '{calculation_id}' not found."
+            logger.warning(error_msg)
+            return {
+                "success": False,
+                "message": error_msg,
+                "calculation_id": calculation_id
+            }
+        else:
+            error_msg = f"HTTP error occurred while deleting calculation: {str(e)}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "message": error_msg,
+                "calculation_id": calculation_id
+            }
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Network error occurred while deleting calculation: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "message": error_msg,
+            "calculation_id": calculation_id
+        }
+    except Exception as e:
+        error_msg = f"Unexpected error occurred while deleting calculation: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return {
+            "success": False,
+            "message": error_msg,
+            "calculation_id": calculation_id
+        }

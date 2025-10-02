@@ -345,6 +345,11 @@ export interface components {
          * @enum {string}
          */
         CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting";
+        /**
+         * @description Type of agent action requiring confirmation
+         * @enum {string}
+         */
+        AgentActionType: "delete_calculation";
         PubChemSearchRequest: {
             /** @description Search query for PubChem */
             query: string;
@@ -1496,6 +1501,22 @@ export interface components {
             data: {
                 /** @description Response message from the AI agent */
                 reply: string;
+            };
+        };
+        ExecuteConfirmedActionRequest: {
+            action_type: components["schemas"]["AgentActionType"];
+            /** @description ID of the calculation to perform the action on */
+            calculation_id: string;
+        };
+        ExecuteConfirmedActionResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description Result message */
+                message: string;
+                action_type?: components["schemas"]["AgentActionType"];
+                /** @description ID of the affected calculation */
+                calculation_id?: string;
             };
         };
     };

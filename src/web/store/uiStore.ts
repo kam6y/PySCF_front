@@ -74,7 +74,8 @@ export const useUIStore = create<UIState>((set, get) => ({
   getCurrentPageTitle: () => getPageTitle(get().currentPage),
 
   // AI Agent actions
-  toggleAIAgent: () => set(state => ({ isAIAgentEnabled: !state.isAIAgentEnabled })),
+  toggleAIAgent: () =>
+    set(state => ({ isAIAgentEnabled: !state.isAIAgentEnabled })),
   setAIAgentEnabled: (enabled: boolean) => set({ isAIAgentEnabled: enabled }),
 
   // Search actions

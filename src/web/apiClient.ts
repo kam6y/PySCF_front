@@ -32,6 +32,10 @@ export type StartCalculationResponse = StartCalculationResponseData;
 // Agent API types
 type AgentChatRequest = components['schemas']['AgentChatRequest'];
 type AgentChatResponse = components['schemas']['AgentChatResponse'];
+type ExecuteConfirmedActionRequest =
+  components['schemas']['ExecuteConfirmedActionRequest'];
+type ExecuteConfirmedActionResponse =
+  components['schemas']['ExecuteConfirmedActionResponse'];
 
 // Settings API types
 type AppSettings = components['schemas']['AppSettings'];
@@ -496,7 +500,10 @@ export const streamChatWithAgent = (
     }
   };
 
-  debug('Starting SSE stream', { messageLength: message.length, historyLength: history?.length || 0 });
+  debug('Starting SSE stream', {
+    messageLength: message.length,
+    historyLength: history?.length || 0,
+  });
 
   fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
     method: 'POST',
@@ -511,7 +518,10 @@ export const streamChatWithAgent = (
       debug('SSE connection opened', { status: response.status });
       if (!response.ok) {
         const errorText = await response.text();
-        debug('SSE connection failed', { status: response.status, error: errorText });
+        debug('SSE connection failed', {
+          status: response.status,
+          error: errorText,
+        });
         callbacks.onError(
           new Error(`Failed to connect: ${response.status} ${errorText}`)
         );
@@ -527,8 +537,11 @@ export const streamChatWithAgent = (
 
       try {
         const parsedData = JSON.parse(event.data);
-        debug('Received SSE message', { type: parsedData.type, hasText: !!parsedData.payload?.text });
-        
+        debug('Received SSE message', {
+          type: parsedData.type,
+          hasText: !!parsedData.payload?.text,
+        });
+
         if (parsedData.type === 'chunk' && parsedData.payload?.text) {
           callbacks.onMessage(parsedData.payload.text);
         } else if (parsedData.type === 'done') {
@@ -537,7 +550,9 @@ export const streamChatWithAgent = (
           callbacks.onClose();
           ctrl.abort(); // End the connection
         } else if (parsedData.type === 'error') {
-          debug('Stream error received', { error: parsedData.payload?.message });
+          debug('Stream error received', {
+            error: parsedData.payload?.message,
+          });
           isStreamClosed = true;
           callbacks.onError(
             new Error(
@@ -571,4 +586,36 @@ export const streamChatWithAgent = (
   });
 
   return () => ctrl.abort(); // Return a function to abort the stream
+};
+
+/**
+ * Execute a confirmed destructive action requested by the AI agent
+ */
+export const executeConfirmedAgentAction = (
+  actionType: ExecuteConfirmedActionRequest['action_type'],
+  calculationId: string
+): Promise<ExecuteConfirmedActionResponse['data']> => {
+  if (!calculationId || calculationId.trim() === '') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid calculation ID provided.',
+        400,
+        'Bad Request',
+        '/api/agent/execute-confirmed-action',
+        null,
+        false
+      )
+    );
+  }
+
+  return request<ExecuteConfirmedActionResponse['data']>(
+    '/api/agent/execute-confirmed-action',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        action_type: actionType,
+        calculation_id: calculationId,
+      }),
+    }
+  );
 };

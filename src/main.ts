@@ -358,8 +358,10 @@ const startPythonServer = async (): Promise<void> => {
         '--keep-alive',
         String(gunicornSettings.keep_alive),
         // access_logfileがnullまたは存在しない場合は引数を追加しない
-        ...(gunicornSettings.access_logfile !== null && gunicornSettings.access_logfile !== undefined ? 
-          ['--access-logfile', gunicornSettings.access_logfile] : []),
+        ...(gunicornSettings.access_logfile !== null &&
+        gunicornSettings.access_logfile !== undefined
+          ? ['--access-logfile', gunicornSettings.access_logfile]
+          : []),
         '--log-level',
         gunicornSettings.log_level,
         '--preload',
@@ -392,10 +394,10 @@ const startPythonServer = async (): Promise<void> => {
       pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { 
-          ...process.env, 
+        env: {
+          ...process.env,
           CONDA_DEFAULT_ENV: 'pyscf-env',
-          PYSCF_SERVER_PORT: String(serverPort)
+          PYSCF_SERVER_PORT: String(serverPort),
         },
       });
 
@@ -417,10 +419,10 @@ const startPythonServer = async (): Promise<void> => {
       console.log('Starting server with direct execution (fallback mode)');
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: { 
-          ...process.env, 
+        env: {
+          ...process.env,
           CONDA_DEFAULT_ENV: 'pyscf-env',
-          PYSCF_SERVER_PORT: String(serverPort)
+          PYSCF_SERVER_PORT: String(serverPort),
         },
       });
     }

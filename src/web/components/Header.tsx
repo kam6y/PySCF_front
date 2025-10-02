@@ -141,12 +141,12 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </svg>
           </button>
-          
+
           <AIAgentSwitch
             isEnabled={isAIAgentEnabled}
             onChange={onAIAgentToggle}
           />
-          
+
           <button
             className={styles.plusButton}
             onClick={onPlusClick}

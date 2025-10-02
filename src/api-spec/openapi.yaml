@@ -671,6 +671,11 @@ components:
       enum: [pending, running, completed, error, waiting]
       description: Status of a calculation
 
+    AgentActionType:
+      type: string
+      enum: [delete_calculation]
+      description: Type of agent action requiring confirmation
+
     # Request Models
     PubChemSearchRequest:
       type: object
@@ -2337,3 +2342,33 @@ components:
             reply:
               type: string
               description: Response message from the AI agent
+
+    ExecuteConfirmedActionRequest:
+      type: object
+      required: [action_type, calculation_id]
+      properties:
+        action_type:
+          $ref: '#/components/schemas/AgentActionType'
+        calculation_id:
+          type: string
+          description: ID of the calculation to perform the action on
+
+    ExecuteConfirmedActionResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message]
+          properties:
+            message:
+              type: string
+              description: Result message
+            action_type:
+              $ref: '#/components/schemas/AgentActionType'
+            calculation_id:
+              type: string
+              description: ID of the affected calculation

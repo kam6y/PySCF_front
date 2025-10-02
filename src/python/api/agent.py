@@ -9,8 +9,9 @@ from typing import Iterator, Dict, Any
 from flask import Blueprint, jsonify, Response, stream_with_context
 from flask_pydantic import validate
 
-from generated_models import AgentChatRequest
+from generated_models import AgentChatRequest, ExecuteConfirmedActionRequest, AgentActionType
 from agent.molecular_agent import MolecularAgent
+from agent import tools
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -126,6 +127,61 @@ def chat_with_agent(body: AgentChatRequest):
     except Exception as e:
         logger.error(f"Unexpected error in agent chat endpoint: {e}", exc_info=True)
         return jsonify({
-            'success': False, 
+            'success': False,
             'error': 'An internal server error occurred in the agent. Please contact support if this persists.'
+        }), 500
+
+
+@agent_bp.route('/api/agent/execute-confirmed-action', methods=['POST'])
+@validate()
+def execute_confirmed_action(body: ExecuteConfirmedActionRequest):
+    """Execute a confirmed destructive action requested by AI agent."""
+    try:
+        logger.info(f"Processing confirmed action execution - Action type: {body.action_type}")
+
+        # Handle different action types
+        if body.action_type == AgentActionType.delete_calculation:
+            # Validate that calculation_id is provided
+            if not body.calculation_id:
+                raise ValueError("calculation_id is required for delete_calculation action")
+
+            logger.info(f"Executing confirmed deletion for calculation: {body.calculation_id}")
+
+            # Execute the confirmed deletion using the internal function
+            result = tools._execute_confirmed_deletion(body.calculation_id)
+
+            if result['success']:
+                logger.info(f"Deletion successful: {result['message']}")
+                return jsonify({
+                    'success': True,
+                    'data': {
+                        'message': result['message'],
+                        'action_type': 'delete_calculation',
+                        'calculation_id': result['calculation_id']
+                    }
+                }), 200
+            else:
+                logger.warning(f"Deletion failed: {result['message']}")
+                return jsonify({
+                    'success': False,
+                    'error': result['message']
+                }), 400
+
+        else:
+            # Unknown action type
+            logger.warning(f"Unknown action type requested: {body.action_type}")
+            raise ValueError(f"Unknown action type: {body.action_type}")
+
+    except ValueError as e:
+        logger.warning(f"Validation error in execute confirmed action: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Invalid input: {str(e)}'
+        }), 400
+
+    except Exception as e:
+        logger.error(f"Unexpected error in execute confirmed action endpoint: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'An internal server error occurred while executing the action. Please contact support if this persists.'
         }), 500

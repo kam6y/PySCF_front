@@ -3,16 +3,26 @@
 """File system monitoring utilities for quantum chemistry calculations."""
 
 import os
+import sys
 import json
 import logging
 import threading
 from pathlib import Path
 from typing import Dict, Callable, Optional, Set
 from datetime import datetime
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
 import queue
 import threading
+
+# Platform-specific observer selection
+# FSEventsObserver (macOS default) fails after fork in Gunicorn workers
+# Use PollingObserver on macOS for fork-safety, regular Observer elsewhere
+if sys.platform == 'darwin':
+    from watchdog.observers.polling import PollingObserver as Observer
+    logging.getLogger(__name__).info("Using PollingObserver for macOS fork-safety")
+else:
+    from watchdog.observers import Observer
+
+from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
 
 from .exceptions import FileManagerError, WebSocketError
 
