@@ -170,7 +170,22 @@ def start_quantum_calculation(
     charges: int = 0,
     spin: int = 0,
     exchange_correlation: Optional[str] = "B3LYP",
-    name: str = "AI Generated Calculation"
+    solvent_method: str = "none",
+    solvent: str = "-",
+    name: str = "AI Generated Calculation",
+    cpu_cores: Optional[int] = None,
+    memory_mb: Optional[int] = None,
+    tddft_nstates: int = 10,
+    tddft_method: str = "TDDFT",
+    tddft_analyze_nto: bool = False,
+    ncas: int = 4,
+    nelecas: int = 4,
+    max_cycle_macro: int = 50,
+    max_cycle_micro: int = 3,
+    natorb: bool = True,
+    conv_tol: float = 0.000001,
+    conv_tol_grad: float = 0.0001,
+    optimize_geometry: bool = True
 ) -> str:
     """
     Start a new quantum chemistry calculation with the specified molecular structure and parameters.
@@ -180,13 +195,32 @@ def start_quantum_calculation(
     
     Args:
         xyz (str): XYZ molecular structure data (atomic symbols and coordinates).
-                  Example: "3\nWater molecule\nO 0.0 0.0 0.0\nH 0.7570 0.5860 0.0\nH -0.7570 0.5860 0.0"
+                  Example: "3
+Water molecule
+O 0.0 0.0 0.0
+H 0.7570 0.5860 0.0
+H -0.7570 0.5860 0.0"
         calculation_method (str): Quantum chemistry method. Options: 'DFT', 'HF', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF'
         basis_function (str): Basis set for calculation. Examples: 'STO-3G', '6-31G(d)', '6-31+G(d,p)', 'cc-pVDZ', 'aug-cc-pVTZ', 'def2-SVP'
         charges (int): Molecular charge (-10 to 10). Default: 0 (neutral molecule)
         spin (int): Number of unpaired electrons (2S). Default: 0 (closed shell singlet)
-        exchange_correlation (str): Exchange-correlation functional for DFT. Examples: 'B3LYP', 'PBE0', 'M06-2X', 'CAM-B3LYP'
+        exchange_correlation (str): Exchange-correlation functional for DFT/TDDFT. Examples: 'B3LYP', 'PBE0', 'M06-2X', 'CAM-B3LYP'. Ignored for HF method.
+        solvent_method (str): Solvent effect method. Options: 'none', 'ief-pcm', 'c-pcm', 'cosmo', 'ssvpe', 'ddcosmo'. Default: 'none'
+        solvent (str): Solvent type or dielectric constant. Predefined: 'water', 'methanol', 'ethanol', 'acetone', etc., or numeric value >1.0. Default: '-'
         name (str): Display name for the calculation. Used for identification in calculation list
+        cpu_cores (int): Number of CPU cores to use (1-32). If None, system will auto-allocate based on availability
+        memory_mb (int): Memory in MB (512-32768). If None, system will auto-allocate based on availability
+        tddft_nstates (int): Number of excited states to calculate (TDDFT only, 1-50). Default: 10
+        tddft_method (str): TDDFT calculation method. Options: 'TDDFT', 'TDA' (Tamm-Dancoff approximation). Default: 'TDDFT'
+        tddft_analyze_nto (bool): Perform Natural Transition Orbital analysis (TDDFT only). Default: False
+        ncas (int): Number of active space orbitals (CASCI/CASSCF only, 1-50). Default: 4
+        nelecas (int): Number of active space electrons (CASCI/CASSCF only, 1-100). Default: 4
+        max_cycle_macro (int): Maximum CASSCF macro iterations (CASSCF only, 1-200). Default: 50
+        max_cycle_micro (int): Maximum CI solver micro iterations (CASCI/CASSCF, 1-20). Default: 3
+        natorb (bool): Transform to natural orbitals in active space (CASCI/CASSCF only). Default: True
+        conv_tol (float): Energy convergence tolerance (CASSCF only, 1e-12 to 1e-3). Default: 0.000001
+        conv_tol_grad (float): Gradient convergence tolerance (CASSCF only, 1e-8 to 1e-2). Default: 0.0001
+        optimize_geometry (bool): Whether to perform geometry optimization before the main calculation. Default: True
     
     Returns:
         str: JSON string of the created calculation instance with ID and initial status.
@@ -208,6 +242,49 @@ def start_quantum_calculation(
     if not isinstance(name, str) or len(name.strip()) == 0 or len(name) > 100:
         return "Error: name must be a non-empty string with maximum 100 characters."
     
+    # Validate solvent parameters
+    if not isinstance(solvent_method, str) or solvent_method not in ['none', 'ief-pcm', 'c-pcm', 'cosmo', 'ssvpe', 'ddcosmo']:
+        return "Error: solvent_method must be one of: 'none', 'ief-pcm', 'c-pcm', 'cosmo', 'ssvpe', 'ddcosmo'"
+    
+    # Validate resource parameters
+    if cpu_cores is not None and (not isinstance(cpu_cores, int) or cpu_cores < 1 or cpu_cores > 32):
+        return "Error: cpu_cores must be an integer between 1 and 32, or None for auto-allocation."
+    
+    if memory_mb is not None and (not isinstance(memory_mb, int) or memory_mb < 512 or memory_mb > 32768):
+        return "Error: memory_mb must be an integer between 512 and 32768, or None for auto-allocation."
+    
+    # Validate TDDFT parameters
+    if calculation_method == 'TDDFT':
+        if not isinstance(tddft_nstates, int) or tddft_nstates < 1 or tddft_nstates > 50:
+            return "Error: tddft_nstates must be an integer between 1 and 50 for TDDFT calculations."
+        
+        if not isinstance(tddft_method, str) or tddft_method not in ['TDDFT', 'TDA']:
+            return "Error: tddft_method must be either 'TDDFT' or 'TDA'."
+    
+    # Validate CASCI/CASSCF parameters
+    if calculation_method in ['CASCI', 'CASSCF']:
+        if not isinstance(ncas, int) or ncas < 1 or ncas > 50:
+            return "Error: ncas must be an integer between 1 and 50 for CASCI/CASSCF calculations."
+        
+        if not isinstance(nelecas, int) or nelecas < 1 or nelecas > 100:
+            return "Error: nelecas must be an integer between 1 and 100 for CASCI/CASSCF calculations."
+        
+        if nelecas > 2 * ncas:
+            return f"Error: nelecas ({nelecas}) cannot exceed 2 * ncas ({2 * ncas})."
+        
+        if calculation_method == 'CASSCF':
+            if not isinstance(max_cycle_macro, int) or max_cycle_macro < 1 or max_cycle_macro > 200:
+                return "Error: max_cycle_macro must be an integer between 1 and 200 for CASSCF calculations."
+            
+            if not isinstance(conv_tol, (int, float)) or conv_tol < 1e-12 or conv_tol > 1e-3:
+                return "Error: conv_tol must be a number between 1e-12 and 1e-3 for CASSCF calculations."
+            
+            if not isinstance(conv_tol_grad, (int, float)) or conv_tol_grad < 1e-8 or conv_tol_grad > 1e-2:
+                return "Error: conv_tol_grad must be a number between 1e-8 and 1e-2 for CASSCF calculations."
+        
+        if not isinstance(max_cycle_micro, int) or max_cycle_micro < 1 or max_cycle_micro > 20:
+            return "Error: max_cycle_micro must be an integer between 1 and 20 for CASCI/CASSCF calculations."
+    
     # Prepare request data
     request_data = {
         "xyz": xyz.strip(),
@@ -215,12 +292,32 @@ def start_quantum_calculation(
         "basis_function": basis_function,
         "charges": charges,
         "spin": spin,
-        "name": name.strip()
+        "solvent_method": solvent_method,
+        "solvent": solvent,
+        "name": name.strip(),
+        "tddft_nstates": tddft_nstates,
+        "tddft_method": tddft_method,
+        "tddft_analyze_nto": tddft_analyze_nto,
+        "ncas": ncas,
+        "nelecas": nelecas,
+        "max_cycle_macro": max_cycle_macro,
+        "max_cycle_micro": max_cycle_micro,
+        "natorb": natorb,
+        "conv_tol": conv_tol,
+        "conv_tol_grad": conv_tol_grad,
+        "optimize_geometry": optimize_geometry
     }
     
     # Add exchange_correlation only for methods that use it (not HF)
     if calculation_method != "HF" and exchange_correlation:
         request_data["exchange_correlation"] = exchange_correlation
+    
+    # Add resource parameters if specified
+    if cpu_cores is not None:
+        request_data["cpu_cores"] = cpu_cores
+    
+    if memory_mb is not None:
+        request_data["memory_mb"] = memory_mb
     
     try:
         logger.debug(f"Starting quantum calculation: {calculation_method}/{basis_function} for '{name}'")
