@@ -5,12 +5,13 @@ Integrates with Google Gemini API to provide intelligent responses for quantum c
 
 import os
 import logging
+import time
 from typing import List, Dict, Any, Optional, Iterator
 from google import genai
 from google.genai import types
-from google.genai.errors import ServerError, ClientError, APIError
+from google.genai.errors import APIError, ServerError
 from quantum_calc.settings_manager import get_current_settings
-from generated_models import HistoryItem, Role, Part
+from generated_models import HistoryItem
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -77,27 +78,25 @@ class MolecularAgent:
         gemini_history = []
         
         for item in history:
+            # Extract role (default to 'user')
             role = item.role.value if item.role else 'user'
-            parts = item.parts or []
             
-            # Convert role mapping: 'model' -> 'model', 'user' -> 'user'
-            gemini_role = 'model' if role == 'model' else 'user'
-            
-            # Extract text from parts
+            # Extract text from first part if available
             text_content = ""
-            if parts and len(parts) > 0:
-                text_content = parts[0].text or ""
+            if item.parts and len(item.parts) > 0 and item.parts[0].text:
+                text_content = item.parts[0].text.strip()
             
-            if text_content.strip():  # Only add non-empty messages
+            # Only add non-empty messages
+            if text_content:
                 gemini_history.append({
-                    "role": gemini_role,
+                    "role": role,
                     "parts": [{"text": text_content}]
                 })
         
         return gemini_history
     
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for molecular analysis context with ReAct framework and English responses."""
+        """Get the system prompt for molecular analysis context with ReAct framework."""
         return """You are an intelligent AI assistant specialized in molecular analysis and quantum chemistry, called "PySCF Agent". 
 You can help users with quantum chemistry calculations, molecular structure analysis, and related scientific tasks.
 
@@ -114,11 +113,8 @@ IMPORTANT: You have access to powerful tools that can interact with the PySCF ap
 Before taking any action, you MUST follow this pattern:
 
 1. **[Thought]**: Analyze the user's request and plan your approach. Think step-by-step about what tools you need to use and why.
-
 2. **[Action]**: Use the appropriate tools to gather information or perform tasks.
-
 3. **[Observation]**: Analyze the results from your tool usage.
-
 4. **[Response]**: Provide a comprehensive answer to the user based on your observations.
 
 **Guidelines:**
@@ -185,70 +181,89 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
         Yields:
             str: AI agent's response chunks
         """
-        try:
-            logger.debug(f"Starting Function Calling chat with message length: {len(message)}, history entries: {len(history)}")
-            
-            # If Gemini API is not available, provide fallback response
-            if not self.client or not self.available_tools:
-                logger.warning("Gemini client or tools not available, using fallback response")
-                yield self._get_fallback_response(message)
-                return
-            
-            # Convert history to Gemini format
-            gemini_history = self._convert_history_to_gemini_format(history)
-            logger.debug(f"Converted history to Gemini format: {len(gemini_history)} entries")
-            
-            # Add new user message in proper format
-            full_conversation = gemini_history + [{"role": "user", "parts": [{"text": message}]}]
-            
-            # Use system_instruction parameter for system prompt
-            system_instruction = self._get_system_prompt()
-            
-            logger.debug(f"Calling Gemini API with {len(full_conversation)} conversation entries and {len(self.available_tools)} tools")
-            
-            # Use new SDK with Function Calling
-            response_stream = self.client.models.generate_content_stream(
-                model='gemini-2.5-pro',
-                contents=full_conversation,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    tools=self.available_tools,  # Pass Python functions directly
-                )
-            )
-            
-            # Stream response chunks
-            chunk_count = 0
-            for chunk in response_stream:
-                if chunk.text:
-                    chunk_count += 1
-                    logger.debug(f"Yielding chunk #{chunk_count}, length: {len(chunk.text)}")
-                    yield chunk.text
-                    
-            logger.debug(f"Completed streaming with {chunk_count} chunks")
+        # Retry configuration
+        MAX_RETRIES = 3
+        RETRY_DELAYS = [1, 2, 4]  # Exponential backoff in seconds
+        RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504]  # Temporary errors
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                logger.debug(f"Starting Function Calling chat (attempt {attempt + 1}/{MAX_RETRIES}) with message length: {len(message)}, history entries: {len(history)}")
                 
-        except ServerError as e:
-            logger.error(f"Gemini API server error (HTTP {e.status_code}): {e}", exc_info=True)
-            logger.debug(f"Server error details: {e.response_json}")
-            logger.debug(f"Message that caused error: {message}")
-            yield self._get_error_response(e)
-        except ClientError as e:
-            logger.error(f"Gemini API client error: {e}", exc_info=True)
-            logger.debug(f"Client error details: {getattr(e, 'response_json', 'No details available')}")
-            logger.debug(f"Message that caused error: {message}")
-            yield self._get_error_response(e)
-        except APIError as e:
-            logger.error(f"Gemini API general error: {e}", exc_info=True)
-            logger.debug(f"API error details: {getattr(e, 'response_json', 'No details available')}")
-            logger.debug(f"Message that caused error: {message}")
-            yield self._get_error_response(e)
-        except Exception as e:
-            logger.error(f"Unexpected error during Gemini API stream call: {e}", exc_info=True)
-            
-            # Log additional context for debugging
-            logger.debug(f"Message that caused error: {message}")
-            logger.debug(f"History length: {len(history)}")
-            
-            yield self._get_error_response(e)
+                # If Gemini API is not available, provide fallback response
+                if not self.client or not self.available_tools:
+                    logger.warning("Gemini client or tools not available, using fallback response")
+                    yield self._get_fallback_response(message)
+                    return
+                
+                # Convert history to Gemini format
+                gemini_history = self._convert_history_to_gemini_format(history)
+                logger.debug(f"Converted history to Gemini format: {len(gemini_history)} entries")
+                
+                # Add new user message in proper format
+                full_conversation = gemini_history + [{"role": "user", "parts": [{"text": message}]}]
+                
+                # Use system_instruction parameter for system prompt
+                system_instruction = self._get_system_prompt()
+                
+                logger.debug(f"Calling Gemini API with {len(full_conversation)} conversation entries and {len(self.available_tools)} tools")
+                
+                # Use new SDK with Function Calling
+                response_stream = self.client.models.generate_content_stream(
+                    model='gemini-2.5-pro',
+                    contents=full_conversation,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        tools=self.available_tools,  # Pass Python functions directly
+                    )
+                )
+                
+                # Stream response chunks
+                chunk_count = 0
+                for chunk in response_stream:
+                    if chunk.text:
+                        chunk_count += 1
+                        logger.debug(f"Yielding chunk #{chunk_count}, length: {len(chunk.text)}")
+                        yield chunk.text
+                        
+                logger.debug(f"Completed streaming with {chunk_count} chunks")
+                return  # Success - exit retry loop
+                    
+            except ServerError as e:
+                # Extract status code from error
+                status_code = getattr(e, 'code', None)
+                is_retryable = status_code in RETRYABLE_STATUS_CODES
+                is_last_attempt = attempt == MAX_RETRIES - 1
+                
+                # Log appropriately based on error type
+                if is_retryable and not is_last_attempt:
+                    logger.warning(
+                        f"Gemini API returned temporary error {status_code} (attempt {attempt + 1}/{MAX_RETRIES}). "
+                        f"Retrying in {RETRY_DELAYS[attempt]}s... Error: {e}"
+                    )
+                    time.sleep(RETRY_DELAYS[attempt])
+                    continue  # Retry
+                else:
+                    # Last attempt or non-retryable error
+                    logger.error(f"Gemini API error: {status_code} {e}")
+                    yield self._get_error_response(e)
+                    return
+                    
+            except APIError as e:
+                # Handle other API errors
+                logger.error(f"Gemini API error: {e}")
+                yield self._get_error_response(e)
+                return
+                
+            except Exception as e:
+                logger.error(f"Unexpected error during Gemini API stream call: {e}", exc_info=True)
+                
+                # Log additional context for debugging
+                logger.debug(f"Message that caused error: {message}")
+                logger.debug(f"History length: {len(history)}")
+                
+                yield self._get_error_response(e)
+                return
     
     def _get_fallback_response(self, message: str) -> str:
         """Provide a fallback response when Gemini API is not available."""
@@ -263,70 +278,62 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
         """Provide an appropriate error response based on the type of error."""
         error_str = str(error).lower()
         
-        # Handle specific Google GenAI API errors
+        # Handle ServerError (503, 502, etc.) specifically
         if isinstance(error, ServerError):
-            status_code = getattr(error, 'status_code', None)
-            if status_code == 503 or "503" in error_str or "service unavailable" in error_str:
+            status_code = getattr(error, 'code', None)
+            
+            if status_code == 503:
                 return (
-                    "The AI service is temporarily unavailable due to high demand or maintenance. "
-                    "Please try again in a few minutes."
+                    "🔄 The AI service is currently experiencing high demand. "
+                    "The system automatically retried your request, but the service is still overloaded. "
+                    "Please wait a few moments and try again."
                 )
-            elif status_code == 502 or "502" in error_str or "bad gateway" in error_str:
+            elif status_code == 502:
                 return (
-                    "The AI service is experiencing connectivity issues. "
+                    "🔌 The AI service is experiencing connectivity issues. "
                     "Please try again in a moment."
                 )
-            elif status_code == 500 or "500" in error_str or "internal server error" in error_str:
+            elif status_code == 500:
                 return (
-                    "The AI service is experiencing internal issues. "
+                    "⚠️ The AI service is experiencing internal issues. "
                     "Please try again later."
                 )
-            else:
+            elif status_code == 429:
                 return (
-                    f"The AI service returned an error (HTTP {status_code}). "
-                    "Please try again later."
+                    "⏱️ Too many requests have been sent to the AI service. "
+                    "Please wait a moment before trying again."
                 )
-        elif isinstance(error, ClientError):
-            return (
-                "There was an issue with the request to the AI service. "
-                "Please check your input and try again."
-            )
-        elif isinstance(error, APIError):
-            return (
-                "There was an API communication error with the AI service. "
-                "Please try again later."
-            )
         
-        # Handle specific TypeError cases (like API method signature changes)
-        if isinstance(error, TypeError) and "unexpected keyword argument" in error_str:
-            logger.error(f"API method signature error: {error}")
-            return (
-                "There was an issue with the AI service API. This may be due to "
-                "a version compatibility problem. Please contact support if this persists."
-            )
-        elif "api key" in error_str or "authentication" in error_str:
-            return (
-                "There was an authentication issue with the AI service. "
-                "Please check that your API key is correctly configured."
-            )
-        elif "quota" in error_str or "limit" in error_str or "rate" in error_str:
-            return (
-                "The AI service is currently experiencing high demand or rate limits. "
-                "Please try again in a few moments."
-            )
-        elif "network" in error_str or "connection" in error_str or "timeout" in error_str:
-            return (
-                "There was a network connectivity issue. "
+        # Define error patterns and their corresponding messages
+        error_patterns = {
+            ("api key", "authentication", "unauthorized"): (
+                "🔑 There was an authentication issue with the AI service. "
+                "Please check that your API key is correctly configured in Settings."
+            ),
+            ("quota", "limit"): (
+                "📊 The AI service quota has been reached. "
+                "Please try again later or check your API quota."
+            ),
+            ("network", "connection", "timeout"): (
+                "🌐 There was a network connectivity issue. "
                 "Please check your internet connection and try again."
-            )
-        elif "model" in error_str and ("not found" in error_str or "unavailable" in error_str):
-            return (
-                "The requested AI model is currently unavailable. "
-                "Please try again later or contact support."
-            )
-        else:
-            logger.error(f"Unexpected error in AI agent: {error}", exc_info=True)
-            return (
-                "I'm experiencing a temporary issue and cannot process your request right now. "
-                "Please try again later."
-            )
+            ),
+        }
+        
+        # Check error patterns
+        for patterns, message in error_patterns.items():
+            if any(pattern in error_str for pattern in patterns):
+                return message
+        
+        # Handle generic APIError
+        if isinstance(error, APIError):
+            status_code = getattr(error, 'code', None)
+            if status_code:
+                return f"⚠️ The AI service returned an error (code {status_code}). Please try again later."
+        
+        # Generic error response
+        logger.error(f"Unexpected error in AI agent: {error}", exc_info=True)
+        return (
+            "❌ I'm experiencing a temporary issue and cannot process your request right now. "
+            "Please try again later."
+        )

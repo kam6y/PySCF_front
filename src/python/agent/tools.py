@@ -8,28 +8,88 @@ Each function is optimized for Gemini SDK's Function Calling feature and
 serves as an API wrapper that strictly adheres to OpenAPI specifications.
 """
 
+"""
+AI Agent Tool Wrapper Module
+
+This module provides Python wrapper functions that enable AI agents to 
+utilize PySCF_front application API endpoints.
+
+Each function is optimized for Gemini SDK's Function Calling feature and 
+serves as an API wrapper that strictly adheres to OpenAPI specifications.
+"""
+
 import json
 import logging
 import os
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import requests
 
-# ロガー設定
+# Logger configuration
 logger = logging.getLogger(__name__)
 
-# Local API server base URL with dynamic port detection
+# Constants
+DEFAULT_PORT = 5000
+API_TIMEOUT = 30  # seconds
+API_HOST = "127.0.0.1"
+
+
 def get_api_base_url() -> str:
     """Get the API base URL with dynamic port detection."""
-    # Try to get the server port from environment variable set by main.ts
-    server_port = os.getenv('PYSCF_SERVER_PORT')
-    if server_port:
-        return f"http://127.0.0.1:{server_port}"
-    
-    # Fallback to default port if environment variable is not set
-    return "http://127.0.0.1:5000"
+    server_port = os.getenv('PYSCF_SERVER_PORT', str(DEFAULT_PORT))
+    return f"http://{API_HOST}:{server_port}"
+
 
 API_BASE_URL = get_api_base_url()
+
+
+def _handle_request_error(error: Exception, context: str = "") -> str:
+    """
+    Handle request errors and return appropriate error messages.
+    
+    Args:
+        error: The exception that occurred
+        context: Additional context about where the error occurred
+        
+    Returns:
+        str: Formatted error message
+    """
+    context_prefix = f"{context}: " if context else ""
+    
+    if isinstance(error, requests.exceptions.HTTPError):
+        status_code = error.response.status_code
+        if status_code == 404:
+            return f"Error: {context_prefix}Resource not found. Please verify the request parameters."
+        elif status_code == 400:
+            try:
+                error_detail = error.response.json()
+                return f"Error: {context_prefix}Invalid request - {error_detail.get('message', 'Bad request')}"
+            except:
+                return f"Error: {context_prefix}Invalid request parameters. Please check your input values."
+        elif status_code >= 500:
+            return f"Error: {context_prefix}Internal server error occurred. Please try again after a moment."
+        else:
+            return f"Error: {context_prefix}HTTP error occurred (status code {status_code})."
+    
+    elif isinstance(error, requests.exceptions.ConnectionError):
+        logger.error(f"Connection error in {context}: {error}")
+        return "Error: Could not connect to API server. Please check if the server is running."
+    
+    elif isinstance(error, requests.exceptions.Timeout):
+        logger.error(f"Timeout error in {context}: {error}")
+        return "Error: API request timed out. Please try again after a moment."
+    
+    elif isinstance(error, requests.exceptions.RequestException):
+        logger.error(f"Request error in {context}: {error}")
+        return f"Error: Network error occurred: {str(error)}"
+    
+    elif isinstance(error, json.JSONDecodeError):
+        logger.error(f"JSON decode error in {context}: {error}")
+        return "Error: Failed to parse API response."
+    
+    else:
+        logger.error(f"Unexpected error in {context}: {error}")
+        return f"Error: An unexpected error occurred: {str(error)}"
 
 
 def list_all_calculations() -> str:
@@ -45,45 +105,11 @@ def list_all_calculations() -> str:
     """
     try:
         logger.debug("Fetching all calculations from API")
-        response = requests.get(f"{API_BASE_URL}/api/quantum/calculations", timeout=30)
+        response = requests.get(f"{API_BASE_URL}/api/quantum/calculations", timeout=API_TIMEOUT)
         response.raise_for_status()
-        
-        # レスポンスをJSON文字列として返す
         return json.dumps(response.json(), ensure_ascii=False, indent=2)
-        
-    except requests.exceptions.HTTPError as e:
-        error_msg = f"HTTP error occurred during API call: {e.response.status_code}"
-        if e.response.status_code == 404:
-            error_msg = "Calculation list not found."
-        elif e.response.status_code >= 500:
-            error_msg = "Internal server error occurred. Please try again after a moment."
-        logger.error(f"HTTP error in list_all_calculations: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.ConnectionError as e:
-        error_msg = "Could not connect to API server. Please check if the server is running."
-        logger.error(f"Connection error in list_all_calculations: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.Timeout as e:
-        error_msg = "API request timed out. Please try again after a moment."
-        logger.error(f"Timeout error in list_all_calculations: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Network error occurred: {str(e)}"
-        logger.error(f"Request error in list_all_calculations: {e}")
-        return f"Error: {error_msg}"
-        
-    except json.JSONDecodeError as e:
-        error_msg = "Failed to parse API response."
-        logger.error(f"JSON decode error in list_all_calculations: {e}")
-        return f"Error: {error_msg}"
-        
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
-        logger.error(f"Unexpected error in list_all_calculations: {e}")
-        return f"Error: {error_msg}"
+        return _handle_request_error(e, "list_all_calculations")
 
 
 def get_calculation_details(calculation_id: str) -> str:
@@ -108,47 +134,12 @@ def get_calculation_details(calculation_id: str) -> str:
         logger.debug(f"Fetching calculation details for ID: {calculation_id}")
         response = requests.get(
             f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}", 
-            timeout=30
+            timeout=API_TIMEOUT
         )
         response.raise_for_status()
-        
-        # レスポンスをJSON文字列として返す
         return json.dumps(response.json(), ensure_ascii=False, indent=2)
-        
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            error_msg = f"Calculation with ID '{calculation_id}' not found. Please verify the ID is correct."
-        elif e.response.status_code >= 500:
-            error_msg = "Internal server error occurred. Please try again after a moment."
-        else:
-            error_msg = f"HTTP error occurred during API call: {e.response.status_code}"
-        logger.error(f"HTTP error in get_calculation_details: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.ConnectionError as e:
-        error_msg = "Could not connect to API server. Please check if the server is running."
-        logger.error(f"Connection error in get_calculation_details: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.Timeout as e:
-        error_msg = "API request timed out. Please try again after a moment."
-        logger.error(f"Timeout error in get_calculation_details: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Network error occurred: {str(e)}"
-        logger.error(f"Request error in get_calculation_details: {e}")
-        return f"Error: {error_msg}"
-        
-    except json.JSONDecodeError as e:
-        error_msg = "Failed to parse API response."
-        logger.error(f"JSON decode error in get_calculation_details: {e}")
-        return f"Error: {error_msg}"
-        
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
-        logger.error(f"Unexpected error in get_calculation_details: {e}")
-        return f"Error: {error_msg}"
+        return _handle_request_error(e, f"get_calculation_details(id={calculation_id})")
 
 
 def get_supported_parameters() -> str:
@@ -165,44 +156,11 @@ def get_supported_parameters() -> str:
     """
     try:
         logger.debug("Fetching supported parameters from API")
-        response = requests.get(f"{API_BASE_URL}/api/quantum/supported-parameters", timeout=30)
+        response = requests.get(f"{API_BASE_URL}/api/quantum/supported-parameters", timeout=API_TIMEOUT)
         response.raise_for_status()
-        
-        # レスポンスをJSON文字列として返す
         return json.dumps(response.json(), ensure_ascii=False, indent=2)
-        
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code >= 500:
-            error_msg = "Internal server error occurred. Please try again after a moment."
-        else:
-            error_msg = f"HTTP error occurred during API call: {e.response.status_code}"
-        logger.error(f"HTTP error in get_supported_parameters: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.ConnectionError as e:
-        error_msg = "Could not connect to API server. Please check if the server is running."
-        logger.error(f"Connection error in get_supported_parameters: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.Timeout as e:
-        error_msg = "API request timed out. Please try again after a moment."
-        logger.error(f"Timeout error in get_supported_parameters: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Network error occurred: {str(e)}"
-        logger.error(f"Request error in get_supported_parameters: {e}")
-        return f"Error: {error_msg}"
-        
-    except json.JSONDecodeError as e:
-        error_msg = "Failed to parse API response."
-        logger.error(f"JSON decode error in get_supported_parameters: {e}")
-        return f"Error: {error_msg}"
-        
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
-        logger.error(f"Unexpected error in get_supported_parameters: {e}")
-        return f"Error: {error_msg}"
+        return _handle_request_error(e, "get_supported_parameters")
 
 
 def start_quantum_calculation(
@@ -269,53 +227,15 @@ def start_quantum_calculation(
         response = requests.post(
             f"{API_BASE_URL}/api/quantum/calculate",
             json=request_data,
-            timeout=30
+            timeout=API_TIMEOUT
         )
         response.raise_for_status()
         
-        # Return the response as JSON string
         result = response.json()
         logger.info(f"Successfully started calculation with ID: {result.get('id', 'unknown')}")
         return json.dumps(result, ensure_ascii=False, indent=2)
-        
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 400:
-            try:
-                error_detail = e.response.json()
-                error_msg = f"Invalid calculation parameters: {error_detail.get('message', 'Bad request')}"
-            except:
-                error_msg = "Invalid calculation parameters. Please check your input values."
-        elif e.response.status_code >= 500:
-            error_msg = "Internal server error occurred while starting calculation. Please try again after a moment."
-        else:
-            error_msg = f"HTTP error occurred during API call: {e.response.status_code}"
-        logger.error(f"HTTP error in start_quantum_calculation: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.ConnectionError as e:
-        error_msg = "Could not connect to API server. Please check if the server is running."
-        logger.error(f"Connection error in start_quantum_calculation: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.Timeout as e:
-        error_msg = "API request timed out. Please try again after a moment."
-        logger.error(f"Timeout error in start_quantum_calculation: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Network error occurred: {str(e)}"
-        logger.error(f"Request error in start_quantum_calculation: {e}")
-        return f"Error: {error_msg}"
-        
-    except json.JSONDecodeError as e:
-        error_msg = "Failed to parse API response."
-        logger.error(f"JSON decode error in start_quantum_calculation: {e}")
-        return f"Error: {error_msg}"
-        
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
-        logger.error(f"Unexpected error in start_quantum_calculation: {e}")
-        return f"Error: {error_msg}"
+        return _handle_request_error(e, "start_quantum_calculation")
 
 
 def search_pubchem_by_name(
@@ -360,52 +280,12 @@ def search_pubchem_by_name(
         response = requests.post(
             f"{API_BASE_URL}/api/pubchem/search",
             json=request_data,
-            timeout=30
+            timeout=API_TIMEOUT
         )
         response.raise_for_status()
         
-        # Return the response as JSON string
         result = response.json()
         logger.info(f"Successfully found compound: {result.get('name', compound_name)}")
         return json.dumps(result, ensure_ascii=False, indent=2)
-        
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            error_msg = f"Compound '{compound_name}' not found in PubChem database. Please check the spelling or try a different search term."
-        elif e.response.status_code == 400:
-            try:
-                error_detail = e.response.json()
-                error_msg = f"Invalid search request: {error_detail.get('message', 'Bad request')}"
-            except:
-                error_msg = "Invalid search parameters. Please check your input values."
-        elif e.response.status_code >= 500:
-            error_msg = "Internal server error occurred while searching PubChem. Please try again after a moment."
-        else:
-            error_msg = f"HTTP error occurred during API call: {e.response.status_code}"
-        logger.error(f"HTTP error in search_pubchem_by_name: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.ConnectionError as e:
-        error_msg = "Could not connect to API server. Please check if the server is running."
-        logger.error(f"Connection error in search_pubchem_by_name: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.Timeout as e:
-        error_msg = "API request timed out. Please try again after a moment."
-        logger.error(f"Timeout error in search_pubchem_by_name: {e}")
-        return f"Error: {error_msg}"
-        
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Network error occurred: {str(e)}"
-        logger.error(f"Request error in search_pubchem_by_name: {e}")
-        return f"Error: {error_msg}"
-        
-    except json.JSONDecodeError as e:
-        error_msg = "Failed to parse API response."
-        logger.error(f"JSON decode error in search_pubchem_by_name: {e}")
-        return f"Error: {error_msg}"
-        
     except Exception as e:
-        error_msg = f"An unexpected error occurred: {str(e)}"
-        logger.error(f"Unexpected error in search_pubchem_by_name: {e}")
-        return f"Error: {error_msg}"
+        return _handle_request_error(e, f"search_pubchem_by_name(compound={compound_name})")

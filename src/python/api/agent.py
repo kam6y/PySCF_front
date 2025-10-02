@@ -5,17 +5,78 @@ Handles chat interactions with the AI agent for molecular analysis and assistanc
 
 import logging
 import json
+from typing import Iterator, Dict, Any
 from flask import Blueprint, jsonify, Response, stream_with_context
 from flask_pydantic import validate
 
-from generated_models import AgentChatRequest, AgentChatResponse
+from generated_models import AgentChatRequest
 from agent.molecular_agent import MolecularAgent
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# Constants
+MAX_MESSAGE_LENGTH = 10000  # Maximum allowed message length in characters
+
+
+def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
+    """
+    Format a Server-Sent Event message.
+    
+    Args:
+        event_type: Type of event ('chunk', 'done', 'error')
+        payload: Optional payload data
+        
+    Returns:
+        Formatted SSE message string
+    """
+    event_data = {"type": event_type}
+    if payload:
+        event_data["payload"] = payload
+    return f"data: {json.dumps(event_data)}\n\n"
+
+
 # Create agent blueprint
 agent_bp = Blueprint('agent', __name__)
+
+def _create_fallback_stream() -> Iterator[str]:
+    """Create a fallback SSE stream when the molecular agent is not available."""
+    fallback_message = "The AI agent service is currently not available. Please check the server configuration."
+    yield _format_sse_event("chunk", {"text": fallback_message})
+    yield _format_sse_event("done")
+
+
+def _create_agent_stream(message: str, history: list) -> Iterator[str]:
+    """
+    Create an SSE stream for agent responses.
+    
+    Args:
+        message: User's message
+        history: Chat history
+        
+    Yields:
+        SSE formatted strings
+    """
+    chunks_count = 0
+    try:
+        logger.debug(f"Starting stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
+        
+        # Call the agent's chat method
+        chunks_iterator = molecular_agent.chat(message, history)
+        for chunk in chunks_iterator:
+            chunks_count += 1
+            logger.debug(f"Streaming chunk #{chunks_count}, length: {len(chunk)}")
+            yield _format_sse_event("chunk", {"text": chunk})
+        
+        logger.debug(f"Stream completed successfully with {chunks_count} chunks")
+        
+    except Exception as e:
+        logger.error(f"Error during streaming after {chunks_count} chunks: {e}", exc_info=True)
+        yield _format_sse_event("error", {"message": "An error occurred during the stream."})
+    finally:
+        logger.debug("Sending stream completion event")
+        yield _format_sse_event("done")
+
 
 # Initialize the molecular agent (singleton instance)
 try:
@@ -35,8 +96,8 @@ def chat_with_agent(body: AgentChatRequest):
         if not body.message or not body.message.strip():
             raise ValueError("Message cannot be empty")
         
-        if len(body.message) > 10000:  # Set reasonable message length limit
-            raise ValueError("Message is too long (maximum 10,000 characters)")
+        if len(body.message) > MAX_MESSAGE_LENGTH:
+            raise ValueError(f"Message is too long (maximum {MAX_MESSAGE_LENGTH} characters)")
         
         logger.info(f"Processing agent chat request - Message length: {len(body.message)}, History entries: {len(body.history or [])}")
         logger.debug(f"Message preview: {body.message[:100]}{'...' if len(body.message) > 100 else ''}")
@@ -44,44 +105,16 @@ def chat_with_agent(body: AgentChatRequest):
         # Check if molecular agent is available
         if not molecular_agent:
             logger.warning("MolecularAgent not available, returning fallback response")
-            
-            def fallback_stream():
-                fallback_message = "The AI agent service is currently not available. Please check the server configuration."
-                sse_data = json.dumps({"type": "chunk", "payload": {"text": fallback_message}})
-                yield f"data: {sse_data}\n\n"
-                done_data = json.dumps({"type": "done"})
-                yield f"data: {done_data}\n\n"
-            
-            return Response(stream_with_context(fallback_stream()), content_type='text/event-stream')
+            return Response(
+                stream_with_context(_create_fallback_stream()),
+                content_type='text/event-stream'
+            )
 
-        def stream():
-            """エージェントからの応答をSSE形式でストリーミングするジェネレータ"""
-            chunks_count = 0
-            try:
-                logger.debug(f"Starting stream for message: {body.message[:100]}{'...' if len(body.message) > 100 else ''}")
-                
-                # ジェネレータ版のchatメソッドを呼び出す
-                chunks_iterator = molecular_agent.chat(body.message, body.history or [])
-                for chunk in chunks_iterator:
-                    chunks_count += 1
-                    logger.debug(f"Streaming chunk #{chunks_count}, length: {len(chunk)}")
-                    
-                    # SSE形式でデータをフォーマットしてyield
-                    sse_data = json.dumps({"type": "chunk", "payload": {"text": chunk}})
-                    yield f"data: {sse_data}\n\n"
-                logger.debug(f"Stream completed successfully with {chunks_count} chunks")
-                
-            except Exception as e:
-                logger.error(f"Error during streaming after {chunks_count} chunks: {e}", exc_info=True)
-                error_data = json.dumps({"type": "error", "payload": {"message": "An error occurred during the stream."}})
-                yield f"data: {error_data}\n\n"
-            finally:
-                # ストリームの終了を通知するイベント
-                logger.debug("Sending stream completion event")
-                done_data = json.dumps({"type": "done"})
-                yield f"data: {done_data}\n\n"
-        # Responseオブジェクトをストリームとして返す
-        return Response(stream_with_context(stream()), content_type='text/event-stream')
+        # Return streaming response
+        return Response(
+            stream_with_context(_create_agent_stream(body.message, body.history or [])),
+            content_type='text/event-stream'
+        )
 
     except ValueError as e:
         logger.warning(f"Validation error in agent chat: {e}")
