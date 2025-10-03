@@ -11,7 +11,7 @@
 .chatWindow {
   flex-grow: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 52px 20px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -423,4 +423,37 @@
 .markdown .hljs-builtin-name,
 .markdown .hljs-built_in {
   color: #005cc5;
+}
+
+/* Clear button styles */
+.clearButtonContainer {
+  position: absolute;
+  top: 12px;
+  right: 20px;
+  z-index: 10;
+}
+
+.clearButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.clearButton:hover {
+  background-color: #ef4444;
+  color: white;
+  border-color: #ef4444;
+}
+
+.clearButton svg {
+  flex-shrink: 0;
 }

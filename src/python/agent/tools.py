@@ -8,16 +8,6 @@ Each function is optimized for Gemini SDK's Function Calling feature and
 serves as an API wrapper that strictly adheres to OpenAPI specifications.
 """
 
-"""
-AI Agent Tool Wrapper Module
-
-This module provides Python wrapper functions that enable AI agents to 
-utilize PySCF_front application API endpoints.
-
-Each function is optimized for Gemini SDK's Function Calling feature and 
-serves as an API wrapper that strictly adheres to OpenAPI specifications.
-"""
-
 import json
 import logging
 import os
@@ -524,3 +514,569 @@ def _execute_confirmed_deletion(calculation_id: str) -> Dict[str, Any]:
             "message": error_msg,
             "calculation_id": calculation_id
         }
+
+
+def convert_smiles_to_xyz(smiles: str) -> str:
+    """
+    Convert a SMILES string to 3D XYZ molecular structure format.
+    
+    This function takes a SMILES (Simplified Molecular Input Line Entry System) string
+    and converts it to a 3D molecular structure in XYZ format suitable for quantum chemistry calculations.
+    The conversion includes 3D coordinate generation and geometry optimization.
+    
+    Args:
+        smiles (str): SMILES string representing the molecular structure.
+                     Examples: 'CCO' (ethanol), 'c1ccccc1' (benzene), 'CC(=O)O' (acetic acid)
+    
+    Returns:
+        str: JSON string containing the converted XYZ structure.
+             On success, includes xyz field with the molecular structure.
+             On error, contains structured error message.
+    """
+    # Input validation
+    if not smiles or not isinstance(smiles, str):
+        return "Error: smiles parameter is required and must be a non-empty string."
+    
+    if len(smiles.strip()) == 0:
+        return "Error: smiles string cannot be empty or contain only whitespace."
+    
+    # SMILES strings typically don't exceed 500 characters for reasonable molecules
+    if len(smiles) > 500:
+        return "Error: smiles string is too long. Maximum length is 500 characters."
+    
+    # Prepare request data
+    request_data = {
+        "smiles": smiles.strip()
+    }
+    
+    try:
+        logger.debug(f"Converting SMILES to XYZ: '{smiles}'")
+        response = requests.post(
+            f"{API_BASE_URL}/api/smiles/convert",
+            json=request_data,
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        logger.info(f"Successfully converted SMILES to XYZ structure")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, f"convert_smiles_to_xyz(smiles={smiles})")
+
+
+def validate_xyz_format(xyz: str) -> str:
+    """
+    Validate the format of an XYZ molecular structure string.
+    
+    This function checks whether a given string is properly formatted as XYZ molecular structure data.
+    It validates the number of atoms, element symbols, and coordinate values.
+    
+    Args:
+        xyz (str): XYZ format string to validate.
+                  Expected format:
+                  Line 1: Number of atoms
+                  Line 2: Comment line (molecule name)
+                  Lines 3+: Element X Y Z (coordinates in Angstroms)
+    
+    Returns:
+        str: JSON string containing validation results.
+             On success, includes valid=true and parsed structure information.
+             On validation failure, includes valid=false and error message.
+    """
+    # Input validation
+    if not xyz or not isinstance(xyz, str):
+        return "Error: xyz parameter is required and must be a non-empty string."
+    
+    if len(xyz.strip()) == 0:
+        return "Error: xyz string cannot be empty or contain only whitespace."
+    
+    # Prepare request data
+    request_data = {
+        "xyz": xyz.strip()
+    }
+    
+    try:
+        logger.debug("Validating XYZ format")
+        response = requests.post(
+            f"{API_BASE_URL}/api/pubchem/validate",
+            json=request_data,
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        is_valid = result.get('data', {}).get('valid', False)
+        logger.info(f"XYZ validation result: {'valid' if is_valid else 'invalid'}")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, "validate_xyz_format")
+
+
+
+def get_molecular_orbitals(calculation_id: str) -> str:
+    """
+    Retrieve molecular orbital information for a completed calculation.
+    
+    This function returns detailed information about all molecular orbitals including
+    their energies, occupancies, and types (HOMO, LUMO, core, virtual).
+    This data is useful for understanding electronic structure and preparing orbital visualizations.
+    
+    Args:
+        calculation_id (str): Unique ID of the calculation.
+                             Example: "calc_20240101_120000_abcd1234"
+    
+    Returns:
+        str: JSON string containing orbital information.
+             On success, includes:
+             - List of all orbitals with energies (Hartree and eV), occupancy, and labels
+             - HOMO and LUMO indices
+             - Total number of occupied and virtual orbitals
+             On error, contains structured error message.
+    """
+    # Input validation
+    if not calculation_id or not isinstance(calculation_id, str):
+        return "Error: calculation_id is a required string parameter."
+    
+    if len(calculation_id.strip()) == 0:
+        return "Error: calculation_id cannot be empty or contain only whitespace."
+    
+    try:
+        logger.debug(f"Fetching molecular orbital information for calculation: {calculation_id}")
+        response = requests.get(
+            f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}/orbitals",
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        num_orbitals = result.get('data', {}).get('total_orbitals', 0)
+        logger.info(f"Successfully retrieved {num_orbitals} molecular orbitals for calculation {calculation_id}")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, f"get_molecular_orbitals(id={calculation_id})")
+
+
+def generate_orbital_cube(
+    calculation_id: str,
+    orbital_index: int,
+    grid_size: int = 80,
+    isovalue_pos: float = 0.02,
+    isovalue_neg: float = -0.02
+) -> str:
+    """
+    Generate a CUBE file for visualizing a specific molecular orbital.
+    
+    CUBE files contain 3D volumetric data for orbital visualization in molecular viewers.
+    This function generates the CUBE file data for a specified orbital with customizable
+    grid resolution and isosurface values.
+    
+    Args:
+        calculation_id (str): Unique ID of the calculation.
+                             Example: "calc_20240101_120000_abcd1234"
+        orbital_index (int): Index of the molecular orbital to visualize (0-based).
+                            Use get_molecular_orbitals() to find available orbital indices.
+        grid_size (int): Grid resolution for the CUBE file (40-120).
+                        Higher values give better resolution but larger files.
+                        Default: 80
+        isovalue_pos (float): Positive isovalue for orbital surface (0.001-0.1).
+                             Default: 0.02
+        isovalue_neg (float): Negative isovalue for orbital surface (-0.1 to -0.001).
+                             Default: -0.02
+    
+    Returns:
+        str: JSON string containing CUBE file data and metadata.
+             On success, includes:
+             - cube_data: CUBE file content as string
+             - orbital_info: Information about the orbital
+             - generation_params: Parameters used for generation
+             - file_path: Path to saved file (if cached)
+             On error, contains structured error message.
+    """
+    # Input validation
+    if not calculation_id or not isinstance(calculation_id, str):
+        return "Error: calculation_id is a required string parameter."
+    
+    if len(calculation_id.strip()) == 0:
+        return "Error: calculation_id cannot be empty or contain only whitespace."
+    
+    if not isinstance(orbital_index, int) or orbital_index < 0:
+        return "Error: orbital_index must be a non-negative integer."
+    
+    if not isinstance(grid_size, int) or grid_size < 40 or grid_size > 120:
+        return "Error: grid_size must be an integer between 40 and 120."
+    
+    if not isinstance(isovalue_pos, (int, float)) or isovalue_pos < 0.001 or isovalue_pos > 0.1:
+        return "Error: isovalue_pos must be a number between 0.001 and 0.1."
+    
+    if not isinstance(isovalue_neg, (int, float)) or isovalue_neg < -0.1 or isovalue_neg > -0.001:
+        return "Error: isovalue_neg must be a number between -0.1 and -0.001."
+    
+    # Prepare query parameters
+    params = {
+        "gridSize": grid_size,
+        "isovaluePos": isovalue_pos,
+        "isovalueNeg": isovalue_neg
+    }
+    
+    try:
+        logger.debug(f"Generating CUBE file for orbital {orbital_index} in calculation {calculation_id}")
+        response = requests.get(
+            f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}/orbitals/{orbital_index}/cube",
+            params=params,
+            timeout=API_TIMEOUT * 2  # CUBE generation can take longer
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        logger.info(f"Successfully generated CUBE file for orbital {orbital_index}")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, f"generate_orbital_cube(id={calculation_id}, orbital={orbital_index})")
+
+
+def list_cube_files(calculation_id: str) -> str:
+    """
+    List all generated CUBE files for a calculation.
+    
+    This function retrieves a list of all CUBE files that have been previously generated
+    for molecular orbitals in a specific calculation. Useful for managing cached files
+    and understanding what visualizations are available.
+    
+    Args:
+        calculation_id (str): Unique ID of the calculation.
+                             Example: "calc_20240101_120000_abcd1234"
+    
+    Returns:
+        str: JSON string containing list of CUBE files.
+             On success, includes:
+             - Array of CUBE file information (filename, path, orbital index, size, etc.)
+             - Total number of files
+             - Total size in KB
+             On error, contains structured error message.
+    """
+    # Input validation
+    if not calculation_id or not isinstance(calculation_id, str):
+        return "Error: calculation_id is a required string parameter."
+    
+    if len(calculation_id.strip()) == 0:
+        return "Error: calculation_id cannot be empty or contain only whitespace."
+    
+    try:
+        logger.debug(f"Listing CUBE files for calculation: {calculation_id}")
+        response = requests.get(
+            f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}/orbitals/cube-files",
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        num_files = result.get('data', {}).get('total_files', 0)
+        logger.info(f"Found {num_files} CUBE files for calculation {calculation_id}")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, f"list_cube_files(id={calculation_id})")
+
+
+def delete_cube_files(calculation_id: str, orbital_index: Optional[int] = None) -> str:
+    """
+    Delete CUBE files for a calculation.
+    
+    This function removes generated CUBE files to free up disk space.
+    You can delete a specific orbital's CUBE file or all CUBE files for the calculation.
+    
+    Args:
+        calculation_id (str): Unique ID of the calculation.
+                             Example: "calc_20240101_120000_abcd1234"
+        orbital_index (int, optional): Specific orbital index to delete.
+                                      If None, deletes all CUBE files for the calculation.
+                                      Default: None (delete all)
+    
+    Returns:
+        str: JSON string containing deletion result.
+             On success, includes:
+             - Number of files deleted
+             - Confirmation message
+             On error, contains structured error message.
+    """
+    # Input validation
+    if not calculation_id or not isinstance(calculation_id, str):
+        return "Error: calculation_id is a required string parameter."
+    
+    if len(calculation_id.strip()) == 0:
+        return "Error: calculation_id cannot be empty or contain only whitespace."
+    
+    if orbital_index is not None and (not isinstance(orbital_index, int) or orbital_index < 0):
+        return "Error: orbital_index must be a non-negative integer or None."
+    
+    # Prepare query parameters
+    params = {}
+    if orbital_index is not None:
+        params["orbitalIndex"] = orbital_index
+    
+    try:
+        if orbital_index is not None:
+            logger.debug(f"Deleting CUBE file for orbital {orbital_index} in calculation {calculation_id}")
+        else:
+            logger.debug(f"Deleting all CUBE files for calculation {calculation_id}")
+        
+        response = requests.delete(
+            f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}/orbitals/cube-files",
+            params=params,
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        num_deleted = result.get('data', {}).get('deleted_files', 0)
+        logger.info(f"Successfully deleted {num_deleted} CUBE file(s)")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        context = f"orbital {orbital_index}" if orbital_index is not None else "all orbitals"
+        return _handle_request_error(e, f"delete_cube_files(id={calculation_id}, {context})")
+
+
+def generate_ir_spectrum(
+    calculation_id: str,
+    broadening_fwhm: float = 100.0,
+    x_min: float = 400.0,
+    x_max: float = 4000.0,
+    show_peaks: bool = True
+) -> str:
+    """
+    Generate theoretical IR (infrared) spectrum from vibrational frequency data.
+    
+    This function creates an IR spectrum plot with Lorentzian broadening and scale factor corrections
+    based on the calculation method and basis set. The spectrum is useful for comparing with
+    experimental IR spectroscopy data and identifying functional groups.
+    
+    Note: This function requires that the calculation included vibrational frequency analysis.
+    
+    Args:
+        calculation_id (str): Unique ID of the calculation.
+                             Example: "calc_20240101_120000_abcd1234"
+        broadening_fwhm (float): Full width at half maximum for Lorentzian broadening in cm⁻¹.
+                                Higher values create broader, smoother peaks.
+                                Range: 0.1-1000.0, Default: 100.0
+        x_min (float): Minimum wavenumber for spectrum range in cm⁻¹.
+                      Range: 0.0+, Default: 400.0
+        x_max (float): Maximum wavenumber for spectrum range in cm⁻¹.
+                      Range: up to 10000.0, Default: 4000.0
+        show_peaks (bool): Whether to mark individual peaks in the plot.
+                          Default: True
+    
+    Returns:
+        str: JSON string containing IR spectrum data.
+             On success, includes:
+             - spectrum: x_axis (wavenumbers), y_axis (intensities), peaks, metadata
+             - generation_info: Parameters used for generation
+             On error, contains structured error message.
+    """
+    # Input validation
+    if not calculation_id or not isinstance(calculation_id, str):
+        return "Error: calculation_id is a required string parameter."
+    
+    if len(calculation_id.strip()) == 0:
+        return "Error: calculation_id cannot be empty or contain only whitespace."
+    
+    if not isinstance(broadening_fwhm, (int, float)) or broadening_fwhm < 0.1 or broadening_fwhm > 1000.0:
+        return "Error: broadening_fwhm must be a number between 0.1 and 1000.0."
+    
+    if not isinstance(x_min, (int, float)) or x_min < 0.0:
+        return "Error: x_min must be a non-negative number."
+    
+    if not isinstance(x_max, (int, float)) or x_max > 10000.0:
+        return "Error: x_max must be a number up to 10000.0."
+    
+    if x_min >= x_max:
+        return "Error: x_min must be less than x_max."
+    
+    if not isinstance(show_peaks, bool):
+        return "Error: show_peaks must be a boolean value."
+    
+    # Prepare query parameters
+    params = {
+        "broadeningFwhm": broadening_fwhm,
+        "xMin": x_min,
+        "xMax": x_max,
+        "showPeaks": show_peaks
+    }
+    
+    try:
+        logger.debug(f"Generating IR spectrum for calculation: {calculation_id}")
+        response = requests.get(
+            f"{API_BASE_URL}/api/quantum/calculations/{calculation_id}/ir-spectrum",
+            params=params,
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        num_peaks = len(result.get('data', {}).get('spectrum', {}).get('peaks', []))
+        logger.info(f"Successfully generated IR spectrum with {num_peaks} peaks for calculation {calculation_id}")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, f"generate_ir_spectrum(id={calculation_id})")
+
+
+def get_app_settings() -> str:
+    """
+    Retrieve current application settings.
+    
+    This function returns the current configuration settings for the application,
+    including parallel processing limits, resource utilization constraints, and API keys.
+    
+    Returns:
+        str: JSON string containing application settings.
+             On success, includes:
+             - max_parallel_instances: Maximum number of parallel calculations
+             - max_cpu_utilization_percent: Maximum CPU usage percentage
+             - max_memory_utilization_percent: Maximum memory usage percentage
+             - system_total_cores: Total CPU cores in the system
+             - system_total_memory_mb: Total system memory in MB
+             - gemini_api_key: Google Gemini API key (if configured)
+             On error, contains structured error message.
+    """
+    try:
+        logger.debug("Fetching application settings")
+        response = requests.get(
+            f"{API_BASE_URL}/api/settings",
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        logger.info("Successfully retrieved application settings")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, "get_app_settings")
+
+
+def update_app_settings(
+    max_parallel_instances: Optional[int] = None,
+    max_cpu_utilization_percent: Optional[float] = None,
+    max_memory_utilization_percent: Optional[float] = None,
+    gemini_api_key: Optional[str] = None
+) -> str:
+    """
+    Update application settings.
+    
+    This function modifies the application configuration settings. All parameters are optional;
+    only provided parameters will be updated. This allows for partial updates without
+    affecting other settings.
+    
+    Args:
+        max_parallel_instances (int, optional): Maximum number of parallel calculation instances.
+                                               Range: 1-32
+        max_cpu_utilization_percent (float, optional): Maximum CPU utilization percentage.
+                                                       Range: 10.0-100.0
+        max_memory_utilization_percent (float, optional): Maximum memory utilization percentage.
+                                                          Range: 10.0-100.0
+        gemini_api_key (str, optional): Google Gemini API key for AI agent functionality.
+                                       Pass empty string to remove the key.
+    
+    Returns:
+        str: JSON string containing updated settings.
+             On success, includes all application settings with updated values.
+             On error, contains structured error message.
+    """
+    # Input validation
+    if max_parallel_instances is not None:
+        if not isinstance(max_parallel_instances, int) or max_parallel_instances < 1 or max_parallel_instances > 32:
+            return "Error: max_parallel_instances must be an integer between 1 and 32."
+    
+    if max_cpu_utilization_percent is not None:
+        if not isinstance(max_cpu_utilization_percent, (int, float)) or max_cpu_utilization_percent < 10.0 or max_cpu_utilization_percent > 100.0:
+            return "Error: max_cpu_utilization_percent must be a number between 10.0 and 100.0."
+    
+    if max_memory_utilization_percent is not None:
+        if not isinstance(max_memory_utilization_percent, (int, float)) or max_memory_utilization_percent < 10.0 or max_memory_utilization_percent > 100.0:
+            return "Error: max_memory_utilization_percent must be a number between 10.0 and 100.0."
+    
+    if gemini_api_key is not None and not isinstance(gemini_api_key, str):
+        return "Error: gemini_api_key must be a string."
+    
+    # First, get current settings
+    try:
+        logger.debug("Fetching current settings for update")
+        get_response = requests.get(
+            f"{API_BASE_URL}/api/settings",
+            timeout=API_TIMEOUT
+        )
+        get_response.raise_for_status()
+        current_settings = get_response.json().get('data', {}).get('settings', {})
+    except Exception as e:
+        return _handle_request_error(e, "update_app_settings (fetching current settings)")
+    
+    # Prepare update data with current values as defaults
+    update_data = {
+        "max_parallel_instances": current_settings.get('max_parallel_instances', 4),
+        "max_cpu_utilization_percent": current_settings.get('max_cpu_utilization_percent', 95.0),
+        "max_memory_utilization_percent": current_settings.get('max_memory_utilization_percent', 95.0),
+        "system_total_cores": current_settings.get('system_total_cores', 8),
+        "system_total_memory_mb": current_settings.get('system_total_memory_mb', 16384),
+        "gemini_api_key": current_settings.get('gemini_api_key')
+    }
+    
+    # Update with provided values
+    if max_parallel_instances is not None:
+        update_data["max_parallel_instances"] = max_parallel_instances
+    
+    if max_cpu_utilization_percent is not None:
+        update_data["max_cpu_utilization_percent"] = max_cpu_utilization_percent
+    
+    if max_memory_utilization_percent is not None:
+        update_data["max_memory_utilization_percent"] = max_memory_utilization_percent
+    
+    if gemini_api_key is not None:
+        update_data["gemini_api_key"] = gemini_api_key if gemini_api_key else None
+    
+    try:
+        logger.debug("Updating application settings")
+        response = requests.put(
+            f"{API_BASE_URL}/api/settings",
+            json=update_data,
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        logger.info("Successfully updated application settings")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, "update_app_settings")
+
+
+def get_system_resources() -> str:
+    """
+    Retrieve current system resource status and allocation information.
+    
+    This function provides detailed information about system resources including
+    CPU and memory usage, resource constraints from settings, and current allocation
+    to running calculations. Useful for monitoring system health and understanding
+    why new calculations might be queued.
+    
+    Returns:
+        str: JSON string containing system resource information.
+             On success, includes:
+             - system_info: Total and available CPU/memory, current usage percentages
+             - resource_constraints: Maximum allowed resource utilization from settings
+             - allocated_resources: Resources currently allocated to active calculations
+             On error, contains structured error message.
+    """
+    try:
+        logger.debug("Fetching system resource status")
+        response = requests.get(
+            f"{API_BASE_URL}/api/system/resource-status",
+            timeout=API_TIMEOUT
+        )
+        response.raise_for_status()
+        
+        result = response.json()
+        logger.info("Successfully retrieved system resource status")
+        return json.dumps(result, ensure_ascii=False, indent=2)
+    except Exception as e:
+        return _handle_request_error(e, "get_system_resources")
+
+
+

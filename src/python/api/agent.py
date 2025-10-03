@@ -17,7 +17,7 @@ from agent import tools
 logger = logging.getLogger(__name__)
 
 # Constants
-MAX_MESSAGE_LENGTH = 10000  # Maximum allowed message length in characters
+MAX_MESSAGE_LENGTH = 100000  # Maximum allowed message length in characters
 
 
 def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
@@ -40,6 +40,11 @@ def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
 # Create agent blueprint
 agent_bp = Blueprint('agent', __name__)
 
+# Global agent instance (will be initialized lazily)
+_molecular_agent = None
+_agent_lock = __import__('threading').Lock()
+
+
 def _create_fallback_stream() -> Iterator[str]:
     """Create a fallback SSE stream when the molecular agent is not available."""
     fallback_message = "The AI agent service is currently not available. Please check the server configuration."
@@ -47,11 +52,12 @@ def _create_fallback_stream() -> Iterator[str]:
     yield _format_sse_event("done")
 
 
-def _create_agent_stream(message: str, history: list) -> Iterator[str]:
+def _create_agent_stream(molecular_agent: MolecularAgent, message: str, history: list) -> Iterator[str]:
     """
     Create an SSE stream for agent responses.
     
     Args:
+        molecular_agent: The MolecularAgent instance to use for generating responses
         message: User's message
         history: Chat history
         
@@ -79,13 +85,35 @@ def _create_agent_stream(message: str, history: list) -> Iterator[str]:
         yield _format_sse_event("done")
 
 
-# Initialize the molecular agent (singleton instance)
-try:
-    molecular_agent = MolecularAgent()
-    logger.info("MolecularAgent initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize MolecularAgent: {e}")
-    molecular_agent = None
+def get_molecular_agent():
+    """
+    Get or create the MolecularAgent instance (lazy initialization).
+    This approach ensures that the agent is initialized after Gunicorn fork,
+    avoiding issues with Google Genai SDK and multiprocessing.
+    
+    Returns:
+        MolecularAgent or None: The agent instance, or None if initialization fails
+    """
+    global _molecular_agent
+    
+    # Fast path: if already initialized, return immediately
+    if _molecular_agent is not None:
+        return _molecular_agent
+    
+    # Slow path: acquire lock and initialize
+    with _agent_lock:
+        # Double-check pattern: another thread might have initialized while we waited
+        if _molecular_agent is not None:
+            return _molecular_agent
+        
+        try:
+            logger.info("Initializing MolecularAgent (lazy initialization after fork)")
+            _molecular_agent = MolecularAgent()
+            logger.info("MolecularAgent initialized successfully")
+            return _molecular_agent
+        except Exception as e:
+            logger.error(f"Failed to initialize MolecularAgent: {e}", exc_info=True)
+            return None
 
 
 @agent_bp.route('/api/agent/chat', methods=['POST'])
@@ -103,7 +131,8 @@ def chat_with_agent(body: AgentChatRequest):
         logger.info(f"Processing agent chat request - Message length: {len(body.message)}, History entries: {len(body.history or [])}")
         logger.debug(f"Message preview: {body.message[:100]}{'...' if len(body.message) > 100 else ''}")
         
-        # Check if molecular agent is available
+        # Get or initialize molecular agent (lazy initialization)
+        molecular_agent = get_molecular_agent()
         if not molecular_agent:
             logger.warning("MolecularAgent not available, returning fallback response")
             return Response(
@@ -111,9 +140,9 @@ def chat_with_agent(body: AgentChatRequest):
                 content_type='text/event-stream'
             )
 
-        # Return streaming response
+        # Return streaming response (pass molecular_agent instance)
         return Response(
-            stream_with_context(_create_agent_stream(body.message, body.history or [])),
+            stream_with_context(_create_agent_stream(molecular_agent, body.message, body.history or [])),
             content_type='text/event-stream'
         )
 
@@ -138,7 +167,9 @@ def execute_confirmed_action(body: ExecuteConfirmedActionRequest):
     """Execute a confirmed destructive action requested by AI agent."""
     try:
         logger.info(f"Processing confirmed action execution - Action type: {body.action_type}")
-
+        
+        # Note: This endpoint doesn't require molecular agent, it directly calls tool functions
+        
         # Handle different action types
         if body.action_type == AgentActionType.delete_calculation:
             # Validate that calculation_id is provided

@@ -37,12 +37,31 @@ class MolecularAgent:
                 # Import and set up available tools
                 from . import tools
                 self.available_tools = [
+                    # Calculation management
                     tools.list_all_calculations,
                     tools.get_calculation_details,
-                    tools.get_supported_parameters,
                     tools.start_quantum_calculation,
-                    tools.search_pubchem_by_name,
                     tools.delete_calculation,  # HIL-enabled destructive tool
+                    
+                    # Molecular structure tools
+                    tools.search_pubchem_by_name,
+                    tools.convert_smiles_to_xyz,
+                    tools.validate_xyz_format,
+                    
+                    # Molecular orbital analysis
+                    tools.get_molecular_orbitals,
+                    tools.generate_orbital_cube,
+                    tools.list_cube_files,
+                    tools.delete_cube_files,
+                    
+                    # Spectroscopy
+                    tools.generate_ir_spectrum,
+                    
+                    # System and settings
+                    tools.get_supported_parameters,
+                    tools.get_app_settings,
+                    tools.update_app_settings,
+                    tools.get_system_resources,
                 ]
                 
                 logger.info("Gemini API client initialized successfully with tool integration")
@@ -104,12 +123,32 @@ You can help users with quantum chemistry calculations, molecular structure anal
 IMPORTANT: You have access to powerful tools that can interact with the PySCF application backend. Use these tools actively to help users achieve their goals.
 
 **Available Tools:**
+
+**Calculation Management:**
 - `list_all_calculations`: Retrieve all saved quantum chemistry calculations
 - `get_calculation_details`: Get detailed results for a specific calculation ID
-- `get_supported_parameters`: Get available calculation methods, basis sets, functionals, and solvents
 - `start_quantum_calculation`: Start a new quantum chemistry calculation with molecular XYZ data
-- `search_pubchem_by_name`: Search PubChem database for molecular structures by compound name
 - `delete_calculation`: **[DESTRUCTIVE]** Request deletion of a calculation (requires user confirmation)
+
+**Molecular Structure Tools:**
+- `search_pubchem_by_name`: Search PubChem database for molecular structures by compound name, CID, or formula
+- `convert_smiles_to_xyz`: Convert SMILES strings to 3D XYZ molecular structure format
+- `validate_xyz_format`: Validate the format of XYZ molecular structure data
+
+**Molecular Orbital Analysis:**
+- `get_molecular_orbitals`: Retrieve molecular orbital information (energies, HOMO/LUMO, occupancies)
+- `generate_orbital_cube`: Generate CUBE files for visualizing specific molecular orbitals
+- `list_cube_files`: List all generated CUBE files for a calculation
+- `delete_cube_files`: Delete CUBE files to free up disk space
+
+**Spectroscopy:**
+- `generate_ir_spectrum`: Generate theoretical IR (infrared) spectrum from vibrational frequency data
+
+**System and Settings:**
+- `get_supported_parameters`: Get available calculation methods, basis sets, functionals, and solvents
+- `get_app_settings`: Retrieve current application settings (resource limits, API keys)
+- `update_app_settings`: Update application settings (parallel instances, resource utilization)
+- `get_system_resources`: Get current system resource status and allocation information
 
 **ReAct Framework Instructions:**
 Before taking any action, you MUST follow this pattern:
@@ -124,6 +163,10 @@ Before taking any action, you MUST follow this pattern:
 - Use tools proactively when they can help answer the user's question
 - If a tool returns an error, explain what happened and suggest alternatives
 - For calculation-related questions, always check the calculation list first
+- When users provide SMILES strings, use `convert_smiles_to_xyz` to convert them
+- For molecular orbital questions, use `get_molecular_orbitals` first to see available orbitals
+- When generating IR spectra, check if the calculation included frequency analysis
+- For system resource questions, use `get_system_resources` to provide accurate information
 - Provide scientific explanations when discussing quantum chemistry results
 - Be helpful, accurate, and educational in your responses
 
@@ -173,13 +216,32 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
                     # Reinitialize tools
                     from . import tools
                     self.available_tools = [
-                    tools.list_all_calculations,
-                    tools.get_calculation_details,
-                    tools.get_supported_parameters,
-                    tools.start_quantum_calculation,
-                    tools.search_pubchem_by_name,
+                        # Calculation management
+                        tools.list_all_calculations,
+                        tools.get_calculation_details,
+                        tools.start_quantum_calculation,
                     tools.delete_calculation,  # HIL-enabled destructive tool
-                ]
+                        
+                        # Molecular structure tools
+                        tools.search_pubchem_by_name,
+                        tools.convert_smiles_to_xyz,
+                        tools.validate_xyz_format,
+                        
+                        # Molecular orbital analysis
+                        tools.get_molecular_orbitals,
+                        tools.generate_orbital_cube,
+                        tools.list_cube_files,
+                        tools.delete_cube_files,
+                        
+                        # Spectroscopy
+                        tools.generate_ir_spectrum,
+                        
+                        # System and settings
+                        tools.get_supported_parameters,
+                        tools.get_app_settings,
+                        tools.update_app_settings,
+                        tools.get_system_resources,
+                    ]
                     
                     logger.info("Gemini API client reinitialized successfully after settings update")
                     return True
@@ -234,7 +296,7 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
                 
                 # Use new SDK with Function Calling
                 response_stream = self.client.models.generate_content_stream(
-                    model='gemini-2.5-pro',
+                    model='gemini-2.5-flash',  #本当はプロにしたい
                     contents=full_conversation,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,

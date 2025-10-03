@@ -4,16 +4,9 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
+import { useAgentStore, ChatHistory } from '../store/agentStore';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import styles from './AgentPage.module.css';
-
-// 履歴の型定義（生成されたAPI型を使用）
-type ChatHistory = {
-  role: 'user' | 'model';
-  parts: { text: string }[];
-  isStreaming?: boolean; // ストリーミング中かを示すフラグ
-  tempId?: number; // 一意識別子（ストリーミング中のメッセージ管理用）
-};
 
 // 確認リクエストの型定義
 type ConfirmationRequest = {
@@ -25,7 +18,13 @@ type ConfirmationRequest = {
 };
 
 export const AgentPage = () => {
-  const [history, setHistory] = useState<ChatHistory[]>([]);
+  // Zustandストアから会話履歴を取得
+  const history = useAgentStore(state => state.history);
+  const addMessage = useAgentStore(state => state.addMessage);
+  const updateMessage = useAgentStore(state => state.updateMessage);
+  const setHistory = useAgentStore(state => state.setHistory);
+  const clearHistory = useAgentStore(state => state.clearHistory);
+
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,13 +38,21 @@ export const AgentPage = () => {
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
 
+  // Clear history confirmation modal state
+  const [isClearConfirmationOpen, setIsClearConfirmationOpen] = useState(false);
+
   // Parse confirmation request from AI message
   const parseConfirmationRequest = useCallback(
     (text: string): ConfirmationRequest | null => {
       try {
-        console.log('[ConfirmationParser] Parsing text for confirmation request');
+        console.log(
+          '[ConfirmationParser] Parsing text for confirmation request'
+        );
         console.log('[ConfirmationParser] Text length:', text.length);
-        console.log('[ConfirmationParser] Text preview:', text.substring(0, 500));
+        console.log(
+          '[ConfirmationParser] Text preview:',
+          text.substring(0, 500)
+        );
 
         // Try to extract JSON from markdown code blocks first (```json ... ```)
         const jsonBlockRegex = /```json\s*(\{[\s\S]*?\})\s*```/;
@@ -58,7 +65,9 @@ export const AgentPage = () => {
             parsed.action &&
             parsed.calculation_id
           ) {
-            console.log('[ConfirmationParser] Valid confirmation request found in code block');
+            console.log(
+              '[ConfirmationParser] Valid confirmation request found in code block'
+            );
             return parsed as ConfirmationRequest;
           }
         }
@@ -66,12 +75,17 @@ export const AgentPage = () => {
         // Try to extract plain JSON object (more robust pattern)
         // This pattern finds JSON objects that contain "requires_confirmation": true
         // and handles multi-line structures with nested content
-        const jsonPatternRegex = /\{[^{}]*"requires_confirmation"\s*:\s*true[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+        const jsonPatternRegex =
+          /\{[^{}]*"requires_confirmation"\s*:\s*true[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
         const matches = text.match(jsonPatternRegex);
-        
+
         if (matches) {
-          console.log('[ConfirmationParser] Found', matches.length, 'potential JSON matches');
-          
+          console.log(
+            '[ConfirmationParser] Found',
+            matches.length,
+            'potential JSON matches'
+          );
+
           // Try to parse each match
           for (const match of matches) {
             try {
@@ -81,11 +95,16 @@ export const AgentPage = () => {
                 parsed.action &&
                 parsed.calculation_id
               ) {
-                console.log('[ConfirmationParser] Valid confirmation request found');
+                console.log(
+                  '[ConfirmationParser] Valid confirmation request found'
+                );
                 return parsed as ConfirmationRequest;
               }
             } catch (parseError) {
-              console.debug('[ConfirmationParser] Failed to parse match:', parseError);
+              console.debug(
+                '[ConfirmationParser] Failed to parse match:',
+                parseError
+              );
               continue;
             }
           }
@@ -95,10 +114,14 @@ export const AgentPage = () => {
         // Find all { ... } blocks and try to parse them
         const allJsonRegex = /\{(?:[^{}]|\{[^{}]*\})*\}/g;
         const allMatches = text.match(allJsonRegex);
-        
+
         if (allMatches) {
-          console.log('[ConfirmationParser] Trying lenient parsing with', allMatches.length, 'matches');
-          
+          console.log(
+            '[ConfirmationParser] Trying lenient parsing with',
+            allMatches.length,
+            'matches'
+          );
+
           for (const match of allMatches) {
             try {
               const parsed = JSON.parse(match);
@@ -107,7 +130,9 @@ export const AgentPage = () => {
                 parsed.action &&
                 parsed.calculation_id
               ) {
-                console.log('[ConfirmationParser] Valid confirmation request found with lenient parsing');
+                console.log(
+                  '[ConfirmationParser] Valid confirmation request found with lenient parsing'
+                );
                 return parsed as ConfirmationRequest;
               }
             } catch (parseError) {
@@ -120,12 +145,15 @@ export const AgentPage = () => {
         console.log('[ConfirmationParser] No valid confirmation request found');
         return null;
       } catch (e) {
-        console.error('[ConfirmationParser] Error parsing confirmation request:', e);
+        console.error(
+          '[ConfirmationParser] Error parsing confirmation request:',
+          e
+        );
         return null;
       }
     },
     []
-  );;
+  );
 
   // Handle confirmation modal confirm action
   const handleConfirmAction = useCallback(async () => {
@@ -158,7 +186,7 @@ export const AgentPage = () => {
           { text: `✅ ${result.message || 'Action completed successfully.'}` },
         ],
       };
-      setHistory(prev => [...prev, successMessage]);
+      addMessage(successMessage);
     } catch (err: any) {
       // Show error notification
       addNotification({
@@ -178,7 +206,7 @@ export const AgentPage = () => {
           },
         ],
       };
-      setHistory(prev => [...prev, errorMessage]);
+      addMessage(errorMessage);
     } finally {
       setIsExecutingAction(false);
     }
@@ -194,7 +222,28 @@ export const AgentPage = () => {
       role: 'model',
       parts: [{ text: '❌ Action cancelled by user.' }],
     };
-    setHistory(prev => [...prev, cancelMessage]);
+    addMessage(cancelMessage);
+  }, [addMessage]);
+
+  // Handle clear history confirmation
+  const handleClearHistoryRequest = useCallback(() => {
+    setIsClearConfirmationOpen(true);
+  }, []);
+
+  const handleClearHistoryConfirm = useCallback(() => {
+    clearHistory();
+    setIsClearConfirmationOpen(false);
+    addNotification({
+      type: 'success',
+      title: 'History Cleared',
+      message: 'Conversation history has been cleared.',
+      autoClose: true,
+      duration: 3000,
+    });
+  }, [clearHistory, addNotification]);
+
+  const handleClearHistoryCancel = useCallback(() => {
+    setIsClearConfirmationOpen(false);
   }, []);
 
   // メッセージ送信処理
@@ -217,7 +266,9 @@ export const AgentPage = () => {
     };
 
     // ユーザーメッセージとAIのプレースホルダーを履歴に追加
-    setHistory(prev => [...prev, userMessage, aiPlaceholder]);
+    addMessage(userMessage);
+    addMessage(aiPlaceholder);
+    const aiMessageIndex = history.length + 1; // AIメッセージのインデックス
     setCurrentMessage('');
     setIsLoading(true);
     setError(null);
@@ -227,80 +278,66 @@ export const AgentPage = () => {
       history, // ストリーム開始前の履歴を渡す
       {
         onMessage: chunk => {
-          setHistory(prev => {
-            const newHistory = [...prev];
-            // 最後のメッセージを安全に取得し、tempIdで確認
-            const lastIndex = newHistory.length - 1;
-            const lastMessage = newHistory[lastIndex];
+          const currentHistory = useAgentStore.getState().history;
+          const lastIndex = currentHistory.length - 1;
+          const lastMessage = currentHistory[lastIndex];
 
-            if (
-              lastMessage &&
-              lastMessage.role === 'model' &&
-              lastMessage.tempId === tempMessageId &&
-              lastMessage.isStreaming
-            ) {
-              // 新しいオブジェクトを作成して状態を更新（不変性を保持）
-              newHistory[lastIndex] = {
-                ...lastMessage,
-                parts: [{ text: lastMessage.parts[0].text + chunk }],
-              };
-            }
-            return newHistory;
-          });
+          if (
+            lastMessage &&
+            lastMessage.role === 'model' &&
+            lastMessage.tempId === tempMessageId &&
+            lastMessage.isStreaming
+          ) {
+            // メッセージを更新（テキストを追加）
+            updateMessage(lastIndex, {
+              parts: [{ text: lastMessage.parts[0].text + chunk }],
+            });
+          }
         },
         onClose: () => {
           setIsLoading(false);
-          setHistory(prev => {
-            const newHistory = [...prev];
-            const lastIndex = newHistory.length - 1;
-            const lastMessage = newHistory[lastIndex];
+          const currentHistory = useAgentStore.getState().history;
+          const lastIndex = currentHistory.length - 1;
+          const lastMessage = currentHistory[lastIndex];
 
-            if (
-              lastMessage &&
-              lastMessage.role === 'model' &&
-              lastMessage.tempId === tempMessageId
-            ) {
-              // ストリーミング終了時にtempIdを削除し、新しいオブジェクトを作成
-              newHistory[lastIndex] = {
-                role: lastMessage.role,
-                parts: lastMessage.parts,
-                isStreaming: false,
-              };
+          if (
+            lastMessage &&
+            lastMessage.role === 'model' &&
+            lastMessage.tempId === tempMessageId
+          ) {
+            // ストリーミング終了時にtempIdを削除し、isStreamingをfalseに
+            updateMessage(lastIndex, {
+              isStreaming: false,
+            });
 
-              // Check for confirmation request in the final message
-              const messageText = lastMessage.parts[0]?.text || '';
-              const confirmation = parseConfirmationRequest(messageText);
-              if (confirmation) {
-                // Show confirmation modal
-                setConfirmationRequest(confirmation);
-                setIsConfirmationModalOpen(true);
-              }
+            // Check for confirmation request in the final message
+            const messageText = lastMessage.parts[0]?.text || '';
+            const confirmation = parseConfirmationRequest(messageText);
+            if (confirmation) {
+              // Show confirmation modal
+              setConfirmationRequest(confirmation);
+              setIsConfirmationModalOpen(true);
             }
-            return newHistory;
-          });
+          }
         },
         onError: err => {
           setIsLoading(false);
           setError(err.message);
-          setHistory(prev => {
-            const newHistory = [...prev];
-            const lastIndex = newHistory.length - 1;
-            const lastMessage = newHistory[lastIndex];
+          const currentHistory = useAgentStore.getState().history;
+          const lastIndex = currentHistory.length - 1;
+          const lastMessage = currentHistory[lastIndex];
 
-            if (
-              lastMessage &&
-              lastMessage.role === 'model' &&
-              lastMessage.tempId === tempMessageId
-            ) {
-              // エラー時も新しいオブジェクトを作成
-              newHistory[lastIndex] = {
-                role: lastMessage.role,
-                parts: [{ text: `Error: ${err.message}` }],
-                isStreaming: false,
-              };
-            }
-            return newHistory;
-          });
+          if (
+            lastMessage &&
+            lastMessage.role === 'model' &&
+            lastMessage.tempId === tempMessageId
+          ) {
+            // エラー時もメッセージを更新
+            updateMessage(lastIndex, {
+              parts: [{ text: `Error: ${err.message}` }],
+              isStreaming: false,
+            });
+          }
 
           // 通知でエラーを表示
           addNotification({
@@ -386,6 +423,32 @@ export const AgentPage = () => {
 
   return (
     <div className={styles.agentPageContainer}>
+      {/* Clear button */}
+      {history.length > 0 && (
+        <div className={styles.clearButtonContainer}>
+          <button
+            className={styles.clearButton}
+            onClick={handleClearHistoryRequest}
+            title="Clear conversation history"
+          >
+            <svg
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+            Clear History
+          </button>
+        </div>
+      )}
       <div className={styles.chatWindow} ref={chatWindowRef}>
         {history.length === 0 ? (
           renderEmptyState()
@@ -497,6 +560,18 @@ export const AgentPage = () => {
         onConfirm={handleConfirmAction}
         onCancel={handleCancelAction}
         isLoading={isExecutingAction}
+      />
+
+      {/* Clear History Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isClearConfirmationOpen}
+        title="Clear Conversation History"
+        message="Are you sure you want to clear all conversation history? This action cannot be undone."
+        confirmButtonText="Clear"
+        cancelButtonText="Cancel"
+        onConfirm={handleClearHistoryConfirm}
+        onCancel={handleClearHistoryCancel}
+        isLoading={false}
       />
     </div>
   );
