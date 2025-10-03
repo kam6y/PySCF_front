@@ -125,6 +125,17 @@ def create_app():
     
     # Store the immediate notification function globally for other modules to use
     app.send_immediate_websocket_notification = websocket_funcs['send_immediate_websocket_notification']
+    
+    # Initialize process manager with WebSocket notification callback
+    from quantum_calc import initialize_process_manager_with_callback
+    try:
+        initialize_process_manager_with_callback(
+            notification_callback=websocket_funcs['send_immediate_websocket_notification']
+        )
+        logger.info("Process manager initialized with WebSocket notification callback")
+    except Exception as e:
+        logger.error(f"Failed to initialize process manager with callback: {e}")
+        # Continue anyway - process manager will work without notifications
 
     # Error handlers
     @app.errorhandler(ValidationError)
@@ -286,7 +297,8 @@ def create_socketio():
     return socketio
 
 
-# Create global app instance for import by other modules
+# Create global app and socketio instances for import by other modules
+# These are created at module import time for Gunicorn compatibility
 app, socketio = create_app()
 
 

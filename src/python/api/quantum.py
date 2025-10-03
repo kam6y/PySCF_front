@@ -9,6 +9,7 @@ import os
 import time
 import shutil
 from datetime import datetime
+from typing import Optional
 from flask import Blueprint, request, jsonify
 from flask_pydantic import validate
 
@@ -27,6 +28,152 @@ logger = logging.getLogger(__name__)
 
 # Create quantum blueprint
 quantum_bp = Blueprint('quantum', __name__)
+
+
+# ========== Private Helper Functions for quantum_calculate ==========
+
+def _extract_enum_values(body: QuantumCalculationRequest) -> dict:
+    """Extract enum values from Pydantic model."""
+    def get_enum_value(field_value):
+        if hasattr(field_value, 'value'):
+            return field_value.value
+        return field_value
+    
+    return {
+        'calculation_method': get_enum_value(body.calculation_method),
+        'solvent_method': get_enum_value(body.solvent_method),
+        'tddft_method': get_enum_value(body.tddft_method) if body.tddft_method else 'TDDFT'
+    }
+
+
+def _build_calculation_parameters(body: QuantumCalculationRequest, enum_values: dict) -> dict:
+    """Build calculation parameters dictionary from request body."""
+    calculation_method = enum_values['calculation_method']
+    
+    parameters = {
+        'calculation_method': calculation_method,
+        'basis_function': body.basis_function,
+        'charges': body.charges,
+        'spin': body.spin,
+        'solvent_method': enum_values['solvent_method'],
+        'solvent': body.solvent,
+        'xyz': body.xyz,
+        'name': body.name,
+        'cpu_cores': body.cpu_cores,
+        'memory_mb': body.memory_mb,
+        'created_at': datetime.now().isoformat(),
+        'optimize_geometry': body.optimize_geometry,
+    }
+    
+    # Add exchange_correlation parameter only for DFT methods
+    if calculation_method != 'HF':
+        parameters['exchange_correlation'] = body.exchange_correlation
+    else:
+        parameters['exchange_correlation'] = None
+        logger.info(f"HF calculation - exchange_correlation parameter ignored (was: {body.exchange_correlation})")
+    
+    # Always include TDDFT parameters for consistency
+    parameters.update({
+        'tddft_nstates': body.tddft_nstates,
+        'tddft_method': enum_values['tddft_method'],
+        'tddft_analyze_nto': body.tddft_analyze_nto,
+    })
+    
+    # Always include CASCI/CASSCF parameters for consistency
+    parameters.update({
+        'ncas': body.ncas,
+        'nelecas': body.nelecas,
+        'max_cycle_macro': body.max_cycle_macro,
+        'max_cycle_micro': body.max_cycle_micro,
+        'natorb': body.natorb,
+        'conv_tol': body.conv_tol,
+        'conv_tol_grad': body.conv_tol_grad
+    })
+    
+    return parameters
+
+
+def _initialize_calculation_directory(parameters: dict):
+    """
+    Initialize calculation directory and save parameters.
+    Returns (calc_dir, calculation_id).
+    Raises FileManagerError on failure.
+    """
+    file_manager = CalculationFileManager()
+    calc_dir = file_manager.create_calculation_dir(parameters['name'])
+    calculation_id = os.path.basename(calc_dir)
+    
+    # Save initial parameters
+    file_manager.save_calculation_parameters(calc_dir, parameters)
+    logger.info(f"Created calculation directory and saved parameters for calculation {calculation_id}")
+    
+    return calc_dir, calculation_id
+
+
+def _submit_to_process_manager(calculation_id: str, parameters: dict, calc_dir: str):
+    """
+    Submit calculation to process manager.
+    Returns (success, initial_status, waiting_reason).
+    """
+    file_manager = CalculationFileManager()
+    
+    # Get process manager
+    try:
+        process_manager = get_process_manager()
+        
+        # Apply current settings to process manager
+        try:
+            from quantum_calc import update_process_manager_settings
+            update_process_manager_settings()
+        except Exception as settings_error:
+            logger.warning(f"Failed to update process manager settings: {settings_error}")
+    
+    except Exception as pm_error:
+        logger.error(f"Failed to initialize process manager: {pm_error}")
+        # Clean up created directory on process manager failure
+        try:
+            shutil.rmtree(calc_dir, ignore_errors=True)
+        except Exception:
+            pass
+        raise ProcessManagerError(f'System initialization error: Unable to initialize calculation system. Please check system resources and try again.')
+    
+    # Submit calculation to process pool
+    try:
+        logger.info(f"About to submit calculation {calculation_id}")
+        success, initial_status, waiting_reason = process_manager.submit_calculation(calculation_id, parameters)
+        logger.info(f"Submit result: success={success}, status={initial_status}, reason={waiting_reason}")
+        
+        return success, initial_status, waiting_reason
+    
+    except Exception as submit_error:
+        logger.error(f"Unexpected error during calculation submission: {submit_error}")
+        # Update status to error and save error information
+        file_manager.save_calculation_status(calc_dir, 'error')
+        error_message = f'Failed to submit calculation: {str(submit_error)}'
+        file_manager.save_calculation_results(calc_dir, {'error': error_message})
+        raise
+
+
+def _build_calculation_instance(calculation_id: str, parameters: dict, 
+                                status: str, waiting_reason: Optional[str] = None) -> dict:
+    """Build calculation instance dict for API response."""
+    instance = {
+        'id': calculation_id,
+        'name': parameters['name'],
+        'status': status,
+        'createdAt': parameters['created_at'],
+        'updatedAt': parameters['created_at'],
+        'parameters': parameters
+    }
+    
+    # Include waiting reason if available
+    if waiting_reason is not None:
+        instance['waitingReason'] = waiting_reason
+    
+    return instance
+
+
+# ========== End of Private Helper Functions ==========
 
 
 def validate_calculation_parameters(body: QuantumCalculationRequest) -> str:
@@ -123,161 +270,57 @@ def quantum_calculate(body: QuantumCalculationRequest):
                 'success': False,
                 'error': f'Invalid parameters: {validation_error}'
             }), 400
-            
-        # Helper function to safely extract value from enum or string
-        def get_enum_value(field_value):
-            if hasattr(field_value, 'value'):
-                return field_value.value
-            return field_value
         
-        # Prepare parameters using validated data from Pydantic model
-        calculation_method = get_enum_value(body.calculation_method)
-
-        parameters = {
-            'calculation_method': calculation_method,
-            'basis_function': body.basis_function,
-            'charges': body.charges,
-            'spin': body.spin,
-            'solvent_method': get_enum_value(body.solvent_method),
-            'solvent': body.solvent,
-            'xyz': body.xyz,
-            'name': body.name,
-            'cpu_cores': body.cpu_cores,
-            'memory_mb': body.memory_mb,
-            'created_at': datetime.now().isoformat(),
-        }
-
-        # Add exchange_correlation parameter only for DFT methods
-        # HF method does not use exchange-correlation functionals
-        if calculation_method != 'HF':
-            parameters['exchange_correlation'] = body.exchange_correlation
-        else:
-            # For HF method, explicitly set to None or omit to avoid confusion
-            parameters['exchange_correlation'] = None
-            logger.info(f"HF calculation - exchange_correlation parameter ignored (was: {body.exchange_correlation})")
-
-        # Always include TDDFT parameters for consistency
-        parameters.update({
-            'tddft_nstates': body.tddft_nstates,
-            'tddft_method': get_enum_value(body.tddft_method) if body.tddft_method else 'TDDFT',
-            'tddft_analyze_nto': body.tddft_analyze_nto,
-        })
-
-        # Always include CASSCF・CASCI parameters for consistency
-        parameters.update({
-            'ncas': body.ncas,
-            'nelecas': body.nelecas,
-            'max_cycle_macro': body.max_cycle_macro,
-            'max_cycle_micro': body.max_cycle_micro,
-            'natorb': body.natorb,
-            'conv_tol': body.conv_tol,
-            'conv_tol_grad': body.conv_tol_grad
-        })
+        # Extract enum values and build parameters
+        enum_values = _extract_enum_values(body)
+        parameters = _build_calculation_parameters(body, enum_values)
         
-        # Add geometry optimization parameter
-        parameters['optimize_geometry'] = body.optimize_geometry
-        
-        # Initialize file manager and create directory with error handling
+        # Initialize calculation directory and files
         try:
-            file_manager = CalculationFileManager()
-            calc_dir = file_manager.create_calculation_dir(parameters['name'])
-            calculation_id = os.path.basename(calc_dir)
-            
-            # Save initial parameters (status will be set based on submission result)
-            file_manager.save_calculation_parameters(calc_dir, parameters)
-            logger.info(f"Created calculation directory and saved parameters for calculation {calculation_id}")
-            
+            calc_dir, calculation_id = _initialize_calculation_directory(parameters)
         except Exception as file_error:
             logger.error(f"Failed to set up calculation files: {file_error}")
             return jsonify({'success': False, 'error': f'Failed to initialize calculation: {str(file_error)}'}), 500
-
-        # Get process manager with enhanced error handling
+        
+        # Submit calculation to process manager
+        file_manager = CalculationFileManager()
         try:
-            process_manager = get_process_manager()
-
-            # Apply current settings to process manager if not already done
-            try:
-                from quantum_calc import update_process_manager_settings
-                update_process_manager_settings()
-            except Exception as settings_error:
-                logger.warning(f"Failed to update process manager settings: {settings_error}")
-
-        except Exception as pm_error:
-            logger.error(f"Failed to initialize process manager: {pm_error}")
-            # Clean up created directory on process manager failure
-            try:
-                shutil.rmtree(calc_dir, ignore_errors=True)
-            except Exception:
-                pass
-            return jsonify({'success': False, 'error': f'System initialization error: Unable to initialize calculation system. Please check system resources and try again.'}), 503
-
-        # Submit calculation to process pool with enhanced error handling
-        try:
-            logger.info(f"About to submit calculation {calculation_id}")
-            success, initial_status, waiting_reason = process_manager.submit_calculation(calculation_id, parameters)
-            logger.info(f"Submit result: success={success}, status={initial_status}, reason={waiting_reason}")
-
+            success, initial_status, waiting_reason = _submit_to_process_manager(
+                calculation_id, parameters, calc_dir
+            )
+        except ProcessManagerError as e:
+            # Error already handled in _submit_to_process_manager
+            return jsonify({'success': False, 'error': str(e)}), 503
         except Exception as submit_error:
-            logger.error(f"Unexpected error during calculation submission: {submit_error}")
-            # Update status to error and save error information
-            file_manager.save_calculation_status(calc_dir, 'error')
+            # Build and return error instance
             error_message = f'Failed to submit calculation: {str(submit_error)}'
-            file_manager.save_calculation_results(calc_dir, {'error': error_message})
-            
-            # Return error instance
-            error_instance = {
-                'id': calculation_id,
-                'name': parameters['name'],
-                'status': 'error',
-                'createdAt': parameters['created_at'],
-                'updatedAt': parameters['created_at'],
-                'parameters': parameters,
-                'error': error_message
-            }
+            error_instance = _build_calculation_instance(calculation_id, parameters, 'error')
+            error_instance['error'] = error_message
             return jsonify(error_instance), 500
         
+        # Handle submission failure
         if not success:
-            # If submission failed, update status to error
             error_message = waiting_reason if waiting_reason else 'Failed to submit calculation to process pool.'
             file_manager.save_calculation_status(calc_dir, 'error')
             file_manager.save_calculation_results(calc_dir, {'error': error_message})
             
             logger.error(f"Failed to submit calculation {calculation_id} to process pool: {error_message}")
             
-            # Create error instance to return
-            error_instance = {
-                'id': calculation_id,
-                'name': parameters['name'],
-                'status': 'error',
-                'createdAt': parameters['created_at'],
-                'updatedAt': parameters['created_at'],
-                'parameters': parameters,
-                'error': error_message
-            }
+            error_instance = _build_calculation_instance(calculation_id, parameters, 'error')
+            error_instance['error'] = error_message
             
             return jsonify(error_instance), 202
-
+        
         # Set initial status based on submission result
         file_manager.save_calculation_status(calc_dir, initial_status, waiting_reason)
         
         logger.info(f"Queued calculation {calculation_id} for molecule '{parameters['name']}'")
-
-        # Return immediately with the new calculation instance
-        initial_instance = {
-            'id': calculation_id,
-            'name': parameters['name'],
-            'status': initial_status,
-            'createdAt': parameters['created_at'],
-            'updatedAt': parameters['created_at'],
-            'parameters': parameters
-        }
         
-        # Include waiting reason if available
-        if waiting_reason is not None:
-            initial_instance['waitingReason'] = waiting_reason
-
+        # Return initial calculation instance
+        initial_instance = _build_calculation_instance(calculation_id, parameters, initial_status, waiting_reason)
+        
         return jsonify({'success': True, 'data': {'calculation': initial_instance}}), 202
-
+    
     except (InputError, GeometryError) as e:
         logger.warning(f"Invalid calculation parameters: {e}")
         return jsonify({'success': False, 'error': f'Invalid input parameters: {str(e)}'}), 400

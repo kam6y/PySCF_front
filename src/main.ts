@@ -364,7 +364,7 @@ const startPythonServer = async (): Promise<void> => {
           : []),
         '--log-level',
         gunicornSettings.log_level,
-        '--preload',
+        ...(gunicornSettings.preload_app === true ? ['--preload'] : []),
         'app:app', // Flask application (not socketio object)
       ];
 

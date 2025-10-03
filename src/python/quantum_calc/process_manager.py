@@ -32,78 +32,90 @@ class QueuedCalculation:
     
     def __lt__(self, other):
         """For priority queue ordering by creation time."""
-        return self.created_at < other.created_at
+        return self.created_at &lt; other.created_at
 
 
-def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
+# ========== Private Helper Functions for calculation_worker ==========
+
+def _setup_worker_environment(parameters: dict, process_logger) -> tuple:
     """
-    Worker function to run quantum chemistry calculations in a separate process.
-    Returns (success: bool, error_message: str or None)
+    Set up worker process environment variables and memory configuration.
+    Returns (cpu_cores, memory_mb).
     """
     # Get user-specified CPU cores or default to 1
     cpu_cores = parameters.get('cpu_cores') or 1
     cpu_cores_str = str(int(cpu_cores))
     
     # Set all parallel processing environment variables to control CPU usage
-    # This ensures that user-specified CPU count is respected by all underlying libraries
     os.environ['OMP_NUM_THREADS'] = cpu_cores_str
-    os.environ['MKL_NUM_THREADS'] = cpu_cores_str       # Intel MKL
-    os.environ['OPENBLAS_NUM_THREADS'] = cpu_cores_str  # OpenBLAS
-    os.environ['BLIS_NUM_THREADS'] = cpu_cores_str      # BLIS
-    os.environ['VECLIB_MAXIMUM_THREADS'] = cpu_cores_str # macOS Accelerate Framework
-    os.environ['NUMEXPR_NUM_THREADS'] = cpu_cores_str   # NumExpr
+    os.environ['MKL_NUM_THREADS'] = cpu_cores_str
+    os.environ['OPENBLAS_NUM_THREADS'] = cpu_cores_str
+    os.environ['BLIS_NUM_THREADS'] = cpu_cores_str
+    os.environ['VECLIB_MAXIMUM_THREADS'] = cpu_cores_str
+    os.environ['NUMEXPR_NUM_THREADS'] = cpu_cores_str
     
-    # Set appropriate memory defaults based on calculation method from config
+    # Set appropriate memory defaults based on calculation method
     calculation_method = parameters.get('calculation_method', 'DFT')
     default_memory = get_memory_for_method(calculation_method)
-
     memory_mb = parameters.get('memory_mb') or default_memory
-
-    # Setup logging for this process first
-    process_logger = logging.getLogger(f'worker_{calculation_id}')
-    process_logger.setLevel(logging.INFO)
-
+    
     # Log memory allocation
     if parameters.get('memory_mb'):
         process_logger.info(f"Using user-specified memory: {memory_mb} MB for {calculation_method}")
     else:
         process_logger.info(f"Using default memory: {memory_mb} MB for {calculation_method}")
+    
+    return cpu_cores, memory_mb
 
-    # Perform dependency checks for CASCI/CASSCF
-    if calculation_method in ['CASCI', 'CASSCF']:
-        process_logger.info("Performing PySCF dependency checks for CASCI/CASSCF...")
-        try:
-            import pyscf
-            process_logger.info(f"PySCF version: {pyscf.__version__}")
 
-            # Test mcscf module specifically
-            from pyscf import mcscf
-            process_logger.info("PySCF mcscf module loaded successfully")
+def _check_casci_dependencies(calculation_method: str, process_logger) -> None:
+    """Check PySCF dependencies for CASCI/CASSCF calculations."""
+    if calculation_method not in ['CASCI', 'CASSCF']:
+        return
+    
+    process_logger.info("Performing PySCF dependency checks for CASCI/CASSCF...")
+    try:
+        import pyscf
+        process_logger.info(f"PySCF version: {pyscf.__version__}")
+        
+        from pyscf import mcscf
+        process_logger.info("PySCF mcscf module loaded successfully")
+        
+        from pyscf import gto
+        test_mol = gto.M(atom='H 0 0 0; H 0 0 0.74', basis='sto-3g', verbose=0)
+        process_logger.info("PySCF basic functionality test passed")
+    except ImportError as e:
+        process_logger.error(f"PySCF dependency check failed: {e}")
+        process_logger.error("CASCI/CASSCF calculations will likely fail")
+    except Exception as e:
+        process_logger.warning(f"PySCF functionality test encountered issues: {e}")
+        process_logger.warning("CASCI/CASSCF calculations may have issues")
 
-            # Test basic functionality
-            from pyscf import gto
-            test_mol = gto.M(atom='H 0 0 0; H 0 0 0.74', basis='sto-3g', verbose=0)
-            process_logger.info("PySCF basic functionality test passed")
 
-        except ImportError as e:
-            process_logger.error(f"PySCF dependency check failed: {e}")
-            process_logger.error("CASCI/CASSCF calculations will likely fail")
-        except Exception as e:
-            process_logger.warning(f"PySCF functionality test encountered issues: {e}")
-            process_logger.warning("CASCI/CASSCF calculations may have issues")
-
-    # Import here to avoid issues with multiprocessing and module loading
+def _import_calculator_classes(process_logger):
+    """
+    Import calculator classes and return them as a dict.
+    Returns (calculators_dict, exception_classes_tuple).
+    """
     from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator
     from quantum_calc import CalculationError, ConvergenceError, InputError
-    from quantum_calc.file_manager import CalculationFileManager
-    from threadpoolctl import threadpool_info
-    from pyscf import lib
-
-    # Conditional imports for CASCI/CASSCF with error handling
-    CASCICalculator = None
-    CASSCFCalculator = None
+    
+    calculators = {
+        'DFT': DFTCalculator,
+        'HF': HFCalculator,
+        'MP2': MP2Calculator,
+        'CCSD': CCSDCalculator,
+        'CCSD_T': CCSDCalculator,
+        'TDDFT': TDDFTCalculator,
+        'CASCI': None,
+        'CASSCF': None
+    }
+    
+    # Try importing CASCI/CASSCF
     try:
         from quantum_calc import CASCICalculator, CASSCFCalculator
+        calculators['CASCI'] = CASCICalculator
+        calculators['CASSCF'] = CASSCFCalculator
         process_logger.info("Successfully imported CASCI/CASSCF calculators")
     except ImportError as e:
         process_logger.error(f"Failed to import CASCI/CASSCF calculators: {e}")
@@ -112,26 +124,191 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         process_logger.error(f"Unexpected error importing CASCI/CASSCF calculators: {e}")
         process_logger.error("CASCI and CASSCF calculations will not be available")
     
+    return calculators, (CalculationError, ConvergenceError, InputError)
+
+
+def _create_calculator_instance(calculation_method: str, parameters: dict, 
+                                calc_dir: str, calculator_classes: dict, process_logger):
+    """Create and return appropriate calculator instance."""
+    optimize_geometry = parameters.get('optimize_geometry', True)
+    molecule_name = parameters['name']
+    
+    calculator_class = calculator_classes.get(calculation_method)
+    
+    if calculator_class is None:
+        if calculation_method in ['CASCI', 'CASSCF']:
+            raise ImportError(
+                f"{calculation_method} calculator is not available. "
+                "Please check PySCF mcscf module installation."
+            )
+        # Default to DFT if unknown method
+        calculator_class = calculator_classes['DFT']
+        process_logger.warning(f"Unknown calculation method '{calculation_method}', defaulting to DFT")
+    
+    return calculator_class(
+        working_dir=calc_dir,
+        keep_files=True,
+        molecule_name=molecule_name,
+        optimize_geometry=optimize_geometry
+    )
+
+
+def _prepare_setup_parameters(parameters: dict, memory_mb: int) -> dict:
+    """Prepare setup parameters dict for calculator."""
+    calculation_method = parameters.get('calculation_method', 'DFT')
+    
+    setup_params = {
+        'basis': parameters['basis_function'],
+        'charge': parameters['charges'],
+        'spin': parameters['spin'],
+        'max_cycle': 150,
+        'solvent_method': parameters['solvent_method'],
+        'solvent': parameters['solvent'],
+        'memory_mb': memory_mb,
+    }
+    
+    # Add exchange-correlation functional for DFT and TDDFT
+    if calculation_method in ['DFT', 'TDDFT']:
+        setup_params['xc'] = parameters['exchange_correlation']
+    
+    # Add CCSD-specific parameters
+    if calculation_method in ['CCSD', 'CCSD_T']:
+        setup_params['frozen_core'] = parameters.get('frozen_core', True)
+        setup_params['ccsd_t'] = (calculation_method == 'CCSD_T')
+    
+    # Add TDDFT-specific parameters
+    if calculation_method == 'TDDFT':
+        setup_params['nstates'] = parameters.get('tddft_nstates', 10)
+        setup_params['tddft_method'] = parameters.get('tddft_method', 'TDDFT')
+        setup_params['analyze_nto'] = parameters.get('tddft_analyze_nto', False)
+    
+    # Add CASCI/CASSCF-specific parameters
+    if calculation_method in ['CASCI', 'CASSCF']:
+        setup_params['ncas'] = parameters.get('ncas', 4)
+        setup_params['nelecas'] = parameters.get('nelecas', 4)
+        setup_params['natorb'] = parameters.get('natorb', True)
+        setup_params['max_cycle_micro'] = parameters.get('max_cycle_micro', 4)
+        
+        if calculation_method == 'CASSCF':
+            setup_params['max_cycle_macro'] = parameters.get('max_cycle_macro', 50)
+            setup_params['conv_tol'] = parameters.get('conv_tol', 1e-6)
+            setup_params['conv_tol_grad'] = parameters.get('conv_tol_grad', 1e-4)
+    
+    return setup_params
+
+
+def _handle_calculation_error(error: Exception, calc_dir: str, file_manager,
+                              calculation_method: str, memory_mb: int, 
+                              cpu_cores: int, process_logger) -> tuple:
+    """
+    Handle calculation errors, save error information, and return error details.
+    Returns (success=False, error_message).
+    """
+    from quantum_calc import CalculationError, ConvergenceError, InputError
+    
+    error_message = str(error)
+    error_type = type(error).__name__
+    
+    # Build error diagnosis
+    error_info = {
+        'error_type': error_type,
+        'error_message': error_message,
+        'calculation_method': calculation_method,
+        'memory_mb': memory_mb,
+        'cpu_cores': cpu_cores
+    }
+    
+    # Add specific diagnoses based on error type and content
+    if isinstance(error, (InputError, ConvergenceError, CalculationError)):
+        if calculation_method in ['CASCI', 'CASSCF']:
+            if 'import' in error_message.lower() or 'mcscf' in error_message.lower():
+                error_info['diagnosis'] = 'PySCF mcscf module import failure - check PySCF installation'
+                error_info['suggestion'] = 'Install PySCF with: conda install pyscf -c pyscf'
+            elif 'memory' in error_message.lower():
+                error_info['diagnosis'] = 'Insufficient memory for CASCI/CASSCF calculation'
+                error_info['suggestion'] = f'Increase memory allocation (current: {memory_mb} MB, try: {memory_mb * 2} MB)'
+            elif 'active' in error_message.lower() and 'space' in error_message.lower():
+                error_info['diagnosis'] = 'Invalid active space configuration'
+                error_info['suggestion'] = 'Check ncas and nelecas parameters'
+    elif isinstance(error, ImportError):
+        error_info['diagnosis'] = 'Python module import failure'
+        error_info['suggestion'] = 'Check PySCF installation and dependencies'
+        if 'mcscf' in error_message.lower():
+            error_info['diagnosis'] = 'PySCF mcscf module not found'
+            error_info['suggestion'] = 'Install complete PySCF package: conda install pyscf -c pyscf'
+    else:
+        # General error diagnosis
+        error_str = error_message.lower()
+        if 'pyscf' in error_str:
+            error_info['diagnosis'] = 'PySCF library error'
+            error_info['suggestion'] = 'Check PySCF installation and system compatibility'
+        elif 'memory' in error_str or 'malloc' in error_str:
+            error_info['diagnosis'] = 'Memory allocation error'
+            error_info['suggestion'] = f'Increase available system memory or reduce memory_mb (current: {memory_mb} MB)'
+        elif 'thread' in error_str or 'lock' in error_str:
+            error_info['diagnosis'] = 'Threading/concurrency error'
+            error_info['suggestion'] = 'Check system threading configuration'
+        else:
+            error_info['diagnosis'] = 'Unexpected error during calculation'
+            error_info['suggestion'] = 'Check logs for more details'
+    
+    process_logger.error(f"Calculation error: {error_message}")
+    process_logger.error(f"Error diagnosis: {error_info}")
+    
+    # Save error status and information
+    file_manager.save_calculation_status(calc_dir, 'error')
+    file_manager.save_calculation_results(calc_dir, {'error': error_message, 'diagnosis': error_info})
+    
+    return False, error_message
+
+
+# ========== End of Private Helper Functions ==========
+
+
+def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
+    """
+    Worker function to run quantum chemistry calculations in a separate process.
+    Returns (success: bool, error_message: str or None)
+    """
+    # Setup logging for this process
+    process_logger = logging.getLogger(f'worker_{calculation_id}')
+    process_logger.setLevel(logging.INFO)
+    
+    # Setup environment and get configuration
+    cpu_cores, memory_mb = _setup_worker_environment(parameters, process_logger)
+    calculation_method = parameters.get('calculation_method', 'DFT')
+    
+    # Perform dependency checks for CASCI/CASSCF
+    _check_casci_dependencies(calculation_method, process_logger)
+    
+    # Import calculator classes and exception types
+    from quantum_calc.file_manager import CalculationFileManager
+    from threadpoolctl import threadpool_info, threadpool_limits
+    from pyscf import lib
+    
+    calculator_classes, exception_types = _import_calculator_classes(process_logger)
     file_manager = CalculationFileManager()
     calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
-
+    
     try:
-        # Update status to running on the file system
+        # Update status to running
         file_manager.save_calculation_status(calc_dir, 'running')
         process_logger.info(f"Starting calculation {calculation_id} in process {os.getpid()}")
-        process_logger.info(f"Using {cpu_cores} CPU cores per process for calculation.")
-        process_logger.info(f"Set environment variables: OMP_NUM_THREADS={cpu_cores_str}, MKL_NUM_THREADS={cpu_cores_str}, OPENBLAS_NUM_THREADS={cpu_cores_str}")
+        process_logger.info(f"Using {cpu_cores} CPU cores and {memory_mb} MB memory")
         
         # Log detected threadpool libraries for debugging
         try:
             thread_info = threadpool_info()
             process_logger.info(f"Detected threadpool libraries: {len(thread_info)} found")
             for info in thread_info:
-                process_logger.info(f"  {info.get('user_api', 'unknown')}: {info.get('internal_api', 'unknown')} - threads: {info.get('num_threads', 'unknown')}")
+                process_logger.info(
+                    f"  {info.get('user_api', 'unknown')}: {info.get('internal_api', 'unknown')} "
+                    f"- threads: {info.get('num_threads', 'unknown')}"
+                )
         except Exception as e:
             process_logger.warning(f"Could not get threadpool info: {e}")
         
-        # Set PySCF thread count using official API
+        # Set PySCF thread count
         original_threads = None
         try:
             original_threads = lib.num_threads()
@@ -141,75 +318,14 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         except Exception as e:
             process_logger.warning(f"Could not set PySCF threads: {e}")
         
-        # Initialize calculator based on calculation method
-        calculation_method = parameters.get('calculation_method', 'DFT')
-        optimize_geometry = parameters.get('optimize_geometry', True)
-        
-        if calculation_method == 'HF':
-            calculator = HFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
-        elif calculation_method == 'MP2':
-            calculator = MP2Calculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
-        elif calculation_method == 'CCSD':
-            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
-        elif calculation_method == 'CCSD_T':
-            calculator = CCSDCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
-        elif calculation_method == 'TDDFT':
-            calculator = TDDFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
-        elif calculation_method == 'CASCI':
-            if CASCICalculator is None:
-                process_logger.error(f"CASCI calculator not available due to import failure")
-                raise ImportError("CASCI calculator is not available. Please check PySCF mcscf module installation.")
-            calculator = CASCICalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
-        elif calculation_method == 'CASSCF':
-            if CASSCFCalculator is None:
-                process_logger.error(f"CASSCF calculator not available due to import failure")
-                raise ImportError("CASSCF calculator is not available. Please check PySCF mcscf module installation.")
-            calculator = CASSCFCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
-        else:  # Default to DFT
-            calculator = DFTCalculator(working_dir=calc_dir, keep_files=True, molecule_name=parameters['name'], optimize_geometry=optimize_geometry)
+        # Create calculator instance
+        calculator = _create_calculator_instance(
+            calculation_method, parameters, calc_dir, calculator_classes, process_logger
+        )
         
         # Parse XYZ and setup calculation
         atoms = calculator.parse_xyz(parameters['xyz'])
-        
-        # Prepare setup parameters
-        setup_params = {
-            'basis': parameters['basis_function'],
-            'charge': parameters['charges'],
-            'spin': parameters['spin'],
-            'max_cycle': 150,
-            'solvent_method': parameters['solvent_method'],
-            'solvent': parameters['solvent'],
-            'memory_mb': memory_mb,  # メモリ設定を渡す (必ず有効な値)
-        }
-        
-        # Add exchange-correlation functional for DFT and TDDFT calculations
-        if calculation_method in ['DFT', 'TDDFT']:
-            setup_params['xc'] = parameters['exchange_correlation']
-        
-        # Add CCSD-specific parameters
-        if calculation_method in ['CCSD', 'CCSD_T']:
-            setup_params['frozen_core'] = parameters.get('frozen_core', True)
-            setup_params['ccsd_t'] = (calculation_method == 'CCSD_T')
-        
-        # Add TDDFT-specific parameters
-        if calculation_method == 'TDDFT':
-            setup_params['nstates'] = parameters.get('tddft_nstates', 10)
-            setup_params['tddft_method'] = parameters.get('tddft_method', 'TDDFT')
-            setup_params['analyze_nto'] = parameters.get('tddft_analyze_nto', False)
-        
-        # Add CASCI/CASSCF-specific parameters
-        if calculation_method in ['CASCI', 'CASSCF']:
-            setup_params['ncas'] = parameters.get('ncas', 4)
-            setup_params['nelecas'] = parameters.get('nelecas', 4)
-            setup_params['natorb'] = parameters.get('natorb', True)
-            setup_params['max_cycle_micro'] = parameters.get('max_cycle_micro', 4)
-            
-            # CASSCF-specific parameters
-            if calculation_method == 'CASSCF':
-                setup_params['max_cycle_macro'] = parameters.get('max_cycle_macro', 50)
-                setup_params['conv_tol'] = parameters.get('conv_tol', 1e-6)
-                setup_params['conv_tol_grad'] = parameters.get('conv_tol_grad', 1e-4)
-        
+        setup_params = _prepare_setup_parameters(parameters, memory_mb)
         calculator.setup_calculation(atoms, **setup_params)
         
         # Run calculation with controlled BLAS/LAPACK threading
@@ -223,84 +339,18 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         
         process_logger.info(f"Calculation {calculation_id} completed successfully in process {os.getpid()}")
         return True, None
-
-    except (InputError, ConvergenceError, CalculationError) as e:
-        process_logger.error(f"Calculation {calculation_id} failed: {e}")
-        # Enhanced error diagnosis
-        error_info = {
-            'error_type': type(e).__name__,
-            'error_message': str(e),
-            'calculation_method': calculation_method,
-            'memory_mb': memory_mb,
-            'cpu_cores': cpu_cores
-        }
-
-        # Add specific diagnosis for CASCI/CASSCF errors
-        if calculation_method in ['CASCI', 'CASSCF']:
-            if 'import' in str(e).lower() or 'mcscf' in str(e).lower():
-                error_info['diagnosis'] = 'PySCF mcscf module import failure - check PySCF installation'
-                error_info['suggestion'] = 'Install PySCF with: conda install pyscf -c pyscf'
-            elif 'memory' in str(e).lower():
-                error_info['diagnosis'] = 'Insufficient memory for CASCI/CASSCF calculation'
-                error_info['suggestion'] = f'Increase memory allocation (current: {memory_mb} MB, try: {memory_mb * 2} MB)'
-            elif 'active' in str(e).lower() and 'space' in str(e).lower():
-                error_info['diagnosis'] = 'Invalid active space configuration'
-                error_info['suggestion'] = 'Check ncas and nelecas parameters'
-
-        process_logger.error(f"Error diagnosis: {error_info}")
-        file_manager.save_calculation_status(calc_dir, 'error')
-        # Save error information to results.json
-        file_manager.save_calculation_results(calc_dir, {'error': str(e), 'diagnosis': error_info})
-        return False, str(e)
-
+    
+    except exception_types as e:
+        # Handle known calculation errors
+        return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
+    
     except ImportError as e:
-        import_error_info = {
-            'error_type': 'ImportError',
-            'error_message': str(e),
-            'calculation_method': calculation_method,
-            'diagnosis': 'Python module import failure',
-            'suggestion': 'Check PySCF installation and dependencies'
-        }
-
-        if 'mcscf' in str(e).lower():
-            import_error_info['diagnosis'] = 'PySCF mcscf module not found'
-            import_error_info['suggestion'] = 'Install complete PySCF package: conda install pyscf -c pyscf'
-
-        process_logger.error(f"Import error in calculation {calculation_id}: {e}")
-        process_logger.error(f"Import error diagnosis: {import_error_info}")
-        file_manager.save_calculation_status(calc_dir, 'error')
-        file_manager.save_calculation_results(calc_dir, {'error': str(e), 'diagnosis': import_error_info})
-        return False, str(e)
-
+        # Handle import errors
+        return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
+    
     except Exception as e:
-        # Enhanced general error handling
-        general_error_info = {
-            'error_type': type(e).__name__,
-            'error_message': str(e),
-            'calculation_method': calculation_method,
-            'memory_mb': memory_mb,
-            'cpu_cores': cpu_cores,
-            'diagnosis': 'Unexpected error during calculation',
-            'suggestion': 'Check logs for more details'
-        }
-
-        # Add specific diagnoses for common error patterns
-        error_str = str(e).lower()
-        if 'pyscf' in error_str:
-            general_error_info['diagnosis'] = 'PySCF library error'
-            general_error_info['suggestion'] = 'Check PySCF installation and system compatibility'
-        elif 'memory' in error_str or 'malloc' in error_str:
-            general_error_info['diagnosis'] = 'Memory allocation error'
-            general_error_info['suggestion'] = f'Increase available system memory or reduce memory_mb (current: {memory_mb} MB)'
-        elif 'thread' in error_str or 'lock' in error_str:
-            general_error_info['diagnosis'] = 'Threading/concurrency error'
-            general_error_info['suggestion'] = 'Check system threading configuration'
-
-        process_logger.error(f"Unexpected error in calculation {calculation_id}: {e}", exc_info=True)
-        process_logger.error(f"General error diagnosis: {general_error_info}")
-        file_manager.save_calculation_status(calc_dir, 'error')
-        file_manager.save_calculation_results(calc_dir, {'error': str(e), 'diagnosis': general_error_info})
-        return False, str(e)
+        # Handle unexpected errors
+        return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
     
     finally:
         # Restore original PySCF thread count
@@ -315,14 +365,18 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
 class CalculationProcessManager:
     """Manages a process pool for quantum chemistry calculations with queueing support and resource management."""
     
-    def __init__(self, max_workers: Optional[int] = None, max_parallel_instances: Optional[int] = None):
+    def __init__(self, max_workers: Optional[int] = None, max_parallel_instances: Optional[int] = None,
+                 notification_callback: Optional[Callable] = None):
         """
         Initialize the process manager with a fixed process pool and queueing system.
         
         Args:
             max_workers: Maximum number of worker processes. If None, defaults to CPU count.
             max_parallel_instances: Maximum number of parallel calculation instances. If None, defaults to max_workers.
+            notification_callback: Optional callback function for sending WebSocket notifications.
+                                   Signature: callback(calculation_id, status, error_message)
         """
+        self.notification_callback = notification_callback
         self.max_workers = max_workers or multiprocessing.cpu_count()
         self.max_parallel_instances = max_parallel_instances or self.max_workers
         self.active_futures: Dict[str, Future] = {}
@@ -887,15 +941,13 @@ class CalculationProcessManager:
     
     def _send_websocket_notification(self, calculation_id: str, status: str, error_message: Optional[str] = None):
         """Send immediate WebSocket notification for calculation status changes."""
+        if self.notification_callback is None:
+            logger.debug(f"WebSocket notification not available for calculation {calculation_id}")
+            return
+        
         try:
-            # Import here to avoid circular imports
-            import sys
-            app_module = sys.modules.get('app')
-            if app_module and hasattr(app_module, 'send_immediate_websocket_notification'):
-                app_module.send_immediate_websocket_notification(calculation_id, status, error_message)
-                logger.debug(f"Sent WebSocket notification for calculation {calculation_id} with status {status}")
-            else:
-                logger.debug(f"WebSocket notification not available for calculation {calculation_id}")
+            self.notification_callback(calculation_id, status, error_message)
+            logger.debug(f"Sent WebSocket notification for calculation {calculation_id} with status {status}")
         except Exception as e:
             logger.warning(f"Failed to send WebSocket notification for calculation {calculation_id}: {e}")
     
@@ -909,21 +961,67 @@ class CalculationProcessManager:
 _process_manager: Optional[CalculationProcessManager] = None
 
 
+def initialize_process_manager_with_callback(notification_callback: Optional[Callable] = None,
+                                             max_parallel_instances: Optional[int] = None) -> CalculationProcessManager:
+    """
+    Initialize the global process manager with a notification callback.
+    This should be called once during application startup.
+    
+    Args:
+        notification_callback: Function to call for WebSocket notifications.
+                               Signature: callback(calculation_id, status, error_message)
+        max_parallel_instances: Maximum number of parallel calculation instances.
+    
+    Returns:
+        The initialized CalculationProcessManager instance.
+    """
+    global _process_manager
+    
+    if _process_manager is not None:
+        logger.warning("Process manager already initialized. Updating notification callback.")
+        _process_manager.notification_callback = notification_callback
+        if max_parallel_instances is not None:
+            _process_manager.set_max_parallel_instances(max_parallel_instances)
+        return _process_manager
+    
+    # Determine max parallel instances
+    if max_parallel_instances is None:
+        max_parallel_instances = min(4, multiprocessing.cpu_count())
+    
+    logger.info(f"Initializing process manager with notification callback, max_parallel={max_parallel_instances}")
+    
+    try:
+        _process_manager = CalculationProcessManager(
+            max_parallel_instances=max_parallel_instances,
+            notification_callback=notification_callback
+        )
+        logger.info("Process manager initialized successfully with notification callback")
+    except Exception as e:
+        logger.error(f"Failed to initialize process manager: {e}")
+        _process_manager = None
+        raise ProcessManagerError(f"Failed to initialize process manager: {str(e)}")
+    
+    return _process_manager
+
+
 def get_process_manager() -> CalculationProcessManager:
-    """Get the global process manager instance."""
+    """
+    Get the global process manager instance.
+    If not already initialized, creates a basic instance without notification callback.
+    For proper initialization with callback, use initialize_process_manager_with_callback().
+    """
     global _process_manager
     if _process_manager is None:
-        # Initialize with default values to avoid circular imports
-        # Settings will be applied later via update_process_manager_settings()
+        # Initialize with default values without callback
+        # This is a fallback - proper initialization should use initialize_process_manager_with_callback()
         default_max_parallel = min(4, multiprocessing.cpu_count())
-        logger.info(f"Initializing process manager with default settings: max_parallel={default_max_parallel}")
+        logger.warning(f"Process manager not initialized with callback. Using default settings: max_parallel={default_max_parallel}")
         
         try:
             _process_manager = CalculationProcessManager(max_parallel_instances=default_max_parallel)
-            logger.info("Process manager initialized successfully")
+            logger.info("Process manager initialized with defaults (no callback)")
         except Exception as e:
             logger.error(f"Failed to initialize process manager: {e}")
-            # Create a minimal process manager that can handle errors gracefully
             _process_manager = None
             raise ProcessManagerError(f"Failed to initialize process manager: {str(e)}")
     
