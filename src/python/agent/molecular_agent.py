@@ -4,8 +4,10 @@ Integrates with Google Gemini API to provide intelligent responses for quantum c
 """
 
 import os
+import json
 import logging
 import time
+from pathlib import Path
 from typing import List, Dict, Any, Optional, Iterator
 from google import genai
 from google.genai import types
@@ -19,51 +21,27 @@ logger = logging.getLogger(__name__)
 
 class MolecularAgent:
     """AI agent for molecular analysis and quantum chemistry assistance."""
-    
+
     def __init__(self):
         """Initialize the Molecular Agent with Gemini API and tools."""
+        # Load agent configuration from config file
+        self.config = self._load_agent_config()
+
         # Get API key with priority: environment variable -> settings file -> fallback
         self.api_key = self._get_api_key()
         self.client = None
         self.available_tools = []
-        
+
         if not self.api_key:
             logger.warning("Gemini API key not found in environment variable or settings. Agent will use fallback responses.")
         else:
             try:
                 # Initialize with latest google.genai SDK
                 self.client = genai.Client(api_key=self.api_key)
-                
-                # Import and set up available tools
-                from . import tools
-                self.available_tools = [
-                    # Calculation management
-                    tools.list_all_calculations,
-                    tools.get_calculation_details,
-                    tools.start_quantum_calculation,
-                    tools.delete_calculation,  # HIL-enabled destructive tool
-                    
-                    # Molecular structure tools
-                    tools.search_pubchem_by_name,
-                    tools.convert_smiles_to_xyz,
-                    tools.validate_xyz_format,
-                    
-                    # Molecular orbital analysis
-                    tools.get_molecular_orbitals,
-                    tools.generate_orbital_cube,
-                    tools.list_cube_files,
-                    tools.delete_cube_files,
-                    
-                    # Spectroscopy
-                    tools.generate_ir_spectrum,
-                    
-                    # System and settings
-                    tools.get_supported_parameters,
-                    tools.get_app_settings,
-                    tools.update_app_settings,
-                    tools.get_system_resources,
-                ]
-                
+
+                # Initialize tools
+                self.available_tools = self._initialize_tools()
+
                 logger.info("Gemini API client initialized successfully with tool integration")
                 logger.debug(f"Available tools: {[tool.__name__ for tool in self.available_tools]}")
             except Exception as e:
@@ -80,7 +58,7 @@ class MolecularAgent:
         if api_key:
             logger.debug("Using Gemini API key from environment variable")
             return api_key
-        
+
         # Priority 2: Settings file
         try:
             settings = get_current_settings()
@@ -89,10 +67,76 @@ class MolecularAgent:
                 return settings.gemini_api_key
         except Exception as e:
             logger.warning(f"Failed to load settings for API key: {e}")
-        
+
         # Priority 3: None (fallback)
         return None
-    
+
+    def _load_agent_config(self) -> Dict[str, Any]:
+        """Load AI agent configuration from server-config.json with fallback defaults."""
+        # Default configuration
+        default_config = {
+            "model_name": "gemini-2.5-flash",
+            "max_retries": 3,
+            "retry_delays": [1, 2, 4],
+            "retryable_status_codes": [429, 500, 502, 503, 504]
+        }
+
+        try:
+            # Try to find config file (go up from agent directory to project root)
+            config_path = Path(__file__).parent.parent.parent.parent / "config" / "server-config.json"
+
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    server_config = json.load(f)
+
+                # Extract ai_agent section if it exists
+                if "ai_agent" in server_config:
+                    config = {**default_config, **server_config["ai_agent"]}
+                    logger.debug(f"Loaded AI agent config from {config_path}")
+                    return config
+                else:
+                    logger.info("No 'ai_agent' section in server-config.json, using defaults")
+                    return default_config
+            else:
+                logger.warning(f"Config file not found at {config_path}, using default configuration")
+                return default_config
+
+        except Exception as e:
+            logger.error(f"Failed to load agent configuration: {e}, using defaults")
+            return default_config
+
+    def _initialize_tools(self) -> List[Any]:
+        """Initialize and return the list of available tools."""
+        from . import tools
+
+        return [
+            # Calculation management
+            tools.list_all_calculations,
+            tools.get_calculation_details,
+            tools.start_quantum_calculation,
+            tools.delete_calculation,  # HIL-enabled destructive tool
+
+            # Molecular structure tools
+            tools.search_pubchem_by_name,
+            tools.convert_smiles_to_xyz,
+            tools.validate_xyz_format,
+
+            # Molecular orbital analysis
+            tools.get_molecular_orbitals,
+            tools.generate_orbital_cube,
+            tools.list_cube_files,
+            tools.delete_cube_files,
+
+            # Spectroscopy
+            tools.generate_ir_spectrum,
+
+            # System and settings
+            tools.get_supported_parameters,
+            tools.get_app_settings,
+            tools.update_app_settings,
+            tools.get_system_resources,
+        ]
+
     def _convert_history_to_gemini_format(self, history: List[HistoryItem]) -> List[Dict[str, Any]]:
         """Convert frontend chat history to Gemini API format."""
         gemini_history = []
@@ -117,81 +161,26 @@ class MolecularAgent:
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for molecular analysis context with ReAct framework."""
-        return """You are an intelligent AI assistant specialized in molecular analysis and quantum chemistry, called "PySCF Agent". 
-You can help users with quantum chemistry calculations, molecular structure analysis, and related scientific tasks.
+        try:
+            # Try to load system prompt from file
+            prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
 
-IMPORTANT: You have access to powerful tools that can interact with the PySCF application backend. Use these tools actively to help users achieve their goals.
+            if prompt_path.exists():
+                with open(prompt_path, 'r', encoding='utf-8') as f:
+                    prompt = f.read()
+                logger.debug(f"Loaded system prompt from {prompt_path}")
+                return prompt
+            else:
+                logger.warning(f"System prompt file not found at {prompt_path}, using fallback")
+                return self._get_fallback_system_prompt()
 
-**Available Tools:**
+        except Exception as e:
+            logger.error(f"Failed to load system prompt from file: {e}, using fallback")
+            return self._get_fallback_system_prompt()
 
-**Calculation Management:**
-- `list_all_calculations`: Retrieve all saved quantum chemistry calculations
-- `get_calculation_details`: Get detailed results for a specific calculation ID
-- `start_quantum_calculation`: Start a new quantum chemistry calculation with molecular XYZ data
-- `delete_calculation`: **[DESTRUCTIVE]** Request deletion of a calculation (requires user confirmation)
-
-**Molecular Structure Tools:**
-- `search_pubchem_by_name`: Search PubChem database for molecular structures by compound name, CID, or formula
-- `convert_smiles_to_xyz`: Convert SMILES strings to 3D XYZ molecular structure format
-- `validate_xyz_format`: Validate the format of XYZ molecular structure data
-
-**Molecular Orbital Analysis:**
-- `get_molecular_orbitals`: Retrieve molecular orbital information (energies, HOMO/LUMO, occupancies)
-- `generate_orbital_cube`: Generate CUBE files for visualizing specific molecular orbitals
-- `list_cube_files`: List all generated CUBE files for a calculation
-- `delete_cube_files`: Delete CUBE files to free up disk space
-
-**Spectroscopy:**
-- `generate_ir_spectrum`: Generate theoretical IR (infrared) spectrum from vibrational frequency data
-
-**System and Settings:**
-- `get_supported_parameters`: Get available calculation methods, basis sets, functionals, and solvents
-- `get_app_settings`: Retrieve current application settings (resource limits, API keys)
-- `update_app_settings`: Update application settings (parallel instances, resource utilization)
-- `get_system_resources`: Get current system resource status and allocation information
-
-**ReAct Framework Instructions:**
-Before taking any action, you MUST follow this pattern:
-
-1. **[Thought]**: Analyze the user's request and plan your approach. Think step-by-step about what tools you need to use and why.
-2. **[Action]**: Use the appropriate tools to gather information or perform tasks.
-3. **[Observation]**: Analyze the results from your tool usage.
-4. **[Response]**: Provide a comprehensive answer to the user based on your observations.
-
-**Guidelines:**
-- Always respond in clear, professional English
-- Use tools proactively when they can help answer the user's question
-- If a tool returns an error, explain what happened and suggest alternatives
-- For calculation-related questions, always check the calculation list first
-- When users provide SMILES strings, use `convert_smiles_to_xyz` to convert them
-- For molecular orbital questions, use `get_molecular_orbitals` first to see available orbitals
-- When generating IR spectra, check if the calculation included frequency analysis
-- For system resource questions, use `get_system_resources` to provide accurate information
-- Provide scientific explanations when discussing quantum chemistry results
-- Be helpful, accurate, and educational in your responses
-
-**CRITICAL - Destructive Operations:**
-- The `delete_calculation` tool returns a JSON confirmation request, NOT a deletion result
-- When you receive a confirmation request JSON (with "requires_confirmation": true), you MUST:
-  1. Include the COMPLETE JSON in your response as a ```json code block FIRST
-  2. Then provide a natural language explanation to the user
-  3. Example format:
-     ```json
-     {{
-       "requires_confirmation": true,
-       "action": "delete_calculation",
-       "calculation_id": "calc_id_here",
-       "calculation_name": "calc name here",
-       "message": "confirmation message here"
-     }}
-     ```
-     
-     [Your natural language explanation about the deletion request]
-- NEVER tell the user that you "deleted" something when you only requested confirmation
-- The actual deletion happens only after user approval through the UI confirmation modal
-- The frontend will automatically parse the JSON block and display the confirmation modal
-
-Remember: You are not just a chatbot - you are an active assistant that can access real application data and functionality to help users with their molecular analysis workflows."""
+    def _get_fallback_system_prompt(self) -> str:
+        """Fallback system prompt in case file loading fails."""
+        return "You are PySCF Agent, an AI assistant specialized in molecular analysis and quantum chemistry. You have access to tools for calculation management, molecular structure analysis, and more. Use them proactively to help users."
     
     def reload_api_key(self) -> bool:
         """
@@ -199,11 +188,11 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
         Returns True if API key was found and model was initialized successfully.
         """
         new_api_key = self._get_api_key()
-        
+
         # Only reinitialize if the API key has changed
         if new_api_key != self.api_key:
             self.api_key = new_api_key
-            
+
             if not self.api_key:
                 logger.warning("Gemini API key not found after reload. Agent will use fallback responses.")
                 self.client = None
@@ -212,37 +201,10 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
             else:
                 try:
                     self.client = genai.Client(api_key=self.api_key)
-                    
-                    # Reinitialize tools
-                    from . import tools
-                    self.available_tools = [
-                        # Calculation management
-                        tools.list_all_calculations,
-                        tools.get_calculation_details,
-                        tools.start_quantum_calculation,
-                    tools.delete_calculation,  # HIL-enabled destructive tool
-                        
-                        # Molecular structure tools
-                        tools.search_pubchem_by_name,
-                        tools.convert_smiles_to_xyz,
-                        tools.validate_xyz_format,
-                        
-                        # Molecular orbital analysis
-                        tools.get_molecular_orbitals,
-                        tools.generate_orbital_cube,
-                        tools.list_cube_files,
-                        tools.delete_cube_files,
-                        
-                        # Spectroscopy
-                        tools.generate_ir_spectrum,
-                        
-                        # System and settings
-                        tools.get_supported_parameters,
-                        tools.get_app_settings,
-                        tools.update_app_settings,
-                        tools.get_system_resources,
-                    ]
-                    
+
+                    # Reinitialize tools using centralized method
+                    self.available_tools = self._initialize_tools()
+
                     logger.info("Gemini API client reinitialized successfully after settings update")
                     return True
                 except Exception as e:
@@ -259,22 +221,22 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
     def chat(self, message: str, history: List[Dict[str, Any]]) -> Iterator[str]:
         """
         Chat with AI agent using streaming with Function Calling support.
-        
+
         Args:
             message (str): User's message
             history (List[Dict[str, Any]]): Chat history in frontend format
-            
+
         Yields:
             str: AI agent's response chunks
         """
-        # Retry configuration
-        MAX_RETRIES = 3
-        RETRY_DELAYS = [1, 2, 4]  # Exponential backoff in seconds
-        RETRYABLE_STATUS_CODES = [429, 500, 502, 503, 504]  # Temporary errors
-        
-        for attempt in range(MAX_RETRIES):
+        # Load retry configuration from config
+        max_retries = self.config.get("max_retries", 3)
+        retry_delays = self.config.get("retry_delays", [1, 2, 4])
+        retryable_status_codes = self.config.get("retryable_status_codes", [429, 500, 502, 503, 504])
+
+        for attempt in range(max_retries):
             try:
-                logger.debug(f"Starting Function Calling chat (attempt {attempt + 1}/{MAX_RETRIES}) with message length: {len(message)}, history entries: {len(history)}")
+                logger.debug(f"Starting Function Calling chat (attempt {attempt + 1}/{max_retries}) with message length: {len(message)}, history entries: {len(history)}")
                 
                 # If Gemini API is not available, provide fallback response
                 if not self.client or not self.available_tools:
@@ -295,8 +257,9 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
                 logger.debug(f"Calling Gemini API with {len(full_conversation)} conversation entries and {len(self.available_tools)} tools")
                 
                 # Use new SDK with Function Calling
+                model_name = self.config.get("model_name", "gemini-2.5-flash")
                 response_stream = self.client.models.generate_content_stream(
-                    model='gemini-2.5-flash',  #本当はプロにしたい
+                    model=model_name,
                     contents=full_conversation,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
@@ -318,16 +281,17 @@ Remember: You are not just a chatbot - you are an active assistant that can acce
             except ServerError as e:
                 # Extract status code from error
                 status_code = getattr(e, 'code', None)
-                is_retryable = status_code in RETRYABLE_STATUS_CODES
-                is_last_attempt = attempt == MAX_RETRIES - 1
-                
+                is_retryable = status_code in retryable_status_codes
+                is_last_attempt = attempt == max_retries - 1
+
                 # Log appropriately based on error type
                 if is_retryable and not is_last_attempt:
+                    delay = retry_delays[attempt] if attempt < len(retry_delays) else retry_delays[-1]
                     logger.warning(
-                        f"Gemini API returned temporary error {status_code} (attempt {attempt + 1}/{MAX_RETRIES}). "
-                        f"Retrying in {RETRY_DELAYS[attempt]}s... Error: {e}"
+                        f"Gemini API returned temporary error {status_code} (attempt {attempt + 1}/{max_retries}). "
+                        f"Retrying in {delay}s... Error: {e}"
                     )
-                    time.sleep(RETRY_DELAYS[attempt])
+                    time.sleep(delay)
                     continue  # Retry
                 else:
                     # Last attempt or non-retryable error

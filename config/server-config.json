@@ -85,5 +85,11 @@
     "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     "enable_access_log": true,
     "enable_error_log": true
+  },
+  "ai_agent": {
+    "model_name": "gemini-2.5-flash",
+    "max_retries": 3,
+    "retry_delays": [1, 2, 4],
+    "retryable_status_codes": [429, 500, 502, 503, 504]
   }
 }
