@@ -391,11 +391,17 @@ const startPythonServer = async (): Promise<void> => {
       const appPyPath = path.join(pythonPath, 'app.py');
       console.log(`• app.py exists: ${fs.existsSync(appPyPath)}`);
 
+      // Ensure conda environment's bin directory is at the front of PATH
+      // This prevents pyenv or other Python version managers from interfering
+      const condaBinDir = path.dirname(pythonExecutablePath);
+      const modifiedPath = `${condaBinDir}:${process.env.PATH || ''}`;
+
       pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
+          PATH: modifiedPath,
           CONDA_DEFAULT_ENV: 'pyscf-env',
           PYSCF_SERVER_PORT: String(serverPort),
         },
@@ -417,10 +423,16 @@ const startPythonServer = async (): Promise<void> => {
     } else {
       // フォールバック: 直接実行（設定でGunicorn無効時のみ）
       console.log('Starting server with direct execution (fallback mode)');
+
+      // Ensure conda environment's bin directory is at the front of PATH
+      const condaBinDir = path.dirname(pythonExecutablePath);
+      const modifiedPath = `${condaBinDir}:${process.env.PATH || ''}`;
+
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
+          PATH: modifiedPath,
           CONDA_DEFAULT_ENV: 'pyscf-env',
           PYSCF_SERVER_PORT: String(serverPort),
         },

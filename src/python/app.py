@@ -96,11 +96,23 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_app():
-    """Application factory for Gunicorn compatibility."""
+def create_app(server_port: int = None):
+    """
+    Application factory for Gunicorn compatibility.
+
+    Args:
+        server_port: The port number on which the server will run.
+                    This is stored in app.config for access by other modules.
+    """
     # Initialize Flask app
     app = Flask(__name__)
     CORS(app)  # Enable CORS for cross-origin requests
+
+    # Store server port in app config for access by other modules (e.g., agent tools)
+    # This ensures a single source of truth for the server port across the application
+    if server_port is not None:
+        app.config['SERVER_PORT'] = server_port
+        logger.info(f"Server port configured in app.config: {server_port}")
 
     # Initialize SocketIO with configuration-based settings
     socketio_config = SERVER_CONFIG.get('socketio', {})
@@ -304,9 +316,9 @@ def start_development_server():
     
     logger.info(f"Starting API server with Flask-SocketIO on http://{host}:{actual_port}")
     logger.info(f"Configuration: Debug={debug}, Async_mode={socketio_config.get('async_mode', 'threading')}")
-    
-    # Create app and socketio instances
-    app, socketio = create_app()
+
+    # Create app and socketio instances with the determined port
+    app, socketio = create_app(server_port=actual_port)
     
     # Register cleanup functions
     atexit.register(cleanup_resources)
@@ -338,7 +350,10 @@ def create_socketio():
 
 # Create global app and socketio instances for import by other modules
 # These are created at module import time for Gunicorn compatibility
-app, socketio = create_app()
+# Port is read from environment variable if available (set by Electron main process)
+_port_from_env = os.getenv('PYSCF_SERVER_PORT')
+_server_port = int(_port_from_env) if _port_from_env else None
+app, socketio = create_app(server_port=_server_port)
 
 
 if __name__ == '__main__':
