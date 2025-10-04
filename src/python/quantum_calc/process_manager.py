@@ -41,13 +41,30 @@ class QueuedCalculation:
 def _setup_worker_environment(parameters: dict, process_logger) -> tuple:
     """
     Set up worker process environment variables and memory configuration.
+
+    Thread Control Strategy (Unified Approach):
+    This is the ONLY place where thread counts are configured for calculations.
+    The configuration uses a three-layered approach:
+
+    1. Environment variables (set here): Control BLAS/LAPACK libraries at the OS level
+       - OMP_NUM_THREADS, MKL_NUM_THREADS, etc.
+       - These must be set BEFORE importing PySCF to take effect
+
+    2. PySCF lib.num_threads() (set in calculation_worker): Controls PySCF's internal threading
+       - Set in calculation_worker function after PySCF import
+
+    3. threadpoolctl context (used in calculation_worker): Runtime control for specific operations
+       - Applied as a context manager around calculation execution
+       - Provides additional safety layer
+
     Returns (cpu_cores, memory_mb).
     """
     # Get user-specified CPU cores or default to 1
     cpu_cores = parameters.get('cpu_cores') or 1
     cpu_cores_str = str(int(cpu_cores))
-    
+
     # Set all parallel processing environment variables to control CPU usage
+    # These environment variables must be set before any BLAS/LAPACK library is loaded
     os.environ['OMP_NUM_THREADS'] = cpu_cores_str
     os.environ['MKL_NUM_THREADS'] = cpu_cores_str
     os.environ['OPENBLAS_NUM_THREADS'] = cpu_cores_str
