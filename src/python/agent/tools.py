@@ -2,91 +2,24 @@
 AI Agent Tool Wrapper Module
 
 This module provides Python wrapper functions that enable AI agents to
-utilize PySCF_front application API endpoints.
+utilize PySCF_front application services.
 
 Each function is optimized for Gemini SDK's Function Calling feature and
-serves as an API wrapper that strictly adheres to OpenAPI specifications.
+serves as a service wrapper that uses the internal service layer directly
+instead of HTTP requests for better performance.
 """
 
 import json
 import logging
-import os
 from typing import Optional, Dict, Any
 
-import requests
-from flask import current_app
+from services import (
+    get_quantum_service, get_pubchem_service, get_smiles_service,
+    get_settings_service, get_system_service, ServiceError
+)
 
 # Logger configuration
 logger = logging.getLogger(__name__)
-
-
-def get_api_base_url() -> str:
-    """
-    Get the API base URL with dynamic port detection.
-
-    The port number and host are retrieved from Flask's app.config,
-    which serves as the single source of truth for server configuration.
-
-    Priority order for port detection:
-    1. Flask app.config['SERVER_PORT'] (if within Flask application context)
-    2. Environment variable PYSCF_SERVER_PORT (fallback)
-    3. Default port 5000 (final fallback)
-
-    Returns:
-        str: The base URL for API requests (e.g., "http://127.0.0.1:5000")
-    """
-    # Default values
-    default_host = "127.0.0.1"
-    default_port = 5000
-
-    try:
-        # Try to get configuration from Flask app.config (single source of truth)
-        # Accessing current_app.config will raise RuntimeError if outside of Flask context
-        host = current_app.config.get('SERVER_HOST', default_host)
-        port = current_app.config.get('SERVER_PORT')
-
-        if port is not None:
-            logger.debug(f"Using host:port from app.config: {host}:{port}")
-            return f"http://{host}:{port}"
-
-        # Fallback to environment variable if not set in app.config
-        env_port = os.getenv('PYSCF_SERVER_PORT')
-        if env_port:
-            port = int(env_port)
-            logger.debug(f"Using port from environment variable: {host}:{port}")
-            return f"http://{host}:{port}"
-
-        # Final fallback to default port
-        logger.debug(f"Using default host:port: {host}:{default_port}")
-        return f"http://{host}:{default_port}"
-
-    except RuntimeError:
-        # Outside of Flask application context - fallback to environment variable or default
-        env_port = os.getenv('PYSCF_SERVER_PORT')
-        if env_port:
-            port = int(env_port)
-            logger.debug(f"Outside Flask context, using port from environment: {default_host}:{port}")
-            return f"http://{default_host}:{port}"
-        else:
-            logger.debug(f"Outside Flask context, using default: {default_host}:{default_port}")
-            return f"http://{default_host}:{default_port}"
-
-
-def get_api_timeout() -> int:
-    """
-    Get API request timeout from configuration.
-
-    Returns:
-        int: Timeout in seconds (default: 30)
-    """
-    try:
-        # Try to get timeout from Flask app.config
-        external_services = current_app.config.get('EXTERNAL_SERVICES', {})
-        timeout = external_services.get('api_timeout', 30)
-        return timeout
-    except RuntimeError:
-        # Outside Flask context, use default
-        return 30
 
 
 def _validation_error(message: str) -> str:
@@ -108,58 +41,26 @@ def _validation_error(message: str) -> str:
     }, ensure_ascii=False, indent=2)
 
 
-def _handle_request_error(error: Exception, context: str = "") -> str:
+def _handle_service_error(error: ServiceError, context: str = "") -> str:
     """
-    Handle request errors and return appropriate error messages in JSON format.
+    Handle service errors and return appropriate error messages in JSON format.
 
     This function ensures consistent error response format for AI agents by always
     returning a JSON string with a structured error object containing success=False
     and an error message.
 
     Args:
-        error: The exception that occurred
+        error: The ServiceError that occurred
         context: Additional context about where the error occurred
 
     Returns:
         str: JSON-formatted error message with structure: {"success": false, "error": "message"}
     """
     context_prefix = f"{context}: " if context else ""
-
-    if isinstance(error, requests.exceptions.HTTPError):
-        status_code = error.response.status_code
-        if status_code == 404:
-            error_msg = f"{context_prefix}Resource not found. Please verify the request parameters."
-        elif status_code == 400:
-            try:
-                error_detail = error.response.json()
-                error_msg = f"{context_prefix}Invalid request - {error_detail.get('message', 'Bad request')}"
-            except:
-                error_msg = f"{context_prefix}Invalid request parameters. Please check your input values."
-        elif status_code >= 500:
-            error_msg = f"{context_prefix}Internal server error occurred. Please try again after a moment."
-        else:
-            error_msg = f"{context_prefix}HTTP error occurred (status code {status_code})."
-
-    elif isinstance(error, requests.exceptions.ConnectionError):
-        logger.error(f"Connection error in {context}: {error}")
-        error_msg = "Could not connect to API server. Please check if the server is running."
-
-    elif isinstance(error, requests.exceptions.Timeout):
-        logger.error(f"Timeout error in {context}: {error}")
-        error_msg = "API request timed out. Please try again after a moment."
-
-    elif isinstance(error, requests.exceptions.RequestException):
-        logger.error(f"Request error in {context}: {error}")
-        error_msg = f"Network error occurred: {str(error)}"
-
-    elif isinstance(error, json.JSONDecodeError):
-        logger.error(f"JSON decode error in {context}: {error}")
-        error_msg = "Failed to parse API response."
-
-    else:
-        logger.error(f"Unexpected error in {context}: {error}")
-        error_msg = f"An unexpected error occurred: {str(error)}"
-
+    error_msg = f"{context_prefix}{error.message}"
+    
+    logger.error(f"Service error in {context}: {error_msg}")
+    
     # Return error in consistent JSON format
     return json.dumps({
         "success": False,
@@ -179,12 +80,23 @@ def list_all_calculations() -> str:
              On error, contains structured text with error message.
     """
     try:
-        logger.debug("Fetching all calculations from API")
-        response = requests.get(f"{get_api_base_url()}/api/quantum/calculations", timeout=get_api_timeout())
-        response.raise_for_status()
-        return json.dumps(response.json(), ensure_ascii=False, indent=2)
+        logger.debug("Fetching all calculations from service")
+        quantum_service = get_quantum_service()
+        result = quantum_service.list_calculations()
+        
+        # Return in the expected format with success flag
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "list_all_calculations")
     except Exception as e:
-        return _handle_request_error(e, "list_all_calculations")
+        logger.error(f"Unexpected error in list_all_calculations: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def get_calculation_details(calculation_id: str) -> str:
@@ -207,14 +119,21 @@ def get_calculation_details(calculation_id: str) -> str:
     
     try:
         logger.debug(f"Fetching calculation details for ID: {calculation_id}")
-        response = requests.get(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}",
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-        return json.dumps(response.json(), ensure_ascii=False, indent=2)
+        quantum_service = get_quantum_service()
+        result = quantum_service.get_calculation_details(calculation_id)
+        
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, f"get_calculation_details(id={calculation_id})")
     except Exception as e:
-        return _handle_request_error(e, f"get_calculation_details(id={calculation_id})")
+        logger.error(f"Unexpected error in get_calculation_details: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def get_supported_parameters() -> str:
@@ -230,12 +149,22 @@ def get_supported_parameters() -> str:
              On error, contains structured text with error message.
     """
     try:
-        logger.debug("Fetching supported parameters from API")
-        response = requests.get(f"{get_api_base_url()}/api/quantum/supported-parameters", timeout=get_api_timeout())
-        response.raise_for_status()
-        return json.dumps(response.json(), ensure_ascii=False, indent=2)
+        logger.debug("Fetching supported parameters from service")
+        quantum_service = get_quantum_service()
+        parameters = quantum_service.get_supported_parameters()
+        
+        return json.dumps({
+            'success': True,
+            'data': parameters
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "get_supported_parameters")
     except Exception as e:
-        return _handle_request_error(e, "get_supported_parameters")
+        logger.error(f"Unexpected error in get_supported_parameters: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def start_quantum_calculation(
@@ -270,11 +199,7 @@ def start_quantum_calculation(
     
     Args:
         xyz (str): XYZ molecular structure data (atomic symbols and coordinates).
-                  Example: "3
-Water molecule
-O 0.0 0.0 0.0
-H 0.7570 0.5860 0.0
-H -0.7570 0.5860 0.0"
+                  Example: "3\nWater molecule\nO 0.0 0.0 0.0\nH 0.7570 0.5860 0.0\nH -0.7570 0.5860 0.0"
         calculation_method (str): Quantum chemistry method. Options: 'DFT', 'HF', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF'
         basis_function (str): Basis set for calculation. Examples: 'STO-3G', '6-31G(d)', '6-31+G(d,p)', 'cc-pVDZ', 'aug-cc-pVTZ', 'def2-SVP'
         charges (int): Molecular charge (-10 to 10). Default: 0 (neutral molecule)
@@ -360,54 +285,63 @@ H -0.7570 0.5860 0.0"
         if not isinstance(max_cycle_micro, int) or max_cycle_micro < 1 or max_cycle_micro > 20:
             return _validation_error("max_cycle_micro must be an integer between 1 and 20 for CASCI/CASSCF calculations.")
     
-    # Prepare request data
-    request_data = {
-        "xyz": xyz.strip(),
-        "calculation_method": calculation_method,
-        "basis_function": basis_function,
-        "charges": charges,
-        "spin": spin,
-        "solvent_method": solvent_method,
-        "solvent": solvent,
-        "name": name.strip(),
-        "tddft_nstates": tddft_nstates,
-        "tddft_method": tddft_method,
-        "tddft_analyze_nto": tddft_analyze_nto,
-        "ncas": ncas,
-        "nelecas": nelecas,
-        "max_cycle_macro": max_cycle_macro,
-        "max_cycle_micro": max_cycle_micro,
-        "natorb": natorb,
-        "conv_tol": conv_tol,
-        "conv_tol_grad": conv_tol_grad,
-        "optimize_geometry": optimize_geometry
+    # Build parameters dictionary
+    from datetime import datetime
+    
+    parameters = {
+        'xyz': xyz.strip(),
+        'calculation_method': calculation_method,
+        'basis_function': basis_function,
+        'charges': charges,
+        'spin': spin,
+        'solvent_method': solvent_method,
+        'solvent': solvent,
+        'name': name.strip(),
+        'tddft_nstates': tddft_nstates,
+        'tddft_method': tddft_method,
+        'tddft_analyze_nto': tddft_analyze_nto,
+        'ncas': ncas,
+        'nelecas': nelecas,
+        'max_cycle_macro': max_cycle_macro,
+        'max_cycle_micro': max_cycle_micro,
+        'natorb': natorb,
+        'conv_tol': conv_tol,
+        'conv_tol_grad': conv_tol_grad,
+        'optimize_geometry': optimize_geometry,
+        'created_at': datetime.now().isoformat()
     }
     
     # Add exchange_correlation only for methods that use it (not HF)
     if calculation_method != "HF" and exchange_correlation:
-        request_data["exchange_correlation"] = exchange_correlation
+        parameters["exchange_correlation"] = exchange_correlation
+    else:
+        parameters["exchange_correlation"] = None
     
     # Add resource parameters if specified
     if cpu_cores is not None:
-        request_data["cpu_cores"] = cpu_cores
+        parameters["cpu_cores"] = cpu_cores
     
     if memory_mb is not None:
-        request_data["memory_mb"] = memory_mb
+        parameters["memory_mb"] = memory_mb
     
     try:
         logger.debug(f"Starting quantum calculation: {calculation_method}/{basis_function} for '{name}'")
-        response = requests.post(
-            f"{get_api_base_url()}/api/quantum/calculate",
-            json=request_data,
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
+        quantum_service = get_quantum_service()
+        result = quantum_service.start_calculation(parameters)
+        
         logger.info(f"Successfully started calculation with ID: {result.get('id', 'unknown')}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': {'calculation': result}
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "start_quantum_calculation")
     except Exception as e:
-        return _handle_request_error(e, "start_quantum_calculation")
+        logger.error(f"Unexpected error in start_quantum_calculation: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def search_pubchem_by_name(
@@ -441,26 +375,24 @@ def search_pubchem_by_name(
     if len(compound_name.strip()) == 0:
         return _validation_error("compound_name cannot be empty or contain only whitespace.")
     
-    # Prepare request data
-    request_data = {
-        "query": compound_name.strip(),
-        "searchType": search_type
-    }
-    
     try:
         logger.debug(f"Searching PubChem for compound: '{compound_name}' (type: {search_type})")
-        response = requests.post(
-            f"{get_api_base_url()}/api/pubchem/search",
-            json=request_data,
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
-        logger.info(f"Successfully found compound: {result.get('name', compound_name)}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        pubchem_service = get_pubchem_service()
+        result = pubchem_service.search_compound(compound_name.strip(), search_type)
+        
+        logger.info(f"Successfully found compound")
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, f"search_pubchem_by_name(compound={compound_name})")
     except Exception as e:
-        return _handle_request_error(e, f"search_pubchem_by_name(compound={compound_name})")
+        logger.error(f"Unexpected error in search_pubchem_by_name: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def delete_calculation(calculation_id: str) -> str:
@@ -491,14 +423,10 @@ def delete_calculation(calculation_id: str) -> str:
     try:
         # First, get calculation details to provide context for the confirmation
         logger.debug(f"Fetching calculation details for deletion request: {calculation_id}")
-        response = requests.get(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}",
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        calc_data = response.json()
-        calculation_name = calc_data.get('data', {}).get('calculation', {}).get('name', 'Unknown Calculation')
+        quantum_service = get_quantum_service()
+        calc_data = quantum_service.get_calculation_details(calculation_id)
+        
+        calculation_name = calc_data.get('calculation', {}).get('name', 'Unknown Calculation')
 
         # Return a structured confirmation request instead of deleting directly
         confirmation_request = {
@@ -512,13 +440,14 @@ def delete_calculation(calculation_id: str) -> str:
         logger.info(f"Returning confirmation request for deletion of calculation: {calculation_id}")
         return json.dumps(confirmation_request, ensure_ascii=False, indent=2)
 
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            return f"Error: Calculation with ID '{calculation_id}' not found. Please verify the calculation ID."
-        else:
-            return _handle_request_error(e, f"delete_calculation(id={calculation_id})")
+    except ServiceError as e:
+        return _handle_service_error(e, f"delete_calculation(id={calculation_id})")
     except Exception as e:
-        return _handle_request_error(e, f"delete_calculation(id={calculation_id})")
+        logger.error(f"Unexpected error in delete_calculation: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def _execute_confirmed_deletion(calculation_id: str) -> Dict[str, Any]:
@@ -527,7 +456,7 @@ def _execute_confirmed_deletion(calculation_id: str) -> Dict[str, Any]:
 
     This function should ONLY be called after user confirmation has been obtained
     through the Human-in-the-Loop confirmation mechanism. It actually performs
-    the deletion by calling the DELETE API endpoint.
+    the deletion by calling the service layer directly.
 
     Args:
         calculation_id (str): Unique ID of the calculation to delete.
@@ -539,8 +468,7 @@ def _execute_confirmed_deletion(calculation_id: str) -> Dict[str, Any]:
                        - calculation_id (str): ID of the deleted calculation
 
     Raises:
-        requests.exceptions.HTTPError: If the API request fails
-        requests.exceptions.RequestException: If a network error occurs
+        ServiceError: If the deletion fails
     """
     if not calculation_id or not isinstance(calculation_id, str):
         return {
@@ -551,40 +479,19 @@ def _execute_confirmed_deletion(calculation_id: str) -> Dict[str, Any]:
 
     try:
         logger.info(f"Executing confirmed deletion for calculation: {calculation_id}")
-        response = requests.delete(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}",
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
+        quantum_service = get_quantum_service()
+        result = quantum_service.delete_calculation(calculation_id)
+        
         logger.info(f"Successfully deleted calculation: {calculation_id}")
 
         return {
             "success": True,
-            "message": result.get('data', {}).get('message', 'Calculation deleted successfully'),
+            "message": result.get('message', 'Calculation deleted successfully'),
             "calculation_id": calculation_id
         }
 
-    except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404:
-            error_msg = f"Calculation with ID '{calculation_id}' not found."
-            logger.warning(error_msg)
-            return {
-                "success": False,
-                "message": error_msg,
-                "calculation_id": calculation_id
-            }
-        else:
-            error_msg = f"HTTP error occurred while deleting calculation: {str(e)}"
-            logger.error(error_msg)
-            return {
-                "success": False,
-                "message": error_msg,
-                "calculation_id": calculation_id
-            }
-    except requests.exceptions.RequestException as e:
-        error_msg = f"Network error occurred while deleting calculation: {str(e)}"
+    except ServiceError as e:
+        error_msg = f"Error deleting calculation: {e.message}"
         logger.error(error_msg)
         return {
             "success": False,
@@ -629,25 +536,24 @@ def convert_smiles_to_xyz(smiles: str) -> str:
     if len(smiles) > 500:
         return _validation_error("smiles string is too long. Maximum length is 500 characters.")
     
-    # Prepare request data
-    request_data = {
-        "smiles": smiles.strip()
-    }
-    
     try:
         logger.debug(f"Converting SMILES to XYZ: '{smiles}'")
-        response = requests.post(
-            f"{get_api_base_url()}/api/smiles/convert",
-            json=request_data,
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
+        smiles_service = get_smiles_service()
+        result = smiles_service.convert_smiles(smiles.strip())
+        
         logger.info(f"Successfully converted SMILES to XYZ structure")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, f"convert_smiles_to_xyz(smiles={smiles})")
     except Exception as e:
-        return _handle_request_error(e, f"convert_smiles_to_xyz(smiles={smiles})")
+        logger.error(f"Unexpected error in convert_smiles_to_xyz: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def validate_xyz_format(xyz: str) -> str:
@@ -676,26 +582,25 @@ def validate_xyz_format(xyz: str) -> str:
     if len(xyz.strip()) == 0:
         return _validation_error("xyz string cannot be empty or contain only whitespace.")
     
-    # Prepare request data
-    request_data = {
-        "xyz": xyz.strip()
-    }
-    
     try:
         logger.debug("Validating XYZ format")
-        response = requests.post(
-            f"{get_api_base_url()}/api/pubchem/validate",
-            json=request_data,
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
-        is_valid = result.get('data', {}).get('valid', False)
+        pubchem_service = get_pubchem_service()
+        result = pubchem_service.validate_xyz(xyz.strip())
+        
+        is_valid = result.get('valid', False)
         logger.info(f"XYZ validation result: {'valid' if is_valid else 'invalid'}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "validate_xyz_format")
     except Exception as e:
-        return _handle_request_error(e, "validate_xyz_format")
+        logger.error(f"Unexpected error in validate_xyz_format: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 
@@ -728,18 +633,23 @@ def get_molecular_orbitals(calculation_id: str) -> str:
     
     try:
         logger.debug(f"Fetching molecular orbital information for calculation: {calculation_id}")
-        response = requests.get(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals",
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
-        num_orbitals = result.get('data', {}).get('total_orbitals', 0)
+        quantum_service = get_quantum_service()
+        orbital_summary = quantum_service.get_molecular_orbitals(calculation_id)
+        
+        num_orbitals = orbital_summary.get('total_orbitals', 0)
         logger.info(f"Successfully retrieved {num_orbitals} molecular orbitals for calculation {calculation_id}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': orbital_summary
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, f"get_molecular_orbitals(id={calculation_id})")
     except Exception as e:
-        return _handle_request_error(e, f"get_molecular_orbitals(id={calculation_id})")
+        logger.error(f"Unexpected error in get_molecular_orbitals: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def generate_orbital_cube(
@@ -797,27 +707,30 @@ def generate_orbital_cube(
     if not isinstance(isovalue_neg, (int, float)) or isovalue_neg < -0.1 or isovalue_neg > -0.001:
         return _validation_error("isovalue_neg must be a number between -0.1 and -0.001.")
     
-    # Prepare query parameters
-    params = {
-        "gridSize": grid_size,
-        "isovaluePos": isovalue_pos,
-        "isovalueNeg": isovalue_neg
-    }
-    
     try:
         logger.debug(f"Generating CUBE file for orbital {orbital_index} in calculation {calculation_id}")
-        response = requests.get(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals/{orbital_index}/cube",
-            params=params,
-            timeout=get_api_timeout() * 2  # CUBE generation can take longer
+        quantum_service = get_quantum_service()
+        cube_data = quantum_service.generate_orbital_cube(
+            calculation_id,
+            orbital_index,
+            grid_size=grid_size,
+            isovalue_pos=isovalue_pos,
+            isovalue_neg=isovalue_neg
         )
-        response.raise_for_status()
-
-        result = response.json()
+        
         logger.info(f"Successfully generated CUBE file for orbital {orbital_index}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': cube_data
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, f"generate_orbital_cube(id={calculation_id}, orbital={orbital_index})")
     except Exception as e:
-        return _handle_request_error(e, f"generate_orbital_cube(id={calculation_id}, orbital={orbital_index})")
+        logger.error(f"Unexpected error in generate_orbital_cube: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def list_cube_files(calculation_id: str) -> str:
@@ -849,18 +762,23 @@ def list_cube_files(calculation_id: str) -> str:
     
     try:
         logger.debug(f"Listing CUBE files for calculation: {calculation_id}")
-        response = requests.get(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals/cube-files",
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
-        num_files = result.get('data', {}).get('total_files', 0)
+        quantum_service = get_quantum_service()
+        result = quantum_service.list_cube_files(calculation_id)
+        
+        num_files = result.get('total_files', 0)
         logger.info(f"Found {num_files} CUBE files for calculation {calculation_id}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, f"list_cube_files(id={calculation_id})")
     except Exception as e:
-        return _handle_request_error(e, f"list_cube_files(id={calculation_id})")
+        logger.error(f"Unexpected error in list_cube_files: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def delete_cube_files(calculation_id: str, orbital_index: Optional[int] = None) -> str:
@@ -894,31 +812,30 @@ def delete_cube_files(calculation_id: str, orbital_index: Optional[int] = None) 
     if orbital_index is not None and (not isinstance(orbital_index, int) or orbital_index < 0):
         return _validation_error("orbital_index must be a non-negative integer or None.")
     
-    # Prepare query parameters
-    params = {}
-    if orbital_index is not None:
-        params["orbitalIndex"] = orbital_index
-    
     try:
         if orbital_index is not None:
             logger.debug(f"Deleting CUBE file for orbital {orbital_index} in calculation {calculation_id}")
         else:
             logger.debug(f"Deleting all CUBE files for calculation {calculation_id}")
 
-        response = requests.delete(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals/cube-files",
-            params=params,
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
-        num_deleted = result.get('data', {}).get('deleted_files', 0)
+        quantum_service = get_quantum_service()
+        result = quantum_service.delete_cube_files(calculation_id, orbital_index)
+        
+        num_deleted = result.get('deleted_files', 0)
         logger.info(f"Successfully deleted {num_deleted} CUBE file(s)")
-        return json.dumps(result, ensure_ascii=False, indent=2)
-    except Exception as e:
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
         context = f"orbital {orbital_index}" if orbital_index is not None else "all orbitals"
-        return _handle_request_error(e, f"delete_cube_files(id={calculation_id}, {context})")
+        return _handle_service_error(e, f"delete_cube_files(id={calculation_id}, {context})")
+    except Exception as e:
+        logger.error(f"Unexpected error in delete_cube_files: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def generate_ir_spectrum(
@@ -979,29 +896,31 @@ def generate_ir_spectrum(
     if not isinstance(show_peaks, bool):
         return _validation_error("show_peaks must be a boolean value.")
     
-    # Prepare query parameters
-    params = {
-        "broadeningFwhm": broadening_fwhm,
-        "xMin": x_min,
-        "xMax": x_max,
-        "showPeaks": show_peaks
-    }
-    
     try:
         logger.debug(f"Generating IR spectrum for calculation: {calculation_id}")
-        response = requests.get(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/ir-spectrum",
-            params=params,
-            timeout=get_api_timeout()
+        quantum_service = get_quantum_service()
+        result = quantum_service.generate_ir_spectrum(
+            calculation_id,
+            broadening_fwhm=broadening_fwhm,
+            x_min=x_min,
+            x_max=x_max,
+            show_peaks=show_peaks
         )
-        response.raise_for_status()
-
-        result = response.json()
-        num_peaks = len(result.get('data', {}).get('spectrum', {}).get('peaks', []))
+        
+        num_peaks = len(result.get('spectrum', {}).get('peaks', []))
         logger.info(f"Successfully generated IR spectrum with {num_peaks} peaks for calculation {calculation_id}")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, f"generate_ir_spectrum(id={calculation_id})")
     except Exception as e:
-        return _handle_request_error(e, f"generate_ir_spectrum(id={calculation_id})")
+        logger.error(f"Unexpected error in generate_ir_spectrum: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def get_app_settings() -> str:
@@ -1024,17 +943,22 @@ def get_app_settings() -> str:
     """
     try:
         logger.debug("Fetching application settings")
-        response = requests.get(
-            f"{get_api_base_url()}/api/settings",
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
+        settings_service = get_settings_service()
+        settings = settings_service.get_settings()
+        
         logger.info("Successfully retrieved application settings")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': {'settings': settings}
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "get_app_settings")
     except Exception as e:
-        return _handle_request_error(e, "get_app_settings")
+        logger.error(f"Unexpected error in get_app_settings: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def update_app_settings(
@@ -1084,14 +1008,16 @@ def update_app_settings(
     # First, get current settings
     try:
         logger.debug("Fetching current settings for update")
-        get_response = requests.get(
-            f"{get_api_base_url()}/api/settings",
-            timeout=get_api_timeout()
-        )
-        get_response.raise_for_status()
-        current_settings = get_response.json().get('data', {}).get('settings', {})
+        settings_service = get_settings_service()
+        current_settings = settings_service.get_settings()
+    except ServiceError as e:
+        return _handle_service_error(e, "update_app_settings (fetching current settings)")
     except Exception as e:
-        return _handle_request_error(e, "update_app_settings (fetching current settings)")
+        logger.error(f"Unexpected error fetching current settings: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
     
     # Prepare update data with current values as defaults
     update_data = {
@@ -1118,18 +1044,22 @@ def update_app_settings(
     
     try:
         logger.debug("Updating application settings")
-        response = requests.put(
-            f"{get_api_base_url()}/api/settings",
-            json=update_data,
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
+        settings_service = get_settings_service()
+        updated_settings = settings_service.update_settings(update_data)
+        
         logger.info("Successfully updated application settings")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': {'settings': updated_settings}
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "update_app_settings")
     except Exception as e:
-        return _handle_request_error(e, "update_app_settings")
+        logger.error(f"Unexpected error in update_app_settings: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 def get_system_resources() -> str:
@@ -1151,17 +1081,22 @@ def get_system_resources() -> str:
     """
     try:
         logger.debug("Fetching system resource status")
-        response = requests.get(
-            f"{get_api_base_url()}/api/system/resource-status",
-            timeout=get_api_timeout()
-        )
-        response.raise_for_status()
-
-        result = response.json()
+        system_service = get_system_service()
+        result = system_service.get_resource_status()
+        
         logger.info("Successfully retrieved system resource status")
-        return json.dumps(result, ensure_ascii=False, indent=2)
+        return json.dumps({
+            'success': True,
+            'data': result
+        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "get_system_resources")
     except Exception as e:
-        return _handle_request_error(e, "get_system_resources")
+        logger.error(f"Unexpected error in get_system_resources: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
 
 
 

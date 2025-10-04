@@ -3,12 +3,11 @@ SMILES conversion API endpoints.
 Handles conversion of SMILES strings to XYZ format.
 """
 
-
 import logging
 from flask import Blueprint, jsonify
 from flask_pydantic import validate
 
-from SMILES.smiles_converter import smiles_to_xyz, SMILESError
+from services import get_smiles_service, ServiceError
 from generated_models import SMILESConvertRequest
 
 # Set up logging
@@ -23,17 +22,18 @@ smiles_bp = Blueprint('smiles', __name__)
 def convert_smiles(body: SMILESConvertRequest):
     """Converts a SMILES string to XYZ format."""
     try:
+        smiles_service = get_smiles_service()
+        
         smiles = body.smiles
         
-        logger.info(f"Converting SMILES: {smiles}")
+        # Call service layer
+        result = smiles_service.convert_smiles(smiles)
+        
+        return jsonify({'success': True, 'data': result})
 
-        xyz_string = smiles_to_xyz(smiles, title=f"Molecule from SMILES: {smiles}")
-
-        return jsonify({'success': True, 'data': {'xyz': xyz_string}})
-
-    except SMILESError as e:
-        logger.error(f"SMILES conversion failed: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 400
+    except ServiceError as e:
+        logger.error(f"Service error during SMILES conversion: {e}")
+        return jsonify({'success': False, 'error': e.message}), e.status_code
     except Exception as e:
         logger.error(f"An unexpected error occurred during SMILES conversion: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500

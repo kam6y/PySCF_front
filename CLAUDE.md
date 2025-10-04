@@ -1,22 +1,22 @@
-This file provides guidance to Claude when working with code in this repository.Your owner is Japanese, so you must use Japanese when reporting your plans.
+This file provides guidance to Claude when working with code in this repository.
 
 Project Overview
-This is a PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
+This is PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
 
-The application supports various quantum chemistry calculation methods, including DFT, Hartree-Fock (HF), MP2, CCSD, TDDFT, CASCI, and CASSCF. It also features geometry optimization, vibrational frequency analysis with IR spectrum visualization, and advanced analysis like Molecular Orbitals (MO) and Natural Transition Orbitals (NTO) for TDDFT. It dynamically loads supported parameters (basis sets, functionals, etc.) from the backend.
+The application supports various quantum chemistry calculation methods, including DFT, Hartree-Fock (HF), MP2, CCSD, TDDFT, CASCI, and CASSCF. It also features geometry optimization, vibrational frequency analysis with IR spectrum visualization, and advanced analysis like Molecular Orbitals (MO) and Natural Transition Orbitals (NTO) for TDDFT. A recent addition is an AI-powered molecular agent that can perform tasks based on natural language prompts. It dynamically loads supported parameters (basis sets, functionals, etc.) from the backend.
 
 A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend. The application uses WebSockets for real-time status updates of running calculations, providing a more efficient and responsive user experience than a polling-based system.
 
 Development Philosophy
 This is a development-stage application. Backward compatibility is not a concern, and breaking changes should be made freely in favor of better design and simpler code. When refactoring or improving the codebase:
 
-Prioritize simplicity over compatibility - Remove deprecated patterns and complex fallback logic
+Prioritize simplicity over compatibility - Remove deprecated patterns and complex fallback logic.
 
-Make breaking changes confidently - Don't hesitate to change APIs, data structures, or file formats
+Make breaking changes confidently - Don't hesitate to change APIs, data structures, or file formats.
 
-Clean up legacy code - Remove old implementations when better alternatives are available
+Clean up legacy code - Remove old implementations when better alternatives are available.
 
-Focus on the best solution - Don't compromise design quality for compatibility with older versions
+Focus on the best solution - Don't compromise design quality for compatibility with older versions.
 
 This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
 
@@ -27,122 +27,132 @@ This project requires a conda environment for development. The application featu
 
 Quick Setup (Recommended)
 
-Install Node.js dependencies
+Bash
+
+# Install Node.js dependencies
 npm install
 
-Automated environment setup (handles all conda setup)
+# Automated environment setup (handles all conda setup)
 npm run setup-env
 
-Verify environment health
+# Verify environment health
 npm run verify-env
 
-Verify build tools
+# Verify build tools
 npm run verify-build-env
 
-Check server configuration
+# Check server configuration
 npm run debug:config
-
 Manual Setup
 
-Install Node.js dependencies
+Bash
+
+# Install Node.js dependencies
 npm install
 
-Install Miniforge (if not already installed)
-Example for macOS ARM:
+# Install Miniforge (if not already installed)
+# Example for macOS ARM:
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
 bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
 
-Create conda environment from environment.yml (includes all dependencies)
+# Create conda environment from environment.yml (includes all dependencies)
 source $HOME/miniforge3/etc/profile.d/conda.sh
 conda env create -f .github/environment.yml
 
-Activate the environment
+# Activate the environment
 conda activate pyscf-env
 
-Verify the setup
+# Verify the setup
 npm run verify-env
-
 Note: The conda environment setup is mandatory. The application will show an error dialog if the conda environment is not properly configured.
 
 Development Commands
+Bash
 
-Activate conda environment
+# Activate conda environment
 conda activate pyscf-env
 
-Development mode (generates code, builds, and runs Electron with hot reload + Python backend)
+# Development mode (generates code, builds, and runs Electron with hot reload + Python backend)
 npm run dev
 
-Production build (generates code, builds frontend and creates Python executable)
+# Production build (generates code, builds frontend and creates Python executable)
 npm run build
 
-Package application for distribution (includes production build)
+# Package application for distribution (includes production build)
 npm run package
-
 Individual Commands
 Environment Management
 
-Automated environment setup (conda + dependencies)
+Bash
+
+# Automated environment setup (conda + dependencies)
 npm run setup-env
 
-Verify environment health and dependencies
+# Verify environment health and dependencies
 npm run verify-env
 
-Verify build tools (conda-pack, Gunicorn)
+# Verify build tools (conda-pack, Gunicorn)
 npm run verify-build-env
 
-Debug server configuration
+# Debug server configuration
 npm run debug:config
-
 Build Commands
 
-Clean build directory
+Bash
+
+# Clean build directory
 npm run clean
 
-Generate TypeScript types and Python models from OpenAPI spec
+# Generate TypeScript types and Python models from OpenAPI spec
 npm run codegen
 
-Build frontend with webpack in development mode
+# Build frontend with webpack in development mode
 npm run dev:webpack
 
-Start Electron (requires dist files to exist)
+# Start Electron (requires dist files to exist)
 npm run dev:electron
 
-Package conda environment for distribution
+# Package conda environment for distribution
 npm run build:conda-pack
 
-Validate build completeness (after build)
+# Validate build completeness (after build)
 npm run validate-build
+Code Formatting
 
-Code formatting (using Prettier)
-npm run format      # Format all source code
-npm run format:check # Check if code is properly formatted
+Bash
 
+# Format all source code (using Prettier)
+npm run format
+
+# Check if code is properly formatted
+npm run format:check
 Testing and Validation Commands
 
-Complete build test (frontend + backend)
+Bash
+
+# Complete build test (frontend + backend)
 npm run test:build
 
-Test Python imports and dependencies
+# Test Python imports and dependencies
 npm run test:python-build
 
-Test Gunicorn server locally with unified configuration
+# Test Gunicorn server locally with unified configuration
 npm run test:gunicorn-local
 
-Full packaging test (build + package)
+# Full packaging test (build + package)
 npm run test:run-packaged
 
---- Manual Python Backend Testing (in a separate terminal) ---
+# --- Manual Python Backend Testing (in a separate terminal) ---
 cd src/python
 
-Activate conda environment
+# Activate conda environment
 conda activate pyscf-env
 
-Start Flask API server directly
+# Start Flask API server directly
 python app.py
 
-Run Python backend tests
+# Run Python backend tests
 pytest tests/
-
 Development Workflow
 The npm run dev script is the primary command for development. It automatically:
 
@@ -186,7 +196,6 @@ Python Pydantic Models (src/python/generated_models.py) for type-safe request/re
 TypeScript Type Definitions (src/web/types/generated-api.ts) to keep the frontend API client synchronized with the backend.
 
 Electron Structure
-
 Main Process (src/main.ts): Creates the BrowserWindow, manages the Python Flask subprocess, and handles application lifecycle events.
 
 Preload Script (src/preload.ts): Securely exposes specific Electron APIs to the renderer process.
@@ -199,6 +208,8 @@ A Flask API server with REST endpoints and a WebSocket interface for:
 PubChem & SMILES Integration: Searching and converting molecular structures.
 
 Quantum Chemistry Calculations: Running various calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF) via PySCF. This now includes geometry optimization and vibrational frequency analysis. Calculations are executed in parallel using a ProcessPoolExecutor.
+
+Molecular Agent: An AI agent that interprets natural language prompts to perform molecular calculations and analysis using a set of defined tools.
 
 Molecular Orbital Analysis: Generating data for visualizing molecular orbitals, including CUBE files and energy level diagrams.
 
@@ -215,7 +226,7 @@ Health Check: An endpoint (/health) for startup coordination.
 Core Components & State Management
 The application uses a modern, hook-based state management architecture with a clear separation of concerns, moving complex logic out of App.tsx and into reusable hooks.
 
-State Management Architecture
+State Management Architecture:
 
 TanStack Query: Manages all server-side state, including API data fetching, caching, and synchronization.
 
@@ -259,175 +270,76 @@ The Flask backend's WebSocket handler monitors status.json. As the worker proces
 The onUpdate callback in useUnifiedWebSocket receives the new data and directly updates the TanStack Query cache using queryClient.setQueryData(), triggering re-renders in all components using that data.
 
 File Structure
-
-├── .github
-    ├── environment.yml
-    └── workflows
-    │   ├── ci.yml
-    │   └── release.yml
-├── .gitignore
-├── .prettierignore
-├── .prettierrc
-├── CLAUDE.md
-├── LICENSE
-├── PySCF_front_view.png
-├── README.md
-├── config
-    └── server-config.json
-├── package-lock.json
+.
+├── .github/
+│   ├── environment.yml
+│   └── workflows/
+│       ├── ci.yml
+│       └── release.yml
+├── config/
+│   └── server-config.json
+├── scripts/
+│   ├── setup-environment.sh
+│   ├── test-python-standalone.js
+│   ├── validate-build-completeness.py
+│   └── verify-environment.py
+├── src/
+│   ├── api-spec/
+│   │   └── openapi.yaml
+│   ├── assets/
+│   │   ├── fonts/
+│   │   └── icon/
+│   ├── main.ts
+│   ├── preload.ts
+│   ├── python/
+│   │   ├── SMILES/
+│   │   │   ├── __init__.py
+│   │   │   └── smiles_converter.py
+│   │   ├── agent/
+│   │   │   ├── __init__.py
+│   │   │   ├── molecular_agent.py
+│   │   │   ├── prompts/
+│   │   │   │   └── system_prompt.txt
+│   │   │   └── tools.py
+│   │   ├── api/
+│   │   │   ├── __init__.py
+│   │   │   ├── agent.py
+│   │   │   ├── health.py
+│   │   │   ├── pubchem.py
+│   │   │   ├── quantum.py
+│   │   │   └── ...
+│   │   ├── quantum_calc/
+│   │   │   └── ...
+│   │   ├── tests/
+│   │   │   └── ...
+│   │   ├── websocket/
+│   │   │   └── ...
+│   │   ├── app.py
+│   │   └── generated_models.py
+│   ├── types/
+│   │   └── ...
+│   └── web/
+│       ├── components/
+│       ├── hooks/
+│       ├── pages/
+│       ├── store/
+│       ├── types/
+│       ├── utils/
+│       ├── App.tsx
+│       ├── apiClient.ts
+│       ├── index.html
+│       └── index.tsx
 ├── package.json
-├── scripts
-    ├── setup-environment.sh
-    ├── test-python-standalone.js
-    ├── validate-build-completeness.py
-    └── verify-environment.py
-├── src
-    ├── api-spec
-    │   └── openapi.yaml
-    ├── assets
-    │   ├── fonts
-    │   │   └── ADLaMDisplay-Regular.ttf
-    │   └── icon
-    │   │   └── mac
-    │   │       └── Pyscf_front.icns
-    ├── main.ts
-    ├── preload.ts
-    ├── python
-    │   ├── SMILES
-    │   │   ├── __init__.py
-    │   │   └── smiles_converter.py
-    │   ├── api
-    │   │   ├── __init__.py
-    │   │   ├── health.py
-    │   │   ├── pubchem.py
-    │   │   ├── quantum.py
-    │   │   ├── settings.py
-    │   │   ├── smiles.py
-    │   │   └── system.py
-    │   ├── app.py
-    │   ├── data
-    │   │   ├── __init__.py
-    │   │   ├── scale_factors.py
-    │   │   └── solvent_properties.py
-    │   ├── generated_models.py
-    │   ├── pubchem
-    │   │   ├── __init__.py
-    │   │   ├── client.py
-    │   │   └── parser.py
-    │   ├── quantum_calc
-    │   │   ├── __init__.py
-    │   │   ├── base_calculator.py
-    │   │   ├── casci_calculator.py
-    │   │   ├── casscf_calculator.py
-    │   │   ├── ccsd_calculator.py
-    │   │   ├── dft_calculator.py
-    │   │   ├── exceptions.py
-    │   │   ├── file_manager.py
-    │   │   ├── file_watcher.py
-    │   │   ├── hf_calculator.py
-    │   │   ├── ir_spectrum.py
-    │   │   ├── mp2_calculator.py
-    │   │   ├── orbital_generator.py
-    │   │   ├── process_manager.py
-    │   │   ├── resource_manager.py
-    │   │   ├── settings_manager.py
-    │   │   ├── solvent_effects.py
-    │   │   ├── supported_parameters.py
-    │   │   └── tddft_calculator.py
-    │   ├── run_geometry_tests.py
-    │   ├── tests
-    │   │   ├── __init__.py
-    │   │   ├── test_casci_casscf.py
-    │   │   ├── test_concurrent_websockets.py
-    │   │   ├── test_error_scenarios.py
-    │   │   ├── test_file_watcher.py
-    │   │   ├── test_flask_api.py
-    │   │   ├── test_geometry_optimization.py
-    │   │   ├── test_pubchem.py
-    │   │   ├── test_quantum_calc.py
-    │   │   └── test_websocket_integration.py
-    │   └── websocket
-    │   │   ├── __init__.py
-    │   │   └── handlers.py
-    ├── types
-    │   ├── 3dmol.d.ts
-    │   ├── css-modules.d.ts
-    │   └── electron.d.ts
-    └── web
-    │   ├── App.css
-    │   ├── App.module.css
-    │   ├── App.tsx
-    │   ├── apiClient.ts
-    │   ├── components
-    │       ├── CIAnalysisViewer.module.css
-    │       ├── CIAnalysisViewer.tsx
-    │       ├── DropdownMenu.module.css
-    │       ├── DropdownMenu.tsx
-    │       ├── Header.module.css
-    │       ├── Header.tsx
-    │       ├── IRSpectrumViewer.module.css
-    │       ├── IRSpectrumViewer.tsx
-    │       ├── MolecularOrbitalEnergyDiagram.module.css
-    │       ├── MolecularOrbitalEnergyDiagram.tsx
-    │       ├── MolecularOrbitalViewer.module.css
-    │       ├── MolecularOrbitalViewer.tsx
-    │       ├── MoleculeViewer.module.css
-    │       ├── MoleculeViewer.tsx
-    │       ├── MoleculeViewerSection.module.css
-    │       ├── MoleculeViewerSection.tsx
-    │       ├── Sidebar.module.css
-    │       ├── Sidebar.tsx
-    │       ├── StyleControls.module.css
-    │       ├── StyleControls.tsx
-    │       ├── ToastContainer.module.css
-    │       ├── ToastContainer.tsx
-    │       ├── ToastNotification.module.css
-    │       ├── ToastNotification.tsx
-    │       ├── XYZInput.module.css
-    │       └── XYZInput.tsx
-    │   ├── data
-    │       └── atomicRadii.ts
-    │   ├── hooks
-    │       ├── index.ts
-    │       ├── useActiveCalculation.ts
-    │       ├── useActiveCalculationId.ts
-    │       ├── useAppSettings.ts
-    │       ├── useAppState.ts
-    │       ├── useCalculationActions.ts
-    │       ├── useCalculationData.ts
-    │       ├── useCalculationOperations.ts
-    │       ├── useCalculationQueries.ts
-    │       └── useUnifiedWebSocket.ts
-    │   ├── index.html
-    │   ├── index.tsx
-    │   ├── pages
-    │       ├── CalculationResultsPage.module.css
-    │       ├── CalculationResultsPage.tsx
-    │       ├── CalculationSettingsPage.module.css
-    │       ├── CalculationSettingsPage.tsx
-    │       ├── DrawMoleculePage.module.css
-    │       ├── DrawMoleculePage.tsx
-    │       ├── SettingsPage.module.css
-    │       └── SettingsPage.tsx
-    │   ├── store
-    │       ├── calculationStore.ts
-    │       ├── notificationStore.ts
-    │       └── uiStore.ts
-    │   ├── types
-    │       ├── api-types.ts
-    │       └── generated-api.ts
-    │   └── utils
-    │       └── xyzParser.ts
 ├── tsconfig.json
 └── webpack.config.ts
-
 Key API Endpoints
-
 GET /health: Health check endpoint.
 
 POST /api/pubchem/search: Search PubChem.
 
 POST /api/smiles/convert: Convert a SMILES string to XYZ.
+
+POST /api/agent/invoke: Invoke the molecular agent with a natural language prompt.
 
 GET /api/quantum/supported-parameters: Get lists of supported calculation methods, basis sets, functionals, etc.
 
@@ -444,10 +356,6 @@ DELETE /api/quantum/calculations/<id>: Deletes a calculation.
 GET /api/quantum/calculations/<id>/orbitals: Get molecular orbital information.
 
 GET /api/quantum/calculations/<id>/orbitals/{orbitalIndex}/cube: Generate and retrieve a CUBE file for a specific orbital.
-
-GET /api/quantum/calculations/<id>/orbitals/cube-files: List all generated CUBE files for a calculation.
-
-DELETE /api/quantum/calculations/<id>/orbitals/cube-files: Delete generated CUBE files.
 
 GET /api/quantum/calculations/<id>/ir-spectrum: Generate an IR spectrum for a calculation.
 
@@ -479,7 +387,6 @@ Triplet state (2 unpaired electrons): spin=2
 
 Troubleshooting
 Environment Setup Issues
-
 Automated Diagnosis: Always start with environment verification: npm run verify-env. This command provides comprehensive diagnostic information.
 
 Environment Detection Failures: If detection fails, use npm run setup-env or set the CONDA_ENV_PATH environment variable.
@@ -487,9 +394,7 @@ Environment Detection Failures: If detection fails, use npm run setup-env or set
 Build Tool Issues: If npm run verify-build-env fails, ensure conda-pack and gunicorn are installed in the active pyscf-env environment.
 
 Development Server Issues
-
 The unified Gunicorn-based server reduces environment-specific issues. Most behavior is controlled by config/server-config.json. Use npm run debug:config to verify server settings. The server automatically finds free ports.
 
 Build and Packaging Issues
-
 The build system includes pre- and post-build verification steps (verify-env, verify-build-env, validate-build). A failure in these steps indicates an issue with the conda environment or the server configuration.

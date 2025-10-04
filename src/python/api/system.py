@@ -4,15 +4,10 @@ Handles system resource monitoring and diagnostic information.
 """
 
 import logging
-import os
-import sys
-import multiprocessing
 from datetime import datetime
 from flask import Blueprint, jsonify
 
-from quantum_calc import get_process_manager, get_current_settings
-from quantum_calc.resource_manager import get_resource_manager
-from quantum_calc.file_manager import CalculationFileManager
+from services import get_system_service, ServiceError
 from generated_models import SystemResourceSummary, SystemResourceInfo, ResourceConstraints, AllocatedResources
 
 # Set up logging
@@ -26,13 +21,10 @@ system_bp = Blueprint('system', __name__)
 def get_system_resource_status():
     """Get current system resource status including constraints and allocation."""
     try:
-        logger.info("Getting system resource status")
+        system_service = get_system_service()
         
-        # Get resource manager
-        resource_manager = get_resource_manager()
-        
-        # Get resource summary
-        resource_summary = resource_manager.get_resource_summary()
+        # Call service layer
+        resource_summary = system_service.get_resource_status()
         
         # Create response using Pydantic models
         system_info = SystemResourceInfo(
@@ -65,17 +57,22 @@ def get_system_resource_status():
             allocated_resources=allocated_resources
         )
         
-        logger.info(f"Successfully retrieved system resource status: {summary}")
         return jsonify({
             'success': True,
             'data': summary.model_dump()
         })
         
+    except ServiceError as e:
+        logger.error(f"Service error retrieving system resource status: {e}")
+        return jsonify({
+            'success': False,
+            'error': e.message
+        }), e.status_code
     except Exception as e:
         logger.error(f"Failed to retrieve system resource status: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': f'Failed to retrieve system resource status: {str(e)}'
+            'error': 'An internal server error occurred.'
         }), 500
 
 
@@ -83,129 +80,27 @@ def get_system_resource_status():
 def get_system_diagnostics():
     """Get comprehensive system diagnostics for troubleshooting."""
     try:
-        logger.info("Getting comprehensive system diagnostics")
+        system_service = get_system_service()
         
-        # Import server config here to avoid circular imports
-        import json
-        try:
-            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config', 'server-config.json')
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    server_config = json.load(f)
-            else:
-                server_config = {}
-        except Exception:
-            server_config = {}
+        # Call service layer
+        diagnostics = system_service.get_system_diagnostics()
         
-        # Collect system information
-        diagnostics = {
-            'timestamp': datetime.now().isoformat(),
-            'service_info': {
-                'service': 'pyscf-front-api',
-                'version': server_config.get('app_info', {}).get('version', 'unknown'),
-                'pid': os.getpid(),
-                'working_directory': os.getcwd()
-            },
-            'system_info': {
-                'cpu_count': multiprocessing.cpu_count(),
-                'platform': os.name,
-                'python_version': sys.version
-            }
-        }
-        
-        # Process manager diagnostics
-        try:
-            process_manager = get_process_manager()
-            diagnostics['process_manager'] = {
-                'status': 'available',
-                'max_workers': process_manager.max_workers,
-                'max_parallel_instances': process_manager.max_parallel_instances,
-                'active_calculations': len(process_manager.active_futures),
-                'queued_calculations': len(process_manager.calculation_queue),
-                'is_shutdown': process_manager._shutdown,
-                'queue_status': process_manager.get_queue_status()
-            }
-        except Exception as pm_error:
-            diagnostics['process_manager'] = {
-                'status': 'error',
-                'error': str(pm_error),
-                'error_type': type(pm_error).__name__
-            }
-        
-        # Resource manager diagnostics
-        try:
-            resource_manager = get_resource_manager()
-            diagnostics['resource_manager'] = resource_manager.get_diagnostics()
-        except Exception as rm_error:
-            diagnostics['resource_manager'] = {
-                'status': 'error',
-                'error': str(rm_error),
-                'error_type': type(rm_error).__name__
-            }
-        
-        # File manager diagnostics
-        try:
-            file_manager = CalculationFileManager()
-            base_dir = file_manager.get_base_directory()
-            
-            diagnostics['file_manager'] = {
-                'status': 'available',
-                'base_directory': base_dir,
-                'base_directory_exists': os.path.exists(base_dir),
-                'base_directory_writable': os.access(base_dir, os.W_OK) if os.path.exists(base_dir) else False
-            }
-            
-            # Count calculation directories
-            try:
-                calculations = file_manager.list_calculations()
-                diagnostics['file_manager']['total_calculations'] = len(calculations)
-                diagnostics['file_manager']['calculation_statuses'] = {}
-                
-                # Count by status
-                status_counts = {}
-                for calc in calculations[:20]:  # Limit to first 20 for performance
-                    try:
-                        status = file_manager.read_calculation_status(os.path.join(base_dir, calc['id']))
-                        status_counts[status] = status_counts.get(status, 0) + 1
-                    except Exception:
-                        status_counts['unknown'] = status_counts.get('unknown', 0) + 1
-                
-                diagnostics['file_manager']['calculation_statuses'] = status_counts
-            except Exception as calc_error:
-                diagnostics['file_manager']['calculations_error'] = str(calc_error)
-                
-        except Exception as fm_error:
-            diagnostics['file_manager'] = {
-                'status': 'error',
-                'error': str(fm_error),
-                'error_type': type(fm_error).__name__
-            }
-        
-        # Settings diagnostics
-        try:
-            settings = get_current_settings()
-            diagnostics['settings'] = {
-                'status': 'available',
-                'settings': settings.model_dump()
-            }
-        except Exception as settings_error:
-            diagnostics['settings'] = {
-                'status': 'error',
-                'error': str(settings_error),
-                'error_type': type(settings_error).__name__
-            }
-        
-        logger.info("Successfully retrieved comprehensive system diagnostics")
         return jsonify({
             'success': True,
             'data': diagnostics
         })
         
+    except ServiceError as e:
+        logger.error(f"Service error retrieving system diagnostics: {e}")
+        return jsonify({
+            'success': False,
+            'error': e.message
+        }), e.status_code
     except Exception as e:
         logger.error(f"Failed to retrieve system diagnostics: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': f'Failed to retrieve system diagnostics: {str(e)}'
+            'error': 'An internal server error occurred.'
         }), 500
 
 
@@ -213,77 +108,27 @@ def get_system_diagnostics():
 def get_process_manager_diagnostics():
     """Get detailed process manager diagnostics."""
     try:
-        logger.info("Getting process manager diagnostics")
+        system_service = get_system_service()
         
-        try:
-            process_manager = get_process_manager()
-            
-            # Get detailed process manager state
-            diagnostics = {
-                'timestamp': datetime.now().isoformat(),
-                'status': 'available',
-                'configuration': {
-                    'max_workers': process_manager.max_workers,
-                    'max_parallel_instances': process_manager.max_parallel_instances,
-                    'is_shutdown': process_manager._shutdown
-                },
-                'current_state': {
-                    'active_futures_count': len(process_manager.active_futures),
-                    'active_calculation_ids': list(process_manager.active_futures.keys()),
-                    'queued_calculations_count': len(process_manager.calculation_queue),
-                    'completion_callbacks_count': len(process_manager.completion_callbacks)
-                },
-                'queue_details': [],
-                'resource_monitoring': {
-                    'monitoring_active': process_manager._resource_monitor_thread is not None and process_manager._resource_monitor_thread.is_alive(),
-                    'monitoring_interval': process_manager._resource_monitor_interval
-                }
-            }
-            
-            # Get detailed queue information
-            for i, queued_calc in enumerate(process_manager.calculation_queue[:10]):  # Limit to first 10
-                queue_item = {
-                    'position': i + 1,
-                    'calculation_id': queued_calc.calculation_id,
-                    'created_at': queued_calc.created_at.isoformat(),
-                    'waiting_reason': queued_calc.waiting_reason,
-                    'calculation_method': queued_calc.parameters.get('calculation_method', 'unknown'),
-                    'cpu_cores': queued_calc.parameters.get('cpu_cores', 'unknown'),
-                    'memory_mb': queued_calc.parameters.get('memory_mb', 'unknown')
-                }
-                diagnostics['queue_details'].append(queue_item)
-            
-            # Executor status
-            if process_manager.executor is not None:
-                diagnostics['executor'] = {
-                    'available': True,
-                    'type': type(process_manager.executor).__name__
-                }
-            else:
-                diagnostics['executor'] = {
-                    'available': False,
-                    'error': 'ProcessPoolExecutor is None'
-                }
-                
-        except Exception as pm_error:
-            diagnostics = {
-                'timestamp': datetime.now().isoformat(),
-                'status': 'error',
-                'error': str(pm_error),
-                'error_type': type(pm_error).__name__
-            }
+        # Call service layer
+        diagnostics = system_service.get_process_manager_diagnostics()
         
-        logger.info("Successfully retrieved process manager diagnostics")
         return jsonify({
             'success': True,
             'data': diagnostics
         })
         
+    except ServiceError as e:
+        logger.error(f"Service error retrieving process manager diagnostics: {e}")
+        return jsonify({
+            'success': False,
+            'error': e.message
+        }), e.status_code
     except Exception as e:
         logger.error(f"Failed to retrieve process manager diagnostics: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': f'Failed to retrieve process manager diagnostics: {str(e)}'
+            'error': 'An internal server error occurred.'
         }), 500
 
 
@@ -291,30 +136,25 @@ def get_process_manager_diagnostics():
 def get_resource_manager_diagnostics():
     """Get detailed resource manager diagnostics."""
     try:
-        logger.info("Getting resource manager diagnostics")
+        system_service = get_system_service()
         
-        try:
-            resource_manager = get_resource_manager()
-            diagnostics = resource_manager.get_diagnostics()
-            diagnostics['timestamp'] = datetime.now().isoformat()
-            
-        except Exception as rm_error:
-            diagnostics = {
-                'timestamp': datetime.now().isoformat(),
-                'status': 'error',
-                'error': str(rm_error),
-                'error_type': type(rm_error).__name__
-            }
+        # Call service layer
+        diagnostics = system_service.get_resource_manager_diagnostics()
         
-        logger.info("Successfully retrieved resource manager diagnostics")
         return jsonify({
             'success': True,
             'data': diagnostics
         })
         
+    except ServiceError as e:
+        logger.error(f"Service error retrieving resource manager diagnostics: {e}")
+        return jsonify({
+            'success': False,
+            'error': e.message
+        }), e.status_code
     except Exception as e:
         logger.error(f"Failed to retrieve resource manager diagnostics: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': f'Failed to retrieve resource manager diagnostics: {str(e)}'
+            'error': 'An internal server error occurred.'
         }), 500
