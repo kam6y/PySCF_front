@@ -19,10 +19,69 @@ from flask import current_app
 # Logger configuration
 logger = logging.getLogger(__name__)
 
-# Constants
-DEFAULT_PORT = 5000
-API_TIMEOUT = 30  # seconds
-API_HOST = "127.0.0.1"
+
+def load_api_config():
+    """
+    Load API client configuration from server config file.
+
+    Reads configuration values from config/server-config.json to avoid hardcoded constants.
+    Falls back to default values if the config file cannot be loaded.
+
+    Returns:
+        dict: Dictionary containing API client configuration:
+            - api_timeout (int): Timeout for API requests in seconds
+            - api_host (str): API host address
+            - default_port (int): Default API port number
+    """
+    try:
+        config_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'config',
+            'server-config.json'
+        )
+
+        if not os.path.exists(config_path):
+            logger.warning(f"Config file not found at {config_path}, using defaults")
+            return {
+                "api_timeout": 30,
+                "api_host": "127.0.0.1",
+                "default_port": 5000
+            }
+
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+
+        # Extract API client settings from config
+        external_services = config.get('external_services', {})
+        server = config.get('server', {})
+
+        # Handle both dict and int port configurations
+        server_port = server.get('port', {})
+        if isinstance(server_port, dict):
+            default_port = server_port.get('default', 5000)
+        else:
+            default_port = server_port if isinstance(server_port, int) else 5000
+
+        logger.debug(f"Loaded API config from {config_path}")
+        return {
+            "api_timeout": external_services.get('api_timeout', 30),
+            "api_host": server.get('host', '127.0.0.1'),
+            "default_port": default_port
+        }
+    except Exception as e:
+        logger.warning(f"Failed to load API config: {e}, using defaults")
+        return {
+            "api_timeout": 30,
+            "api_host": "127.0.0.1",
+            "default_port": 5000
+        }
+
+
+# Load configuration at module level
+API_CONFIG = load_api_config()
+API_TIMEOUT = API_CONFIG["api_timeout"]
+API_HOST = API_CONFIG["api_host"]
+DEFAULT_PORT = API_CONFIG["default_port"]
 
 
 def get_api_base_url() -> str:
@@ -68,53 +127,82 @@ def get_api_base_url() -> str:
     return f"http://{API_HOST}:{server_port}"
 
 
+def _validation_error(message: str) -> str:
+    """
+    Return a validation error message in JSON format.
+
+    This helper function ensures consistent error response format for input validation
+    errors by returning a JSON string with success=False and the error message.
+
+    Args:
+        message: The validation error message
+
+    Returns:
+        str: JSON-formatted error message with structure: {"success": false, "error": "message"}
+    """
+    return json.dumps({
+        "success": False,
+        "error": message
+    }, ensure_ascii=False, indent=2)
+
+
 def _handle_request_error(error: Exception, context: str = "") -> str:
     """
-    Handle request errors and return appropriate error messages.
-    
+    Handle request errors and return appropriate error messages in JSON format.
+
+    This function ensures consistent error response format for AI agents by always
+    returning a JSON string with a structured error object containing success=False
+    and an error message.
+
     Args:
         error: The exception that occurred
         context: Additional context about where the error occurred
-        
+
     Returns:
-        str: Formatted error message
+        str: JSON-formatted error message with structure: {"success": false, "error": "message"}
     """
     context_prefix = f"{context}: " if context else ""
-    
+
     if isinstance(error, requests.exceptions.HTTPError):
         status_code = error.response.status_code
         if status_code == 404:
-            return f"Error: {context_prefix}Resource not found. Please verify the request parameters."
+            error_msg = f"{context_prefix}Resource not found. Please verify the request parameters."
         elif status_code == 400:
             try:
                 error_detail = error.response.json()
-                return f"Error: {context_prefix}Invalid request - {error_detail.get('message', 'Bad request')}"
+                error_msg = f"{context_prefix}Invalid request - {error_detail.get('message', 'Bad request')}"
             except:
-                return f"Error: {context_prefix}Invalid request parameters. Please check your input values."
+                error_msg = f"{context_prefix}Invalid request parameters. Please check your input values."
         elif status_code >= 500:
-            return f"Error: {context_prefix}Internal server error occurred. Please try again after a moment."
+            error_msg = f"{context_prefix}Internal server error occurred. Please try again after a moment."
         else:
-            return f"Error: {context_prefix}HTTP error occurred (status code {status_code})."
-    
+            error_msg = f"{context_prefix}HTTP error occurred (status code {status_code})."
+
     elif isinstance(error, requests.exceptions.ConnectionError):
         logger.error(f"Connection error in {context}: {error}")
-        return "Error: Could not connect to API server. Please check if the server is running."
-    
+        error_msg = "Could not connect to API server. Please check if the server is running."
+
     elif isinstance(error, requests.exceptions.Timeout):
         logger.error(f"Timeout error in {context}: {error}")
-        return "Error: API request timed out. Please try again after a moment."
-    
+        error_msg = "API request timed out. Please try again after a moment."
+
     elif isinstance(error, requests.exceptions.RequestException):
         logger.error(f"Request error in {context}: {error}")
-        return f"Error: Network error occurred: {str(error)}"
-    
+        error_msg = f"Network error occurred: {str(error)}"
+
     elif isinstance(error, json.JSONDecodeError):
         logger.error(f"JSON decode error in {context}: {error}")
-        return "Error: Failed to parse API response."
-    
+        error_msg = "Failed to parse API response."
+
     else:
         logger.error(f"Unexpected error in {context}: {error}")
-        return f"Error: An unexpected error occurred: {str(error)}"
+        error_msg = f"An unexpected error occurred: {str(error)}"
+
+    # Return error in consistent JSON format
+    return json.dumps({
+        "success": False,
+        "error": error_msg
+    }, ensure_ascii=False, indent=2)
 
 
 def list_all_calculations() -> str:
@@ -153,7 +241,7 @@ def get_calculation_details(calculation_id: str) -> str:
              On error, contains structured text with error message.
     """
     if not calculation_id or not isinstance(calculation_id, str):
-        return "Error: calculation_id is a required string parameter."
+        return _validation_error("calculation_id is a required string parameter.")
     
     try:
         logger.debug(f"Fetching calculation details for ID: {calculation_id}")
@@ -253,62 +341,62 @@ H -0.7570 0.5860 0.0"
     """
     # Input validation
     if not xyz or not isinstance(xyz, str):
-        return "Error: xyz parameter is required and must be a non-empty string containing molecular structure data."
+        return _validation_error("xyz parameter is required and must be a non-empty string containing molecular structure data.")
     
     if not isinstance(calculation_method, str) or calculation_method not in ['DFT', 'HF', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF']:
-        return "Error: calculation_method must be one of: 'DFT', 'HF', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF'"
+        return _validation_error("calculation_method must be one of: 'DFT', 'HF', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF'")
     
     if not isinstance(charges, int) or charges < -10 or charges > 10:
-        return "Error: charges must be an integer between -10 and 10."
+        return _validation_error("charges must be an integer between -10 and 10.")
     
     if not isinstance(spin, int) or spin < 0 or spin > 10:
-        return "Error: spin must be an integer between 0 and 10 (number of unpaired electrons)."
+        return _validation_error("spin must be an integer between 0 and 10 (number of unpaired electrons).")
     
     if not isinstance(name, str) or len(name.strip()) == 0 or len(name) > 100:
-        return "Error: name must be a non-empty string with maximum 100 characters."
+        return _validation_error("name must be a non-empty string with maximum 100 characters.")
     
     # Validate solvent parameters
     if not isinstance(solvent_method, str) or solvent_method not in ['none', 'ief-pcm', 'c-pcm', 'cosmo', 'ssvpe', 'ddcosmo']:
-        return "Error: solvent_method must be one of: 'none', 'ief-pcm', 'c-pcm', 'cosmo', 'ssvpe', 'ddcosmo'"
+        return _validation_error("solvent_method must be one of: 'none', 'ief-pcm', 'c-pcm', 'cosmo', 'ssvpe', 'ddcosmo'")
     
     # Validate resource parameters
     if cpu_cores is not None and (not isinstance(cpu_cores, int) or cpu_cores < 1 or cpu_cores > 32):
-        return "Error: cpu_cores must be an integer between 1 and 32, or None for auto-allocation."
+        return _validation_error("cpu_cores must be an integer between 1 and 32, or None for auto-allocation.")
     
     if memory_mb is not None and (not isinstance(memory_mb, int) or memory_mb < 512 or memory_mb > 32768):
-        return "Error: memory_mb must be an integer between 512 and 32768, or None for auto-allocation."
+        return _validation_error("memory_mb must be an integer between 512 and 32768, or None for auto-allocation.")
     
     # Validate TDDFT parameters
     if calculation_method == 'TDDFT':
         if not isinstance(tddft_nstates, int) or tddft_nstates < 1 or tddft_nstates > 50:
-            return "Error: tddft_nstates must be an integer between 1 and 50 for TDDFT calculations."
+            return _validation_error("tddft_nstates must be an integer between 1 and 50 for TDDFT calculations.")
         
         if not isinstance(tddft_method, str) or tddft_method not in ['TDDFT', 'TDA']:
-            return "Error: tddft_method must be either 'TDDFT' or 'TDA'."
+            return _validation_error("tddft_method must be either 'TDDFT' or 'TDA'.")
     
     # Validate CASCI/CASSCF parameters
     if calculation_method in ['CASCI', 'CASSCF']:
         if not isinstance(ncas, int) or ncas < 1 or ncas > 50:
-            return "Error: ncas must be an integer between 1 and 50 for CASCI/CASSCF calculations."
+            return _validation_error("ncas must be an integer between 1 and 50 for CASCI/CASSCF calculations.")
         
         if not isinstance(nelecas, int) or nelecas < 1 or nelecas > 100:
-            return "Error: nelecas must be an integer between 1 and 100 for CASCI/CASSCF calculations."
+            return _validation_error("nelecas must be an integer between 1 and 100 for CASCI/CASSCF calculations.")
         
         if nelecas > 2 * ncas:
-            return f"Error: nelecas ({nelecas}) cannot exceed 2 * ncas ({2 * ncas})."
+            return _validation_error(f"nelecas ({nelecas}) cannot exceed 2 * ncas ({2 * ncas}).")
         
         if calculation_method == 'CASSCF':
             if not isinstance(max_cycle_macro, int) or max_cycle_macro < 1 or max_cycle_macro > 200:
-                return "Error: max_cycle_macro must be an integer between 1 and 200 for CASSCF calculations."
+                return _validation_error("max_cycle_macro must be an integer between 1 and 200 for CASSCF calculations.")
             
             if not isinstance(conv_tol, (int, float)) or conv_tol < 1e-12 or conv_tol > 1e-3:
-                return "Error: conv_tol must be a number between 1e-12 and 1e-3 for CASSCF calculations."
+                return _validation_error("conv_tol must be a number between 1e-12 and 1e-3 for CASSCF calculations.")
             
             if not isinstance(conv_tol_grad, (int, float)) or conv_tol_grad < 1e-8 or conv_tol_grad > 1e-2:
-                return "Error: conv_tol_grad must be a number between 1e-8 and 1e-2 for CASSCF calculations."
+                return _validation_error("conv_tol_grad must be a number between 1e-8 and 1e-2 for CASSCF calculations.")
         
         if not isinstance(max_cycle_micro, int) or max_cycle_micro < 1 or max_cycle_micro > 20:
-            return "Error: max_cycle_micro must be an integer between 1 and 20 for CASCI/CASSCF calculations."
+            return _validation_error("max_cycle_micro must be an integer between 1 and 20 for CASCI/CASSCF calculations.")
     
     # Prepare request data
     request_data = {
@@ -383,13 +471,13 @@ def search_pubchem_by_name(
     """
     # Input validation
     if not compound_name or not isinstance(compound_name, str):
-        return "Error: compound_name parameter is required and must be a non-empty string."
+        return _validation_error("compound_name parameter is required and must be a non-empty string.")
     
     if not isinstance(search_type, str) or search_type not in ['name', 'cid', 'formula']:
-        return "Error: search_type must be one of: 'name', 'cid', 'formula'"
+        return _validation_error("search_type must be one of: 'name', 'cid', 'formula'")
     
     if len(compound_name.strip()) == 0:
-        return "Error: compound_name cannot be empty or contain only whitespace."
+        return _validation_error("compound_name cannot be empty or contain only whitespace.")
     
     # Prepare request data
     request_data = {
@@ -433,10 +521,10 @@ def delete_calculation(calculation_id: str) -> str:
     """
     # Input validation
     if not calculation_id or not isinstance(calculation_id, str):
-        return "Error: calculation_id is a required string parameter."
+        return _validation_error("calculation_id is a required string parameter.")
 
     if len(calculation_id.strip()) == 0:
-        return "Error: calculation_id cannot be empty or contain only whitespace."
+        return _validation_error("calculation_id cannot be empty or contain only whitespace.")
 
     try:
         # First, get calculation details to provide context for the confirmation
@@ -570,14 +658,14 @@ def convert_smiles_to_xyz(smiles: str) -> str:
     """
     # Input validation
     if not smiles or not isinstance(smiles, str):
-        return "Error: smiles parameter is required and must be a non-empty string."
+        return _validation_error("smiles parameter is required and must be a non-empty string.")
     
     if len(smiles.strip()) == 0:
-        return "Error: smiles string cannot be empty or contain only whitespace."
+        return _validation_error("smiles string cannot be empty or contain only whitespace.")
     
     # SMILES strings typically don't exceed 500 characters for reasonable molecules
     if len(smiles) > 500:
-        return "Error: smiles string is too long. Maximum length is 500 characters."
+        return _validation_error("smiles string is too long. Maximum length is 500 characters.")
     
     # Prepare request data
     request_data = {
@@ -621,10 +709,10 @@ def validate_xyz_format(xyz: str) -> str:
     """
     # Input validation
     if not xyz or not isinstance(xyz, str):
-        return "Error: xyz parameter is required and must be a non-empty string."
+        return _validation_error("xyz parameter is required and must be a non-empty string.")
     
     if len(xyz.strip()) == 0:
-        return "Error: xyz string cannot be empty or contain only whitespace."
+        return _validation_error("xyz string cannot be empty or contain only whitespace.")
     
     # Prepare request data
     request_data = {
@@ -671,10 +759,10 @@ def get_molecular_orbitals(calculation_id: str) -> str:
     """
     # Input validation
     if not calculation_id or not isinstance(calculation_id, str):
-        return "Error: calculation_id is a required string parameter."
+        return _validation_error("calculation_id is a required string parameter.")
     
     if len(calculation_id.strip()) == 0:
-        return "Error: calculation_id cannot be empty or contain only whitespace."
+        return _validation_error("calculation_id cannot be empty or contain only whitespace.")
     
     try:
         logger.debug(f"Fetching molecular orbital information for calculation: {calculation_id}")
@@ -730,22 +818,22 @@ def generate_orbital_cube(
     """
     # Input validation
     if not calculation_id or not isinstance(calculation_id, str):
-        return "Error: calculation_id is a required string parameter."
+        return _validation_error("calculation_id is a required string parameter.")
     
     if len(calculation_id.strip()) == 0:
-        return "Error: calculation_id cannot be empty or contain only whitespace."
+        return _validation_error("calculation_id cannot be empty or contain only whitespace.")
     
     if not isinstance(orbital_index, int) or orbital_index < 0:
-        return "Error: orbital_index must be a non-negative integer."
+        return _validation_error("orbital_index must be a non-negative integer.")
     
     if not isinstance(grid_size, int) or grid_size < 40 or grid_size > 120:
-        return "Error: grid_size must be an integer between 40 and 120."
+        return _validation_error("grid_size must be an integer between 40 and 120.")
     
     if not isinstance(isovalue_pos, (int, float)) or isovalue_pos < 0.001 or isovalue_pos > 0.1:
-        return "Error: isovalue_pos must be a number between 0.001 and 0.1."
+        return _validation_error("isovalue_pos must be a number between 0.001 and 0.1.")
     
     if not isinstance(isovalue_neg, (int, float)) or isovalue_neg < -0.1 or isovalue_neg > -0.001:
-        return "Error: isovalue_neg must be a number between -0.1 and -0.001."
+        return _validation_error("isovalue_neg must be a number between -0.1 and -0.001.")
     
     # Prepare query parameters
     params = {
@@ -792,10 +880,10 @@ def list_cube_files(calculation_id: str) -> str:
     """
     # Input validation
     if not calculation_id or not isinstance(calculation_id, str):
-        return "Error: calculation_id is a required string parameter."
+        return _validation_error("calculation_id is a required string parameter.")
     
     if len(calculation_id.strip()) == 0:
-        return "Error: calculation_id cannot be empty or contain only whitespace."
+        return _validation_error("calculation_id cannot be empty or contain only whitespace.")
     
     try:
         logger.debug(f"Listing CUBE files for calculation: {calculation_id}")
@@ -836,13 +924,13 @@ def delete_cube_files(calculation_id: str, orbital_index: Optional[int] = None) 
     """
     # Input validation
     if not calculation_id or not isinstance(calculation_id, str):
-        return "Error: calculation_id is a required string parameter."
+        return _validation_error("calculation_id is a required string parameter.")
     
     if len(calculation_id.strip()) == 0:
-        return "Error: calculation_id cannot be empty or contain only whitespace."
+        return _validation_error("calculation_id cannot be empty or contain only whitespace.")
     
     if orbital_index is not None and (not isinstance(orbital_index, int) or orbital_index < 0):
-        return "Error: orbital_index must be a non-negative integer or None."
+        return _validation_error("orbital_index must be a non-negative integer or None.")
     
     # Prepare query parameters
     params = {}
@@ -909,25 +997,25 @@ def generate_ir_spectrum(
     """
     # Input validation
     if not calculation_id or not isinstance(calculation_id, str):
-        return "Error: calculation_id is a required string parameter."
+        return _validation_error("calculation_id is a required string parameter.")
     
     if len(calculation_id.strip()) == 0:
-        return "Error: calculation_id cannot be empty or contain only whitespace."
+        return _validation_error("calculation_id cannot be empty or contain only whitespace.")
     
     if not isinstance(broadening_fwhm, (int, float)) or broadening_fwhm < 0.1 or broadening_fwhm > 1000.0:
-        return "Error: broadening_fwhm must be a number between 0.1 and 1000.0."
+        return _validation_error("broadening_fwhm must be a number between 0.1 and 1000.0.")
     
     if not isinstance(x_min, (int, float)) or x_min < 0.0:
-        return "Error: x_min must be a non-negative number."
+        return _validation_error("x_min must be a non-negative number.")
     
     if not isinstance(x_max, (int, float)) or x_max > 10000.0:
-        return "Error: x_max must be a number up to 10000.0."
+        return _validation_error("x_max must be a number up to 10000.0.")
     
     if x_min >= x_max:
-        return "Error: x_min must be less than x_max."
+        return _validation_error("x_min must be less than x_max.")
     
     if not isinstance(show_peaks, bool):
-        return "Error: show_peaks must be a boolean value."
+        return _validation_error("show_peaks must be a boolean value.")
     
     # Prepare query parameters
     params = {
@@ -1018,18 +1106,18 @@ def update_app_settings(
     # Input validation
     if max_parallel_instances is not None:
         if not isinstance(max_parallel_instances, int) or max_parallel_instances < 1 or max_parallel_instances > 32:
-            return "Error: max_parallel_instances must be an integer between 1 and 32."
+            return _validation_error("max_parallel_instances must be an integer between 1 and 32.")
     
     if max_cpu_utilization_percent is not None:
         if not isinstance(max_cpu_utilization_percent, (int, float)) or max_cpu_utilization_percent < 10.0 or max_cpu_utilization_percent > 100.0:
-            return "Error: max_cpu_utilization_percent must be a number between 10.0 and 100.0."
+            return _validation_error("max_cpu_utilization_percent must be a number between 10.0 and 100.0.")
     
     if max_memory_utilization_percent is not None:
         if not isinstance(max_memory_utilization_percent, (int, float)) or max_memory_utilization_percent < 10.0 or max_memory_utilization_percent > 100.0:
-            return "Error: max_memory_utilization_percent must be a number between 10.0 and 100.0."
+            return _validation_error("max_memory_utilization_percent must be a number between 10.0 and 100.0.")
     
     if gemini_api_key is not None and not isinstance(gemini_api_key, str):
-        return "Error: gemini_api_key must be a string."
+        return _validation_error("gemini_api_key must be a string.")
     
     # First, get current settings
     try:
