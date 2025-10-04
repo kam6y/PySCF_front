@@ -1,10 +1,10 @@
 """
 AI Agent Tool Wrapper Module
 
-This module provides Python wrapper functions that enable AI agents to 
+This module provides Python wrapper functions that enable AI agents to
 utilize PySCF_front application API endpoints.
 
-Each function is optimized for Gemini SDK's Function Calling feature and 
+Each function is optimized for Gemini SDK's Function Calling feature and
 serves as an API wrapper that strictly adheres to OpenAPI specifications.
 """
 
@@ -20,111 +20,73 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 
-def load_api_config():
-    """
-    Load API client configuration from server config file.
-
-    Reads configuration values from config/server-config.json to avoid hardcoded constants.
-    Falls back to default values if the config file cannot be loaded.
-
-    Returns:
-        dict: Dictionary containing API client configuration:
-            - api_timeout (int): Timeout for API requests in seconds
-            - api_host (str): API host address
-            - default_port (int): Default API port number
-    """
-    try:
-        config_path = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            'config',
-            'server-config.json'
-        )
-
-        if not os.path.exists(config_path):
-            logger.warning(f"Config file not found at {config_path}, using defaults")
-            return {
-                "api_timeout": 30,
-                "api_host": "127.0.0.1",
-                "default_port": 5000
-            }
-
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-
-        # Extract API client settings from config
-        external_services = config.get('external_services', {})
-        server = config.get('server', {})
-
-        # Handle both dict and int port configurations
-        server_port = server.get('port', {})
-        if isinstance(server_port, dict):
-            default_port = server_port.get('default', 5000)
-        else:
-            default_port = server_port if isinstance(server_port, int) else 5000
-
-        logger.debug(f"Loaded API config from {config_path}")
-        return {
-            "api_timeout": external_services.get('api_timeout', 30),
-            "api_host": server.get('host', '127.0.0.1'),
-            "default_port": default_port
-        }
-    except Exception as e:
-        logger.warning(f"Failed to load API config: {e}, using defaults")
-        return {
-            "api_timeout": 30,
-            "api_host": "127.0.0.1",
-            "default_port": 5000
-        }
-
-
-# Load configuration at module level
-API_CONFIG = load_api_config()
-API_TIMEOUT = API_CONFIG["api_timeout"]
-API_HOST = API_CONFIG["api_host"]
-DEFAULT_PORT = API_CONFIG["default_port"]
-
-
 def get_api_base_url() -> str:
     """
     Get the API base URL with dynamic port detection.
 
-    The port number is retrieved in the following priority order:
-    1. Flask app.config['SERVER_PORT'] (if within Flask application context)
-    2. Environment variable PYSCF_SERVER_PORT (fallback for backward compatibility)
-    3. DEFAULT_PORT constant (5000)
+    The port number and host are retrieved from Flask's app.config,
+    which serves as the single source of truth for server configuration.
 
-    This ensures a single source of truth for the server port across the application.
+    Priority order for port detection:
+    1. Flask app.config['SERVER_PORT'] (if within Flask application context)
+    2. Environment variable PYSCF_SERVER_PORT (fallback)
+    3. Default port 5000 (final fallback)
 
     Returns:
         str: The base URL for API requests (e.g., "http://127.0.0.1:5000")
     """
-    server_port = DEFAULT_PORT  # Default fallback
+    # Default values
+    default_host = "127.0.0.1"
+    default_port = 5000
 
     try:
-        # Priority 1: Try to get port from Flask app.config (single source of truth)
+        # Try to get configuration from Flask app.config (single source of truth)
         # Accessing current_app.config will raise RuntimeError if outside of Flask context
-        configured_port = current_app.config.get('SERVER_PORT')
-        if configured_port is not None:
-            server_port = configured_port
-            logger.debug(f"Using port from app.config: {server_port}")
-        else:
-            # Fallback to environment variable if not set in app.config
-            env_port = os.getenv('PYSCF_SERVER_PORT')
-            if env_port:
-                server_port = int(env_port)
-                logger.debug(f"Using port from environment variable: {server_port}")
-            else:
-                logger.debug(f"Using default port: {server_port}")
-    except RuntimeError:
-        # Outside of Flask application context - fallback to environment variable
+        host = current_app.config.get('SERVER_HOST', default_host)
+        port = current_app.config.get('SERVER_PORT')
+
+        if port is not None:
+            logger.debug(f"Using host:port from app.config: {host}:{port}")
+            return f"http://{host}:{port}"
+
+        # Fallback to environment variable if not set in app.config
         env_port = os.getenv('PYSCF_SERVER_PORT')
         if env_port:
-            server_port = int(env_port)
-            logger.debug(f"Outside Flask context, using port from environment variable: {server_port}")
-        else:
-            logger.debug(f"Outside Flask context, using default port: {server_port}")
+            port = int(env_port)
+            logger.debug(f"Using port from environment variable: {host}:{port}")
+            return f"http://{host}:{port}"
 
-    return f"http://{API_HOST}:{server_port}"
+        # Final fallback to default port
+        logger.debug(f"Using default host:port: {host}:{default_port}")
+        return f"http://{host}:{default_port}"
+
+    except RuntimeError:
+        # Outside of Flask application context - fallback to environment variable or default
+        env_port = os.getenv('PYSCF_SERVER_PORT')
+        if env_port:
+            port = int(env_port)
+            logger.debug(f"Outside Flask context, using port from environment: {default_host}:{port}")
+            return f"http://{default_host}:{port}"
+        else:
+            logger.debug(f"Outside Flask context, using default: {default_host}:{default_port}")
+            return f"http://{default_host}:{default_port}"
+
+
+def get_api_timeout() -> int:
+    """
+    Get API request timeout from configuration.
+
+    Returns:
+        int: Timeout in seconds (default: 30)
+    """
+    try:
+        # Try to get timeout from Flask app.config
+        external_services = current_app.config.get('EXTERNAL_SERVICES', {})
+        timeout = external_services.get('api_timeout', 30)
+        return timeout
+    except RuntimeError:
+        # Outside Flask context, use default
+        return 30
 
 
 def _validation_error(message: str) -> str:
@@ -218,7 +180,7 @@ def list_all_calculations() -> str:
     """
     try:
         logger.debug("Fetching all calculations from API")
-        response = requests.get(f"{get_api_base_url()}/api/quantum/calculations", timeout=API_TIMEOUT)
+        response = requests.get(f"{get_api_base_url()}/api/quantum/calculations", timeout=get_api_timeout())
         response.raise_for_status()
         return json.dumps(response.json(), ensure_ascii=False, indent=2)
     except Exception as e:
@@ -246,8 +208,8 @@ def get_calculation_details(calculation_id: str) -> str:
     try:
         logger.debug(f"Fetching calculation details for ID: {calculation_id}")
         response = requests.get(
-            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}", 
-            timeout=API_TIMEOUT
+            f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}",
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
         return json.dumps(response.json(), ensure_ascii=False, indent=2)
@@ -269,7 +231,7 @@ def get_supported_parameters() -> str:
     """
     try:
         logger.debug("Fetching supported parameters from API")
-        response = requests.get(f"{get_api_base_url()}/api/quantum/supported-parameters", timeout=API_TIMEOUT)
+        response = requests.get(f"{get_api_base_url()}/api/quantum/supported-parameters", timeout=get_api_timeout())
         response.raise_for_status()
         return json.dumps(response.json(), ensure_ascii=False, indent=2)
     except Exception as e:
@@ -437,10 +399,10 @@ H -0.7570 0.5860 0.0"
         response = requests.post(
             f"{get_api_base_url()}/api/quantum/calculate",
             json=request_data,
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         logger.info(f"Successfully started calculation with ID: {result.get('id', 'unknown')}")
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -490,10 +452,10 @@ def search_pubchem_by_name(
         response = requests.post(
             f"{get_api_base_url()}/api/pubchem/search",
             json=request_data,
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         logger.info(f"Successfully found compound: {result.get('name', compound_name)}")
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -531,7 +493,7 @@ def delete_calculation(calculation_id: str) -> str:
         logger.debug(f"Fetching calculation details for deletion request: {calculation_id}")
         response = requests.get(
             f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}",
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
 
@@ -591,7 +553,7 @@ def _execute_confirmed_deletion(calculation_id: str) -> Dict[str, Any]:
         logger.info(f"Executing confirmed deletion for calculation: {calculation_id}")
         response = requests.delete(
             f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}",
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
 
@@ -677,10 +639,10 @@ def convert_smiles_to_xyz(smiles: str) -> str:
         response = requests.post(
             f"{get_api_base_url()}/api/smiles/convert",
             json=request_data,
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         logger.info(f"Successfully converted SMILES to XYZ structure")
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -724,10 +686,10 @@ def validate_xyz_format(xyz: str) -> str:
         response = requests.post(
             f"{get_api_base_url()}/api/pubchem/validate",
             json=request_data,
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         is_valid = result.get('data', {}).get('valid', False)
         logger.info(f"XYZ validation result: {'valid' if is_valid else 'invalid'}")
@@ -768,10 +730,10 @@ def get_molecular_orbitals(calculation_id: str) -> str:
         logger.debug(f"Fetching molecular orbital information for calculation: {calculation_id}")
         response = requests.get(
             f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals",
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         num_orbitals = result.get('data', {}).get('total_orbitals', 0)
         logger.info(f"Successfully retrieved {num_orbitals} molecular orbitals for calculation {calculation_id}")
@@ -847,10 +809,10 @@ def generate_orbital_cube(
         response = requests.get(
             f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals/{orbital_index}/cube",
             params=params,
-            timeout=API_TIMEOUT * 2  # CUBE generation can take longer
+            timeout=get_api_timeout() * 2  # CUBE generation can take longer
         )
         response.raise_for_status()
-        
+
         result = response.json()
         logger.info(f"Successfully generated CUBE file for orbital {orbital_index}")
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -889,10 +851,10 @@ def list_cube_files(calculation_id: str) -> str:
         logger.debug(f"Listing CUBE files for calculation: {calculation_id}")
         response = requests.get(
             f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals/cube-files",
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         num_files = result.get('data', {}).get('total_files', 0)
         logger.info(f"Found {num_files} CUBE files for calculation {calculation_id}")
@@ -942,14 +904,14 @@ def delete_cube_files(calculation_id: str, orbital_index: Optional[int] = None) 
             logger.debug(f"Deleting CUBE file for orbital {orbital_index} in calculation {calculation_id}")
         else:
             logger.debug(f"Deleting all CUBE files for calculation {calculation_id}")
-        
+
         response = requests.delete(
             f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/orbitals/cube-files",
             params=params,
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         num_deleted = result.get('data', {}).get('deleted_files', 0)
         logger.info(f"Successfully deleted {num_deleted} CUBE file(s)")
@@ -1030,10 +992,10 @@ def generate_ir_spectrum(
         response = requests.get(
             f"{get_api_base_url()}/api/quantum/calculations/{calculation_id}/ir-spectrum",
             params=params,
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         num_peaks = len(result.get('data', {}).get('spectrum', {}).get('peaks', []))
         logger.info(f"Successfully generated IR spectrum with {num_peaks} peaks for calculation {calculation_id}")
@@ -1064,10 +1026,10 @@ def get_app_settings() -> str:
         logger.debug("Fetching application settings")
         response = requests.get(
             f"{get_api_base_url()}/api/settings",
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         logger.info("Successfully retrieved application settings")
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -1124,7 +1086,7 @@ def update_app_settings(
         logger.debug("Fetching current settings for update")
         get_response = requests.get(
             f"{get_api_base_url()}/api/settings",
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         get_response.raise_for_status()
         current_settings = get_response.json().get('data', {}).get('settings', {})
@@ -1159,10 +1121,10 @@ def update_app_settings(
         response = requests.put(
             f"{get_api_base_url()}/api/settings",
             json=update_data,
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         logger.info("Successfully updated application settings")
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -1191,10 +1153,10 @@ def get_system_resources() -> str:
         logger.debug("Fetching system resource status")
         response = requests.get(
             f"{get_api_base_url()}/api/system/resource-status",
-            timeout=API_TIMEOUT
+            timeout=get_api_timeout()
         )
         response.raise_for_status()
-        
+
         result = response.json()
         logger.info("Successfully retrieved system resource status")
         return json.dumps(result, ensure_ascii=False, indent=2)

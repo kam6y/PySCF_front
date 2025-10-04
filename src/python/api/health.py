@@ -3,7 +3,7 @@ Health check API endpoints.
 Provides basic health monitoring for the Flask application.
 """
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, current_app
 
 # Create health blueprint
 health_bp = Blueprint('health', __name__)
@@ -11,24 +11,19 @@ health_bp = Blueprint('health', __name__)
 
 @health_bp.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint."""
-    # Import here to avoid circular imports when using SERVER_CONFIG
-    import os
-    import sys
-    import json
-    
-    # Load server configuration for version info
+    """
+    Health check endpoint.
+
+    Returns application status and version information from Flask app.config,
+    which serves as the single source of truth for configuration.
+    """
     try:
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config', 'server-config.json')
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                config = json.load(f)
-            version = config.get('app_info', {}).get('version', 'unknown')
-        else:
-            version = 'unknown'
-    except Exception:
+        # Get version from Flask app.config (single source of truth)
+        version = current_app.config.get('APP_VERSION', 'unknown')
+    except RuntimeError:
+        # Outside Flask context (should not happen in normal operation)
         version = 'unknown'
-    
+
     return jsonify({
         'status': 'ok',
         'service': 'pyscf-front-api',

@@ -1,14 +1,21 @@
 import logging
 import os
 import sys
-import json
 import signal
 import atexit
-import socket
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from pydantic import ValidationError
+
+# Import unified configuration module
+from config import (
+    ServerConfig,
+    get_server_config,
+    determine_server_port,
+    configure_flask_app,
+    ConfigurationError
+)
 
 # Import blueprint registration and WebSocket handlers
 from api import register_blueprints
@@ -18,76 +25,15 @@ from websocket import register_websocket_handlers
 from quantum_calc import shutdown_process_manager, shutdown_websocket_watcher
 from quantum_calc.exceptions import ProcessManagerError
 
-
-def load_server_config():
-    """Load server configuration from JSON file."""
-    try:
-        # Load from config directory (single source of truth)
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config', 'server-config.json')
-        
-        if not os.path.exists(config_path):
-            raise FileNotFoundError(f"Server configuration file not found at {config_path}")
-        
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        
-        print(f"Loaded server configuration from: {config_path}")
-        return config
-    except Exception as e:
-        print(f"WARNING: Failed to load server configuration: {e}. Using defaults.")
-        # Return default configuration that matches config/server-config.json structure
-        return {
-            "server": {
-                "host": "127.0.0.1",
-                "port": {
-                    "default": 5000,
-                    "auto_detect": True,
-                    "range": {"start": 5000, "end": 5100}
-                },
-                "debug": False
-            },
-            "gunicorn": {
-                "workers": 1,
-                "threads": 4,
-                "worker_class": "sync",
-                "timeout": 0,
-                "keep_alive": 30,
-                "preload_app": True,
-                "access_logfile": "-",
-                "log_level": "info"
-            },
-            "socketio": {
-                "cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"],
-                "async_mode": "threading",
-                "ping_timeout": 60,
-                "ping_interval": 25,
-                "allow_unsafe_werkzeug": True,
-                "logger": True,
-                "engineio_logger": False
-            },
-            "development": {"use_reloader": False, "debug": False, "enable_dev_tools": True},
-            "production": {"use_gunicorn": True, "optimize_performance": True, "enable_logging": True},
-            "quantum_calculations": {
-                "max_concurrent_calculations": "auto",
-                "process_pool_size": "auto",
-                "timeout_calculation": 0,
-                "memory_limit_mb": 0
-            },
-            "logging": {
-                "level": "INFO",
-                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                "enable_access_log": True,
-                "enable_error_log": True
-            }
-        }
-
-
-# Global configuration
-SERVER_CONFIG = load_server_config()
-
-# Configure logging based on configuration
-log_level = getattr(logging, SERVER_CONFIG.get('logging', {}).get('level', 'INFO').upper())
-log_format = SERVER_CONFIG.get('logging', {}).get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Initialize configuration and logging
+try:
+    _server_config = get_server_config()
+    log_level = getattr(logging, _server_config.get_logging_level().upper())
+    log_format = _server_config.get_logging_format()
+except ConfigurationError as e:
+    print(f"WARNING: Configuration error: {e}. Using default logging settings.")
+    log_level = logging.INFO
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 
 logging.basicConfig(
     level=log_level,
@@ -102,22 +48,28 @@ def create_app(server_port: int = None):
 
     Args:
         server_port: The port number on which the server will run.
-                    This is stored in app.config for access by other modules.
+                    If None, it will be determined from configuration.
     """
     # Initialize Flask app
     app = Flask(__name__)
     CORS(app)  # Enable CORS for cross-origin requests
 
-    # Store server port in app config for access by other modules (e.g., agent tools)
-    # This ensures a single source of truth for the server port across the application
-    if server_port is not None:
-        app.config['SERVER_PORT'] = server_port
-        logger.info(f"Server port configured in app.config: {server_port}")
+    # Load server configuration
+    server_config = get_server_config()
+
+    # Determine server port if not provided
+    if server_port is None:
+        port_env = os.getenv('PYSCF_SERVER_PORT')
+        server_port = determine_server_port(server_config, port_env=port_env)
+
+    # Configure Flask app with all settings from ServerConfig
+    # This establishes app.config as the single source of truth for configuration
+    configure_flask_app(app, server_config, server_port)
 
     # Initialize SocketIO with configuration-based settings
-    socketio_config = SERVER_CONFIG.get('socketio', {})
+    socketio_config = app.config.get('SOCKETIO', {})
     socketio = SocketIO(
-        app, 
+        app,
         cors_allowed_origins=socketio_config.get('cors_allowed_origins', ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"]),
         async_mode=socketio_config.get('async_mode', 'threading'),
         ping_timeout=socketio_config.get('ping_timeout', 60),
@@ -277,43 +229,24 @@ def signal_handler(signum, frame):
     sys.exit(0)
 
 
-def find_available_port(host, start_port, end_port):
-    """Find an available port within the specified range."""
-    for port in range(start_port, end_port + 1):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((host, port))
-                return port
-        except OSError:
-            continue
-    raise RuntimeError(f"No available port found in range {start_port}-{end_port}")
-
-
 def start_development_server():
     """Start the server in development mode using Flask-SocketIO."""
-    server_config = SERVER_CONFIG.get('server', {})
-    dev_config = SERVER_CONFIG.get('development', {})
-    socketio_config = SERVER_CONFIG.get('socketio', {})
-    
-    host = server_config.get('host', '127.0.0.1')
-    port_config = server_config.get('port', {})
-    debug = dev_config.get('debug', False)
-    
+    # Load server configuration
+    server_config = get_server_config()
+
+    host = server_config.get_server_host()
+    debug = server_config.get('development.debug', False)
+
     # Command line port argument takes precedence
-    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-    
-    if port_arg > 0:
-        actual_port = port_arg
-    elif port_config.get('auto_detect', True):
-        port_range = port_config.get('range', {'start': 5000, 'end': 5100})
-        start_port = port_config.get('default', 5000)
-        actual_port = find_available_port(host, start_port, port_range['end'])
-    else:
-        actual_port = port_config.get('default', 5000)
-    
+    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else None
+
+    # Determine server port using unified logic
+    actual_port = determine_server_port(server_config, port_arg=port_arg)
+
     # Notify Electron process of the port
     print(f"FLASK_SERVER_PORT:{actual_port}", file=sys.stdout, flush=True)
-    
+
+    socketio_config = server_config.get('socketio', {})
     logger.info(f"Starting API server with Flask-SocketIO on http://{host}:{actual_port}")
     logger.info(f"Configuration: Debug={debug}, Async_mode={socketio_config.get('async_mode', 'threading')}")
 
@@ -350,10 +283,8 @@ def create_socketio():
 
 # Create global app and socketio instances for import by other modules
 # These are created at module import time for Gunicorn compatibility
-# Port is read from environment variable if available (set by Electron main process)
-_port_from_env = os.getenv('PYSCF_SERVER_PORT')
-_server_port = int(_port_from_env) if _port_from_env else None
-app, socketio = create_app(server_port=_server_port)
+# Port is determined from environment variable or configuration
+app, socketio = create_app()
 
 
 if __name__ == '__main__':
