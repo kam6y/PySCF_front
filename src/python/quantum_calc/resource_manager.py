@@ -6,11 +6,20 @@ import multiprocessing
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 
 try:
     import psutil
 except ImportError:
     psutil = None
+
+
+class AllocationStatus(Enum):
+    """Status of resource allocation check."""
+    CAN_START = "can_start"           # Resources available, can start immediately
+    SHOULD_QUEUE = "should_queue"     # Resources temporarily unavailable, should queue
+    INSUFFICIENT_RESOURCES = "insufficient_resources"  # System resources fundamentally insufficient
+    
     
 logger = logging.getLogger(__name__)
 
@@ -377,6 +386,54 @@ class SystemResourceManager:
             logger.warning(f"Failed to check system resource insufficiency: {e}")
             # In case of error, assume resources are sufficient to avoid blocking calculations
             return False, f"Resource check failed ({str(e)}) - assuming sufficient resources"
+    
+    def check_allocation_status(self, cpu_cores: int, memory_mb: int, 
+                              calculation_method: str, active_count: int, 
+                              max_slots: int) -> Tuple[AllocationStatus, str]:
+        """
+        Unified resource allocation check that determines if a calculation can start,
+        should be queued, or should error due to insufficient system resources.
+        
+        Args:
+            cpu_cores: Requested CPU cores
+            memory_mb: Requested memory in MB
+            calculation_method: Calculation method (DFT, HF, etc.)
+            active_count: Number of currently active calculations
+            max_slots: Maximum number of parallel calculation slots
+            
+        Returns:
+            Tuple of (AllocationStatus, reason: str)
+        """
+        # First check: Are all slots occupied?
+        if active_count >= max_slots:
+            reason = f"All calculation slots occupied ({active_count}/{max_slots})"
+            logger.debug(f"Allocation status: SHOULD_QUEUE - {reason}")
+            return AllocationStatus.SHOULD_QUEUE, reason
+        
+        # Second check: Can we allocate resources?
+        can_allocate, resource_reason = self.can_allocate_resources(
+            cpu_cores=cpu_cores,
+            memory_mb=memory_mb,
+            calculation_method=calculation_method
+        )
+        
+        if can_allocate:
+            # Resources available, can start immediately
+            logger.debug(f"Allocation status: CAN_START - {resource_reason}")
+            return AllocationStatus.CAN_START, resource_reason
+        
+        # Third check: Is this a fundamental system resource insufficiency?
+        # (i.e., resources insufficient even with no active calculations)
+        insufficient, insufficient_reason = self.check_if_system_resources_insufficient()
+        
+        if insufficient:
+            # System resources are fundamentally insufficient
+            logger.warning(f"Allocation status: INSUFFICIENT_RESOURCES - {insufficient_reason}")
+            return AllocationStatus.INSUFFICIENT_RESOURCES, insufficient_reason
+        
+        # Resources temporarily unavailable but system is generally capable
+        logger.debug(f"Allocation status: SHOULD_QUEUE - {resource_reason}")
+        return AllocationStatus.SHOULD_QUEUE, resource_reason
     
     def get_diagnostics(self) -> Dict:
         """Get diagnostic information about the resource manager state."""
