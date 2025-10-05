@@ -41,14 +41,20 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize SocketIO extension globally (without binding to app)
+# This will be initialized with init_app() in create_app()
+socketio = SocketIO()
 
-def create_app(server_port: int = None):
+
+def create_app(server_port: int = None, test_config: dict = None):
     """
-    Application factory for Gunicorn compatibility.
+    Application factory for Gunicorn compatibility and testing.
 
     Args:
         server_port: The port number on which the server will run.
                     If None, it will be determined from configuration.
+        test_config: Dictionary of configuration values for testing.
+                    If provided, these settings override the default configuration.
     """
     # Initialize Flask app
     app = Flask(__name__)
@@ -66,9 +72,14 @@ def create_app(server_port: int = None):
     # This establishes app.config as the single source of truth for configuration
     configure_flask_app(app, server_config, server_port)
 
+    # Apply test configuration if provided
+    if test_config is not None:
+        app.config.update(test_config)
+
     # Initialize SocketIO with configuration-based settings
+    # Use init_app() pattern for better testability
     socketio_config = app.config.get('SOCKETIO', {})
-    socketio = SocketIO(
+    socketio.init_app(
         app,
         cors_allowed_origins=socketio_config.get('cors_allowed_origins', ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"]),
         async_mode=socketio_config.get('async_mode', 'threading'),
@@ -200,8 +211,8 @@ def create_app(server_port: int = None):
 
     # Store socketio instance for access by other modules
     app.socketio = socketio
-    
-    return app, socketio
+
+    return app
 
 
 def cleanup_resources():
@@ -250,8 +261,9 @@ def start_development_server():
     logger.info(f"Starting API server with Flask-SocketIO on http://{host}:{actual_port}")
     logger.info(f"Configuration: Debug={debug}, Async_mode={socketio_config.get('async_mode', 'threading')}")
 
-    # Create app and socketio instances with the determined port
-    app, socketio = create_app(server_port=actual_port)
+    # Create app instance with the determined port
+    # Global socketio instance is used automatically
+    app = create_app(server_port=actual_port)
     
     # Register cleanup functions
     atexit.register(cleanup_resources)
@@ -275,16 +287,11 @@ def start_development_server():
         cleanup_resources()
 
 
-def create_socketio():
-    """SocketIO factory for Gunicorn compatibility."""
-    app, socketio = create_app()
-    return socketio
-
-
-# Create global app and socketio instances for import by other modules
+# Create global app instance for import by other modules
+# Global socketio instance is already defined above
 # These are created at module import time for Gunicorn compatibility
 # Port is determined from environment variable or configuration
-app, socketio = create_app()
+app = create_app()
 
 
 if __name__ == '__main__':

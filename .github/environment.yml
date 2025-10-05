@@ -20,6 +20,8 @@ dependencies:
   - psutil=7.0.0
   # Development and testing dependencies
   - pytest=8.4.2
+  - pytest-mock=3.14.0
+  - pytest-cov=6.0.0
   - pip=25.2
   # Environment packaging for distribution
   - conda-pack=0.8.1
