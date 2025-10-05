@@ -46,16 +46,21 @@ class SMILESService:
             
             logger.info(f"Converting SMILES: {smiles}")
             
+            # Strip whitespace from SMILES string
+            smiles_stripped = smiles.strip()
+            
             # Use provided title or default
             if title is None:
-                title = f"Molecule from SMILES: {smiles}"
+                title = f"Molecule from SMILES: {smiles_stripped}"
             
-            xyz_string = smiles_to_xyz(smiles, title=title)
+            xyz_string = smiles_to_xyz(smiles_stripped, title=title)
             
             logger.info(f"Successfully converted SMILES to XYZ structure")
             
             return {'xyz': xyz_string}
             
+        except ValidationError:
+            raise  # Re-raise ValidationError to propagate to caller
         except SMILESError as e:
             logger.error(f"SMILES conversion failed: {e}")
             raise ValidationError(str(e))

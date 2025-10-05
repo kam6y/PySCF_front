@@ -74,6 +74,10 @@ class PubChemService:
                 'atom_count': len(compound_data.atoms)
             }
             
+        except ValidationError:
+            raise  # Re-raise ValidationError to propagate to caller
+        except NotFoundError:
+            raise  # Re-raise NotFoundError to propagate to caller
         except PubChemNotFoundError as e:
             logger.warning(f"PubChem search failed (Not Found): {e}")
             raise NotFoundError(str(e))
@@ -113,6 +117,8 @@ class PubChemService:
             
             return validation_result
             
+        except ValidationError:
+            raise  # Re-raise ValidationError to propagate to caller
         except (TypeError, AttributeError) as e:
             logger.warning(f"Invalid input data for XYZ validation: {e}")
             raise ValidationError('Invalid input format for XYZ validation.')

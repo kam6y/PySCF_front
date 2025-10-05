@@ -164,6 +164,11 @@ class BaseCalculator(ABC):
         self.max_cycle = common_params['max_cycle']
         self.solvent_method = common_params['solvent_method']
         self.solvent = common_params['solvent']
+        
+        # Store spin in results so _create_scf_method can access it
+        self.results['spin'] = common_params['spin']
+        self.results['charge'] = common_params['charge']
+        self.results['basis'] = common_params['basis']
 
         # Create SCF method object (RHF/UHF, RKS/UKS, etc.)
         self.mf = self._create_scf_method(self.mol)
