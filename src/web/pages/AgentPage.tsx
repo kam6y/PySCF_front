@@ -6,6 +6,7 @@ import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAgentStore, ChatHistory } from '../store/agentStore';
 import { ConfirmationModal } from '../components/ConfirmationModal';
+import { InlineOrbitalViewer } from '../components/InlineOrbitalViewer';
 import styles from './AgentPage.module.css';
 
 // 確認リクエストの型定義
@@ -15,6 +16,28 @@ type ConfirmationRequest = {
   calculation_id: string;
   calculation_name: string;
   message: string;
+};
+
+// パラメータパース関数（orbital-viewerコードブロック用）
+const parseOrbitalViewerParams = (code: string): Record<string, any> => {
+  const params: Record<string, any> = {};
+  const lines = code.trim().split('\n');
+  
+  lines.forEach(line => {
+    const colonIndex = line.indexOf(':');
+    if (colonIndex === -1) return;
+    
+    const key = line.substring(0, colonIndex).trim();
+    const value = line.substring(colonIndex + 1).trim();
+    
+    if (!key || !value) return;
+    
+    // 数値に変換できる場合は数値として扱う
+    const numValue = Number(value);
+    params[key] = isNaN(numValue) ? value : numValue;
+  });
+  
+  return params;
 };
 
 export const AgentPage = () => {
@@ -473,6 +496,167 @@ export const AgentPage = () => {
                         ]}
                         unwrapDisallowed={true}
                         className={styles.markdown}
+                        components={{
+                          pre: ({ children, ...props }: any) => {
+                            // Debug logging for pre blocks
+                            console.log('[Pre Component Debug]', {
+                              childrenType: typeof children,
+                              children: children,
+                            });
+                            
+                            // Check if this pre contains an orbital-viewer code block
+                            if (React.isValidElement(children) && children.props) {
+                              const codeProps = children.props as any;
+                              const className = codeProps.className;
+                              
+                              console.log('[Pre > Code Debug]', {
+                                className,
+                                hasClassName: !!className,
+                                isOrbitalViewer: className?.includes('language-orbital-viewer'),
+                              });
+                              
+                              if (className?.includes('language-orbital-viewer')) {
+                                try {
+                                  const codeContent = String(codeProps.children).replace(/\n$/, '');
+                                  const params = parseOrbitalViewerParams(codeContent);
+                                  
+                                  console.log('[Orbital Viewer] Parsed params:', params);
+                                  
+                                  // Validate required parameters
+                                  if (!params.calculation_id || params.orbital_index === undefined) {
+                                    return (
+                                      <div style={{
+                                        padding: '12px',
+                                        backgroundColor: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        color: '#dc2626',
+                                        margin: '12px 0'
+                                      }}>
+                                        ❌ Invalid orbital-viewer block: missing required parameters (calculation_id, orbital_index)
+                                      </div>
+                                    );
+                                  }
+                                  
+                                  // Render InlineOrbitalViewer component
+                                  return (
+                                    <InlineOrbitalViewer
+                                      calculation_id={params.calculation_id}
+                                      orbital_index={params.orbital_index}
+                                      grid_size={params.grid_size}
+                                      isovalue_pos={params.isovalue_pos}
+                                      isovalue_neg={params.isovalue_neg}
+                                      onError={(error) => {
+                                        console.error('Orbital viewer error:', error);
+                                        addNotification({
+                                          type: 'error',
+                                          title: 'Orbital Viewer Error',
+                                          message: error,
+                                          autoClose: false,
+                                          duration: 0,
+                                        });
+                                      }}
+                                    />
+                                  );
+                                } catch (error) {
+                                  console.error('Failed to render orbital viewer:', error);
+                                  return (
+                                    <div style={{
+                                      padding: '12px',
+                                      backgroundColor: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      borderRadius: '8px',
+                                      color: '#dc2626',
+                                      margin: '12px 0'
+                                    }}>
+                                      ❌ Failed to render orbital viewer: {error instanceof Error ? error.message : String(error)}
+                                    </div>
+                                  );
+                                }
+                              }
+                            }
+                            
+                            // Default pre rendering
+                            return <pre {...props}>{children}</pre>;
+                          },
+                          code: ({ className, children, ...props }: any) => {
+                            // Debug logging
+                            console.log('[Code Component Debug]', {
+                              className,
+                              inline: props.inline,
+                              node: props.node,
+                              childrenType: typeof children,
+                              childrenValue: String(children).substring(0, 100),
+                            });
+                            
+                            // Check if this is an orbital-viewer code block
+                            const inline = props.inline;
+                            if (!inline && className?.includes('language-orbital-viewer')) {
+                              try {
+                                const codeContent = String(children).replace(/\n$/, '');
+                                const params = parseOrbitalViewerParams(codeContent);
+                                
+                                // Validate required parameters
+                                if (!params.calculation_id || params.orbital_index === undefined) {
+                                  return (
+                                    <div style={{
+                                      padding: '12px',
+                                      backgroundColor: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      borderRadius: '8px',
+                                      color: '#dc2626',
+                                      margin: '12px 0'
+                                    }}>
+                                      ❌ Invalid orbital-viewer block: missing required parameters (calculation_id, orbital_index)
+                                    </div>
+                                  );
+                                }
+                                
+                                // Render InlineOrbitalViewer component
+                                return (
+                                  <InlineOrbitalViewer
+                                    calculation_id={params.calculation_id}
+                                    orbital_index={params.orbital_index}
+                                    grid_size={params.grid_size}
+                                    isovalue_pos={params.isovalue_pos}
+                                    isovalue_neg={params.isovalue_neg}
+                                    onError={(error) => {
+                                      console.error('Orbital viewer error:', error);
+                                      addNotification({
+                                        type: 'error',
+                                        title: 'Orbital Viewer Error',
+                                        message: error,
+                                        autoClose: false,
+                                        duration: 0,
+                                      });
+                                    }}
+                                  />
+                                );
+                              } catch (error) {
+                                console.error('Failed to render orbital viewer:', error);
+                                return (
+                                  <div style={{
+                                    padding: '12px',
+                                    backgroundColor: '#fef2f2',
+                                    border: '1px solid #fecaca',
+                                    borderRadius: '8px',
+                                    color: '#dc2626',
+                                    margin: '12px 0'
+                                  }}>
+                                    ❌ Failed to render orbital viewer: {error instanceof Error ? error.message : String(error)}
+                                  </div>
+                                );
+                              }
+                            }
+                            
+                            // Default code block rendering
+                            return (
+                              <code className={className} {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                        }}
                       >
                         {entry.parts[0].text}
                       </ReactMarkdown>

@@ -457,3 +457,15 @@
 .clearButton svg {
   flex-shrink: 0;
 }
+
+/* Orbital viewer in chat - override max-width for messages containing visualizations */
+.model:has(.markdown > div) {
+  max-width: 85%;
+}
+
+/* Ensure inline viewers are visible on smaller screens */
+@media (max-width: 768px) {
+  .model:has(.markdown > div) {
+    max-width: 95%;
+  }
+}
