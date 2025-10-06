@@ -40,3 +40,9 @@ dependencies:
     - pytest-flask==1.3.0
     # AI/ML API integration
     - google-genai>=1.39.1
+    # LangChain ecosystem for multi-agent architecture
+    - langchain==0.3.27
+    - langgraph==0.6.8
+    - langchain-google-genai==2.1.12
+    # arXiv API client for research agent
+    - arxiv
