@@ -248,6 +248,47 @@ const findAvailablePort = async (
 };
 
 /**
+ * pyenv関連の環境変数を除外し、conda環境専用の環境変数を作成
+ * pyenvとcondaの競合を防ぐために、pyenv関連の環境変数を明示的に除外する
+ *
+ * @param condaBinDir - conda環境のbinディレクトリパス
+ * @param serverPort - Flaskサーバーのポート番号
+ * @returns クリーニングされた環境変数のマップ
+ */
+const createCleanEnvironment = (
+  condaBinDir: string,
+  serverPort: number
+): Record<string, string> => {
+  const cleanEnv: Record<string, string> = {};
+
+  // pyenv関連の環境変数を除外してコピー
+  const excludeKeys = ['PYENV_ROOT', 'PYENV_SHELL', 'PYENV_VERSION', 'PYENV_DIR'];
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && !excludeKeys.includes(key)) {
+      cleanEnv[key] = value;
+    }
+  }
+
+  // PATHからpyenv関連ディレクトリを除外
+  const originalPath = process.env.PATH || '';
+  const pathEntries = originalPath
+    .split(':')
+    .filter(p => !p.includes('/.pyenv/shims') && !p.includes('/.pyenv/bin'));
+
+  // conda binディレクトリを最優先に配置
+  cleanEnv.PATH = `${condaBinDir}:${pathEntries.join(':')}`;
+  cleanEnv.CONDA_DEFAULT_ENV = 'pyscf-env';
+  cleanEnv.PYSCF_SERVER_PORT = String(serverPort);
+
+  // macOS ARM64のNumPy初期化問題対策
+  if (process.platform === 'darwin' && process.arch === 'arm64') {
+    cleanEnv.OPENBLAS_CORETYPE = 'ARMV8';
+  }
+
+  return cleanEnv;
+};
+
+/**
  * Python/Flaskサーバーを起動する統一関数
  * 設定ファイルに基づいて開発・本番環境で同一の起動方法を使用
  */
@@ -391,20 +432,14 @@ const startPythonServer = async (): Promise<void> => {
       const appPyPath = path.join(pythonPath, 'app.py');
       console.log(`• app.py exists: ${fs.existsSync(appPyPath)}`);
 
-      // Ensure conda environment's bin directory is at the front of PATH
-      // This prevents pyenv or other Python version managers from interfering
+      // pyenv環境変数を除外した、conda環境専用の環境変数を作成
       const condaBinDir = path.dirname(pythonExecutablePath);
-      const modifiedPath = `${condaBinDir}:${process.env.PATH || ''}`;
+      const envVars = createCleanEnvironment(condaBinDir, serverPort);
 
       pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          PATH: modifiedPath,
-          CONDA_DEFAULT_ENV: 'pyscf-env',
-          PYSCF_SERVER_PORT: String(serverPort),
-        },
+        env: envVars,
       });
 
       // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
@@ -424,18 +459,13 @@ const startPythonServer = async (): Promise<void> => {
       // フォールバック: 直接実行（設定でGunicorn無効時のみ）
       console.log('Starting server with direct execution (fallback mode)');
 
-      // Ensure conda environment's bin directory is at the front of PATH
+      // pyenv環境変数を除外した、conda環境専用の環境変数を作成
       const condaBinDir = path.dirname(pythonExecutablePath);
-      const modifiedPath = `${condaBinDir}:${process.env.PATH || ''}`;
+      const envVars = createCleanEnvironment(condaBinDir, serverPort);
 
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
-        env: {
-          ...process.env,
-          PATH: modifiedPath,
-          CONDA_DEFAULT_ENV: 'pyscf-env',
-          PYSCF_SERVER_PORT: String(serverPort),
-        },
+        env: envVars,
       });
     }
 
