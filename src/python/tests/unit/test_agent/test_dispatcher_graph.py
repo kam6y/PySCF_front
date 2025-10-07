@@ -276,7 +276,7 @@ def test_molecular_agent_node_handles_error(mock_agent_class):
     # ASSERT
     assert len(result["messages"]) == 2
     assert isinstance(result["messages"][1], AIMessage)
-    assert "エラー" in result["messages"][1].content
+    assert "error occurred" in result["messages"][1].content
     assert "API error" in result["messages"][1].content
 
 
@@ -302,7 +302,7 @@ def test_molecular_agent_node_handles_empty_response(mock_agent_class):
 
     # ASSERT
     assert len(result["messages"]) == 2
-    assert "応答を生成できませんでした" in result["messages"][1].content
+    assert "Failed to generate a response" in result["messages"][1].content
 
 
 # ============================================================================
@@ -386,7 +386,7 @@ def test_research_agent_node_handles_error(mock_create_runnable):
     # ASSERT
     assert len(result["messages"]) == 2
     assert isinstance(result["messages"][1], AIMessage)
-    assert "エラー" in result["messages"][1].content
+    assert "error occurred" in result["messages"][1].content
     assert "arXiv connection error" in result["messages"][1].content
 
 
@@ -414,7 +414,7 @@ def test_research_agent_node_handles_empty_response(mock_create_runnable):
 
     # ASSERT
     assert len(result["messages"]) == 2
-    assert "論文検索結果が見つかりませんでした" in result["messages"][1].content
+    assert "No papers found" in result["messages"][1].content
 
 
 # ============================================================================
@@ -574,7 +574,7 @@ def test_molecular_agent_node_with_empty_state(mock_agent_class):
 
     # ASSERT
     assert len(result["messages"]) == 1
-    assert "メッセージが見つかりませんでした" in result["messages"][0].content
+    assert "No messages found in conversation state" in result["messages"][0].content
 
 
 @patch('research.agent.create_research_agent_runnable')
@@ -595,4 +595,4 @@ def test_research_agent_node_with_empty_state(mock_create_runnable):
 
     # ASSERT
     assert len(result["messages"]) == 1
-    assert "メッセージが見つかりませんでした" in result["messages"][0].content
+    assert "No messages found in conversation state" in result["messages"][0].content

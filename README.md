@@ -15,6 +15,10 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
     -   Perform **geometry optimization** and **vibrational frequency analysis**.
     -   Analyze results, including SCF energy, molecular orbitals (HOMO/LUMO), and more.
 -   **Calculation History**: View, rename, and delete past calculation results.
+-   **AI-Powered Multi-Agent System**:
+    -   **Molecular Agent**: Assists with quantum chemistry calculations and molecular analysis using natural language.
+    -   **Research Agent**: Searches arXiv for relevant academic papers and provides summaries with PDF links.
+    -   **Intelligent Routing**: Automatically routes queries to the appropriate specialist agent based on user intent.
 -   **Automated Environment Setup**: Set up the complete development environment with a single command (`npm run setup-env`).
 -   **Environment Validation**: Automatically verify Python dependencies and environment health (`npm run verify-env`).
 -   **Unified Execution Environment**: Uses a Gunicorn-based server for both development and production to eliminate environment-specific issues.
@@ -176,6 +180,10 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     -   **構造最適化**と**振動数解析**をサポート。
     -   計算結果（SCFエネルギー、分子軌道、NTO解析など）を表示します。
 -   **計算履歴の管理:** 過去の計算結果を一覧表示し、名前の変更や削除が可能です。
+-   **AIマルチエージェントシステム:**
+    -   **分子エージェント:** 自然言語を使用して量子化学計算と分子解析をサポート。
+    -   **リサーチエージェント:** arXivから関連論文を検索し、PDFリンク付きの要約を提供。
+    -   **知的ルーティング:** ユーザーの質問内容に基づいて、適切な専門エージェントに自動的にルーティング。
 -   **自動環境構築:** ワンコマンドで開発環境をセットアップできます（`npm run setup-env`）。
 -   **環境検証機能:** Python依存関係と環境の健全性を自動チェックします（`npm run verify-env`）。
 -   **統一実行環境:** 開発・本番環境で同一のGunicornベースサーバーを使用し、環境差異問題を解決。

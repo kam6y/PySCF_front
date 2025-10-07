@@ -227,6 +227,17 @@ Python Pydantic Models (src/python/generated_models.py) for type-safe request/re
 
 TypeScript Type Definitions (src/web/types/generated-api.ts) to keep the frontend API client synchronized with the backend.
 
+Multi-Agent AI Architecture
+The application features a sophisticated multi-agent AI system powered by LangGraph:
+
+**Dispatcher (Router)**: Classifies user intent and routes queries to specialized agents based on the context of the user's question.
+
+**Molecular Agent**: Handles quantum chemistry calculations, molecular property analysis, orbital visualization, and general chemistry-related queries. Uses a comprehensive set of tools to interact with the PySCF calculation backend.
+
+**Research Agent**: Specializes in academic literature search, particularly for quantum chemistry papers on arXiv. Can find, summarize, and provide formatted citations with direct PDF links.
+
+The system uses LangGraph's stateful graph architecture with conditional routing, enabling intelligent task distribution. Each agent maintains conversation context and can handle multi-turn interactions. The router uses Gemini's structured output feature to ensure reliable and deterministic routing decisions.
+
 Electron Structure
 Main Process (src/main.ts): Creates the BrowserWindow, manages the Python Flask subprocess, and handles application lifecycle events.
 
@@ -241,7 +252,9 @@ PubChem & SMILES Integration: Searching and converting molecular structures.
 
 Quantum Chemistry Calculations: Running various calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF) via PySCF. This now includes geometry optimization and vibrational frequency analysis. Calculations are executed in parallel using a ProcessPoolExecutor.
 
-Molecular Agent: An AI agent that interprets natural language prompts to perform molecular calculations and analysis using a set of defined tools.
+Multi-Agent AI System: A LangGraph-based system with intelligent routing between specialized agents:
+  - **Molecular Agent**: Interprets natural language prompts to perform molecular calculations and analysis using a comprehensive set of tools.
+  - **Research Agent**: Searches arXiv for academic papers, providing summaries and formatted citations with PDF links.
 
 Molecular Orbital Analysis: Generating data for visualizing molecular orbitals, including CUBE files and energy level diagrams.
 
@@ -371,7 +384,7 @@ POST /api/pubchem/search: Search PubChem.
 
 POST /api/smiles/convert: Convert a SMILES string to XYZ.
 
-POST /api/agent/invoke: Invoke the molecular agent with a natural language prompt.
+POST /api/agent/chat: Chat with the multi-agent AI system (streams responses via Server-Sent Events). The system automatically routes queries to either the Molecular Agent or Research Agent based on intent.
 
 GET /api/quantum/supported-parameters: Get lists of supported calculation methods, basis sets, functionals, etc.
 

@@ -191,7 +191,7 @@ def molecular_agent_node(state: AgentState) -> AgentState:
     messages = state["messages"]
     if not messages:
         logger.warning("No messages in state, returning empty response")
-        state["messages"].append(AIMessage(content="メッセージが見つかりませんでした。"))
+        state["messages"].append(AIMessage(content="No messages found in conversation state."))
         return state
 
     user_message = messages[-1].content
@@ -220,7 +220,7 @@ def molecular_agent_node(state: AgentState) -> AgentState:
 
         if not full_response.strip():
             logger.warning("MolecularAgent returned empty response")
-            full_response = "応答を生成できませんでした。もう一度お試しください。"
+            full_response = "Failed to generate a response. Please try again."
 
         # Append complete response to state
         state["messages"].append(AIMessage(content=full_response))
@@ -229,8 +229,8 @@ def molecular_agent_node(state: AgentState) -> AgentState:
     except Exception as e:
         logger.error(f"Error in molecular_agent_node: {e}", exc_info=True)
         error_message = (
-            f"分子エージェントでエラーが発生しました: {str(e)}\n\n"
-            "APIキーが正しく設定されているか確認してください。"
+            f"An error occurred in the molecular agent: {str(e)}\n\n"
+            "Please verify that your API key is correctly configured."
         )
         state["messages"].append(AIMessage(content=error_message))
 
@@ -262,7 +262,7 @@ def research_agent_node(state: AgentState) -> AgentState:
     messages = state["messages"]
     if not messages:
         logger.warning("No messages in state, returning empty response")
-        state["messages"].append(AIMessage(content="メッセージが見つかりませんでした。"))
+        state["messages"].append(AIMessage(content="No messages found in conversation state."))
         return state
 
     user_message = messages[-1].content
@@ -293,7 +293,7 @@ def research_agent_node(state: AgentState) -> AgentState:
 
         if not full_response.strip():
             logger.warning("ResearchAgent returned empty response")
-            full_response = "論文検索結果が見つかりませんでした。別のキーワードでお試しください。"
+            full_response = "No papers found. Please try different keywords."
 
         # Append complete response to state
         state["messages"].append(AIMessage(content=full_response))
@@ -302,8 +302,8 @@ def research_agent_node(state: AgentState) -> AgentState:
     except Exception as e:
         logger.error(f"Error in research_agent_node: {e}", exc_info=True)
         error_message = (
-            f"リサーチエージェントでエラーが発生しました: {str(e)}\n\n"
-            "APIキーが正しく設定されているか、またはarXivサービスが利用可能か確認してください。"
+            f"An error occurred in the research agent: {str(e)}\n\n"
+            "Please verify that your API key is correctly configured and that the arXiv service is accessible."
         )
         state["messages"].append(AIMessage(content=error_message))
 
