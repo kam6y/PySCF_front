@@ -146,61 +146,54 @@ def _create_agent_stream(molecular_agent: MolecularAgent, message: str, history:
 def _create_graph_stream(message: str, history: list) -> Iterator[str]:
     """
     Create an SSE stream for LangGraph multi-agent responses.
-    
+
     This function integrates the LangGraph dispatcher to route queries
     to the appropriate specialist agent (MolecularAgent or ResearchAgent).
-    
+    Uses real-time token streaming with stream_mode="messages".
+
     Args:
         message: User's message
         history: Chat history in frontend format (dict list)
-        
+
     Yields:
         SSE formatted strings
     """
     chunks_count = 0
     try:
         logger.debug(f"Starting LangGraph stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
-        
+
         # Get compiled graph
         graph_app = get_compiled_graph()
-        
+
         # Convert history to LangChain format
         langchain_history = _convert_dict_to_langchain_format(history)
         logger.debug(f"Converted {len(history)} history messages to LangChain format")
-        
+
         # Add current user message
         all_messages = langchain_history + [HumanMessage(content=message)]
-        
+
         # Prepare graph input
         graph_input = {"messages": all_messages}
-        
-        # Invoke graph execution (returns complete final state)
-        logger.debug("Invoking LangGraph dispatcher")
-        final_state = graph_app.invoke(graph_input)
-        logger.debug(f"Received final state with keys: {list(final_state.keys())}")
-        
-        # Extract new messages added by the agent
-        if "messages" in final_state and len(final_state["messages"]) > len(all_messages):
-            # Get the new message(s) added by the agent
-            new_messages = final_state["messages"][len(all_messages):]
-            for new_msg in new_messages:
-                if isinstance(new_msg, AIMessage):
-                    response_text = new_msg.content
-                    logger.debug(f"Extracted AI response (length: {len(response_text)})")
-                    
-                    # Stream the response in chunks (simulate streaming for consistency with old behavior)
-                    chunk_size = 100
-                    for i in range(0, len(response_text), chunk_size):
-                        chunk = response_text[i:i+chunk_size]
-                        chunks_count += 1
-                        yield _format_sse_event("chunk", {"text": chunk})
-        
+
+        # Stream graph execution with custom mode to capture tokens from nodes
+        logger.debug("Starting LangGraph stream with custom mode")
+        for chunk in graph_app.stream(
+            graph_input,
+            stream_mode="custom"
+        ):
+            # Stream custom tokens emitted by nodes via get_stream_writer()
+            if isinstance(chunk, dict) and "token" in chunk:
+                token = chunk["token"]
+                chunks_count += 1
+                logger.debug(f"Streaming token #{chunks_count}, length: {len(token)}")
+                yield _format_sse_event("chunk", {"text": token})
+
         if chunks_count == 0:
-            logger.warning("No AI response extracted from graph, returning fallback")
+            logger.warning("No tokens streamed from graph, returning fallback")
             yield _format_sse_event("chunk", {"text": "応答を生成できませんでした。もう一度お試しください。"})
-        
-        logger.debug(f"Stream completed successfully with {chunks_count} chunks")
-        
+
+        logger.debug(f"Stream completed successfully with {chunks_count} tokens")
+
     except Exception as e:
         logger.error(f"Error during LangGraph streaming after {chunks_count} chunks: {e}", exc_info=True)
         yield _format_sse_event("error", {"message": f"An error occurred during the stream: {str(e)}"})

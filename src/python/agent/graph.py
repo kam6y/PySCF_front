@@ -171,7 +171,7 @@ def molecular_agent_node(state: AgentState) -> AgentState:
 
     This node integrates the existing MolecularAgent into the LangGraph workflow.
     It converts LangChain messages to the format expected by MolecularAgent,
-    invokes the agent with streaming, and collects the complete response.
+    and streams the agent's output token by token for real-time display.
 
     Args:
         state: Current agent state containing conversation messages
@@ -183,6 +183,7 @@ def molecular_agent_node(state: AgentState) -> AgentState:
         Logs errors but does not raise exceptions; adds error messages to state instead
     """
     from agent.molecular_agent import MolecularAgent
+    from langgraph.config import get_stream_writer
 
     logger.info("Executing molecular_agent_node")
 
@@ -200,13 +201,19 @@ def molecular_agent_node(state: AgentState) -> AgentState:
     logger.debug(f"Converted {len(messages)-1} messages to MolecularAgent format")
 
     try:
-        # Initialize and invoke MolecularAgent
+        # Initialize MolecularAgent
         agent = MolecularAgent()
 
-        # Collect streaming response chunks
+        # Get stream writer for real-time token streaming
+        writer = get_stream_writer()
+
+        # Collect streaming response chunks while writing to stream
         response_chunks = []
         for chunk in agent.chat(user_message, history):
             response_chunks.append(chunk)
+            # Write token to custom stream for real-time display
+            writer({"token": chunk})
+            logger.debug(f"Streamed chunk: {chunk[:50]}...")
 
         # Combine all chunks into complete response
         full_response = "".join(response_chunks)
@@ -235,8 +242,7 @@ def research_agent_node(state: AgentState) -> AgentState:
     Research Agent node - handles academic paper search and literature reviews.
 
     This node integrates the ResearchAgent runnable into the LangGraph workflow.
-    It invokes the agent with the user's query and LangChain automatically
-    handles tool calling (search_arxiv).
+    It streams the agent's output token by token for real-time display.
 
     Args:
         state: Current agent state containing conversation messages
@@ -248,6 +254,7 @@ def research_agent_node(state: AgentState) -> AgentState:
         Logs errors but does not raise exceptions; adds error messages to state instead
     """
     from research.agent import create_research_agent_runnable
+    from langgraph.config import get_stream_writer
 
     logger.info("Executing research_agent_node")
 
@@ -261,38 +268,36 @@ def research_agent_node(state: AgentState) -> AgentState:
     user_message = messages[-1].content
 
     try:
-        # Create and invoke research agent runnable
+        # Create research agent runnable
         agent_runnable = create_research_agent_runnable()
-        logger.debug(f"Invoking research agent with query: {user_message[:100]}...")
+        logger.debug(f"Streaming research agent with query: {user_message[:100]}...")
 
-        # Invoke agent (ReAct agent automatically executes tool calls)
-        # The agent returns a dict with 'messages' key containing the conversation
-        response = agent_runnable.invoke({"messages": [("user", user_message)]})
+        # Get stream writer for real-time token streaming
+        writer = get_stream_writer()
 
-        # Extract the final AI message from the response
-        # create_react_agent returns: {"messages": [..., AIMessage(content="final response")]}
-        if isinstance(response, dict) and "messages" in response:
-            final_message = response["messages"][-1]
-            if hasattr(final_message, 'content'):
-                response_text = final_message.content
-            else:
-                response_text = str(final_message)
-        elif hasattr(response, 'content'):
-            response_text = response.content
-        elif isinstance(response, str):
-            response_text = response
-        else:
-            # Fallback: convert to string
-            response_text = str(response)
-            logger.warning(f"Unexpected response type: {type(response).__name__}")
+        # Collect full response while streaming tokens
+        full_response = ""
 
-        if not response_text.strip():
+        # Stream agent execution with messages mode for token-by-token output
+        for message_chunk, metadata in agent_runnable.stream(
+            {"messages": [("user", user_message)]},
+            stream_mode="messages"
+        ):
+            # Stream each token via custom writer
+            if hasattr(message_chunk, 'content') and message_chunk.content:
+                content = message_chunk.content
+                full_response += content
+                # Write token to custom stream for real-time display
+                writer({"token": content})
+                logger.debug(f"Streamed token: {content[:50]}...")
+
+        if not full_response.strip():
             logger.warning("ResearchAgent returned empty response")
-            response_text = "論文検索結果が見つかりませんでした。別のキーワードでお試しください。"
+            full_response = "論文検索結果が見つかりませんでした。別のキーワードでお試しください。"
 
-        # Append response to state
-        state["messages"].append(AIMessage(content=response_text))
-        logger.info(f"ResearchAgent response added to state (length: {len(response_text)})")
+        # Append complete response to state
+        state["messages"].append(AIMessage(content=full_response))
+        logger.info(f"ResearchAgent response added to state (length: {len(full_response)})")
 
     except Exception as e:
         logger.error(f"Error in research_agent_node: {e}", exc_info=True)
