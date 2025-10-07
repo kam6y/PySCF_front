@@ -9,8 +9,9 @@ responses to research-related queries.
 """
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate
+
 from .tools import search_arxiv
+from agent.molecular_agent import get_gemini_api_key
 
 
 # System prompt for the Research Agent
@@ -37,20 +38,30 @@ Always cite your sources and provide direct links to papers when available.
 
 def create_research_agent_runnable():
     """
-    Create a LangChain runnable for the research agent.
+    Create a LangChain ReAct agent for the research agent.
+
+    This agent uses LangGraph's create_react_agent to automatically handle
+    tool execution loops, allowing the LLM to call search_arxiv and process results.
 
     Returns:
-        A LangChain runnable chain that processes research queries
+        A compiled LangGraph agent that processes research queries with tool execution
     """
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", RESEARCH_AGENT_PROMPT),
-        ("human", "{input}")
-    ])
+    from langgraph.prebuilt import create_react_agent
+    
+    # Use Gemini 2.5 Flash for fast, cost-effective research queries
+    api_key = get_gemini_api_key()
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key)
 
-    # Use Gemini 1.5 Flash for fast, cost-effective research queries
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")
-
-    # Bind the arXiv search tool to the LLM
-    llm_with_tools = llm.bind_tools([search_arxiv])
-
-    return prompt | llm_with_tools
+    # Create a ReAct agent with the arXiv search tool
+    # The agent will automatically:
+    # 1. Decide when to use tools
+    # 2. Execute tool calls
+    # 3. Process tool outputs
+    # 4. Generate final response
+    agent = create_react_agent(
+        llm,
+        tools=[search_arxiv],
+        prompt=RESEARCH_AGENT_PROMPT
+    )
+    
+    return agent

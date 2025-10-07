@@ -15,175 +15,159 @@ from research.agent import create_research_agent_runnable, RESEARCH_AGENT_PROMPT
 # Research Agent Runnable Creation Tests
 # ============================================================================
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
 def test_create_research_agent_runnable_returns_runnable(
-    mock_prompt_template_class,
-    mock_llm_class
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
     WHEN all components are properly initialized
-    THEN it should return a LangChain runnable chain
+    THEN it should return a compiled LangGraph agent
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm = MagicMock()
-    mock_llm_with_tools = MagicMock()
-    mock_llm.bind_tools.return_value = mock_llm_with_tools
     mock_llm_class.return_value = mock_llm
 
-    # Mock the | operator for chaining
-    mock_chain = MagicMock()
-    mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+    mock_agent = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     result = create_research_agent_runnable()
 
     # ASSERT
     assert result is not None
-    assert result == mock_chain
-    mock_prompt_template_class.from_messages.assert_called_once()
+    assert result == mock_agent
     mock_llm_class.assert_called_once()
-    mock_llm.bind_tools.assert_called_once()
+    mock_create_react_agent.assert_called_once()
 
 
+@patch('langgraph.prebuilt.create_react_agent')
+@patch('research.agent.get_gemini_api_key')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
 def test_create_research_agent_uses_correct_model(
-    mock_prompt_template_class,
-    mock_llm_class
+    mock_llm_class,
+    mock_get_api_key,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
     WHEN LLM is initialized
-    THEN it should use gemini-1.5-flash model
+    THEN it should use gemini-2.5-flash model
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
+    mock_get_api_key.return_value = "test-api-key"
+    
     mock_llm = MagicMock()
-    mock_llm.bind_tools.return_value = MagicMock()
     mock_llm_class.return_value = mock_llm
 
-    mock_prompt.__or__ = MagicMock(return_value=MagicMock())
+    mock_agent = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     create_research_agent_runnable()
 
     # ASSERT
-    mock_llm_class.assert_called_once_with(model="gemini-1.5-flash")
+    mock_llm_class.assert_called_once_with(model="gemini-2.5-flash", api_key="test-api-key")
 
 
 # ============================================================================
-# Prompt Template Tests
+# ReAct Agent Creation Tests
 # ============================================================================
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
-def test_create_research_agent_configures_prompt_template(
-    mock_prompt_template_class,
-    mock_llm_class
+def test_create_research_agent_calls_create_react_agent(
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
-    WHEN prompt template is created
-    THEN it should use system and human message templates
+    WHEN creating the agent
+    THEN it should call create_react_agent with correct parameters
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm = MagicMock()
-    mock_llm.bind_tools.return_value = MagicMock()
     mock_llm_class.return_value = mock_llm
 
-    mock_prompt.__or__ = MagicMock(return_value=MagicMock())
+    mock_agent = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     create_research_agent_runnable()
 
     # ASSERT
-    mock_prompt_template_class.from_messages.assert_called_once()
-    call_args = mock_prompt_template_class.from_messages.call_args[0][0]
+    mock_create_react_agent.assert_called_once()
+    call_args = mock_create_react_agent.call_args
+    
+    # Verify LLM is passed
+    assert call_args[0][0] == mock_llm
+    # Verify tools parameter
+    assert "tools" in call_args[1]
+    # Verify state_modifier parameter
+    assert "state_modifier" in call_args[1]
+    assert call_args[1]["state_modifier"] == RESEARCH_AGENT_PROMPT
 
-    # Verify message structure
-    assert len(call_args) == 2
-    assert call_args[0][0] == "system"
-    assert call_args[0][1] == RESEARCH_AGENT_PROMPT
-    assert call_args[1][0] == "human"
-    assert call_args[1][1] == "{input}"
 
-
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
 def test_create_research_agent_uses_research_system_prompt(
-    mock_prompt_template_class,
-    mock_llm_class
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
-    WHEN system prompt is set
-    THEN it should use RESEARCH_AGENT_PROMPT constant
+    WHEN agent is created with state_modifier
+    THEN it should use RESEARCH_AGENT_PROMPT as system prompt
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm = MagicMock()
-    mock_llm.bind_tools.return_value = MagicMock()
     mock_llm_class.return_value = mock_llm
 
-    mock_prompt.__or__ = MagicMock(return_value=MagicMock())
+    mock_agent = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     create_research_agent_runnable()
 
     # ASSERT
-    call_args = mock_prompt_template_class.from_messages.call_args[0][0]
-    system_message = call_args[0]
-    assert system_message[1] == RESEARCH_AGENT_PROMPT
+    call_args = mock_create_react_agent.call_args
+    assert call_args[1]["state_modifier"] == RESEARCH_AGENT_PROMPT
 
 
 # ============================================================================
 # Tool Binding Tests
 # ============================================================================
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
 @patch('research.agent.search_arxiv')
 def test_create_research_agent_binds_search_tool(
     mock_search_arxiv,
-    mock_prompt_template_class,
-    mock_llm_class
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
-    WHEN tools are bound to LLM
-    THEN it should bind search_arxiv tool
+    WHEN tools are passed to create_react_agent
+    THEN it should include search_arxiv tool
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm = MagicMock()
-    mock_llm_with_tools = MagicMock()
-    mock_llm.bind_tools.return_value = mock_llm_with_tools
     mock_llm_class.return_value = mock_llm
 
-    mock_prompt.__or__ = MagicMock(return_value=MagicMock())
+    mock_agent = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     create_research_agent_runnable()
 
     # ASSERT
-    mock_llm.bind_tools.assert_called_once()
-    call_args = mock_llm.bind_tools.call_args[0][0]
-    assert len(call_args) == 1
-    assert call_args[0] == mock_search_arxiv
+    call_args = mock_create_react_agent.call_args
+    tools_list = call_args[1]["tools"]
+    assert len(tools_list) == 1
+    assert tools_list[0] == mock_search_arxiv
 
 
 # ============================================================================
@@ -256,50 +240,43 @@ def test_research_agent_prompt_is_not_empty():
 
 
 # ============================================================================
-# Chain Construction Tests
+# Agent Construction Tests
 # ============================================================================
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
-def test_create_research_agent_chains_prompt_and_llm(
-    mock_prompt_template_class,
-    mock_llm_class
+def test_create_research_agent_returns_agent(
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
-    WHEN runnable chain is created
-    THEN it should chain prompt template with tool-bound LLM
+    WHEN agent is created
+    THEN it should return the compiled agent
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm = MagicMock()
-    mock_llm_with_tools = MagicMock()
-    mock_llm.bind_tools.return_value = mock_llm_with_tools
     mock_llm_class.return_value = mock_llm
 
-    mock_chain = MagicMock()
-    mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+    mock_agent = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     result = create_research_agent_runnable()
 
     # ASSERT
-    # Verify that prompt | llm_with_tools was created
-    mock_prompt.__or__.assert_called_once_with(mock_llm_with_tools)
-    assert result == mock_chain
+    assert result == mock_agent
 
 
 # ============================================================================
 # Integration Tests
 # ============================================================================
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
 def test_create_research_agent_full_pipeline(
-    mock_prompt_template_class,
-    mock_llm_class
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
@@ -307,41 +284,34 @@ def test_create_research_agent_full_pipeline(
     THEN complete pipeline should be set up correctly
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm = MagicMock()
-    mock_llm_with_tools = MagicMock()
-    mock_llm.bind_tools.return_value = mock_llm_with_tools
     mock_llm_class.return_value = mock_llm
 
-    mock_chain = MagicMock()
-    mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+    mock_agent = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     result = create_research_agent_runnable()
 
     # ASSERT
     # Verify call sequence
-    assert mock_prompt_template_class.from_messages.called
     assert mock_llm_class.called
-    assert mock_llm.bind_tools.called
-    assert mock_prompt.__or__.called
+    assert mock_create_react_agent.called
 
     # Verify final result
     assert result is not None
-    assert result == mock_chain
+    assert result == mock_agent
 
 
 # ============================================================================
 # Error Handling Tests
 # ============================================================================
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
 def test_create_research_agent_handles_llm_initialization_error(
-    mock_prompt_template_class,
-    mock_llm_class
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN ChatGoogleGenerativeAI raises an error during initialization
@@ -349,9 +319,6 @@ def test_create_research_agent_handles_llm_initialization_error(
     THEN it should propagate the error
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm_class.side_effect = ValueError("Invalid model configuration")
 
     # ACT & ASSERT
@@ -359,61 +326,57 @@ def test_create_research_agent_handles_llm_initialization_error(
         create_research_agent_runnable()
 
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
-def test_create_research_agent_handles_prompt_creation_error(
-    mock_prompt_template_class,
-    mock_llm_class
+def test_create_research_agent_handles_agent_creation_error(
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
-    GIVEN ChatPromptTemplate raises an error during creation
+    GIVEN create_react_agent raises an error during creation
     WHEN create_research_agent_runnable is called
     THEN it should propagate the error
     """
     # ARRANGE
-    mock_prompt_template_class.from_messages.side_effect = RuntimeError(
-        "Invalid prompt template"
+    mock_llm = MagicMock()
+    mock_llm_class.return_value = mock_llm
+    
+    mock_create_react_agent.side_effect = RuntimeError(
+        "Invalid agent configuration"
     )
 
     # ACT & ASSERT
-    with pytest.raises(RuntimeError, match="Invalid prompt template"):
+    with pytest.raises(RuntimeError, match="Invalid agent configuration"):
         create_research_agent_runnable()
 
 
 # ============================================================================
-# Runnable Interface Tests
+# Agent Interface Tests
 # ============================================================================
 
+@patch('langgraph.prebuilt.create_react_agent')
 @patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.ChatPromptTemplate')
-def test_create_research_agent_returns_chainable_object(
-    mock_prompt_template_class,
-    mock_llm_class
+def test_create_research_agent_returns_invokable_object(
+    mock_llm_class,
+    mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
     WHEN the returned object is inspected
-    THEN it should support LangChain runnable interface
+    THEN it should support LangGraph agent interface
     """
     # ARRANGE
-    mock_prompt = MagicMock()
-    mock_prompt_template_class.from_messages.return_value = mock_prompt
-
     mock_llm = MagicMock()
-    mock_llm_with_tools = MagicMock()
-    mock_llm.bind_tools.return_value = mock_llm_with_tools
     mock_llm_class.return_value = mock_llm
 
-    # Create a chain mock with runnable methods
-    mock_chain = MagicMock()
-    mock_chain.invoke = MagicMock()
-    mock_chain.stream = MagicMock()
-    mock_prompt.__or__ = MagicMock(return_value=mock_chain)
+    # Create an agent mock with invoke method
+    mock_agent = MagicMock()
+    mock_agent.invoke = MagicMock()
+    mock_create_react_agent.return_value = mock_agent
 
     # ACT
     result = create_research_agent_runnable()
 
     # ASSERT
-    # Verify the result has runnable interface methods
+    # Verify the result has agent interface methods
     assert hasattr(result, 'invoke')
-    assert hasattr(result, 'stream')

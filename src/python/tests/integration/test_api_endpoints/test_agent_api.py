@@ -2,11 +2,12 @@
 Integration tests for AI Agent API endpoints.
 
 Tests the chat endpoint which uses Server-Sent Events (SSE) for streaming
-responses from the molecular agent.
+responses from the LangGraph multi-agent dispatcher.
 """
 
 import pytest
 import json
+from langchain_core.messages import HumanMessage, AIMessage
 
 
 class TestAgentChatAPI:
@@ -14,22 +15,31 @@ class TestAgentChatAPI:
 
     def test_chat_success_with_streaming(self, client, mocker):
         """
-        GIVEN MolecularAgent is available and returns streaming response
+        GIVEN LangGraph dispatcher is available and returns streaming response
         WHEN POST /api/agent/chat is called with valid message
         THEN SSE stream is returned with chunks and done event
         """
         # ARRANGE
-        # Mock the agent's chat method to return an iterator
-        def mock_chat_iterator(message, history):
-            yield "This is "
-            yield "a test "
-            yield "response."
+        # Mock the compiled graph
+        mock_graph = mocker.MagicMock()
         
-        mock_agent = mocker.MagicMock()
-        mock_agent.chat.return_value = mock_chat_iterator("test", [])
+        # Mock the stream method to return state updates with AI response
+        def mock_stream(graph_input):
+            # Simulate graph execution returning final state with AI message
+            user_msg = graph_input["messages"][-1]
+            ai_response = AIMessage(content="This is a test response.")
+            final_state = {
+                "molecular": {
+                    "messages": graph_input["messages"] + [ai_response],
+                    "next_node": "end"
+                }
+            }
+            yield final_state
         
-        # Patch get_molecular_agent to return our mock
-        mocker.patch('api.agent.get_molecular_agent', return_value=mock_agent)
+        mock_graph.stream.side_effect = mock_stream
+        
+        # Patch get_compiled_graph to return our mock
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
         # ACT
         response = client.post('/api/agent/chat', json={
@@ -56,7 +66,7 @@ class TestAgentChatAPI:
         """
         GIVEN chat history is provided
         WHEN POST /api/agent/chat is called
-        THEN agent receives the history
+        THEN graph receives the history converted to LangChain format
         """
         # ARRANGE
         chat_history = [
@@ -64,12 +74,23 @@ class TestAgentChatAPI:
             {'role': 'model', 'parts': [{'text': 'Hi there!'}]}
         ]
         
-        def mock_chat_iterator(message, history):
-            yield f"History length: {len(history)}"
+        # Mock the compiled graph
+        mock_graph = mocker.MagicMock()
         
-        mock_agent = mocker.MagicMock()
-        mock_agent.chat.return_value = mock_chat_iterator("test", chat_history)
-        mocker.patch('api.agent.get_molecular_agent', return_value=mock_agent)
+        def mock_stream(graph_input):
+            # Verify history was converted properly (should have 2 history messages + 1 new user message)
+            num_messages = len(graph_input["messages"])
+            ai_response = AIMessage(content=f"Received {num_messages} total messages (including history)")
+            final_state = {
+                "molecular": {
+                    "messages": graph_input["messages"] + [ai_response],
+                    "next_node": "end"
+                }
+            }
+            yield final_state
+        
+        mock_graph.stream.side_effect = mock_stream
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
         # ACT
         response = client.post('/api/agent/chat', json={
@@ -79,10 +100,10 @@ class TestAgentChatAPI:
 
         # ASSERT
         assert response.status_code == 200
-        mock_agent.chat.assert_called_once()
-        call_args = mock_agent.chat.call_args
-        assert call_args[0][0] == 'Continue conversation'
-        assert len(call_args[0][1]) == 2
+        mock_graph.stream.assert_called_once()
+        call_args = mock_graph.stream.call_args
+        # Should have 3 messages total: 2 from history + 1 new user message
+        assert len(call_args[0][0]["messages"]) == 3
 
     def test_chat_empty_message(self, client):
         """
@@ -147,15 +168,17 @@ class TestAgentChatAPI:
         # ASSERT
         assert response.status_code == 400
 
-    def test_chat_agent_not_available_fallback(self, client, mocker):
+    def test_chat_graph_error_handling(self, client, mocker):
         """
-        GIVEN MolecularAgent is not available
+        GIVEN LangGraph raises an exception
         WHEN POST /api/agent/chat is called
-        THEN fallback SSE stream is returned
+        THEN error event is sent in SSE stream
         """
         # ARRANGE
-        # Patch get_molecular_agent to return None (agent not available)
-        mocker.patch('api.agent.get_molecular_agent', return_value=None)
+        # Mock graph to raise an exception
+        mock_graph = mocker.MagicMock()
+        mock_graph.stream.side_effect = Exception("Graph execution error")
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
         # ACT
         response = client.post('/api/agent/chat', json={
@@ -171,29 +194,38 @@ class TestAgentChatAPI:
         data_str = response.data.decode('utf-8')
         lines = [line for line in data_str.split('\n') if line.startswith('data:')]
         
-        # Should contain fallback message
+        # Should contain error event
         assert len(lines) >= 1
-        first_event = json.loads(lines[0].replace('data: ', ''))
-        assert 'not available' in first_event['payload']['text'].lower()
+        events = [json.loads(line.replace('data: ', '')) for line in lines]
+        error_events = [e for e in events if e['type'] == 'error']
+        assert len(error_events) > 0
 
-    def test_chat_agent_error_during_streaming(self, client, mocker):
+    def test_chat_routing_to_molecular_agent(self, client, mocker):
         """
-        GIVEN agent raises exception during streaming
+        GIVEN a molecular chemistry query
         WHEN POST /api/agent/chat is called
-        THEN error event is sent in SSE stream
+        THEN graph routes to molecular agent and returns response
         """
         # ARRANGE
-        def mock_chat_error(message, history):
-            yield "Starting..."
-            raise Exception("Agent internal error")
+        mock_graph = mocker.MagicMock()
         
-        mock_agent = mocker.MagicMock()
-        mock_agent.chat.return_value = mock_chat_error("test", [])
-        mocker.patch('api.agent.get_molecular_agent', return_value=mock_agent)
+        def mock_stream(graph_input):
+            # Simulate routing to molecular agent
+            ai_response = AIMessage(content="HOMO energy calculation result: -0.5 Hartree")
+            final_state = {
+                "molecular": {
+                    "messages": graph_input["messages"] + [ai_response],
+                    "next_node": "end"
+                }
+            }
+            yield final_state
+        
+        mock_graph.stream.side_effect = mock_stream
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
         # ACT
         response = client.post('/api/agent/chat', json={
-            'message': 'Cause an error',
+            'message': 'Calculate HOMO energy for water',
             'history': []
         })
 
@@ -202,24 +234,77 @@ class TestAgentChatAPI:
         data_str = response.data.decode('utf-8')
         lines = [line for line in data_str.split('\n') if line.startswith('data:')]
         
-        # Should contain error event
-        events = [json.loads(line.replace('data: ', '')) for line in lines]
-        error_events = [e for e in events if e['type'] == 'error']
-        assert len(error_events) > 0
+        # Should contain molecular calculation response
+        chunk_events = [json.loads(line.replace('data: ', '')) for line in lines if 'chunk' in line]
+        assert len(chunk_events) > 0
+        
+        # Combine all chunks
+        full_response = ''.join([e['payload']['text'] for e in chunk_events if e['type'] == 'chunk'])
+        assert 'HOMO' in full_response or 'Hartree' in full_response
+
+    def test_chat_routing_to_research_agent(self, client, mocker):
+        """
+        GIVEN a research/paper search query
+        WHEN POST /api/agent/chat is called
+        THEN graph routes to research agent and returns response
+        """
+        # ARRANGE
+        mock_graph = mocker.MagicMock()
+        
+        def mock_stream(graph_input):
+            # Simulate routing to research agent
+            ai_response = AIMessage(content="Found 3 papers on DFT:\n1. Paper Title 1\n2. Paper Title 2")
+            final_state = {
+                "research": {
+                    "messages": graph_input["messages"] + [ai_response],
+                    "next_node": "end"
+                }
+            }
+            yield final_state
+        
+        mock_graph.stream.side_effect = mock_stream
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
+
+        # ACT
+        response = client.post('/api/agent/chat', json={
+            'message': 'Find papers about density functional theory',
+            'history': []
+        })
+
+        # ASSERT
+        assert response.status_code == 200
+        data_str = response.data.decode('utf-8')
+        lines = [line for line in data_str.split('\n') if line.startswith('data:')]
+        
+        # Should contain research response
+        chunk_events = [json.loads(line.replace('data: ', '')) for line in lines if 'chunk' in line]
+        assert len(chunk_events) > 0
+        
+        # Combine all chunks
+        full_response = ''.join([e['payload']['text'] for e in chunk_events if e['type'] == 'chunk'])
+        assert 'papers' in full_response.lower() or 'DFT' in full_response
 
     def test_chat_history_optional(self, client, mocker):
         """
         GIVEN history is empty list
         WHEN POST /api/agent/chat is called
-        THEN agent receives empty history
+        THEN graph receives only the current message
         """
         # ARRANGE
-        def mock_chat_iterator(message, history):
-            yield "Response without history"
+        mock_graph = mocker.MagicMock()
         
-        mock_agent = mocker.MagicMock()
-        mock_agent.chat.return_value = mock_chat_iterator("test", [])
-        mocker.patch('api.agent.get_molecular_agent', return_value=mock_agent)
+        def mock_stream(graph_input):
+            ai_response = AIMessage(content="Response without history")
+            final_state = {
+                "molecular": {
+                    "messages": graph_input["messages"] + [ai_response],
+                    "next_node": "end"
+                }
+            }
+            yield final_state
+        
+        mock_graph.stream.side_effect = mock_stream
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
         # ACT - empty history list
         response = client.post('/api/agent/chat', json={
@@ -229,10 +314,10 @@ class TestAgentChatAPI:
 
         # ASSERT
         assert response.status_code == 200
-        mock_agent.chat.assert_called_once()
-        call_args = mock_agent.chat.call_args
-        # History should be empty list
-        assert call_args[0][1] == []
+        mock_graph.stream.assert_called_once()
+        call_args = mock_graph.stream.call_args
+        # Should have only 1 message (the current user message, no history)
+        assert len(call_args[0][0]["messages"]) == 1
 
     def test_chat_invalid_json(self, client):
         """
@@ -252,20 +337,27 @@ class TestAgentChatAPI:
 
     def test_chat_multiple_chunks_ordering(self, client, mocker):
         """
-        GIVEN agent returns multiple chunks
+        GIVEN graph returns a long response
         WHEN POST /api/agent/chat is called
         THEN chunks are received in correct order
         """
         # ARRANGE
-        expected_chunks = ["First ", "Second ", "Third"]
+        mock_graph = mocker.MagicMock()
         
-        def mock_chat_iterator(message, history):
-            for chunk in expected_chunks:
-                yield chunk
+        def mock_stream(graph_input):
+            # Return a long response that will be chunked
+            long_response = "First Second Third"
+            ai_response = AIMessage(content=long_response)
+            final_state = {
+                "molecular": {
+                    "messages": graph_input["messages"] + [ai_response],
+                    "next_node": "end"
+                }
+            }
+            yield final_state
         
-        mock_agent = mocker.MagicMock()
-        mock_agent.chat.return_value = mock_chat_iterator("test", [])
-        mocker.patch('api.agent.get_molecular_agent', return_value=mock_agent)
+        mock_graph.stream.side_effect = mock_stream
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
         # ACT
         response = client.post('/api/agent/chat', json={
@@ -279,27 +371,35 @@ class TestAgentChatAPI:
         lines = [line for line in data_str.split('\n') if line.startswith('data:')]
         
         # Parse chunk events (exclude done event)
-        chunk_events = [json.loads(line.replace('data: ', '')) for line in lines[:-1]]
+        chunk_events = [json.loads(line.replace('data: ', '')) for line in lines if 'chunk' in line]
         
-        # Verify chunks are in correct order
-        assert len(chunk_events) == 3
-        for i, expected_chunk in enumerate(expected_chunks):
-            assert chunk_events[i]['type'] == 'chunk'
-            assert chunk_events[i]['payload']['text'] == expected_chunk
+        # Verify we received chunks
+        assert len(chunk_events) > 0
+        # Combine all chunks to verify complete message
+        full_response = ''.join([e['payload']['text'] for e in chunk_events if e['type'] == 'chunk'])
+        assert full_response == "First Second Third"
 
     def test_chat_response_format(self, client, mocker):
         """
-        GIVEN agent returns response
+        GIVEN graph returns response
         WHEN POST /api/agent/chat is called
         THEN SSE events have correct format
         """
         # ARRANGE
-        def mock_chat_iterator(message, history):
-            yield "Test response"
+        mock_graph = mocker.MagicMock()
         
-        mock_agent = mocker.MagicMock()
-        mock_agent.chat.return_value = mock_chat_iterator("test", [])
-        mocker.patch('api.agent.get_molecular_agent', return_value=mock_agent)
+        def mock_stream(graph_input):
+            ai_response = AIMessage(content="Test response")
+            final_state = {
+                "molecular": {
+                    "messages": graph_input["messages"] + [ai_response],
+                    "next_node": "end"
+                }
+            }
+            yield final_state
+        
+        mock_graph.stream.side_effect = mock_stream
+        mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
         # ACT
         response = client.post('/api/agent/chat', json={

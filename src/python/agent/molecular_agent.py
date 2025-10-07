@@ -19,6 +19,40 @@ from generated_models import HistoryItem
 logger = logging.getLogger(__name__)
 
 
+def get_gemini_api_key() -> Optional[str]:
+    """
+    Get Gemini API key from environment variable or settings file.
+    
+    This is a utility function that can be used by any module that needs
+    to access the Gemini API key.
+    
+    Priority:
+        1. Environment variable: GEMINI_API_KEY
+        2. Settings file: settings.gemini_api_key
+        3. None (fallback)
+    
+    Returns:
+        Optional[str]: API key if found, None otherwise
+    """
+    # Priority 1: Environment variable
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        logger.debug("Using Gemini API key from environment variable")
+        return api_key
+
+    # Priority 2: Settings file
+    try:
+        settings = get_current_settings()
+        if settings.gemini_api_key:
+            logger.debug("Using Gemini API key from settings file")
+            return settings.gemini_api_key
+    except Exception as e:
+        logger.warning(f"Failed to load settings for API key: {e}")
+
+    # Priority 3: None (fallback)
+    return None
+
+
 class MolecularAgent:
     """AI agent for molecular analysis and quantum chemistry assistance."""
 
@@ -53,23 +87,7 @@ class MolecularAgent:
     
     def _get_api_key(self) -> Optional[str]:
         """Get Gemini API key from environment variable or settings file."""
-        # Priority 1: Environment variable
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key:
-            logger.debug("Using Gemini API key from environment variable")
-            return api_key
-
-        # Priority 2: Settings file
-        try:
-            settings = get_current_settings()
-            if settings.gemini_api_key:
-                logger.debug("Using Gemini API key from settings file")
-                return settings.gemini_api_key
-        except Exception as e:
-            logger.warning(f"Failed to load settings for API key: {e}")
-
-        # Priority 3: None (fallback)
-        return None
+        return get_gemini_api_key()
 
     def _load_agent_config(self) -> Dict[str, Any]:
         """Load AI agent configuration from server-config.json with fallback defaults."""
@@ -138,23 +156,36 @@ class MolecularAgent:
         ]
 
     def _convert_history_to_gemini_format(self, history: List[HistoryItem]) -> List[Dict[str, Any]]:
-        """Convert frontend chat history to Gemini API format."""
+        """Convert frontend chat history to Gemini API format.
+        
+        Handles both Pydantic HistoryItem objects and plain dictionaries,
+        ensuring compatibility with both direct API calls and LangGraph dispatcher.
+        """
         gemini_history = []
         
         for item in history:
-            # Extract role (default to 'user')
-            role = item.role.value if item.role else 'user'
+            # Handle both dict and Pydantic model objects
+            if isinstance(item, dict):
+                role = item.get("role", "user")
+                parts = item.get("parts", [])
+            else:
+                # Pydantic model (HistoryItem)
+                role = item.role.value if item.role else 'user'
+                parts = item.parts or []
             
-            # Extract text from first part if available
+            # Extract text from all parts
             text_content = ""
-            if item.parts and len(item.parts) > 0 and item.parts[0].text:
-                text_content = item.parts[0].text.strip()
+            for part in parts:
+                if isinstance(part, dict) and "text" in part:
+                    text_content += part["text"]
+                elif hasattr(part, "text") and part.text:
+                    text_content += part.text
             
             # Only add non-empty messages
-            if text_content:
+            if text_content.strip():
                 gemini_history.append({
                     "role": role,
-                    "parts": [{"text": text_content}]
+                    "parts": [{"text": text_content.strip()}]
                 })
         
         return gemini_history

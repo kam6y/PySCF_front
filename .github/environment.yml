@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3.12.11
   # Core scientific computing libraries
+  - numpy>=2.0,<2.3  # longdouble問題を回避するため2.3より前のバージョンを使用
   - pyscf=2.10.0
   - rdkit=2025.03.6
   - geometric=1.1

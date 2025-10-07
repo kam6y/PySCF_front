@@ -283,6 +283,7 @@ const createCleanEnvironment = (
   // macOS ARM64のNumPy初期化問題対策
   if (process.platform === 'darwin' && process.arch === 'arm64') {
     cleanEnv.OPENBLAS_CORETYPE = 'ARMV8';
+    cleanEnv.LC_ALL = 'C'; // longdouble初期化問題の回避
   }
 
   return cleanEnv;
