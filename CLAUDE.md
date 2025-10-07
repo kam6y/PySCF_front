@@ -1,4 +1,4 @@
-This file provides guidance to Claude when working with code in this repository.
+This file provides guidance to Claude when working with code in this repository. Your partner is Japanese, so please always report in Japanese.
 
 Project Overview
 This is PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
@@ -19,6 +19,38 @@ Clean up legacy code - Remove old implementations when better alternatives are a
 Focus on the best solution - Don't compromise design quality for compatibility with older versions.
 
 This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
+
+AI Development Guidelines
+When working with external libraries, frameworks, or implementing new features, Claude should ALWAYS:
+
+**Verify Current API Documentation First**
+
+Before writing any code that uses external libraries (LangChain, LangGraph, Flask, React, etc.), ALWAYS use Web Search and Context7 tools to verify the current API:
+```
+1. Use WebSearch to find recent updates and breaking changes (e.g., "langgraph 2025 API changes")
+2. Use Context7 to fetch the latest official documentation for the specific library
+3. Check for deprecated parameters or methods in the current version
+```
+
+**Mandatory Checks**
+- API parameter names and signatures (they change frequently!)
+- Deprecated methods or parameters
+- New recommended patterns or best practices
+- Breaking changes in recent versions
+
+**Example Workflow**
+
+When implementing a feature with LangGraph:
+```
+1. WebSearch: "langgraph stream messages 2025" to find recent changes
+2. Context7: Fetch /langchain-ai/langgraph docs for "create_react_agent parameters"
+3. Verify the exact parameter names (e.g., prompt vs messages_modifier vs stateModifier)
+4. Write code using the verified, current API
+```
+
+**Why This Matters**
+
+Libraries like LangChain and LangGraph update frequently, and parameters/methods get renamed or deprecated. Using outdated APIs leads to runtime errors that could have been avoided. Always verify before coding.
 
 Development Commands
 Initial Setup
