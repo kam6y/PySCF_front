@@ -1,7 +1,7 @@
 // src/main.ts
 
 import path from 'node:path';
-import { BrowserWindow, app, ipcMain, dialog } from 'electron';
+import { BrowserWindow, app, ipcMain, dialog, shell } from 'electron';
 import { spawn, ChildProcess } from 'child_process';
 import http from 'node:http';
 import { execFile } from 'child_process';
@@ -724,3 +724,22 @@ app.on('before-quit', () => {
 
 // IPC handler for renderer to get port (fallback)
 ipcMain.handle('get-flask-port', () => flaskPort);
+
+// IPC handler for opening external URLs in default browser
+ipcMain.handle('open-external-url', async (_event, url: string) => {
+  try {
+    // Security: Only allow http and https protocols
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      console.warn(`Blocked attempt to open non-http(s) URL: ${url}`);
+      return { success: false, error: 'Only HTTP and HTTPS URLs are allowed' };
+    }
+
+    console.log(`Opening external URL in default browser: ${url}`);
+    await shell.openExternal(url);
+    return { success: true };
+  } catch (error) {
+    console.error(`Failed to open external URL: ${url}`, error);
+    return { success: false, error: String(error) };
+  }
+});

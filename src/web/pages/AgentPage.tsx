@@ -656,6 +656,42 @@ export const AgentPage = () => {
                               </code>
                             );
                           },
+                          a: ({ href, children, ...props }: any) => {
+                            // Handle external links - open in default browser
+                            const handleClick = async (e: React.MouseEvent) => {
+                              if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+                                e.preventDefault();
+                                try {
+                                  const result = await window.electronAPI.openExternalUrl(href);
+                                  if (!result.success) {
+                                    console.error('Failed to open URL:', result.error);
+                                    addNotification({
+                                      type: 'error',
+                                      title: 'Failed to open link',
+                                      message: result.error || 'Could not open the URL in your browser.',
+                                      autoClose: true,
+                                      duration: 5000,
+                                    });
+                                  }
+                                } catch (error) {
+                                  console.error('Error opening external URL:', error);
+                                  addNotification({
+                                    type: 'error',
+                                    title: 'Failed to open link',
+                                    message: 'An unexpected error occurred.',
+                                    autoClose: true,
+                                    duration: 5000,
+                                  });
+                                }
+                              }
+                            };
+
+                            return (
+                              <a href={href} onClick={handleClick} {...props}>
+                                {children}
+                              </a>
+                            );
+                          },
                         }}
                       >
                         {entry.parts[0].text}
