@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
-import { useAgentStore, ChatHistory } from '../store/agentStore';
+import { useAgentStore, ChatHistory, AgentStatus } from '../store/agentStore';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { InlineOrbitalViewer } from '../components/InlineOrbitalViewer';
 import styles from './AgentPage.module.css';
@@ -41,12 +41,14 @@ const parseOrbitalViewerParams = (code: string): Record<string, any> => {
 };
 
 export const AgentPage = () => {
-  // Zustandストアから会話履歴を取得
+  // Zustandストアから会話履歴とエージェントステータスを取得
   const history = useAgentStore(state => state.history);
+  const currentAgentStatus = useAgentStore(state => state.currentAgentStatus);
   const addMessage = useAgentStore(state => state.addMessage);
   const updateMessage = useAgentStore(state => state.updateMessage);
   const setHistory = useAgentStore(state => state.setHistory);
   const clearHistory = useAgentStore(state => state.clearHistory);
+  const setAgentStatus = useAgentStore(state => state.setAgentStatus);
 
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -317,8 +319,18 @@ export const AgentPage = () => {
             });
           }
         },
+        onAgentStatus: (status, agent) => {
+          // エージェントステータスを更新
+          const agentName = agent as 'supervisor' | 'quantum_calculation_worker' | 'research_expert';
+          const agentStatus: AgentStatus = {
+            agent: agentName,
+            status: status === 'running' ? 'running' : status === 'responding' ? 'responding' : 'idle'
+          };
+          setAgentStatus(agentStatus);
+        },
         onClose: () => {
           setIsLoading(false);
+          setAgentStatus({ agent: null, status: 'idle' }); // ステータスをリセット
           const currentHistory = useAgentStore.getState().history;
           const lastIndex = currentHistory.length - 1;
           const lastMessage = currentHistory[lastIndex];
@@ -345,6 +357,7 @@ export const AgentPage = () => {
         },
         onError: err => {
           setIsLoading(false);
+          setAgentStatus({ agent: null, status: 'idle' }); // エラー時もステータスをリセット
           setError(err.message);
           const currentHistory = useAgentStore.getState().history;
           const lastIndex = currentHistory.length - 1;
@@ -373,7 +386,7 @@ export const AgentPage = () => {
         },
       }
     );
-  }, [currentMessage, history, isLoading, addNotification]);
+  }, [currentMessage, history, isLoading, addNotification, setAgentStatus]);
 
   // Enter키で送信（Shift+Enterで改行）
   const handleKeyDown = useCallback(
@@ -444,6 +457,16 @@ export const AgentPage = () => {
     </div>
   );
 
+  // エージェント表示名を取得
+  const getAgentDisplayName = (agent: string) => {
+    const names: Record<string, string> = {
+      'supervisor': 'Supervisor',
+      'quantum_calculation_worker': 'Quantum Calculation Worker',
+      'research_expert': 'Research Expert'
+    };
+    return names[agent] || agent;
+  };
+
   return (
     <div className={styles.agentPageContainer}>
       {/* Clear button */}
@@ -472,6 +495,7 @@ export const AgentPage = () => {
           </button>
         </div>
       )}
+
       <div className={styles.chatWindow} ref={chatWindowRef}>
         {history.length === 0 ? (
           renderEmptyState()
@@ -710,6 +734,30 @@ export const AgentPage = () => {
           </>
         )}
       </div>
+
+      {/* エージェントステータス表示 */}
+      {currentAgentStatus.agent && currentAgentStatus.status !== 'idle' && (
+        <div className={styles.agentStatusBar}>
+          <div className={styles.statusIndicator}>
+            {currentAgentStatus.status === 'running' && (
+              <>
+                <div className={styles.spinner} />
+                <span>{getAgentDisplayName(currentAgentStatus.agent)}が動作中...</span>
+              </>
+            )}
+            {currentAgentStatus.status === 'responding' && (
+              <>
+                <div className={styles.typingDots}>
+                  <div className={styles.typingDot}></div>
+                  <div className={styles.typingDot}></div>
+                  <div className={styles.typingDot}></div>
+                </div>
+                <span>Supervisorが応答を生成中...</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className={styles.inputArea}>
         <textarea

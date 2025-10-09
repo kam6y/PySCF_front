@@ -11,7 +11,7 @@ responses to research-related queries.
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .tools import search_arxiv
-from agent.molecular_agent import get_gemini_api_key
+from agent.quantum_calc.quantum_calc_worker import get_gemini_api_key
 
 
 # System prompt for the Research Agent
@@ -61,7 +61,8 @@ def create_research_agent_runnable():
     agent = create_react_agent(
         llm,
         tools=[search_arxiv],
+        name="research_expert",
         prompt=RESEARCH_AGENT_PROMPT
     )
-    
+
     return agent

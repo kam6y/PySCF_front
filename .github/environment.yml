@@ -45,5 +45,6 @@ dependencies:
     - langchain==0.3.27
     - langgraph==0.6.8
     - langchain-google-genai==2.1.12
+    - langgraph-supervisor>=0.0.29
     # arXiv API client for research agent
     - arxiv

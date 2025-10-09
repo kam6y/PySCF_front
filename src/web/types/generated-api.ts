@@ -311,7 +311,13 @@ export interface paths {
         put?: never;
         /**
          * Chat with AI agent
-         * @description Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
+         * @description Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+         *
+         *     SSE Event Types:
+         *     - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
+         *     - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+         *     - `done`: Stream completion - `{"type": "done"}`
+         *     - `error`: Error occurred - `{"type": "error", "payload": {"message": "..."}}`
          *
          */
         post: operations["streamChatWithAgent"];

@@ -309,7 +309,7 @@ def test_molecular_agent_node_handles_empty_response(mock_agent_class):
 # Research Agent Node Tests
 # ============================================================================
 
-@patch('research.agent.create_research_agent_runnable')
+@patch('agent.research.agent.create_research_agent_runnable')
 def test_research_agent_node_success(mock_create_runnable):
     """
     GIVEN research_agent_node is called with valid state
@@ -338,7 +338,7 @@ def test_research_agent_node_success(mock_create_runnable):
     mock_runnable.invoke.assert_called_once_with({"input": "Find papers about CASSCF"})
 
 
-@patch('research.agent.create_research_agent_runnable')
+@patch('agent.research.agent.create_research_agent_runnable')
 def test_research_agent_node_handles_string_response(mock_create_runnable):
     """
     GIVEN ResearchAgent returns a plain string
@@ -363,7 +363,7 @@ def test_research_agent_node_handles_string_response(mock_create_runnable):
     assert result["messages"][1].content == "String response"
 
 
-@patch('research.agent.create_research_agent_runnable')
+@patch('agent.research.agent.create_research_agent_runnable')
 def test_research_agent_node_handles_error(mock_create_runnable):
     """
     GIVEN ResearchAgent raises an exception
@@ -390,7 +390,7 @@ def test_research_agent_node_handles_error(mock_create_runnable):
     assert "arXiv connection error" in result["messages"][1].content
 
 
-@patch('research.agent.create_research_agent_runnable')
+@patch('agent.research.agent.create_research_agent_runnable')
 def test_research_agent_node_handles_empty_response(mock_create_runnable):
     """
     GIVEN ResearchAgent returns empty content
@@ -481,7 +481,7 @@ def test_graph_execution_molecular_pathway(mock_llm_class, mock_agent_class):
     assert result["messages"][1].content == "Molecular response"
 
 
-@patch('research.agent.create_research_agent_runnable')
+@patch('agent.research.agent.create_research_agent_runnable')
 @patch('agent.graph.ChatGoogleGenerativeAI')
 def test_graph_execution_research_pathway(mock_llm_class, mock_create_runnable):
     """
@@ -577,7 +577,7 @@ def test_molecular_agent_node_with_empty_state(mock_agent_class):
     assert "No messages found in conversation state" in result["messages"][0].content
 
 
-@patch('research.agent.create_research_agent_runnable')
+@patch('agent.research.agent.create_research_agent_runnable')
 def test_research_agent_node_with_empty_state(mock_create_runnable):
     """
     GIVEN state with no messages

@@ -606,7 +606,18 @@ paths:
       summary: Chat with AI agent
       description: >
         Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE).
-        The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
+        The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+
+
+        SSE Event Types:
+
+        - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
+
+        - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+
+        - `done`: Stream completion - `{"type": "done"}`
+
+        - `error`: Error occurred - `{"type": "error", "payload": {"message": "..."}}`
       operationId: streamChatWithAgent
       requestBody:
         required: true
@@ -626,8 +637,14 @@ paths:
                 type: string
                 description: >
                   Server-Sent Events stream where each event contains JSON data.
-                  Event types include 'chunk' (text data), 'error' (error message), and 'done' (stream completion).
+                  Event types include 'chunk' (text data), 'agent_status' (agent execution status), 'error' (error message), and 'done' (stream completion).
                 example: |
+                  data: {"type": "agent_status", "payload": {"status": "running", "agent": "research_expert"}}
+
+                  data: {"type": "agent_status", "payload": {"status": "completed", "agent": "research_expert"}}
+
+                  data: {"type": "agent_status", "payload": {"status": "responding", "agent": "supervisor"}}
+
                   data: {"type": "chunk", "payload": {"text": "Hello, "}}
 
                   data: {"type": "chunk", "payload": {"text": "how can I "}}

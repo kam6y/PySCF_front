@@ -488,6 +488,7 @@ export const streamChatWithAgent = (
     onMessage: (chunk: string) => void;
     onClose: () => void;
     onError: (error: Error) => void;
+    onAgentStatus?: (status: 'running' | 'completed' | 'responding', agent: string) => void;
   }
 ) => {
   const ctrl = new AbortController();
@@ -544,6 +545,15 @@ export const streamChatWithAgent = (
 
         if (parsedData.type === 'chunk' && parsedData.payload?.text) {
           callbacks.onMessage(parsedData.payload.text);
+        } else if (parsedData.type === 'agent_status' && parsedData.payload) {
+          // New event type: Agent status update
+          debug('Agent status update received', {
+            status: parsedData.payload.status,
+            agent: parsedData.payload.agent,
+          });
+          if (callbacks.onAgentStatus) {
+            callbacks.onAgentStatus(parsedData.payload.status, parsedData.payload.agent);
+          }
         } else if (parsedData.type === 'done') {
           debug('Stream completed');
           isStreamClosed = true;

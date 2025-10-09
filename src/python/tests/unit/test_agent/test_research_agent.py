@@ -8,7 +8,7 @@ components to verify runnable creation, prompt configuration, and tool binding.
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 
-from research.agent import create_research_agent_runnable, RESEARCH_AGENT_PROMPT
+from agent.agent.research.agent import create_research_agent_runnable, RESEARCH_AGENT_PROMPT
 
 
 # ============================================================================
@@ -16,7 +16,7 @@ from research.agent import create_research_agent_runnable, RESEARCH_AGENT_PROMPT
 # ============================================================================
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_runnable_returns_runnable(
     mock_llm_class,
     mock_create_react_agent
@@ -44,8 +44,8 @@ def test_create_research_agent_runnable_returns_runnable(
 
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.get_gemini_api_key')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.get_gemini_api_key')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_uses_correct_model(
     mock_llm_class,
     mock_get_api_key,
@@ -77,7 +77,7 @@ def test_create_research_agent_uses_correct_model(
 # ============================================================================
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_calls_create_react_agent(
     mock_llm_class,
     mock_create_react_agent
@@ -111,7 +111,7 @@ def test_create_research_agent_calls_create_react_agent(
 
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_uses_research_system_prompt(
     mock_llm_class,
     mock_create_react_agent
@@ -141,8 +141,8 @@ def test_create_research_agent_uses_research_system_prompt(
 # ============================================================================
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
-@patch('research.agent.search_arxiv')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.search_arxiv')
 def test_create_research_agent_binds_search_tool(
     mock_search_arxiv,
     mock_llm_class,
@@ -244,7 +244,7 @@ def test_research_agent_prompt_is_not_empty():
 # ============================================================================
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_returns_agent(
     mock_llm_class,
     mock_create_react_agent
@@ -273,7 +273,7 @@ def test_create_research_agent_returns_agent(
 # ============================================================================
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_full_pipeline(
     mock_llm_class,
     mock_create_react_agent
@@ -308,7 +308,7 @@ def test_create_research_agent_full_pipeline(
 # ============================================================================
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_handles_llm_initialization_error(
     mock_llm_class,
     mock_create_react_agent
@@ -327,7 +327,7 @@ def test_create_research_agent_handles_llm_initialization_error(
 
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_handles_agent_creation_error(
     mock_llm_class,
     mock_create_react_agent
@@ -355,7 +355,7 @@ def test_create_research_agent_handles_agent_creation_error(
 # ============================================================================
 
 @patch('langgraph.prebuilt.create_react_agent')
-@patch('research.agent.ChatGoogleGenerativeAI')
+@patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_returns_invokable_object(
     mock_llm_class,
     mock_create_react_agent
