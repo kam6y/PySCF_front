@@ -21,6 +21,23 @@ logger = logging.getLogger(__name__)
 MAX_MESSAGE_LENGTH = 100000  # Maximum allowed message length in characters
 
 
+def _is_internal_transfer_message(content: str) -> bool:
+    """
+    Check if a message is an internal transfer message that should be filtered out.
+    
+    Args:
+        content: Message content to check
+        
+    Returns:
+        True if the message is an internal transfer message, False otherwise
+    """
+    internal_patterns = [
+        "Successfully transferred to",
+        "Successfully transferred back to",
+    ]
+    return any(pattern in content for pattern in internal_patterns)
+
+
 def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
     """
     Format a Server-Sent Event message.
@@ -186,6 +203,11 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                                 # Get the last message
                                 last_message = messages[-1]
                                 if hasattr(last_message, "content") and last_message.content:
+                                    # Filter out internal transfer messages
+                                    if _is_internal_transfer_message(last_message.content):
+                                        logger.debug(f"Filtering internal transfer message: {last_message.content[:100]}")
+                                        continue
+                                    
                                     # Notify that supervisor is responding
                                     if not supervisor_response_started:
                                         logger.info("Supervisor started generating response")
@@ -218,6 +240,11 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                         if messages:
                             last_message = messages[-1]
                             if hasattr(last_message, "content") and last_message.content:
+                                # Filter out internal transfer messages
+                                if _is_internal_transfer_message(last_message.content):
+                                    logger.debug(f"Filtering internal transfer message: {last_message.content[:100]}")
+                                    continue
+                                
                                 # Notify that supervisor is responding
                                 if not supervisor_response_started:
                                     logger.info("Supervisor started generating response")
