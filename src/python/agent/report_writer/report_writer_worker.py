@@ -83,18 +83,39 @@ def _get_fallback_system_prompt() -> str:
     )
 
 
+def _initialize_tools():
+    """Initialize and return the list of available tools for the Report Writer."""
+    from . import tools
+
+    return [
+        # Calculation data retrieval
+        tools.get_calculation_details,
+
+        # Molecular orbital analysis
+        tools.get_molecular_orbitals,
+        tools.generate_orbital_cube,
+        tools.list_cube_files,
+        tools.delete_cube_files,
+
+        # Spectroscopy
+        tools.generate_ir_spectrum,
+    ]
+
+
 def create_report_writer():
     """
     Create a Report Writer agent using LangGraph's create_react_agent.
 
     This worker specializes in:
+    - Retrieving and interpreting quantum chemistry calculation results
+    - Analyzing molecular orbitals and spectroscopy data
     - Creating comprehensive scientific reports
     - Synthesizing information from multiple sources
     - Generating calculation reports and literature reviews
     - Formatting professional documentation in Japanese or English
 
-    The Report Writer does not use tools, relying entirely on the LLM's
-    language generation capabilities to produce high-quality reports.
+    The Report Writer uses tools to access calculation results, molecular orbital data,
+    and spectroscopy information, then synthesizes this data into well-structured reports.
 
     Returns:
         A compiled LangGraph ReAct agent ready for use in supervisor workflows
@@ -123,9 +144,9 @@ def create_report_writer():
     # Load system prompt
     system_prompt = _load_system_prompt()
 
-    # Report Writer does not use tools - it purely generates text based on LLM capabilities
-    tools = []
-    logger.debug("Report Writer initialized with no tools (pure text generation)")
+    # Initialize tools for accessing and analyzing calculation results
+    tools = _initialize_tools()
+    logger.debug(f"Report Writer initialized with {len(tools)} tools for result analysis")
 
     # Create ReAct agent using LangGraph prebuilt
     agent = create_react_agent(

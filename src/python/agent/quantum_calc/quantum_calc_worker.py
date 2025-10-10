@@ -99,15 +99,6 @@ def _initialize_tools():
         tools.convert_smiles_to_xyz,
         tools.validate_xyz_format,
 
-        # Molecular orbital analysis
-        tools.get_molecular_orbitals,
-        tools.generate_orbital_cube,
-        tools.list_cube_files,
-        tools.delete_cube_files,
-
-        # Spectroscopy
-        tools.generate_ir_spectrum,
-
         # System and settings
         tools.get_supported_parameters,
         tools.get_app_settings,
