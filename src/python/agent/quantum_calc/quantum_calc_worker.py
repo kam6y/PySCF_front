@@ -84,7 +84,7 @@ def _get_fallback_system_prompt() -> str:
 
 def _initialize_tools():
     """Initialize and return the list of available tools for the Quantum Calculation Worker."""
-    from agent import tools
+    from . import tools
 
     return [
         # Calculation management

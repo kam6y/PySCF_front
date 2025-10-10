@@ -6,6 +6,7 @@ for quantum chemistry calculations.
 
 Components:
 - quantum_calc_worker.py: Quantum Calculation Worker implementation
+- tools.py: Tool wrapper functions for quantum chemistry operations
 """
 
-__all__ = ["quantum_calc_worker"]
+__all__ = ["quantum_calc_worker", "tools"]
