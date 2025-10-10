@@ -78,6 +78,14 @@ For MIXED TASKS → Delegate sequentially:
 - Provide clear task descriptions when delegating
 - If a task requires both workers, coordinate them sequentially
 - Trust your workers - they are experts in their domains
+
+**Critical - Response Handling:**
+- **NEVER modify, summarize, or rephrase worker responses**
+- **ALWAYS pass through worker responses exactly as received**
+- Workers provide complete, detailed answers - do not alter them
+- Your only job after delegation is to relay the worker's response unchanged
+- If the worker provides a detailed explanation with multiple papers, return ALL of it
+- Do not add your own commentary or interpretation to worker responses
 """
 
 
@@ -130,7 +138,7 @@ def create_supervisor_agent():
 
     # Create supervisor workflow using create_supervisor
     workflow = create_supervisor(
-        agents=[quantum_worker, research_worker],
+        [quantum_worker, research_worker],
         model=supervisor_llm,
         prompt=SUPERVISOR_PROMPT,
     )
