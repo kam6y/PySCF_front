@@ -14,6 +14,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
 from agent.quantum_calc.quantum_calc_worker import create_quantum_calculation_worker, get_gemini_api_key
 from agent.research.agent import create_research_agent_runnable
+from agent.report_writer.report_writer_worker import create_report_writer
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -51,6 +52,17 @@ Your role is to:
   * Providing formatted citations with PDF links
 - Use for: Literature searches, finding papers, research summaries, academic references
 
+**report_writer** - Scientific Report Generation Expert
+- Handles: Creating comprehensive scientific reports and documentation
+- Capabilities:
+  * Generating structured calculation reports from quantum chemistry results
+  * Creating literature review documents from research findings
+  * Synthesizing information from multiple sources into coherent reports
+  * Formatting scientific documents with proper structure, tables, and citations
+  * Writing in Japanese or English based on user preference
+  * Producing executive summaries and technical documentation
+- Use for: Report generation, documentation creation, summary writing, formal scientific reports
+
 **Decision Guidelines:**
 
 For QUANTUM CALCULATIONS and MOLECULAR TASKS → Use **quantum_calculation_worker**:
@@ -68,15 +80,25 @@ For LITERATURE SEARCH and ACADEMIC PAPERS → Use **research_expert**:
 - "Show me research on excited states"
 - "Literature review on quantum chemistry methods"
 
-For MIXED TASKS → Delegate sequentially:
-1. Start with **research_expert** to gather literature context
-2. Then use **quantum_calculation_worker** to perform calculations based on findings
+For REPORT GENERATION and DOCUMENTATION → Use **report_writer**:
+- "Create a report on this calculation"
+- "Write a summary of these findings"
+- "Generate a comprehensive report"
+- "Prepare documentation for this analysis"
+- "Create a literature review report"
+- "Write a technical summary"
+
+For COMPLEX WORKFLOWS → Delegate sequentially:
+1. **Calculation + Report**: Use **quantum_calculation_worker** first, then **report_writer** to document results
+2. **Research + Report**: Use **research_expert** first, then **report_writer** to create literature review
+3. **Calculation + Research + Report**: Use **quantum_calculation_worker**, then **research_expert** for context, finally **report_writer** to integrate findings
+4. **Research + Calculation**: Use **research_expert** to gather literature context, then **quantum_calculation_worker** to perform calculations based on findings
 
 **Important:**
 - Always choose the most specialized worker for the task
 - Be decisive - analyze the request and delegate immediately
 - Provide clear task descriptions when delegating
-- If a task requires both workers, coordinate them sequentially
+- If a task requires multiple workers, coordinate them sequentially
 - Trust your workers - they are experts in their domains
 
 **Critical - Response Handling:**
@@ -96,6 +118,7 @@ def create_supervisor_agent():
     The Supervisor coordinates between:
     - Quantum Calculation Worker (quantum chemistry and molecular analysis)
     - Research Agent (academic literature search)
+    - Report Writer (scientific report generation)
 
     Returns:
         A compiled LangGraph Supervisor workflow ready for execution
@@ -129,6 +152,13 @@ def create_supervisor_agent():
         logger.error(f"Failed to create Research Agent: {e}", exc_info=True)
         raise
 
+    try:
+        report_writer_worker = create_report_writer()
+        logger.info("Report Writer initialized")
+    except Exception as e:
+        logger.error(f"Failed to create Report Writer: {e}", exc_info=True)
+        raise
+
     # Initialize Supervisor LLM (using more capable model for coordination)
     supervisor_llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
@@ -138,7 +168,7 @@ def create_supervisor_agent():
 
     # Create supervisor workflow using create_supervisor
     workflow = create_supervisor(
-        [quantum_worker, research_worker],
+        [quantum_worker, research_worker, report_writer_worker],
         model=supervisor_llm,
         prompt=SUPERVISOR_PROMPT,
     )
