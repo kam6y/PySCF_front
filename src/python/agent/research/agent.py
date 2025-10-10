@@ -4,109 +4,105 @@ Research Agent Module
 This module implements the Research Agent, which specializes in searching and
 summarizing academic papers from sources like arXiv.
 
-The Research Agent uses LangChain and Google's Gemini model to provide intelligent
-responses to research-related queries.
+The Research Agent uses LangGraph's create_react_agent pattern with Google Gemini
+for intelligent literature search and analysis.
 """
 
+import logging
+from pathlib import Path
 from flask import current_app
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .tools import search_arxiv
 from agent.quantum_calc.quantum_calc_worker import get_gemini_api_key
 
+# Set up logging
+logger = logging.getLogger(__name__)
 
-# System prompt for the Research Agent
-RESEARCH_AGENT_PROMPT = """You are a specialized research assistant for academic literature search.
 
-Your primary role is to help users find and understand relevant academic papers,
-particularly in the fields of:
-- Quantum Chemistry
-- Computational Chemistry
-- Molecular Physics
-- Density Functional Theory
-- Electronic Structure Theory
+def _load_system_prompt() -> str:
+    """Load the system prompt for the Research Expert."""
+    try:
+        # Try to load system prompt from file
+        prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
 
-**Important Instructions:**
+        if prompt_path.exists():
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                prompt = f.read()
+            logger.debug(f"Loaded system prompt from {prompt_path}")
+            return prompt
+        else:
+            logger.warning(f"System prompt file not found at {prompt_path}, using fallback")
+            return _get_fallback_system_prompt()
 
-1. **Search Strategy:**
-   - Use the search_arxiv tool to find relevant papers
-   - Always search with appropriate English keywords, even if the user asks in another language
-   - Retrieve multiple papers when appropriate (3-5 papers for broad topics)
+    except Exception as e:
+        logger.error(f"Failed to load system prompt from file: {e}, using fallback")
+        return _get_fallback_system_prompt()
 
-2. **Response Format:**
-   - **Always provide detailed explanations** of each paper's key findings and contributions
-   - Summarize the abstract/summary in an accessible, easy-to-understand way
-   - Explain technical concepts in simpler terms when possible
-   - Highlight the main methodologies, results, and conclusions
-   - Organize multiple papers by relevance or chronological order
 
-3. **Language Adaptation:**
-   - If the user asks in Japanese, respond in Japanese
-   - If the user asks in English, respond in English
-   - Always maintain the same language as the user's query in your explanations
-
-4. **Citations and Links:**
-   - Provide clickable PDF links for all papers
-   - Include author names and publication dates
-   - Use Markdown formatting for readability
-
-5. **Content Guidelines:**
-   - Don't just list paper titles - explain what each paper discovered or proposed
-   - Connect papers to the user's specific question when possible
-   - If papers are highly technical, provide a simplified explanation first
-
-**Example Response Structure:**
-
-For a query about "organic photocatalysts":
-
-"有機光触媒に関する論文を検索し、その概要を説明します。これらの論文は、室内VOCs除去、バイオマス変換、水素発生、太陽燃料生成、水質汚染処理など、様々な応用における有機光触媒の利用と開発について言及しています。
-
-1. **[Paper Title]** (Authors, Year)
-   
-   この研究では、[main contribution/finding]について報告しています。具体的には、[methodology]を用いて[results]を達成しました。これは[significance/impact]において重要な成果です。
-   
-   📄 [PDF Link]
-
-2. **[Paper Title]** (Authors, Year)
-   
-   [Detailed explanation of the paper's content]
-   
-   📄 [PDF Link]
-
-ご希望に応じて、さらに詳細な情報を提供したり、特定の論文について深掘りしたりすることも可能です。"
-
-Always cite your sources and provide direct links to papers when available.
-"""
+def _get_fallback_system_prompt() -> str:
+    """Fallback system prompt in case file loading fails."""
+    return (
+        "You are a Research Expert specializing in academic literature search for "
+        "quantum chemistry and computational chemistry. Use the search_arxiv tool to find "
+        "relevant papers and provide detailed explanations of their findings. Always explain "
+        "papers in detail, not just listing titles."
+    )
 
 
 def create_research_agent_runnable():
     """
-    Create a LangChain ReAct agent for the research agent.
+    Create a Research Expert agent using LangGraph's create_react_agent.
 
-    This agent uses LangGraph's create_react_agent to automatically handle
+    This worker specializes in:
+    - Academic literature search (arXiv)
+    - Paper analysis and summarization
+    - Identifying trends and developments in quantum chemistry research
+    - Providing formatted citations with PDF links
+
+    The agent uses LangGraph's create_react_agent pattern to automatically handle
     tool execution loops, allowing the LLM to call search_arxiv and process results.
 
     Returns:
-        A compiled LangGraph agent that processes research queries with tool execution
+        A compiled LangGraph ReAct agent ready for use in supervisor workflows
+
+    Raises:
+        ValueError: If Gemini API key is not configured
     """
     from langgraph.prebuilt import create_react_agent
-    
-    # Use configured model for research queries
-    api_key = get_gemini_api_key()
-    model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
-    llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
 
-    # Create a ReAct agent with the arXiv search tool
+    # Get API key
+    api_key = get_gemini_api_key()
+    if not api_key:
+        logger.error("Gemini API key not found. Cannot initialize Research Expert.")
+        raise ValueError(
+            "Gemini API key not configured. Please set GEMINI_API_KEY environment variable "
+            "or configure it in application settings."
+        )
+
+    # Initialize LLM with configured model
+    model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
+    llm = ChatGoogleGenerativeAI(
+        model=model_name,
+        api_key=api_key
+    )
+    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Research Expert")
+
+    # Load system prompt
+    system_prompt = _load_system_prompt()
+
+    # Create ReAct agent with arXiv search tool
     # The agent will automatically:
     # 1. Decide when to use tools
     # 2. Execute tool calls
     # 3. Process tool outputs
     # 4. Generate final response
     agent = create_react_agent(
-        llm,
+        model=llm,
         tools=[search_arxiv],
         name="research_expert",
-        prompt=RESEARCH_AGENT_PROMPT
+        prompt=system_prompt
     )
 
+    logger.info("Research Expert created successfully")
     return agent
