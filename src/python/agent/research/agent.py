@@ -8,6 +8,7 @@ The Research Agent uses LangChain and Google's Gemini model to provide intellige
 responses to research-related queries.
 """
 
+from flask import current_app
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .tools import search_arxiv
@@ -90,9 +91,10 @@ def create_research_agent_runnable():
     """
     from langgraph.prebuilt import create_react_agent
     
-    # Use Gemini 2.5 Flash for fast, cost-effective research queries
+    # Use configured model for research queries
     api_key = get_gemini_api_key()
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", api_key=api_key)
+    model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
+    llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
 
     # Create a ReAct agent with the arXiv search tool
     # The agent will automatically:

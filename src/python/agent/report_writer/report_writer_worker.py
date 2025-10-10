@@ -11,6 +11,7 @@ intelligent report generation without requiring external tools.
 import logging
 from pathlib import Path
 from typing import Optional
+from flask import current_app
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 
@@ -110,13 +111,14 @@ def create_report_writer():
             "or configure it in application settings."
         )
 
-    # Initialize LLM with Gemini 2.5 Flash
+    # Initialize LLM with configured model
     # Note: Consider using gemini-2.5-pro for higher quality reports if needed
+    model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model=model_name,
         api_key=api_key
     )
-    logger.info("Initialized ChatGoogleGenerativeAI with gemini-2.5-flash for Report Writer")
+    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Report Writer")
 
     # Load system prompt
     system_prompt = _load_system_prompt()

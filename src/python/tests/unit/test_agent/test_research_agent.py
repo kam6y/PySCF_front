@@ -45,20 +45,25 @@ def test_create_research_agent_runnable_returns_runnable(
 
 @patch('langgraph.prebuilt.create_react_agent')
 @patch('agent.research.agent.get_gemini_api_key')
+@patch('agent.research.agent.current_app')
 @patch('agent.research.agent.ChatGoogleGenerativeAI')
 def test_create_research_agent_uses_correct_model(
     mock_llm_class,
+    mock_current_app,
     mock_get_api_key,
     mock_create_react_agent
 ):
     """
     GIVEN create_research_agent_runnable is called
     WHEN LLM is initialized
-    THEN it should use gemini-2.5-flash model
+    THEN it should use model from config (or default)
     """
     # ARRANGE
     mock_get_api_key.return_value = "test-api-key"
-    
+    mock_current_app.config = {
+        'AI_AGENT': {'model_name': 'gemini-2.5-flash'}
+    }
+
     mock_llm = MagicMock()
     mock_llm_class.return_value = mock_llm
 

@@ -10,6 +10,7 @@ The Supervisor analyzes user requests, delegates tasks to appropriate workers
 
 import logging
 from typing import Optional
+from flask import current_app
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
 from agent.quantum_calc.quantum_calc_worker import create_quantum_calculation_worker, get_gemini_api_key
@@ -159,12 +160,13 @@ def create_supervisor_agent():
         logger.error(f"Failed to create Report Writer: {e}", exc_info=True)
         raise
 
-    # Initialize Supervisor LLM (using more capable model for coordination)
+    # Initialize Supervisor LLM with configured model
+    model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
     supervisor_llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model=model_name,
         api_key=api_key
     )
-    logger.info("Supervisor LLM initialized with gemini-2.5-flash")
+    logger.info(f"Supervisor LLM initialized with {model_name}")
 
     # Create supervisor workflow using create_supervisor
     workflow = create_supervisor(
