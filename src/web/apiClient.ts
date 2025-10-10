@@ -556,19 +556,23 @@ export const streamChatWithAgent = (
           }
         } else if (parsedData.type === 'done') {
           debug('Stream completed');
-          isStreamClosed = true;
-          callbacks.onClose();
+          if (!isStreamClosed) {
+            isStreamClosed = true;
+            callbacks.onClose();
+          }
           ctrl.abort(); // End the connection
         } else if (parsedData.type === 'error') {
           debug('Stream error received', {
             error: parsedData.payload?.message,
           });
-          isStreamClosed = true;
-          callbacks.onError(
-            new Error(
-              parsedData.payload?.message || 'An unknown stream error occurred.'
-            )
-          );
+          if (!isStreamClosed) {
+            isStreamClosed = true;
+            callbacks.onError(
+              new Error(
+                parsedData.payload?.message || 'An unknown stream error occurred.'
+              )
+            );
+          }
           ctrl.abort();
         } else {
           debug('Unknown message type received', parsedData);
@@ -584,13 +588,23 @@ export const streamChatWithAgent = (
     },
 
     onclose() {
-      callbacks.onClose();
+      debug('SSE connection closed');
+      // onClose は onmessage の 'done' イベントで既に呼ばれている可能性があるため、
+      // 重複呼び出しを防止
+      if (!isStreamClosed) {
+        isStreamClosed = true;
+        callbacks.onClose();
+      }
     },
 
     onerror(err) {
-      callbacks.onError(err);
-      // fetchEventSource will automatically retry, which is usually desired.
-      // To stop retrying, you must throw the error.
+      debug('SSE connection error', { error: err });
+      if (!isStreamClosed) {
+        isStreamClosed = true;
+        callbacks.onError(err instanceof Error ? err : new Error(String(err)));
+      }
+      // fetchEventSource の自動リトライを防止するためにエラーを投げる
+      // これにより、エラー時に確実に停止する
       throw err;
     },
   });

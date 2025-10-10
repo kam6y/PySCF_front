@@ -260,12 +260,25 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
 
         logger.debug("Stream completed successfully")
 
+    except GeneratorExit:
+        # Client disconnected - clean up gracefully
+        logger.info("Client disconnected from SSE stream (GeneratorExit)")
+        # Don't yield anything here - the connection is already closed
+        raise  # Re-raise to properly close the generator
     except Exception as e:
         logger.error(f"Error during LangGraph Supervisor streaming: {e}", exc_info=True)
-        yield _format_sse_event("error", {"message": f"An error occurred during the stream: {str(e)}"})
+        try:
+            yield _format_sse_event("error", {"message": f"An error occurred during the stream: {str(e)}"})
+        except (BrokenPipeError, ConnectionResetError, GeneratorExit):
+            # Connection already closed, can't send error message
+            logger.debug("Unable to send error message - connection closed")
     finally:
         logger.debug("Sending stream completion event")
-        yield _format_sse_event("done")
+        try:
+            yield _format_sse_event("done")
+        except (BrokenPipeError, ConnectionResetError, GeneratorExit):
+            # Connection already closed, can't send completion event
+            logger.debug("Unable to send completion event - connection closed")
 
 
 # Create agent blueprint

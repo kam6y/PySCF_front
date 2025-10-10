@@ -57,6 +57,9 @@ export const AgentPage = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const addNotification = useNotificationStore(state => state.addNotification);
 
+  // 重複送信を防止するためのRef（setStateは非同期なので、useRefで同期的に管理）
+  const isSendingRef = useRef(false);
+
   // Confirmation modal state
   const [confirmationRequest, setConfirmationRequest] =
     useState<ConfirmationRequest | null>(null);
@@ -274,7 +277,14 @@ export const AgentPage = () => {
   // メッセージ送信処理
   const handleSendMessage = useCallback(() => {
     const trimmedMessage = currentMessage.trim();
-    if (!trimmedMessage || isLoading) return;
+    
+    // 重複送信を防止（同期的にチェック）
+    if (!trimmedMessage || isLoading || isSendingRef.current) {
+      return;
+    }
+
+    // 送信中フラグを即座に設定（同期的）
+    isSendingRef.current = true;
 
     const userMessage: ChatHistory = {
       role: 'user',
@@ -321,15 +331,14 @@ export const AgentPage = () => {
         },
         onAgentStatus: (status, agent) => {
           // エージェントステータスを更新
-          const agentName = agent as 'supervisor' | 'quantum_calculation_worker' | 'research_expert';
-          const agentStatus: AgentStatus = {
-            agent: agentName,
-            status: status === 'running' ? 'running' : status === 'responding' ? 'responding' : 'idle'
-          };
-          setAgentStatus(agentStatus);
+          setAgentStatus({
+            agent: agent as AgentStatus['agent'],
+            status: status === 'running' || status === 'responding' ? status : 'idle'
+          });
         },
         onClose: () => {
           setIsLoading(false);
+          isSendingRef.current = false; // 送信完了フラグをリセット
           setAgentStatus({ agent: null, status: 'idle' }); // ステータスをリセット
           const currentHistory = useAgentStore.getState().history;
           const lastIndex = currentHistory.length - 1;
@@ -357,6 +366,7 @@ export const AgentPage = () => {
         },
         onError: err => {
           setIsLoading(false);
+          isSendingRef.current = false; // エラー時も送信フラグをリセット
           setAgentStatus({ agent: null, status: 'idle' }); // エラー時もステータスをリセット
           setError(err.message);
           const currentHistory = useAgentStore.getState().history;
@@ -388,7 +398,7 @@ export const AgentPage = () => {
     );
   }, [currentMessage, history, isLoading, addNotification, setAgentStatus]);
 
-  // Enter키で送信（Shift+Enterで改行）
+  // Enterで送信（Shift+Enterで改行）
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
