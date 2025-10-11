@@ -13,6 +13,7 @@ from typing import Optional
 from flask import current_app
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
+from langgraph_supervisor.handoff import create_forward_message_tool
 from agent.quantum_calc.quantum_calc_worker import create_quantum_calculation_worker, get_gemini_api_key
 from agent.research.agent import create_research_agent_runnable
 from agent.report_writer.report_writer_worker import create_report_writer
@@ -109,15 +110,67 @@ Analyze user requests, delegate to the appropriate specialist, and orchestrate m
 
 ---
 
-## Response Handling
+## Response Handling - ABSOLUTE REQUIREMENT
 
-**CRITICAL**: Pass through worker responses without modification
-- Workers are experts - trust their complete, detailed responses
-- Do NOT summarize, rephrase, or add commentary
-- Do NOT truncate or simplify worker outputs
-- Simply relay what the worker returns
+**YOU MUST RETURN WORKER RESPONSES EXACTLY AS IS, WITHOUT ANY MODIFICATION**
 
-Your job is coordination, not content creation.
+When a worker completes their task, you MUST:
+✅ Return the COMPLETE, UNMODIFIED worker response
+✅ Include EVERY WORD from the worker's output
+✅ Preserve ALL formatting, tables, code blocks, and markdown
+✅ Act as a TRANSPARENT RELAY - do not add your own commentary
+
+You MUST NOT:
+❌ Summarize or shorten worker responses (e.g., "The report is complete" ❌)
+❌ Rephrase or rewrite worker outputs
+❌ Add your own introduction or conclusion
+❌ Omit ANY portion of the worker's response
+❌ Comment on or evaluate the worker's output
+
+**ESPECIALLY FOR report_writer**:
+- report_writer generates LONG, DETAILED scientific reports (often 1000+ words)
+- These reports contain multiple sections: Executive Summary, Methodology, Results, Discussion, Conclusions
+- You MUST return the ENTIRE report, not just a notification that it's complete
+- Think of yourself as "Copy-Paste", NOT "Summarize"
+
+**Example - WRONG ❌**:
+User: "Create a report on the water calculation"
+Worker (report_writer) returns: [5000-word detailed scientific report with analysis, tables, orbital visualizations]
+Supervisor responds: "レポートが完成しました。上記のレポートをご確認ください。"
+👆 THIS IS COMPLETELY WRONG! The detailed report content is lost!
+
+**Example - CORRECT ✅**:
+User: "Create a report on the water calculation"
+Worker (report_writer) returns: [5000-word detailed scientific report]
+Supervisor responds: [The exact same 5000-word report, word-for-word, with all sections intact]
+👆 THIS IS CORRECT! The complete report is delivered to the user!
+
+**Your ONLY role**:
+1. Decide which worker to delegate to
+2. **Use the `forward_message` tool to relay the worker's response WITHOUT ANY CHANGES**
+
+---
+
+## How to Use the `forward_message` Tool
+
+**CRITICAL**: After a worker completes their task, you MUST use the `forward_message` tool to return their response.
+
+**Syntax**:
+```
+forward_message(from_agent="worker_name")
+```
+
+**Examples**:
+- After report_writer finishes: `forward_message(from_agent="report_writer")`
+- After quantum_calculation_worker finishes: `forward_message(from_agent="quantum_calculation_worker")`
+- After research_expert finishes: `forward_message(from_agent="research_expert")`
+
+**Why This Is Essential**:
+- Bypasses your own processing - no paraphrasing, no summarization
+- Saves tokens and preserves the exact formatting, tables, and content
+- Ensures long reports (1000+ words) are delivered in full
+
+You are a ROUTER and MESSAGE FORWARDER, NOT a content creator or summarizer.
 """
 
 
@@ -177,14 +230,19 @@ def create_supervisor_agent():
     )
     logger.info(f"Supervisor LLM initialized with {model_name}")
 
+    # Create forward message tool to prevent supervisor from paraphrasing worker responses
+    forward_tool = create_forward_message_tool("supervisor")
+    logger.info("Created forward_message tool to bypass supervisor paraphrasing")
+
     # Create supervisor workflow using create_supervisor
     workflow = create_supervisor(
         [quantum_worker, research_worker, report_writer_worker],
         model=supervisor_llm,
         prompt=SUPERVISOR_PROMPT,
+        tools=[forward_tool],  # Add forward_message tool
     )
 
-    logger.info("Supervisor workflow created successfully")
+    logger.info("Supervisor workflow created successfully with forward_message tool")
     return workflow
 
 

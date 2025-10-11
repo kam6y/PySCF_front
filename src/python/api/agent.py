@@ -218,7 +218,7 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                                         supervisor_response_started = True
 
                                     # Stream the supervisor's response
-                                    logger.debug(f"Streaming supervisor response, length: {len(last_message.content)}")
+                                    logger.info(f"Streaming supervisor response, length: {len(last_message.content)}, preview: {last_message.content[:200]}...")
                                     yield _format_sse_event("chunk", {"text": last_message.content})
             else:
                 # Regular dict format (parent graph without namespace)
@@ -255,7 +255,7 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                                     supervisor_response_started = True
 
                                 # Stream the response
-                                logger.debug(f"Streaming response from {node_name}, length: {len(last_message.content)}")
+                                logger.info(f"Streaming response from {node_name}, length: {len(last_message.content)}, preview: {last_message.content[:200]}...")
                                 yield _format_sse_event("chunk", {"text": last_message.content})
 
         logger.debug("Stream completed successfully")
