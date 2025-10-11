@@ -203,13 +203,7 @@ export const CalculationResultsPage = ({
                 <div>
                   <strong>Correlation Energy:</strong>{' '}
                   <code>{results.correlation_energy.toFixed(8)} hartree</code>
-                  <div
-                    style={{
-                      fontSize: '12px',
-                      color: '#666',
-                      marginTop: '2px',
-                    }}
-                  >
+                  <div className={styles.metaText}>
                     ({parameters.calculation_method} - SCF)
                   </div>
                 </div>
@@ -1284,51 +1278,23 @@ export const CalculationResultsPage = ({
                             </table>
                           </div>
                         ) : (
-                          <div
-                            style={{
-                              padding: '20px',
-                              textAlign: 'center',
-                              color: '#666',
-                              fontStyle: 'italic',
-                            }}
-                          >
+                          <div className={styles.ntoNoData}>
                             No significant NTO pairs found for this excited
                             state.
                           </div>
                         )}
-                        <div
-                          style={{
-                            marginTop: '10px',
-                            fontSize: '12px',
-                            color: '#666',
-                          }}
-                        >
+                        <div className={styles.ntoCount}>
                           Total NTO pairs analyzed:{' '}
                           {stateData.total_nto_pairs || 0}
                         </div>
                       </div>
                     )
                   )}
-                  <div
-                    style={{
-                      marginTop: '20px',
-                      padding: '15px',
-                      backgroundColor: '#e8f5e8',
-                      borderRadius: '4px',
-                      border: '1px solid #4caf50',
-                    }}
-                  >
-                    <h4 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>
+                  <div className={styles.ntoHelpBox}>
+                    <h4 className={styles.ntoHelpTitle}>
                       💡 How to Read NTO Analysis
                     </h4>
-                    <ul
-                      style={{
-                        margin: '0',
-                        paddingLeft: '20px',
-                        fontSize: '14px',
-                        lineHeight: '1.5',
-                      }}
-                    >
+                    <ul className={styles.ntoHelpList}>
                       <li>
                         <strong>Hole軌道（赤色）</strong>: Orbitals from which
                         electrons are excited (mainly HOMO-type)
@@ -1405,10 +1371,7 @@ export const CalculationResultsPage = ({
                 )}
             </div>
             {(results as any).frozen_core && (
-              <div
-                className={styles.sectionDescription}
-                style={{ marginTop: '15px' }}
-              >
+              <div className={styles.sectionDescription}>
                 ℹ️ Frozen core approximation was used in this calculation
               </div>
             )}
@@ -1436,18 +1399,9 @@ export const CalculationResultsPage = ({
                 : '❌ File not found'}
             </div>
             {results.checkpoint_exists && (
-              <div
-                style={{
-                  padding: '15px',
-                  backgroundColor: '#e8f5e8',
-                  borderRadius: '4px',
-                  border: '1px solid #4caf50',
-                }}
-              >
-                <h4 style={{ margin: '0 0 10px 0', color: '#2e7d32' }}>
-                  📁 File Access Methods
-                </h4>
-                <div style={{ fontSize: '14px', lineHeight: '1.4' }}>
+              <div className={styles.infoBox}>
+                <h4>📁 File Access Methods</h4>
+                <div>
                   <p>
                     <strong>Finder:</strong> Open {results.working_directory} in
                     Finder
@@ -1460,13 +1414,7 @@ export const CalculationResultsPage = ({
                     <strong>Checkpoint File:</strong>{' '}
                     <code>calculation.chk</code>
                   </p>
-                  <p
-                    style={{
-                      marginTop: '10px',
-                      fontStyle: 'italic',
-                      color: '#666',
-                    }}
-                  >
+                  <p className={styles.sectionDescription}>
                     ※ This directory contains molecular orbital data and wave
                     function information
                   </p>
@@ -1478,132 +1426,50 @@ export const CalculationResultsPage = ({
 
         {/* Mulliken Charges */}
         {results.mulliken_charges && results.mulliken_charges.length > 0 && (
-          <section
-            style={{
-              marginBottom: '30px',
-              padding: '20px',
-              backgroundColor: '#f0fff8',
-              borderRadius: '8px',
-            }}
-          >
+          <section className={styles.calculationSection}>
             <h2>Mulliken Charge Analysis</h2>
-            <div
-              style={{
-                marginBottom: '15px',
-                fontSize: '14px',
-                color: '#666',
-              }}
-            >
+            <div className={styles.sectionDescription}>
               Partial charges of each atom by Mulliken population analysis.
               Positive values indicate electron deficiency (positive charge),
               negative values indicate electron excess (negative charge).
             </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table
-                style={{
-                  width: '100%',
-                  borderCollapse: 'collapse',
-                  backgroundColor: 'white',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                }}
-              >
+            <div className={styles.tableContainer}>
+              <table className={styles.mullikenChargeTable}>
                 <thead>
-                  <tr style={{ backgroundColor: '#e8f5e8' }}>
-                    <th
-                      style={{
-                        padding: '12px',
-                        border: '1px solid #ddd',
-                        textAlign: 'center',
-                      }}
-                    >
-                      Atom Number
-                    </th>
-                    <th
-                      style={{
-                        padding: '12px',
-                        border: '1px solid #ddd',
-                        textAlign: 'center',
-                      }}
-                    >
-                      Element
-                    </th>
-                    <th
-                      style={{
-                        padding: '12px',
-                        border: '1px solid #ddd',
-                        textAlign: 'center',
-                      }}
-                    >
-                      Mulliken Charge (e)
-                    </th>
-                    <th
-                      style={{
-                        padding: '12px',
-                        border: '1px solid #ddd',
-                        textAlign: 'center',
-                      }}
-                    >
-                      Charge Character
-                    </th>
+                  <tr>
+                    <th>Atom Number</th>
+                    <th>Element</th>
+                    <th>Mulliken Charge (e)</th>
+                    <th>Charge Character</th>
                   </tr>
                 </thead>
                 <tbody>
                   {results.mulliken_charges.map(
                     (chargeData: any, index: number) => {
                       const isPositive = chargeData.charge > 0;
-                      const chargeColor = isPositive ? '#d32f2f' : '#1976d2';
-                      const chargeBgColor = isPositive ? '#ffebee' : '#e3f2fd';
 
                       return (
-                        <tr
-                          key={index}
-                          style={{
-                            backgroundColor:
-                              index % 2 === 0 ? '#fafafa' : 'white',
-                          }}
-                        >
-                          <td
-                            style={{
-                              padding: '10px',
-                              border: '1px solid #ddd',
-                              textAlign: 'center',
-                            }}
-                          >
-                            {chargeData.atom_index + 1}
-                          </td>
-                          <td
-                            style={{
-                              padding: '10px',
-                              border: '1px solid #ddd',
-                              textAlign: 'center',
-                              fontWeight: 'bold',
-                            }}
-                          >
+                        <tr key={index}>
+                          <td>{chargeData.atom_index + 1}</td>
+                          <td style={{ fontWeight: 'bold' }}>
                             {chargeData.element}
                           </td>
                           <td
-                            style={{
-                              padding: '10px',
-                              border: '1px solid #ddd',
-                              textAlign: 'center',
-                              fontFamily: 'monospace',
-                              backgroundColor: chargeBgColor,
-                              color: chargeColor,
-                              fontWeight: 'bold',
-                            }}
+                            className={`${styles.chargeValueCell} ${
+                              isPositive
+                                ? styles.chargeValueCellPositive
+                                : styles.chargeValueCellNegative
+                            }`}
                           >
                             {chargeData.charge > 0 ? '+' : ''}
                             {chargeData.charge.toFixed(4)}
                           </td>
                           <td
-                            style={{
-                              padding: '10px',
-                              border: '1px solid #ddd',
-                              textAlign: 'center',
-                              color: chargeColor,
-                              fontWeight: 'bold',
-                            }}
+                            className={
+                              isPositive
+                                ? styles.chargeCharacterPositive
+                                : styles.chargeCharacterNegative
+                            }
                           >
                             {isPositive ? 'Positive (δ+)' : 'Negative (δ−)'}
                           </td>
@@ -1614,15 +1480,7 @@ export const CalculationResultsPage = ({
                 </tbody>
               </table>
             </div>
-            <div
-              style={{
-                marginTop: '15px',
-                padding: '10px',
-                backgroundColor: '#e8f5e8',
-                borderRadius: '4px',
-                fontSize: '14px',
-              }}
-            >
+            <div className={styles.chargeSummary}>
               <strong>Total Charge:</strong>{' '}
               <code>
                 {results.mulliken_charges
@@ -1636,14 +1494,7 @@ export const CalculationResultsPage = ({
         )}
 
         {/* Molecular Structure */}
-        <section
-          style={{
-            marginBottom: '30px',
-            padding: '20px',
-            backgroundColor: '#fff5f5',
-            borderRadius: '8px',
-          }}
-        >
+        <section className={styles.calculationSection}>
           {(() => {
             // Check if geometry optimization was performed
             const optimizeGeometry =
@@ -1653,13 +1504,7 @@ export const CalculationResultsPage = ({
               return (
                 <>
                   <h2>Initial Geometry</h2>
-                  <div
-                    style={{
-                      fontSize: '14px',
-                      color: '#666',
-                      marginBottom: '15px',
-                    }}
-                  >
+                  <div className={styles.sectionDescription}>
                     ℹ️ No geometry optimization performed - using initial
                     structure
                   </div>
@@ -1673,13 +1518,7 @@ export const CalculationResultsPage = ({
                 return (
                   <>
                     <h2>MP2-Optimized Geometry</h2>
-                    <div
-                      style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        marginBottom: '15px',
-                      }}
-                    >
+                    <div className={styles.sectionDescription}>
                       ℹ️ Geometry optimized using MP2 method
                     </div>
                   </>
@@ -1688,13 +1527,7 @@ export const CalculationResultsPage = ({
                 return (
                   <>
                     <h2>HF-Optimized Geometry</h2>
-                    <div
-                      style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        marginBottom: '15px',
-                      }}
-                    >
+                    <div className={styles.sectionDescription}>
                       ℹ️ Geometry optimized using Hartree-Fock method
                     </div>
                   </>
@@ -1704,13 +1537,7 @@ export const CalculationResultsPage = ({
                 return (
                   <>
                     <h2>Initial Geometry</h2>
-                    <div
-                      style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        marginBottom: '15px',
-                      }}
-                    >
+                    <div className={styles.sectionDescription}>
                       ℹ️ CCSD calculations use initial geometry (no
                       optimization)
                     </div>
@@ -1721,13 +1548,7 @@ export const CalculationResultsPage = ({
                 return (
                   <>
                     <h2>Initial Geometry</h2>
-                    <div
-                      style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        marginBottom: '15px',
-                      }}
-                    >
+                    <div className={styles.sectionDescription}>
                       ℹ️ CASCI/CASSCF calculations use initial geometry (no
                       optimization)
                     </div>
@@ -1737,13 +1558,7 @@ export const CalculationResultsPage = ({
                 return (
                   <>
                     <h2>Initial Geometry</h2>
-                    <div
-                      style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        marginBottom: '15px',
-                      }}
-                    >
+                    <div className={styles.sectionDescription}>
                       ℹ️ TDDFT calculations use initial geometry (no
                       optimization)
                     </div>
@@ -1754,36 +1569,19 @@ export const CalculationResultsPage = ({
                 return (
                   <>
                     <h2>DFT-Optimized Geometry</h2>
-                    <div
-                      style={{
-                        fontSize: '14px',
-                        color: '#666',
-                        marginBottom: '15px',
-                      }}
-                    >
+                    <div className={styles.sectionDescription}>
                       ℹ️ Geometry optimized using DFT method
                     </div>
                   </>
                 );
             }
           })()}
-          <div>
+          <div className={styles.molecularStructureInfo}>
             <strong>Number of Atoms:</strong> {results.atom_count}
           </div>
-          <div style={{ marginTop: '15px' }}>
+          <div className={styles.xyzCoordinatesContainer}>
             <strong>XYZ Coordinates:</strong>
-            <pre
-              style={{
-                backgroundColor: '#f8f8f8',
-                padding: '15px',
-                borderRadius: '4px',
-                overflow: 'auto',
-                fontSize: '14px',
-                fontFamily: 'monospace',
-                border: '1px solid #ddd',
-                marginTop: '10px',
-              }}
-            >
+            <pre className={styles.xyzCoordinates}>
               {results.optimized_geometry}
             </pre>
           </div>

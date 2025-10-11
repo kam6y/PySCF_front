@@ -116,7 +116,7 @@ class MolecularOrbitalGenerator:
                 label = "LUMO"
             elif i < homo_idx:
                 diff = homo_idx - i
-                orbital_type = "homo"
+                orbital_type = "occupied"
                 label = f"HOMO-{diff}"
             elif i > lumo_idx:
                 diff = i - lumo_idx

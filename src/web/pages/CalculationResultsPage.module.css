@@ -1,10 +1,12 @@
 /* Calculation Results Page Styles */
 
+/* Page Layout */
 .pageContainer {
   display: flex;
   flex-direction: column;
   height: 100%;
   padding: 20px;
+  background-color: #f8f9fa;
 }
 
 .pageContent {
@@ -17,42 +19,48 @@
   width: 100%;
 }
 
+/* Status Badges */
 .statusBadge {
+  display: inline-flex;
+  align-items: center;
   padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
 .statusBadge.pending {
-  background-color: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
+  background-color: #fef3c7;
+  color: #92400e;
 }
 
 .statusBadge.running {
-  background-color: #cce5ff;
-  color: #004085;
-  border: 1px solid #a6d1ff;
+  background-color: #dbeafe;
+  color: #1d4ed8;
 }
 
 .statusBadge.completed {
-  background-color: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background-color: #d1fae5;
+  color: #065f46;
 }
 
 .statusBadge.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background-color: #fee2e2;
+  color: #dc2626;
 }
 
-/* Loading state */
-.loadingContainer {
+/* Loading/Error/Empty States */
+.loadingContainer,
+.noCalculationContainer,
+.statusMessageContainer {
   text-align: center;
-  padding: 20px;
+  padding: 40px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .loadingText {
@@ -60,208 +68,214 @@
   color: #666;
 }
 
-/* Error state */
 .errorContainer {
-  color: #e74c3c;
+  color: #dc2626;
   padding: 20px;
   text-align: center;
-}
-
-/* No calculation selected */
-.noCalculationContainer {
-  text-align: center;
-  padding: 20px;
-  color: #666;
-}
-
-/* Status messages */
-.statusMessageContainer {
-  text-align: center;
-  padding: 20px;
-  color: #666;
+  background: #fee2e2;
+  border-radius: 8px;
+  border: 1px solid #fca5a5;
 }
 
 .statusMessageMeta {
   text-align: center;
   margin-top: 20px;
-}
-
-/* Section styles */
-.calculationSection {
-  margin-bottom: 30px;
-  padding: 20px;
-  border-radius: 8px;
-}
-
-.summarySection {
-  background-color: #f8f9fa;
-}
-
-.energySection {
-  background-color: #e8f6f3;
-}
-
-.frequencySection {
-  background-color: #f0f8ff;
-}
-
-.orbitalSection {
-  background-color: #fef9e7;
-}
-
-.energyDiagramSection {
-  background-color: #fff9e6;
-}
-
-.orbitalViewerSection {
-  background-color: #f0f8ff;
-}
-
-.excitedStatesSection {
-  background-color: #e8f0ff;
-}
-
-.excitationTableSection {
-  background-color: #fff8dc;
-}
-
-.uvVisSection {
-  background-color: #f0fff0;
-}
-
-.transitionDipoleSection {
-  background-color: #fff0f5;
-}
-
-.ntoSection {
-  background-color: #f0f8ff;
-}
-
-.ccsdSection {
-  background-color: #fff0e8;
-}
-
-.checkpointSection {
-  background-color: #f0f3ff;
-}
-
-.mullikenSection {
-  background-color: #f0fff8;
-}
-
-.molecularStructureSection {
-  background-color: #fff5f5;
-}
-
-.parametersSection {
-  background-color: #f5f5f5;
-}
-
-/* Grid layouts */
-.summaryGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.thermochemicalGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 15px;
-  font-size: 14px;
-}
-
-.orbitalInfoGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 15px;
-}
-
-.excitedStatesGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 15px;
-}
-
-.parametersGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-/* Energy display */
-.energyResult {
-  font-size: 18px;
-}
-
-/* Section descriptions */
-.sectionDescription {
-  margin-bottom: 15px;
-  font-size: 14px;
   color: #666;
 }
 
-/* Frequency analysis specific */
+/* Unified Section Design */
+.calculationSection {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+.calculationSection:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
+.calculationSection h2 {
+  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  padding-left: 12px;
+  border-left: 4px solid #50D4F5;
+}
+
+.calculationSection h3 {
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 20px 0 12px 0;
+}
+
+.calculationSection h4 {
+  color: #666;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 10px 0;
+}
+
+/* Grid Layouts */
+.summaryGrid,
+.thermochemicalGrid,
+.orbitalInfoGrid,
+.excitedStatesGrid,
+.parametersGrid,
+.casEnergyGrid,
+.activeSpaceGrid,
+.convergenceGrid,
+.rotationGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.summaryGrid > div,
+.thermochemicalGrid > div,
+.orbitalInfoGrid > div,
+.excitedStatesGrid > div,
+.parametersGrid > div,
+.casEnergyGrid > div,
+.activeSpaceGrid > div,
+.convergenceGrid > div,
+.rotationGrid > div {
+  background: #f8f9fa;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s ease;
+}
+
+.summaryGrid > div:hover,
+.thermochemicalGrid > div:hover,
+.orbitalInfoGrid > div:hover,
+.excitedStatesGrid > div:hover,
+.parametersGrid > div:hover,
+.casEnergyGrid > div:hover,
+.activeSpaceGrid > div:hover,
+.convergenceGrid > div:hover,
+.rotationGrid > div:hover {
+  background: #f0f8ff;
+  border-color: #50D4F5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.15);
+}
+
+/* Energy Display */
+.energyResult {
+  font-size: 18px;
+  padding: 16px;
+  background: #f0f8ff;
+  border-radius: 6px;
+  border: 1px solid #50D4F5;
+  font-weight: 500;
+}
+
+/* Section Descriptions */
+.sectionDescription {
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #50D4F5;
+}
+
+/* Frequency Analysis */
 .frequencyStatus {
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #50D4F5;
 }
 
 .successStatus {
-  color: #059669;
+  color: #065f46;
+  font-weight: 500;
 }
 
 .warningStatus {
   color: #d97706;
+  font-weight: 500;
 }
 
 .errorStatus {
   color: #dc2626;
+  font-weight: 500;
 }
 
 .frequencyList {
   margin-top: 8px;
-  padding: 10px;
-  background-color: #f8fafc;
-  border-radius: 4px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
   max-height: 150px;
   overflow-y: auto;
   font-family: monospace;
   font-size: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.frequencyItem {
+  padding: 4px 8px;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
 }
 
 .frequencyCount {
   font-size: 12px;
   color: #6b7280;
-  margin-top: 5px;
-}
-
-.frequencyItem {
-  margin-right: 12px;
+  margin-top: 8px;
+  font-style: italic;
 }
 
 /* Tables */
+.tableContainer {
+  overflow-x: auto;
+  margin: 16px 0;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
 .dataTable {
   width: 100%;
   border-collapse: collapse;
-  background-color: white;
-  border-radius: 4px;
-  overflow: hidden;
+  background: white;
+  font-size: 14px;
 }
 
 .dataTable thead {
-  background-color: #f0f8ff;
-}
-
-.dataTable th,
-.dataTable td {
-  padding: 12px;
-  border: 1px solid #ddd;
-  text-align: left;
+  background: #f8f9fa;
+  border-bottom: 2px solid #e0e0e0;
 }
 
 .dataTable th {
-  padding: 12px;
+  padding: 12px 16px;
   text-align: left;
+  font-weight: 600;
+  color: #333;
+  white-space: nowrap;
+}
+
+.dataTable td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  color: #666;
 }
 
 .dataTable th.rightAlign,
@@ -274,96 +288,87 @@
   text-align: center;
 }
 
-.dataTable tbody tr:nth-child(even) {
-  background-color: #fafafa;
+.dataTable tbody tr {
+  transition: background 0.2s ease;
 }
 
-.dataTable tbody tr:nth-child(odd) {
-  background-color: white;
+.dataTable tbody tr:hover {
+  background: #f0f8ff;
+}
+
+.dataTable tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .dataTable .monoFont {
-  font-family: monospace;
+  font-family: 'SF Mono', Monaco, monospace;
+  font-size: 13px;
 }
 
-/* Mulliken charges table specific */
-.mullikenTable thead {
-  background-color: #e8f5e8;
-}
-
-.positiveCharge {
-  background-color: #ffebee;
-  color: #d32f2f;
-  font-weight: bold;
-}
-
-.negativeCharge {
-  background-color: #e3f2fd;
-  color: #1976d2;
-  font-weight: bold;
-}
-
-.chargeTotal {
-  margin-top: 15px;
-  padding: 10px;
-  background-color: #e8f5e8;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-/* UV-Vis spectrum */
+/* UV-Vis Spectrum */
 .uvVisChart {
   height: 300px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
   position: relative;
   overflow: hidden;
+  padding: 16px;
 }
 
 .uvVisChart svg {
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .uvVisDescription {
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 14px;
   color: #666;
   text-align: center;
+  font-style: italic;
 }
 
-/* NTO Analysis specific */
-.ntoStateTitle {
-  color: #2c5aa0;
-  margin-bottom: 15px;
-}
-
+/* NTO Analysis */
 .ntoState {
   margin-bottom: 30px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
 }
 
-.ntoTable thead {
-  background-color: #e6f3ff;
+.ntoStateTitle {
+  color: #333;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  padding-left: 12px;
+  border-left: 3px solid #50D4F5;
 }
 
 .ntoTransition {
-  padding: 10px;
-  border: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .holeOrbital {
-  color: #d32f2f;
-  font-weight: bold;
+  color: #dc2626;
+  font-weight: 600;
+  font-family: monospace;
 }
 
 .particleOrbital {
-  color: #1976d2;
-  font-weight: bold;
+  color: #2563eb;
+  font-weight: 600;
+  font-family: monospace;
 }
 
 .transitionArrow {
-  margin: 0 8px;
   color: #666;
+  font-weight: bold;
 }
 
 .ntoContribution {
@@ -371,234 +376,125 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  width: 100%;
 }
 
 .contributionBar {
-  height: 12px;
-  border-radius: 6px;
-  min-width: 2px;
+  height: 20px;
+  border-radius: 4px;
+  min-width: 4px;
+  transition: width 0.3s ease;
 }
 
 .contributionBarHigh {
-  background-color: #4caf50;
+  background: linear-gradient(90deg, #10b981, #059669);
 }
 
 .contributionBarMedium {
-  background-color: #ff9800;
+  background: linear-gradient(90deg, #f59e0b, #d97706);
 }
 
 .contributionBarLow {
-  background-color: #f44336;
+  background: linear-gradient(90deg, #ef4444, #dc2626);
 }
 
 .contributionValue {
-  font-weight: bold;
-  min-width: 50px;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+  font-family: monospace;
+  font-size: 13px;
 }
 
 .ntoIndices {
   font-size: 12px;
   color: #666;
-}
-
-.ntoNoData {
-  padding: 20px;
-  text-align: center;
-  color: #666;
-  font-style: italic;
+  font-family: monospace;
 }
 
 .ntoCount {
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 12px;
   color: #666;
-}
-
-.ntoHelpBox {
-  margin-top: 20px;
-  padding: 15px;
-  background-color: #e8f5e8;
-  border-radius: 4px;
-  border: 1px solid #4caf50;
-}
-
-.ntoHelpTitle {
-  margin: 0 0 10px 0;
-  color: #2e7d32;
-}
-
-.ntoHelpList {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-/* Checkpoint file info */
-.checkpointInfo {
-  margin-bottom: 10px;
-}
-
-.checkpointStatus {
-  margin-bottom: 15px;
-}
-
-.checkpointHelp {
-  padding: 15px;
-  background-color: #e8f5e8;
-  border-radius: 4px;
-  border: 1px solid #4caf50;
-}
-
-.checkpointHelpTitle {
-  margin: 0 0 10px 0;
-  color: #2e7d32;
-}
-
-.checkpointHelpContent {
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.checkpointHelpContent p {
-  margin: 5px 0;
-}
-
-.checkpointNote {
-  margin-top: 10px;
   font-style: italic;
+}
+
+/* Checkpoint File Info */
+.checkpointInfo,
+.checkpointStatus {
+  margin-bottom: 12px;
   color: #666;
+  line-height: 1.6;
 }
 
-/* Molecular structure */
-.molecularStructure {
-  margin-top: 15px;
+/* Info Boxes */
+.infoBox {
+  padding: 16px;
+  background: #f0f8ff;
+  border-radius: 6px;
+  border: 1px solid #50D4F5;
+  margin-top: 16px;
 }
 
-.xyzCoordinates {
-  background-color: #f8f8f8;
-  padding: 15px;
-  border-radius: 4px;
-  overflow: auto;
+.infoBox h4 {
+  margin: 0 0 12px 0;
+  color: #333;
   font-size: 14px;
-  font-family: monospace;
-  border: 1px solid #ddd;
-  margin-top: 10px;
+  font-weight: 600;
 }
 
-/* Table overflow containers */
-.tableContainer {
-  overflow-x: auto;
-}
-
-/* IR Spectrum Section */
-.irSpectrumSection {
-  margin-bottom: 20px;
-}
-
-.sectionDescription {
-  color: #666;
+.infoBox p {
+  margin: 8px 0;
   font-size: 14px;
-  margin-bottom: 16px;
   line-height: 1.5;
+  color: #666;
 }
 
-/* CASCI/CASSCF Results Styles */
-.casSection {
-  background-color: #f0f8ff;
-  border-left: 4px solid #1976d2;
-}
-
-.casEnergyGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.casEnergyGrid > div {
-  background-color: white;
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid #e3f2fd;
-}
-
-.activeSpaceInfo {
-  margin-top: 25px;
-}
-
-.activeSpaceInfo h3 {
-  color: #1976d2;
-  margin-bottom: 15px;
-}
-
-.activeSpaceGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.activeSpaceGrid > div {
-  background-color: white;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid #e3f2fd;
-}
-
-.convergenceInfo {
-  margin-top: 25px;
-}
-
-.convergenceInfo h3 {
-  color: #1976d2;
-  margin-bottom: 15px;
-}
-
-.convergenceGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.convergenceGrid > div {
-  background-color: white;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid #e3f2fd;
-}
-
+/* CASCI/CASSCF Specific */
 .convergedTrue {
-  color: #4caf50;
-  font-weight: 500;
+  color: #065f46;
+  font-weight: 600;
 }
 
 .convergedFalse {
-  color: #f44336;
-  font-weight: 500;
+  color: #dc2626;
+  font-weight: 600;
 }
 
 /* Analysis Sections */
 .analysisSection {
-  margin-top: 30px;
+  margin-top: 24px;
   padding: 20px;
-  background-color: white;
-  border-radius: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
   border: 1px solid #e0e0e0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+.analysisSection:hover {
+  border-color: #50D4F5;
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.1);
 }
 
 .analysisSection h3 {
-  color: #2e7d32;
-  margin-bottom: 10px;
-  font-size: 1.3em;
+  color: #333;
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  padding-left: 12px;
+  border-left: 3px solid #50D4F5;
 }
 
 .analysisDescription {
   color: #666;
   font-size: 14px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   line-height: 1.5;
   font-style: italic;
+  padding: 12px;
+  background: white;
+  border-radius: 4px;
+  border-left: 3px solid #e0e0e0;
 }
 
 /* Natural Orbital Analysis */
@@ -607,14 +503,16 @@
 }
 
 .orbitalOccupationSection h4 {
-  color: #2e7d32;
-  margin-bottom: 15px;
+  color: #333;
+  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .occupationGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
   margin-bottom: 20px;
 }
 
@@ -622,60 +520,70 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px;
-  background-color: #f8f8f8;
-  border-radius: 4px;
+  padding: 10px;
+  background: white;
+  border-radius: 6px;
   border: 1px solid #e0e0e0;
+  transition: all 0.2s ease;
+}
+
+.occupationItem:hover {
+  border-color: #50D4F5;
+  box-shadow: 0 2px 8px rgba(80, 212, 245, 0.15);
 }
 
 .orbitalIndex {
-  font-weight: 500;
-  min-width: 20px;
+  font-weight: 600;
+  min-width: 24px;
   font-size: 12px;
   color: #666;
+  text-align: center;
 }
 
 .occupationBar {
   flex: 1;
-  height: 16px;
-  background-color: #eee;
-  border-radius: 8px;
+  height: 18px;
+  background: #e0e0e0;
+  border-radius: 9px;
   overflow: hidden;
   position: relative;
 }
 
 .occupationFill {
   height: 100%;
-  border-radius: 8px;
+  border-radius: 9px;
   transition: width 0.3s ease;
 }
 
 .occupationValue {
   font-family: monospace;
-  font-size: 11px;
-  font-weight: 500;
-  min-width: 40px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 45px;
   text-align: right;
+  color: #333;
 }
 
 .occupationSummary {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 16px;
   margin-top: 20px;
 }
 
 .occupationStats,
 .electronAnalysis {
-  background-color: #f5f5f5;
-  padding: 15px;
+  background: white;
+  padding: 16px;
   border-radius: 6px;
   border: 1px solid #e0e0e0;
 }
 
 .occupationStats > div,
 .electronAnalysis > div {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  color: #666;
+  line-height: 1.5;
 }
 
 .occupationStats > div:last-child,
@@ -684,183 +592,271 @@
 }
 
 /* CI Coefficient Analysis */
-.ciSummary {
-  margin-bottom: 20px;
-}
-
-.ciStats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.ciStats > div {
-  background-color: #f5f5f5;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-}
-
-.majorConfigsSection {
-  margin-top: 20px;
-}
-
-.majorConfigsSection h4 {
-  color: #2e7d32;
-  margin-bottom: 15px;
-}
-
-/* Spin Density Analysis */
-.spinSummary {
-  margin-bottom: 20px;
-}
-
-.spinStats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.spinStats > div {
-  background-color: #f5f5f5;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-}
-
-.atomicSpinSection {
-  margin-top: 20px;
-}
-
-.atomicSpinSection h4 {
-  color: #2e7d32;
-  margin-bottom: 15px;
-}
-
-/* Orbital Overlap Analysis */
-.orbitalOverlapSummary {
-  margin-bottom: 20px;
-}
-
-.overlapStats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-}
-
-.overlapStats > div {
-  background-color: #f5f5f5;
-  padding: 12px;
-  border-radius: 6px;
-  border: 1px solid #e0e0e0;
-}
-
-.minimalTransformation {
-  color: #4caf50;
-  font-weight: 500;
-}
-
-.significantTransformation {
-  color: #ff9800;
-  font-weight: 500;
-}
-
-.activeOrbitalSection {
-  margin-top: 20px;
-}
-
-.activeOrbitalSection h4 {
-  color: #2e7d32;
-  margin-bottom: 15px;
-}
-
-.orbitalType {
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.orbitalType.occupied {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-}
-
-.orbitalType.partially_occupied {
-  background-color: #fff3e0;
-  color: #e65100;
-}
-
-.orbitalType.virtual {
-  background-color: #fce4ec;
-  color: #ad1457;
-}
-
-.orbitalType.unknown {
-  background-color: #f5f5f5;
-  color: #666;
-}
-
-/* CASSCF Orbital Rotation Analysis */
+.ciSummary,
+.spinSummary,
+.orbitalOverlapSummary,
 .rotationSummary {
   margin-bottom: 20px;
 }
 
+.ciStats,
+.spinStats,
+.overlapStats,
 .rotationStats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
 }
 
+.ciStats > div,
+.spinStats > div,
+.overlapStats > div,
 .rotationStats > div {
-  background-color: #f5f5f5;
-  padding: 12px;
+  background: white;
+  padding: 14px;
   border-radius: 6px;
   border: 1px solid #e0e0e0;
+  transition: all 0.2s ease;
+  color: #666;
 }
 
-.rotationExtent {
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
+.ciStats > div:hover,
+.spinStats > div:hover,
+.overlapStats > div:hover,
+.rotationStats > div:hover {
+  border-color: #50D4F5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.15);
 }
 
-.rotationExtent.minimal {
-  background-color: #e8f5e8;
-  color: #2e7d32;
-}
-
-.rotationExtent.moderate {
-  background-color: #fff3e0;
-  color: #e65100;
-}
-
-.rotationExtent.significant {
-  background-color: #fce4ec;
-  color: #ad1457;
-}
-
+.majorConfigsSection,
+.atomicSpinSection,
+.activeOrbitalSection,
 .orbitalSpaceRotations {
   margin-top: 20px;
 }
 
+.majorConfigsSection h4,
+.atomicSpinSection h4,
+.activeOrbitalSection h4,
 .orbitalSpaceRotations h4 {
-  color: #2e7d32;
-  margin-bottom: 15px;
+  color: #333;
+  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 600;
 }
 
-.rotationGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
+/* Orbital Type Badges */
+.orbitalType {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
 }
 
-.rotationGrid > div {
-  background-color: #f5f5f5;
-  padding: 12px;
+.orbitalType.occupied {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.orbitalType.partially_occupied {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.orbitalType.virtual {
+  background: #fce4ec;
+  color: #ad1457;
+}
+
+.orbitalType.unknown {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.minimalTransformation {
+  color: #065f46;
+  font-weight: 600;
+  padding: 4px 8px;
+  background: #d1fae5;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.significantTransformation {
+  color: #d97706;
+  font-weight: 600;
+  padding: 4px 8px;
+  background: #fed7aa;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Rotation Extent Badges */
+.rotationExtent {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.rotationExtent.minimal {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.rotationExtent.moderate {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+\.rotationExtent\.significant {
+  background: #fce4ec;
+  color: #ad1457;
+}
+
+/* Molecular Structure Section */
+.molecularStructureInfo {
+  margin-bottom: 12px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.xyzCoordinatesContainer {
+  margin-top: 16px;
+}
+
+\.xyzCoordinates {
+  background: #f8f9fa;
+  padding: 16px;
   border-radius: 6px;
+  overflow: auto;
+  font-size: 14px;
+  font-family: 'SF Mono', Monaco, monospace;
   border: 1px solid #e0e0e0;
+  margin-top: 12px;
+  line-height: 1.4;
+  color: #333;
+}
+
+/* Mulliken Charges Table */
+.mullikenChargeTable {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  font-size: 14px;
+}
+
+.mullikenChargeTable thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.mullikenChargeTable th {
+  padding: 12px 16px;
+  text-align: center;
+  font-weight: 600;
+  color: #333;
+}
+
+.mullikenChargeTable td {
+  padding: 12px 16px;
+  text-align: center;
+  border-bottom: 1px solid #f0f0f0;
+  color: #666;
+}
+
+.mullikenChargeTable tbody tr {
+  transition: background 0.2s ease;
+}
+
+.mullikenChargeTable tbody tr:hover {
+  background: #f0f8ff;
+}
+
+.mullikenChargeTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.chargeValueCell {
+  font-family: 'SF Mono', Monaco, monospace;
+  font-weight: 600;
+}
+
+.chargeValueCellPositive {
+  background: #ffebee;
+  color: #d32f2f;
+}
+
+.chargeValueCellNegative {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.chargeCharacterPositive {
+  color: #d32f2f;
+  font-weight: 600;
+}
+
+.chargeCharacterNegative {
+  color: #1976d2;
+  font-weight: 600;
+}
+
+\.chargeSummary {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: #f0f8ff;
+  border-radius: 6px;
+  border: 1px solid #50D4F5;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Small metadata text */
+.metaText {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* NTO Help Box */
+.ntoHelpBox {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f0f8ff;
+  border-radius: 6px;
+  border: 1px solid #50D4F5;
+}
+
+.ntoHelpTitle {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ntoHelpList {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ntoHelpList li {
+  margin-bottom: 8px;
+}
+
+.ntoNoData {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
 }

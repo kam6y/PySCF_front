@@ -80,7 +80,7 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [settings, setSettings] = useState({
-    broadening_fwhm: 100.0,
+    broadening_fwhm: 20.0,
     x_min: 400.0,
     x_max: 4000.0,
     show_peaks: true,
