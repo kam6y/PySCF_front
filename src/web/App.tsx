@@ -46,10 +46,6 @@ export const App = () => {
     appState.ui.setSearchQuery(query);
   };
 
-  const handleCreateNew = () => {
-    appState.calculation.createNewCalculation();
-  };
-
   const handleCalculationSelect = (calculationId: string) => {
     appState.actions.handleCalculationSelect(calculationId);
   };
@@ -140,8 +136,8 @@ export const App = () => {
       </button>
 
       <Header
-        onDropdownToggle={appState.ui.toggleDropdown}
-        onPlusClick={handleCreateNew}
+        onDropdownToggle={appState.actions.handleDropdownToggle}
+        onPlusClick={appState.actions.handleCreateNew}
         isDropdownOpen={appState.ui.isDropdownOpen}
         isSidebarOpen={appState.ui.isSidebarOpen}
         currentPageTitle={appState.ui.currentPageTitle}
@@ -173,7 +169,7 @@ export const App = () => {
             appState.ui.setCurrentPage('calculation-settings');
           }
         }}
-        onCreateNew={handleCreateNew}
+        onCreateNew={appState.actions.handleCreateNew}
         searchQuery={appState.ui.searchQuery}
         onSearchChange={handleSearchChange}
         onUserMenuToggle={appState.ui.toggleUserMenu}

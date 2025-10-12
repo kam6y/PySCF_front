@@ -61,14 +61,24 @@ export const useAppState = () => {
 
     // 統合されたアクション（複数ストアにまたがる操作）
     actions: {
-      // 新規計算作成（UI状態も更新）
-      handleCreateNew: calculationState.createNewCalculation,
+      // 新規計算作成（UI状態も更新、Agent画面をオフ）
+      handleCreateNew: () => {
+        calculationState.createNewCalculation();
+        uiState.setAIAgentEnabled(false);
+      },
 
-      // 計算選択（UI状態も更新）
+      // 計算選択（UI状態も更新、Agent画面をオフ）
       handleCalculationSelect: (calculationId: string) => {
         calculationState.selectCalculation(calculationId);
         calculationState.clearStaged();
         uiState.closeSidebar();
+        uiState.setAIAgentEnabled(false);
+      },
+
+      // ドロップダウントグル（Agent画面をオフ）
+      handleDropdownToggle: () => {
+        uiState.toggleDropdown();
+        uiState.setAIAgentEnabled(false);
       },
     },
   };
