@@ -55,6 +55,56 @@ def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
     return f"data: {json.dumps(event_data)}\n\n"
 
 
+def _normalize_markdown_codeblocks(text: str) -> str:
+    """
+    Normalize markdown to ensure code blocks are properly formatted.
+
+    This function ensures that markdown code blocks (```) have proper spacing
+    before them, which is required for correct markdown rendering.
+
+    Specifically:
+    - Ensures there is a newline before ``` code blocks
+    - Handles cases like "text,```code" -> "text,\n```code"
+    - Handles cases where content might be a list instead of a string
+
+    Args:
+        text: Raw markdown text that may have formatting issues
+
+    Returns:
+        Normalized markdown text with proper code block spacing
+
+    Example:
+        >>> text = "HOMO energy is -7.89 eV.,```orbital-viewer\ncalc_id: foo"
+        >>> _normalize_markdown_codeblocks(text)
+        "HOMO energy is -7.89 eV.,\n```orbital-viewer\ncalc_id: foo"
+    """
+    import re
+
+    # Handle case where text might not be a string
+    if not isinstance(text, str):
+        # If it's a list, join the text content
+        if isinstance(text, list):
+            text_parts = []
+            for item in text:
+                if isinstance(item, str):
+                    text_parts.append(item)
+                elif isinstance(item, dict) and 'text' in item:
+                    text_parts.append(item['text'])
+                elif hasattr(item, 'text'):
+                    text_parts.append(item.text)
+            text = ''.join(text_parts)
+        else:
+            # Convert to string as fallback
+            text = str(text)
+
+    # Pattern: any non-whitespace character followed immediately by ```
+    # Replace with the same character, newline, then ```
+    # This handles cases like: "text,```code" or "text.```code"
+    text = re.sub(r'([^\s\n])(```)', r'\1\n\2', text)
+
+    return text
+
+
 def _convert_dict_to_langchain_format(history: List[Dict[str, Any]]) -> List[BaseMessage]:
     """
     Convert frontend message history format to LangChain BaseMessage format.
@@ -217,9 +267,10 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                                         })
                                         supervisor_response_started = True
 
-                                    # Stream the supervisor's response
-                                    logger.info(f"Streaming supervisor response, length: {len(last_message.content)}, preview: {last_message.content[:200]}...")
-                                    yield _format_sse_event("chunk", {"text": last_message.content})
+                                    # Stream the supervisor's response (with markdown normalization)
+                                    normalized_content = _normalize_markdown_codeblocks(last_message.content)
+                                    logger.info(f"Streaming supervisor response, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
+                                    yield _format_sse_event("chunk", {"text": normalized_content})
             else:
                 # Regular dict format (parent graph without namespace)
                 logger.debug(f"Dict format update: {list(chunk.keys())}")
@@ -254,9 +305,10 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                                     })
                                     supervisor_response_started = True
 
-                                # Stream the response
-                                logger.info(f"Streaming response from {node_name}, length: {len(last_message.content)}, preview: {last_message.content[:200]}...")
-                                yield _format_sse_event("chunk", {"text": last_message.content})
+                                # Stream the response (with markdown normalization)
+                                normalized_content = _normalize_markdown_codeblocks(last_message.content)
+                                logger.info(f"Streaming response from {node_name}, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
+                                yield _format_sse_event("chunk", {"text": normalized_content})
 
         logger.debug("Stream completed successfully")
 
