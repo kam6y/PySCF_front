@@ -488,7 +488,10 @@ export const streamChatWithAgent = (
     onMessage: (chunk: string) => void;
     onClose: () => void;
     onError: (error: Error) => void;
-    onAgentStatus?: (status: 'running' | 'completed' | 'responding', agent: string) => void;
+    onAgentStatus?: (
+      status: 'running' | 'completed' | 'responding',
+      agent: string
+    ) => void;
   }
 ) => {
   const ctrl = new AbortController();
@@ -552,7 +555,10 @@ export const streamChatWithAgent = (
             agent: parsedData.payload.agent,
           });
           if (callbacks.onAgentStatus) {
-            callbacks.onAgentStatus(parsedData.payload.status, parsedData.payload.agent);
+            callbacks.onAgentStatus(
+              parsedData.payload.status,
+              parsedData.payload.agent
+            );
           }
         } else if (parsedData.type === 'done') {
           debug('Stream completed');
@@ -569,7 +575,8 @@ export const streamChatWithAgent = (
             isStreamClosed = true;
             callbacks.onError(
               new Error(
-                parsedData.payload?.message || 'An unknown stream error occurred.'
+                parsedData.payload?.message ||
+                  'An unknown stream error occurred.'
               )
             );
           }

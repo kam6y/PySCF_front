@@ -72,17 +72,40 @@
   color: #e74c3c;
 }
 
-/* SVG container */
+/* Viewer container for ReactSVGPanZoom */
+.viewerContainer {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fafafa;
+}
+
+/* ReactSVGPanZoom toolbar styling */
+.viewerContainer :global(.react-svg-pan-zoom-toolbar) {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.viewerContainer :global(.react-svg-pan-zoom-toolbar > *) {
+  cursor: pointer;
+  padding: 5px;
+}
+
+.viewerContainer :global(.react-svg-pan-zoom-toolbar > *:hover) {
+  background-color: #f0f0f0;
+}
+
+/* SVG container (legacy, kept for compatibility) */
 .svgContainer {
   overflow-x: auto;
   overflow-y: hidden;
 }
 
 .diagramSvg {
-  border: 1px solid #eee;
-  border-radius: 4px;
-  background-color: #fafafa;
-  min-width: 600px;
+  background-color: transparent;
 }
 
 /* Legend */

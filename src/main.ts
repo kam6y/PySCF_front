@@ -262,7 +262,12 @@ const createCleanEnvironment = (
   const cleanEnv: Record<string, string> = {};
 
   // pyenv関連の環境変数を除外してコピー
-  const excludeKeys = ['PYENV_ROOT', 'PYENV_SHELL', 'PYENV_VERSION', 'PYENV_DIR'];
+  const excludeKeys = [
+    'PYENV_ROOT',
+    'PYENV_SHELL',
+    'PYENV_VERSION',
+    'PYENV_DIR',
+  ];
   for (const [key, value] of Object.entries(process.env)) {
     if (value !== undefined && !excludeKeys.includes(key)) {
       cleanEnv[key] = value;

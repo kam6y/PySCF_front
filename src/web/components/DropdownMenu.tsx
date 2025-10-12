@@ -1,9 +1,7 @@
 import React from 'react';
 import styles from './DropdownMenu.module.css';
 
-export type DropdownOption =
-  | 'calculation-settings'
-  | 'calculation-results';
+export type DropdownOption = 'calculation-settings' | 'calculation-results';
 
 interface DropdownMenuProps {
   isOpen: boolean;

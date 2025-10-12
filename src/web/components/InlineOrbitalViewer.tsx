@@ -1,7 +1,10 @@
 // src/web/components/InlineOrbitalViewer.tsx
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useGetOrbitals, useGetOrbitalCube } from '../hooks/useCalculationQueries';
+import {
+  useGetOrbitals,
+  useGetOrbitalCube,
+} from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
 import styles from './InlineOrbitalViewer.module.css';
 
@@ -115,7 +118,10 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
               newViewer.resize();
               newViewer.render();
             } catch (error) {
-              console.error('Failed to resize viewer after initialization:', error);
+              console.error(
+                'Failed to resize viewer after initialization:',
+                error
+              );
             }
           }
         }, 100);
@@ -131,7 +137,9 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
             500 * (retryCount + 1)
           );
         } else {
-          onError?.('Failed to initialize molecular viewer after multiple attempts');
+          onError?.(
+            'Failed to initialize molecular viewer after multiple attempts'
+          );
         }
       }
     };
@@ -195,7 +203,11 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
         hasContent: !!cubeContent,
       });
 
-      if (!cubeContent || typeof cubeContent !== 'string' || cubeContent.length < 100) {
+      if (
+        !cubeContent ||
+        typeof cubeContent !== 'string' ||
+        cubeContent.length < 100
+      ) {
         throw new Error('Invalid CUBE data');
       }
 
@@ -228,7 +240,10 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
             viewer.render();
           }
         } catch (delayedRenderError) {
-          console.error('Failed to perform delayed re-render:', delayedRenderError);
+          console.error(
+            'Failed to perform delayed re-render:',
+            delayedRenderError
+          );
         }
       }, 200);
 
@@ -253,7 +268,9 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
   useEffect(() => {
     if (cubeError) {
       console.error('Failed to load orbital visualization data:', cubeError);
-      onError?.(cubeError.message || 'Failed to load orbital visualization data');
+      onError?.(
+        cubeError.message || 'Failed to load orbital visualization data'
+      );
     }
   }, [cubeError, onError]);
 
@@ -270,7 +287,9 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
     return (
       <div className={styles.errorContainer}>
         <div>❌ Failed to load orbital data</div>
-        {orbitalsError && <div className={styles.errorDetail}>{orbitalsError.message}</div>}
+        {orbitalsError && (
+          <div className={styles.errorDetail}>{orbitalsError.message}</div>
+        )}
       </div>
     );
   }
@@ -292,12 +311,12 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
       {/* 軌道情報ヘッダー */}
       <div className={styles.orbitalHeader}>
         <div className={styles.orbitalTitle}>
-          <strong>{selectedOrbital.label}</strong> (Orbital #{selectedOrbital.index})
+          <strong>{selectedOrbital.label}</strong> (Orbital #
+          {selectedOrbital.index})
         </div>
         <div className={styles.orbitalInfo}>
           Energy: <code>{selectedOrbital.energy_ev.toFixed(4)} eV</code> (
-          <code>{selectedOrbital.energy_hartree.toFixed(6)} a.u.</code>)
-          {' | '}
+          <code>{selectedOrbital.energy_hartree.toFixed(6)} a.u.</code>){' | '}
           Occupancy: <code>{selectedOrbital.occupancy}</code>
         </div>
       </div>
@@ -325,7 +344,9 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
       {/* 簡易コントロール */}
       <div className={styles.simpleControls}>
         <div className={styles.controlRow}>
-          <label>Positive Isovalue: {viewerOptions.isovaluePos.toFixed(3)}</label>
+          <label>
+            Positive Isovalue: {viewerOptions.isovaluePos.toFixed(3)}
+          </label>
           <input
             type="range"
             min="0.001"
@@ -341,7 +362,9 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> = ({
           />
         </div>
         <div className={styles.controlRow}>
-          <label>Negative Isovalue: {viewerOptions.isovalueNeg.toFixed(3)}</label>
+          <label>
+            Negative Isovalue: {viewerOptions.isovalueNeg.toFixed(3)}
+          </label>
           <input
             type="range"
             min="-0.1"

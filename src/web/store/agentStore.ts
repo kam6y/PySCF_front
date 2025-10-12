@@ -60,7 +60,8 @@ export const useAgentStore = create<AgentState>()(
       clearHistory: () => set({ history: [] }),
 
       // エージェントステータスを設定
-      setAgentStatus: (status: AgentStatus) => set({ currentAgentStatus: status }),
+      setAgentStatus: (status: AgentStatus) =>
+        set({ currentAgentStatus: status }),
     }),
     {
       name: 'pyscf-agent-storage', // localStorageのキー名

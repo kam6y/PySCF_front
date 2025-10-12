@@ -7,7 +7,9 @@ export interface ElectronAPI {
   removeAllListeners: (channel: string) => void;
   onSetFlaskPort: (callback: (port: number) => void) => () => void;
   getFlaskPort: () => Promise<number | null>;
-  openExternalUrl: (url: string) => Promise<{ success: boolean; error?: string }>;
+  openExternalUrl: (
+    url: string
+  ) => Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {

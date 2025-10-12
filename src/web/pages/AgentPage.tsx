@@ -22,21 +22,21 @@ type ConfirmationRequest = {
 const parseOrbitalViewerParams = (code: string): Record<string, any> => {
   const params: Record<string, any> = {};
   const lines = code.trim().split('\n');
-  
+
   lines.forEach(line => {
     const colonIndex = line.indexOf(':');
     if (colonIndex === -1) return;
-    
+
     const key = line.substring(0, colonIndex).trim();
     const value = line.substring(colonIndex + 1).trim();
-    
+
     if (!key || !value) return;
-    
+
     // 数値に変換できる場合は数値として扱う
     const numValue = Number(value);
     params[key] = isNaN(numValue) ? value : numValue;
   });
-  
+
   return params;
 };
 
@@ -277,7 +277,7 @@ export const AgentPage = () => {
   // メッセージ送信処理
   const handleSendMessage = useCallback(() => {
     const trimmedMessage = currentMessage.trim();
-    
+
     // 重複送信を防止（同期的にチェック）
     if (!trimmedMessage || isLoading || isSendingRef.current) {
       return;
@@ -333,7 +333,8 @@ export const AgentPage = () => {
           // エージェントステータスを更新
           setAgentStatus({
             agent: agent as AgentStatus['agent'],
-            status: status === 'running' || status === 'responding' ? status : 'idle'
+            status:
+              status === 'running' || status === 'responding' ? status : 'idle',
           });
         },
         onClose: () => {
@@ -470,9 +471,9 @@ export const AgentPage = () => {
   // エージェント表示名を取得
   const getAgentDisplayName = (agent: string) => {
     const names: Record<string, string> = {
-      'supervisor': 'Supervisor',
-      'quantum_calculation_worker': 'Quantum Calculation Worker',
-      'research_expert': 'Research Expert'
+      supervisor: 'Supervisor',
+      quantum_calculation_worker: 'Quantum Calculation Worker',
+      research_expert: 'Research Expert',
     };
     return names[agent] || agent;
   };
@@ -537,41 +538,61 @@ export const AgentPage = () => {
                               childrenType: typeof children,
                               children: children,
                             });
-                            
+
                             // Check if this pre contains an orbital-viewer code block
-                            if (React.isValidElement(children) && children.props) {
+                            if (
+                              React.isValidElement(children) &&
+                              children.props
+                            ) {
                               const codeProps = children.props as any;
                               const className = codeProps.className;
-                              
+
                               console.log('[Pre > Code Debug]', {
                                 className,
                                 hasClassName: !!className,
-                                isOrbitalViewer: className?.includes('language-orbital-viewer'),
+                                isOrbitalViewer: className?.includes(
+                                  'language-orbital-viewer'
+                                ),
                               });
-                              
-                              if (className?.includes('language-orbital-viewer')) {
+
+                              if (
+                                className?.includes('language-orbital-viewer')
+                              ) {
                                 try {
-                                  const codeContent = String(codeProps.children).replace(/\n$/, '');
-                                  const params = parseOrbitalViewerParams(codeContent);
-                                  
-                                  console.log('[Orbital Viewer] Parsed params:', params);
-                                  
+                                  const codeContent = String(
+                                    codeProps.children
+                                  ).replace(/\n$/, '');
+                                  const params =
+                                    parseOrbitalViewerParams(codeContent);
+
+                                  console.log(
+                                    '[Orbital Viewer] Parsed params:',
+                                    params
+                                  );
+
                                   // Validate required parameters
-                                  if (!params.calculation_id || params.orbital_index === undefined) {
+                                  if (
+                                    !params.calculation_id ||
+                                    params.orbital_index === undefined
+                                  ) {
                                     return (
-                                      <div style={{
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '8px',
-                                        color: '#dc2626',
-                                        margin: '12px 0'
-                                      }}>
-                                        ❌ Invalid orbital-viewer block: missing required parameters (calculation_id, orbital_index)
+                                      <div
+                                        style={{
+                                          padding: '12px',
+                                          backgroundColor: '#fef2f2',
+                                          border: '1px solid #fecaca',
+                                          borderRadius: '8px',
+                                          color: '#dc2626',
+                                          margin: '12px 0',
+                                        }}
+                                      >
+                                        ❌ Invalid orbital-viewer block: missing
+                                        required parameters (calculation_id,
+                                        orbital_index)
                                       </div>
                                     );
                                   }
-                                  
+
                                   // Render InlineOrbitalViewer component
                                   return (
                                     <InlineOrbitalViewer
@@ -580,8 +601,11 @@ export const AgentPage = () => {
                                       grid_size={params.grid_size}
                                       isovalue_pos={params.isovalue_pos}
                                       isovalue_neg={params.isovalue_neg}
-                                      onError={(error) => {
-                                        console.error('Orbital viewer error:', error);
+                                      onError={error => {
+                                        console.error(
+                                          'Orbital viewer error:',
+                                          error
+                                        );
                                         addNotification({
                                           type: 'error',
                                           title: 'Orbital Viewer Error',
@@ -593,23 +617,31 @@ export const AgentPage = () => {
                                     />
                                   );
                                 } catch (error) {
-                                  console.error('Failed to render orbital viewer:', error);
+                                  console.error(
+                                    'Failed to render orbital viewer:',
+                                    error
+                                  );
                                   return (
-                                    <div style={{
-                                      padding: '12px',
-                                      backgroundColor: '#fef2f2',
-                                      border: '1px solid #fecaca',
-                                      borderRadius: '8px',
-                                      color: '#dc2626',
-                                      margin: '12px 0'
-                                    }}>
-                                      ❌ Failed to render orbital viewer: {error instanceof Error ? error.message : String(error)}
+                                    <div
+                                      style={{
+                                        padding: '12px',
+                                        backgroundColor: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        color: '#dc2626',
+                                        margin: '12px 0',
+                                      }}
+                                    >
+                                      ❌ Failed to render orbital viewer:{' '}
+                                      {error instanceof Error
+                                        ? error.message
+                                        : String(error)}
                                     </div>
                                   );
                                 }
                               }
                             }
-                            
+
                             // Default pre rendering
                             return <pre {...props}>{children}</pre>;
                           },
@@ -622,30 +654,44 @@ export const AgentPage = () => {
                               childrenType: typeof children,
                               childrenValue: String(children).substring(0, 100),
                             });
-                            
+
                             // Check if this is an orbital-viewer code block
                             const inline = props.inline;
-                            if (!inline && className?.includes('language-orbital-viewer')) {
+                            if (
+                              !inline &&
+                              className?.includes('language-orbital-viewer')
+                            ) {
                               try {
-                                const codeContent = String(children).replace(/\n$/, '');
-                                const params = parseOrbitalViewerParams(codeContent);
-                                
+                                const codeContent = String(children).replace(
+                                  /\n$/,
+                                  ''
+                                );
+                                const params =
+                                  parseOrbitalViewerParams(codeContent);
+
                                 // Validate required parameters
-                                if (!params.calculation_id || params.orbital_index === undefined) {
+                                if (
+                                  !params.calculation_id ||
+                                  params.orbital_index === undefined
+                                ) {
                                   return (
-                                    <div style={{
-                                      padding: '12px',
-                                      backgroundColor: '#fef2f2',
-                                      border: '1px solid #fecaca',
-                                      borderRadius: '8px',
-                                      color: '#dc2626',
-                                      margin: '12px 0'
-                                    }}>
-                                      ❌ Invalid orbital-viewer block: missing required parameters (calculation_id, orbital_index)
+                                    <div
+                                      style={{
+                                        padding: '12px',
+                                        backgroundColor: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        color: '#dc2626',
+                                        margin: '12px 0',
+                                      }}
+                                    >
+                                      ❌ Invalid orbital-viewer block: missing
+                                      required parameters (calculation_id,
+                                      orbital_index)
                                     </div>
                                   );
                                 }
-                                
+
                                 // Render InlineOrbitalViewer component
                                 return (
                                   <InlineOrbitalViewer
@@ -654,8 +700,11 @@ export const AgentPage = () => {
                                     grid_size={params.grid_size}
                                     isovalue_pos={params.isovalue_pos}
                                     isovalue_neg={params.isovalue_neg}
-                                    onError={(error) => {
-                                      console.error('Orbital viewer error:', error);
+                                    onError={error => {
+                                      console.error(
+                                        'Orbital viewer error:',
+                                        error
+                                      );
                                       addNotification({
                                         type: 'error',
                                         title: 'Orbital Viewer Error',
@@ -667,22 +716,30 @@ export const AgentPage = () => {
                                   />
                                 );
                               } catch (error) {
-                                console.error('Failed to render orbital viewer:', error);
+                                console.error(
+                                  'Failed to render orbital viewer:',
+                                  error
+                                );
                                 return (
-                                  <div style={{
-                                    padding: '12px',
-                                    backgroundColor: '#fef2f2',
-                                    border: '1px solid #fecaca',
-                                    borderRadius: '8px',
-                                    color: '#dc2626',
-                                    margin: '12px 0'
-                                  }}>
-                                    ❌ Failed to render orbital viewer: {error instanceof Error ? error.message : String(error)}
+                                  <div
+                                    style={{
+                                      padding: '12px',
+                                      backgroundColor: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      borderRadius: '8px',
+                                      color: '#dc2626',
+                                      margin: '12px 0',
+                                    }}
+                                  >
+                                    ❌ Failed to render orbital viewer:{' '}
+                                    {error instanceof Error
+                                      ? error.message
+                                      : String(error)}
                                   </div>
                                 );
                               }
                             }
-                            
+
                             // Default code block rendering
                             return (
                               <code className={className} {...props}>
@@ -693,22 +750,37 @@ export const AgentPage = () => {
                           a: ({ href, children, ...props }: any) => {
                             // Handle external links - open in default browser
                             const handleClick = async (e: React.MouseEvent) => {
-                              if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+                              if (
+                                href &&
+                                (href.startsWith('http://') ||
+                                  href.startsWith('https://'))
+                              ) {
                                 e.preventDefault();
                                 try {
-                                  const result = await window.electronAPI.openExternalUrl(href);
+                                  const result =
+                                    await window.electronAPI.openExternalUrl(
+                                      href
+                                    );
                                   if (!result.success) {
-                                    console.error('Failed to open URL:', result.error);
+                                    console.error(
+                                      'Failed to open URL:',
+                                      result.error
+                                    );
                                     addNotification({
                                       type: 'error',
                                       title: 'Failed to open link',
-                                      message: result.error || 'Could not open the URL in your browser.',
+                                      message:
+                                        result.error ||
+                                        'Could not open the URL in your browser.',
                                       autoClose: true,
                                       duration: 5000,
                                     });
                                   }
                                 } catch (error) {
-                                  console.error('Error opening external URL:', error);
+                                  console.error(
+                                    'Error opening external URL:',
+                                    error
+                                  );
                                   addNotification({
                                     type: 'error',
                                     title: 'Failed to open link',
@@ -752,7 +824,9 @@ export const AgentPage = () => {
             {currentAgentStatus.status === 'running' && (
               <>
                 <div className={styles.spinner} />
-                <span>{getAgentDisplayName(currentAgentStatus.agent)}が動作中...</span>
+                <span>
+                  {getAgentDisplayName(currentAgentStatus.agent)}が動作中...
+                </span>
               </>
             )}
             {currentAgentStatus.status === 'responding' && (

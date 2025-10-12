@@ -15,5 +15,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     };
   },
   getFlaskPort: () => ipcRenderer.invoke('get-flask-port'),
-  openExternalUrl: (url: string) => ipcRenderer.invoke('open-external-url', url),
+  openExternalUrl: (url: string) =>
+    ipcRenderer.invoke('open-external-url', url),
 });
