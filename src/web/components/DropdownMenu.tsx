@@ -3,8 +3,7 @@ import styles from './DropdownMenu.module.css';
 
 export type DropdownOption =
   | 'calculation-settings'
-  | 'calculation-results'
-  | 'draw-molecule';
+  | 'calculation-results';
 
 interface DropdownMenuProps {
   isOpen: boolean;
@@ -108,26 +107,6 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
             />
           </svg>
           <span>Calculation results</span>
-        </div>
-
-        <div
-          className={`${styles.dropdownItem} ${selectedOption === 'draw-molecule' ? styles.selected : ''}`}
-          onClick={() => handleOptionClick('draw-molecule')}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className={styles.dropdownIcon}
-          >
-            <path
-              d="M12.854 1.854a.5.5 0 0 0-.708-.708L10.5 2.793 8.354.646a.5.5 0 1 0-.708.708L9.293 3 1.146 11.146a.5.5 0 0 0-.146.354V14a.5.5 0 0 0 .5.5h2.5a.5.5 0 0 0 .354-.146L12.5 6.207l1.647 1.647a.5.5 0 0 0 .708-.708L12.707 5l1.647-1.647a.5.5 0 0 0 0-.708L12.854 1.854zM11.207 4L4 11.207V13h1.793L13 5.793 11.207 4z"
-              fill="currentColor"
-            />
-          </svg>
-          <span>Draw molecule</span>
         </div>
       </div>
     </>

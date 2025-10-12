@@ -8,7 +8,6 @@ import { Sidebar } from './components/Sidebar';
 import { ToastContainer } from './components/ToastContainer';
 import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
 import { CalculationResultsPage } from './pages/CalculationResultsPage';
-import { DrawMoleculePage } from './pages/DrawMoleculePage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AgentPage } from './pages/AgentPage';
 import { useAppState } from './hooks/useAppState';
@@ -87,8 +86,6 @@ export const App = () => {
             onCalculationUpdate={calculationActions.handleCalculationUpdate}
           />
         );
-      case 'draw-molecule':
-        return <DrawMoleculePage />;
       default:
         return (
           <CalculationSettingsPage
