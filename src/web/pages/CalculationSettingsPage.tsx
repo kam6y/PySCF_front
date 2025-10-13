@@ -97,13 +97,16 @@ export const CalculationSettingsPage = ({
 
       const xyz = activeCalculation.parameters?.xyz;
       if (xyz && xyz.trim() !== '') {
-        moleculeViewerRef.current?.loadXYZ(xyz);
-        // Apply the current style after loading the molecule
-        if (currentStyleRef.current) {
-          setTimeout(() => {
-            moleculeViewerRef.current?.setStyle(currentStyleRef.current!);
-          }, 100); // Small delay to ensure the molecule is fully loaded
-        }
+        // Ensure viewer is initialized before loading molecule
+        setTimeout(() => {
+          moleculeViewerRef.current?.loadXYZ(xyz);
+          // Apply the current style after loading the molecule
+          if (currentStyleRef.current) {
+            setTimeout(() => {
+              moleculeViewerRef.current?.setStyle(currentStyleRef.current!);
+            }, 100); // Small delay to ensure the molecule is fully loaded
+          }
+        }, 0);
       } else {
         moleculeViewerRef.current?.clearModels();
       }
