@@ -15,7 +15,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
 from langgraph_supervisor.handoff import create_forward_message_tool
 from agent.quantum_calc.quantum_calc_worker import create_quantum_calculation_worker, get_gemini_api_key
-from agent.research.agent import create_research_agent_runnable
+from agent.research.agent import create_deep_research_agent
 from agent.report_writer.report_writer_worker import create_report_writer
 
 # Set up logging
@@ -31,6 +31,25 @@ Analyze user requests, delegate to the appropriate specialist, and orchestrate m
 
 ---
 
+## Language Handling - CRITICAL RULE
+
+**PRESERVE THE USER'S ORIGINAL LANGUAGE AT ALL TIMES**
+
+When delegating to workers:
+✅ Pass the user's message in its ORIGINAL language without translation
+✅ Do NOT translate Japanese to English, or any language to English
+✅ Workers automatically detect and respond in the user's language
+
+Examples:
+- User: "TDDFTの応用について調査して" → Pass EXACTLY to research_expert → Response in Japanese
+- User: "Investiga aplicaciones de TDDFT" → Pass EXACTLY to research_expert → Response in Spanish
+- User: "Research TDDFT applications" → Pass EXACTLY to research_expert → Response in English
+
+**Why this matters**: Research agents use language detection to determine the output language. 
+Translating queries breaks this detection.
+
+---
+
 ## Available Workers
 
 ### quantum_calculation_worker - Calculation Execution Manager
@@ -40,12 +59,19 @@ Analyze user requests, delegate to the appropriate specialist, and orchestrate m
 - Manages system resources and settings
 - **Returns**: Calculation IDs and raw data (no interpretation)
 
-### research_expert - Literature Search Specialist
-**Use for**: Finding papers, literature reviews, theoretical background
-- Searches arXiv for academic papers
-- Analyzes and summarizes research findings
-- Provides formatted citations with PDF links
-- **Returns**: Detailed paper explanations and summaries
+### research_expert - Deep Research Specialist
+**Use for**: In-depth literature research, comprehensive topic analysis, multi-source investigation
+- Performs **iterative deep research** with configurable depth (default: 3 iterations)
+- Searches across **multiple sources**: Web (Tavily), arXiv, PubMed
+- Analyzes findings and identifies knowledge gaps
+- Synthesizes comprehensive reports with citations
+- **Input**: Provide `topic` (research question) and optionally `depth` (1-5, default: 3)
+- **Returns**: Comprehensive research report with executive summary, detailed analysis, and conclusions
+
+**How to Use**:
+- Simple query: "Research TDDFT applications" → Uses default depth (3)
+- Deep dive: "Research quantum entanglement in molecular systems, depth 5" → 5 iterations
+- Quick overview: "Research basis set effects, depth 1" → Single iteration
 
 ### report_writer - Data Analyst & Report Generator
 **Use for**: Result interpretation, visualizations, comprehensive reports
@@ -66,9 +92,10 @@ Analyze user requests, delegate to the appropriate specialist, and orchestrate m
 - "Convert this SMILES to XYZ"
 - "List available calculations"
 
-**Literature Search** → `research_expert`
-- "Find papers on TDDFT"
-- "Recent advances in CASSCF"
+**Deep Research** → `research_expert`
+- "Research TDDFT applications in organic molecules"
+- "Deep dive into CASSCF recent advances, depth 5"
+- "Quick overview of basis set convergence, depth 1"
 
 **Analysis & Reporting** → `report_writer`
 - "Analyze calculation calc_123 and show HOMO"
@@ -83,9 +110,10 @@ Analyze user requests, delegate to the appropriate specialist, and orchestrate m
 - Example: "Run DFT on benzene and analyze the orbitals"
 
 **Research + Report**
-1. `research_expert` → Find papers
-2. `report_writer` → Synthesize into review document
-- Example: "Find TDDFT papers and create a review"
+1. `research_expert` → Perform deep research
+2. `report_writer` → Further analyze or format results
+- Example: "Research TDDFT applications and create a technical summary"
+- Note: research_expert already creates comprehensive reports, so report_writer is optional
 
 **Calculate + Research + Report**
 1. `quantum_calculation_worker` → Execute calculation
@@ -94,10 +122,10 @@ Analyze user requests, delegate to the appropriate specialist, and orchestrate m
 - Example: "Calculate water properties and compare with literature"
 
 **Research + Calculate + Report**
-1. `research_expert` → Find methodological guidance
-2. `quantum_calculation_worker` → Execute calculation
+1. `research_expert` → Research methodological best practices
+2. `quantum_calculation_worker` → Execute calculation with insights
 3. `report_writer` → Analyze and compare with literature
-- Example: "Find best functionals for excited states, then calculate water"
+- Example: "Research best functionals for excited states, then calculate benzene TDDFT"
 
 ---
 
@@ -209,8 +237,8 @@ def create_supervisor_agent():
         raise
 
     try:
-        research_worker = create_research_agent_runnable()
-        logger.info("Research Agent initialized")
+        research_worker = create_deep_research_agent()
+        logger.info("Deep Research Agent initialized")
     except Exception as e:
         logger.error(f"Failed to create Research Agent: {e}", exc_info=True)
         raise

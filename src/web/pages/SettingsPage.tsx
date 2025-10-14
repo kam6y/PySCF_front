@@ -22,11 +22,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     number | undefined
   >(undefined);
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
+  const [tavilyApiKey, setTavilyApiKey] = useState<string>('');
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
     maxCpuUtilization?: number;
     maxMemoryUtilization?: number;
     geminiApiKey?: string;
+    tavilyApiKey?: string;
   }>({});
 
   const { settings, isLoading, isUpdating, error, updateSettings } =
@@ -55,6 +57,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           ? maxMemoryUtilizationValue
           : DEFAULT_MAX_MEMORY_UTILIZATION,
         geminiApiKey: settings.gemini_api_key || '',
+        tavilyApiKey: settings.tavily_api_key || '',
       };
 
       if (process.env.NODE_ENV === 'development') {
@@ -65,6 +68,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxCpuUtilization(newValues.maxCpuUtilization);
       setMaxMemoryUtilization(newValues.maxMemoryUtilization);
       setGeminiApiKey(newValues.geminiApiKey);
+      setTavilyApiKey(newValues.tavilyApiKey);
       setOriginalValues(newValues);
 
       if (process.env.NODE_ENV === 'development') {
@@ -87,6 +91,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
         gemini_api_key: geminiApiKey || null,
+        tavily_api_key: tavilyApiKey || null,
       });
 
       const newValues = {
@@ -94,6 +99,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         maxCpuUtilization,
         maxMemoryUtilization,
         geminiApiKey,
+        tavilyApiKey,
       };
       setOriginalValues(newValues);
     } catch (error) {
@@ -103,6 +109,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxCpuUtilization(originalValues.maxCpuUtilization);
       setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
       setGeminiApiKey(originalValues.geminiApiKey || '');
+      setTavilyApiKey(originalValues.tavilyApiKey || '');
     }
   };
 
@@ -111,6 +118,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setMaxCpuUtilization(originalValues.maxCpuUtilization);
     setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
     setGeminiApiKey(originalValues.geminiApiKey || '');
+    setTavilyApiKey(originalValues.tavilyApiKey || '');
   };
 
   const hasUnsavedChanges = useMemo(() => {
@@ -125,7 +133,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const currentCpu = maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
     const currentMemory =
       maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
-    const currentApiKey = geminiApiKey;
+    const currentGeminiApiKey = geminiApiKey;
+    const currentTavilyApiKey = tavilyApiKey;
 
     const originalParallel =
       originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
@@ -133,27 +142,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       originalValues.maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
     const originalMemory =
       originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
-    const originalApiKey = originalValues.geminiApiKey || '';
+    const originalGeminiApiKey = originalValues.geminiApiKey || '';
+    const originalTavilyApiKey = originalValues.tavilyApiKey || '';
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
     const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
-    const apiKeyChanged = currentApiKey !== originalApiKey;
+    const geminiApiKeyChanged = currentGeminiApiKey !== originalGeminiApiKey;
+    const tavilyApiKeyChanged = currentTavilyApiKey !== originalTavilyApiKey;
 
     const hasChanges =
-      parallelChanged || cpuChanged || memoryChanged || apiKeyChanged;
+      parallelChanged || cpuChanged || memoryChanged || geminiApiKeyChanged || tavilyApiKeyChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
       console.log('SettingsPage: hasUnsavedChanges check', {
-        current: { currentParallel, currentCpu, currentMemory, currentApiKey },
+        current: { currentParallel, currentCpu, currentMemory, currentGeminiApiKey, currentTavilyApiKey },
         original: {
           originalParallel,
           originalCpu,
           originalMemory,
-          originalApiKey,
+          originalGeminiApiKey,
+          originalTavilyApiKey,
         },
-        changes: { parallelChanged, cpuChanged, memoryChanged, apiKeyChanged },
+        changes: { parallelChanged, cpuChanged, memoryChanged, geminiApiKeyChanged, tavilyApiKeyChanged },
         hasChanges,
       });
     }
@@ -164,10 +176,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     maxCpuUtilization,
     maxMemoryUtilization,
     geminiApiKey,
+    tavilyApiKey,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
     originalValues?.maxMemoryUtilization,
     originalValues?.geminiApiKey,
+    originalValues?.tavilyApiKey,
   ]);
 
   if (isLoading) {
@@ -453,6 +467,51 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   ) : (
                     <span className={styles.statusNotConfigured}>
                       ⚠ API Key Not Set
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.settingItem}>
+            <div className={styles.settingLabel}>
+              <label htmlFor="tavilyApiKey">Tavily API Key</label>
+              <p className={styles.settingHelp}>
+                API key for Tavily web search to enable Deep Research functionality.
+                Used by the research agent to search the latest information on the web.
+                Leave empty to disable web search (arXiv and PubMed will still work).
+              </p>
+            </div>
+
+            <div className={styles.settingControl}>
+              <div className={styles.textInputContainer}>
+                <input
+                  id="tavilyApiKey"
+                  type="password"
+                  placeholder="Enter your Tavily API key..."
+                  value={tavilyApiKey}
+                  onChange={e => {
+                    const newValue = e.target.value;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log(
+                        'SettingsPage: tavilyApiKey changed (length)',
+                        newValue.length
+                      );
+                    }
+                    setTavilyApiKey(newValue);
+                  }}
+                  className={styles.textInput}
+                  disabled={isUpdating}
+                />
+                <div className={styles.inputStatus}>
+                  {tavilyApiKey ? (
+                    <span className={styles.statusConfigured}>
+                      ✓ API Key Configured
+                    </span>
+                  ) : (
+                    <span className={styles.statusNotConfigured}>
+                      ⚠ API Key Not Set (Web search disabled)
                     </span>
                   )}
                 </div>

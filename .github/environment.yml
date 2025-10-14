@@ -9,6 +9,8 @@ dependencies:
   - rdkit=2025.03.6
   - geometric=1.1
   - ase=3.26.0
+  # Bioinformatics (for PubMed search)
+  - biopython=1.85
   # Web framework and networking
   - flask=3.1.2
   - requests=2.32.5
@@ -44,5 +46,6 @@ dependencies:
     - langgraph==0.6.8
     - langchain-google-genai==2.1.12
     - langgraph-supervisor>=0.0.29
-    # arXiv API client for research agent
+    # Research agent search tools
     - arxiv
+    - langchain-tavily>=0.2.0

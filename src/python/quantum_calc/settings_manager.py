@@ -50,7 +50,8 @@ class SettingsManager:
             max_memory_utilization_percent=95.0,
             system_total_cores=total_cores,
             system_total_memory_mb=total_memory_mb,
-            gemini_api_key=None
+            gemini_api_key=None,
+            tavily_api_key=None
         )
     
     def load_settings(self) -> AppSettings:

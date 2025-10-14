@@ -1737,6 +1737,11 @@ components:
           nullable: true
           description: Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
           example: null
+        tavily_api_key:
+          type: string
+          nullable: true
+          description: Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
+          example: null
 
     SettingsResponse:
       type: object

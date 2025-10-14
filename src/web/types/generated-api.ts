@@ -990,6 +990,11 @@ export interface components {
              * @example null
              */
             gemini_api_key?: string | null;
+            /**
+             * @description Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
+             * @example null
+             */
+            tavily_api_key?: string | null;
         };
         SettingsResponse: {
             /** @example true */
