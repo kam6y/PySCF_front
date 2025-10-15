@@ -9,12 +9,12 @@ The Supervisor analyzes user requests, delegates tasks to appropriate workers
 """
 
 import logging
-from typing import Optional
 from flask import current_app
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
 from langgraph_supervisor.handoff import create_forward_message_tool
-from agent.quantum_calc.quantum_calc_worker import create_quantum_calculation_worker, get_gemini_api_key
+from agent.utils import get_gemini_api_key
+from agent.quantum_calc.quantum_calc_worker import create_quantum_calculation_worker
 from agent.research.agent import create_deep_research_agent
 from agent.report_writer.report_writer_worker import create_report_writer
 

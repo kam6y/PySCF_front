@@ -10,47 +10,16 @@ intelligent report generation without requiring external tools.
 
 import logging
 from pathlib import Path
-from typing import Optional
 from flask import current_app
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
+from langgraph.graph import StateGraph, START, END, MessagesState
+
+from agent.utils import get_gemini_api_key, detect_language, get_language_name
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
-
-def get_gemini_api_key() -> Optional[str]:
-    """
-    Get Gemini API key from environment variable or settings file.
-
-    Priority:
-        1. Environment variable: GEMINI_API_KEY
-        2. Settings file: settings.gemini_api_key
-        3. None (fallback)
-
-    Returns:
-        Optional[str]: API key if found, None otherwise
-    """
-    import os
-    from quantum_calc.settings_manager import get_current_settings
-
-    # Priority 1: Environment variable
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if api_key:
-        logger.debug("Using Gemini API key from environment variable")
-        return api_key
-
-    # Priority 2: Settings file
-    try:
-        settings = get_current_settings()
-        if settings.gemini_api_key:
-            logger.debug("Using Gemini API key from settings file")
-            return settings.gemini_api_key
-    except Exception as e:
-        logger.warning(f"Failed to load settings for API key: {e}")
-
-    # Priority 3: None (fallback)
-    return None
 
 
 def _load_system_prompt() -> str:
@@ -102,26 +71,128 @@ def _initialize_tools():
     ]
 
 
+def _create_supervisor_wrapper(core_agent):
+    """
+    Create a wrapper that makes the Report Writer compatible with Supervisor's message-based interface.
+
+    This wrapper:
+    1. Receives messages from Supervisor
+    2. Detects user's language from the latest message
+    3. Enhances the system prompt with language requirements
+    4. Invokes the core ReAct agent
+    5. Returns results as a message
+    """
+    def wrapper_node(state: MessagesState) -> dict:
+        """Wrapper node that detects language and enhances prompts."""
+        try:
+            # Get messages from Supervisor
+            messages = state.get("messages", [])
+            if not messages:
+                logger.error("No messages received from Supervisor")
+                return {"messages": [AIMessage(content="Error: No query provided", name="report_writer")]}
+
+            # Filter for HumanMessages only (exclude ToolMessage forwarding)
+            human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
+            if not human_messages:
+                logger.error("No HumanMessage found in message history")
+                return {"messages": [AIMessage(content="Error: 有効なクエリが見つかりませんでした", name="report_writer")]}
+
+            user_query = human_messages[-1].content
+            logger.info(f"Report Writer received query: {user_query}")
+
+            # Detect user's language using LLM
+            api_key = get_gemini_api_key()
+            model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
+            llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
+            user_language = detect_language(user_query, llm)
+            language_name = get_language_name(user_language)
+            logger.info(f"Detected user language: {user_language} ({language_name})")
+
+            # Enhance messages with language instruction
+            # Create a system message with language requirement
+            language_instruction = f"""
+## USER LANGUAGE REQUIREMENT (CRITICAL)
+**You MUST write your ENTIRE response in: {language_name}**
+**Language Code: {user_language}**
+**This is the language the user used in their query.**
+
+When creating reports, analyzing data, or explaining results:
+- Write ALL content in {language_name}
+- Use appropriate scientific terminology for {language_name}
+- Maintain the same language throughout the entire response
+"""
+
+            # Pass to the core agent with enhanced context
+            enhanced_messages = [
+                AIMessage(content=language_instruction, name="system"),
+                *messages
+            ]
+
+            result = core_agent.invoke({"messages": enhanced_messages})
+
+            # Extract the final response
+            response_messages = result.get("messages", [])
+            if response_messages:
+                # Get the last AI message
+                final_message = response_messages[-1]
+                logger.info(f"Report Writer completed. Response length: {len(final_message.content)} characters")
+                return {"messages": [AIMessage(content=final_message.content, name="report_writer")]}
+            else:
+                logger.warning("No response from core agent")
+                return {"messages": [AIMessage(content="No response generated", name="report_writer")]}
+
+        except Exception as e:
+            logger.error(f"Error in Report Writer wrapper: {str(e)}", exc_info=True)
+            error_message = f"Error during report generation: {str(e)}"
+            return {"messages": [AIMessage(content=error_message, name="report_writer")]}
+
+    # Build a simple graph with the wrapper node
+    wrapper_builder = StateGraph(MessagesState)
+    wrapper_builder.add_node("report", wrapper_node)
+    wrapper_builder.add_edge(START, "report")
+    wrapper_builder.add_edge("report", END)
+
+    return wrapper_builder.compile(name="report_writer")
+
+
 def create_report_writer():
     """
-    Create a Report Writer agent using LangGraph's create_react_agent.
+    Create a Report Writer agent compatible with LangGraph Supervisor.
 
-    This worker specializes in:
+    This function creates the core Report Writer agent and wraps it in a
+    message-based interface that the Supervisor can interact with, with
+    automatic language detection and adaptation.
+
+    The agent specializes in:
     - Retrieving and interpreting quantum chemistry calculation results
     - Analyzing molecular orbitals and spectroscopy data
-    - Creating comprehensive scientific reports
+    - Creating comprehensive scientific reports in user's language
     - Synthesizing information from multiple sources
     - Generating calculation reports and literature reviews
-    - Formatting professional documentation in Japanese or English
-
-    The Report Writer uses tools to access calculation results, molecular orbital data,
-    and spectroscopy information, then synthesizes this data into well-structured reports.
+    - Formatting professional documentation
 
     Returns:
-        A compiled LangGraph ReAct agent ready for use in supervisor workflows
+        A compiled LangGraph application compatible with Supervisor workflows
 
     Raises:
         ValueError: If Gemini API key is not configured
+    """
+    # Create the core Report Writer agent
+    core_agent = _create_core_report_writer()
+
+    # Wrap it for Supervisor compatibility with language detection
+    supervisor_compatible_agent = _create_supervisor_wrapper(core_agent)
+
+    logger.info("Report Writer with Supervisor wrapper and language detection created successfully")
+    return supervisor_compatible_agent
+
+
+def _create_core_report_writer():
+    """
+    Create the core Report Writer agent (internal implementation).
+
+    This is the original create_report_writer function, now renamed
+    to distinguish it from the public API.
     """
     # Get API key
     api_key = get_gemini_api_key()
@@ -156,5 +227,5 @@ def create_report_writer():
         prompt=system_prompt
     )
 
-    logger.info("Report Writer created successfully")
+    logger.info("Core Report Writer agent created successfully")
     return agent

@@ -25,7 +25,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, START, END, MessagesState
 
 from .tools import search_arxiv, search_tavily, search_pubmed
-from agent.quantum_calc.quantum_calc_worker import get_gemini_api_key
+from agent.utils import get_gemini_api_key, detect_language, get_language_name
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -65,46 +65,6 @@ def _load_prompt(filename: str) -> str:
     except Exception as e:
         logger.error(f"Failed to load prompt {filename}: {e}")
         return ""
-
-
-def _detect_language(text: str, llm: ChatGoogleGenerativeAI) -> str:
-    """
-    Detect the language of the given text using LLM.
-    
-    Args:
-        text: Text to analyze
-        llm: LLM instance for detection
-        
-    Returns:
-        Language code (e.g., 'ja', 'en', 'es', 'zh', 'fr')
-    """
-    try:
-        prompt = f"""Detect the language of the following text and return ONLY the ISO 639-1 language code (2 letters).
-
-Examples:
-- Japanese text → ja
-- English text → en
-- Spanish text → es
-- Chinese text → zh
-- French text → fr
-
-Text: {text}
-
-Return ONLY the 2-letter language code, nothing else:"""
-        
-        response = llm.invoke(prompt)
-        lang_code = response.content.strip().lower()
-        
-        # Validate it's a 2-letter code
-        if len(lang_code) == 2 and lang_code.isalpha():
-            logger.info(f"Detected language: {lang_code}")
-            return lang_code
-        else:
-            logger.warning(f"Invalid language code detected: {lang_code}, defaulting to 'en'")
-            return 'en'
-    except Exception as e:
-        logger.error(f"Error detecting language: {e}, defaulting to 'en'")
-        return 'en'
 
 
 def _create_analyze_node(llm: ChatGoogleGenerativeAI):
@@ -302,20 +262,8 @@ def _create_synthesize_node(llm: ChatGoogleGenerativeAI):
                 for i, f in enumerate(state['findings'])
             ])
 
-            # Language name mapping for clarity
-            lang_names = {
-                'ja': 'Japanese (日本語)',
-                'en': 'English',
-                'es': 'Spanish (Español)',
-                'zh': 'Chinese (中文)',
-                'fr': 'French (Français)',
-                'de': 'German (Deutsch)',
-                'ko': 'Korean (한국어)',
-                'ru': 'Russian (Русский)',
-                'pt': 'Portuguese (Português)',
-                'it': 'Italian (Italiano)'
-            }
-            language_name = lang_names.get(state['user_language'], state['user_language'])
+            # Get language name for clarity
+            language_name = get_language_name(state['user_language'])
 
             # Create synthesis prompt
             prompt = f"""{synthesize_prompt}
@@ -410,7 +358,7 @@ def _create_supervisor_wrapper(research_graph):
             api_key = get_gemini_api_key()
             model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
             llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
-            user_language = _detect_language(user_query, llm)
+            user_language = detect_language(user_query, llm)
             logger.info(f"Detected user language: {user_language}")
 
             # Extract depth from query (e.g., "research topic, depth 5")
