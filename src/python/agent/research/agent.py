@@ -24,7 +24,14 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, START, END, MessagesState
 
-from .tools import search_arxiv, search_tavily, search_pubmed
+from .tools import (
+    search_arxiv,
+    search_tavily,
+    search_pubmed,
+    search_chemrxiv,
+    search_openalex,
+    search_semantic_scholar
+)
 from agent.utils import get_gemini_api_key, detect_language, get_language_name
 
 # Set up logging
@@ -47,6 +54,7 @@ class DeepResearchState(TypedDict):
     # Control flow
     next_search_topic: Optional[str]    # Next topic to search (None if done)
     should_continue: bool               # Whether to continue iterating
+    semantic_scholar_rate_limited: bool # Track if Semantic Scholar rate limit was hit
 
     # Output
     final_report: str                   # Synthesized final report
@@ -174,7 +182,7 @@ def _create_search_node():
 
     This node:
     1. Takes the next_search_topic from state
-    2. Searches Tavily, arXiv, and PubMed
+    2. Searches across 6 sources: Tavily (web), arXiv, PubMed, ChemRxiv, OpenAlex, Semantic Scholar
     3. Accumulates results in findings
     """
     def search_knowledge(state: DeepResearchState) -> dict:
@@ -188,6 +196,7 @@ def _create_search_node():
             logger.info(f"Searching for: '{next_topic}'")
 
             all_results = []
+            rate_limited = state.get('semantic_scholar_rate_limited', False)
 
             # Search Tavily (web search)
             try:
@@ -213,6 +222,39 @@ def _create_search_node():
             except Exception as e:
                 logger.warning(f"PubMed search failed: {str(e)}")
 
+            # Search ChemRxiv (chemistry preprints)
+            try:
+                chemrxiv_results = search_chemrxiv.invoke({"query": next_topic, "max_results": 3})
+                all_results.append(f"## Chemistry Papers (ChemRxiv)\n\n{chemrxiv_results}")
+                logger.debug("ChemRxiv search completed")
+            except Exception as e:
+                logger.warning(f"ChemRxiv search failed: {str(e)}")
+
+            # Search OpenAlex (comprehensive academic database)
+            try:
+                openalex_results = search_openalex.invoke({"query": next_topic, "max_results": 3})
+                all_results.append(f"## Academic Database (OpenAlex)\n\n{openalex_results}")
+                logger.debug("OpenAlex search completed")
+            except Exception as e:
+                logger.warning(f"OpenAlex search failed: {str(e)}")
+
+            # Search Semantic Scholar (AI/ML/science papers with citations)
+            # Skip if already rate limited in a previous iteration
+            if not rate_limited:
+                try:
+                    semantic_results = search_semantic_scholar.invoke({"query": next_topic, "max_results": 3})
+                    all_results.append(f"## Research Papers (Semantic Scholar)\n\n{semantic_results}")
+                    logger.debug("Semantic Scholar search completed")
+
+                    # Check if rate limit was hit
+                    if "rate limit" in semantic_results.lower():
+                        logger.info("Semantic Scholar rate limit detected, will skip in future iterations")
+                        rate_limited = True
+                except Exception as e:
+                    logger.warning(f"Semantic Scholar search failed: {str(e)}")
+            else:
+                logger.info("Skipping Semantic Scholar search (rate limited in previous iteration)")
+
             # Combine all results
             combined_results = "\n\n---\n\n".join(all_results)
 
@@ -230,7 +272,8 @@ def _create_search_node():
 
             return {
                 "findings": new_findings,
-                "searched_topics": new_searched_topics
+                "searched_topics": new_searched_topics,
+                "semantic_scholar_rate_limited": rate_limited
             }
 
         except Exception as e:
@@ -380,6 +423,7 @@ def _create_supervisor_wrapper(research_graph):
                 "findings": [],
                 "next_search_topic": None,
                 "should_continue": True,
+                "semantic_scholar_rate_limited": False,
                 "final_report": ""
             }
 
