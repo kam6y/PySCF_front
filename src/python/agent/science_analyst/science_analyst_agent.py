@@ -189,7 +189,7 @@ def _create_core_science_analyst():
         # Fallback prompt if file not found
         system_prompt = (
             "You are a Science Analyst, an AI assistant specialized in creating comprehensive "
-            "scientific reports for molecular science and computational chemistry. "
+            "scientific reports for molecular science and quantum computational chemistry. "
             "You synthesize information from other agents and produce well-structured, "
             "scientifically accurate reports in Japanese or English based on user preference."
         )

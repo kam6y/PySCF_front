@@ -90,7 +90,7 @@ def create_supervisor_agent():
         # Fallback prompt if file not found
         system_prompt = (
             "You are a Supervisor coordinating specialized AI agents for molecular science "
-            "and computational chemistry research. Analyze user requests, delegate to the "
+            "and quantum computational chemistry research. Analyze user requests, delegate to the "
             "appropriate specialist (quantum_calculator, literature_surveyor, or science_analyst), "
             "and orchestrate multi-step workflows. Use the forward_message tool to relay worker "
             "responses without modification."

@@ -10,12 +10,12 @@ The Science Analyst specializes in:
 - Spectroscopy data analysis (IR spectra)
 - Creating comprehensive scientific reports
 
-All tools are imported from the computational_chemist.tools module to maintain
+All tools are imported from the quantum_calculator.tools module to maintain
 a single source of truth and avoid code duplication.
 """
 
 # Import calculation result retrieval tools
-from agent.computational_chemist.tools import (
+from agent.quantum_calculator.tools import (
     get_calculation_details,
     get_molecular_orbitals,
     generate_orbital_cube,

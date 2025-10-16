@@ -2,7 +2,7 @@
 Quantum Calculator Agent
 
 This module implements the Quantum Calculator agent, which specializes in
-quantum chemistry calculations, molecular analysis, and computational chemistry tasks.
+quantum chemistry calculations, molecular analysis, and quantum computational chemistry tasks.
 
 The agent uses LangGraph's create_react_agent pattern with Google Gemini for
 intelligent task execution and tool calling.
@@ -194,7 +194,7 @@ def _create_core_quantum_calculator():
             "You are a Quantum Calculator, an AI assistant specialized in molecular analysis "
             "and quantum chemistry. You have access to tools for calculation management, molecular "
             "structure analysis, orbital visualization, and more. Use them proactively to help users "
-            "with their computational chemistry tasks."
+            "with their quantum computational chemistry tasks."
         )
         logger.warning("Using fallback system prompt for Quantum Calculator")
 

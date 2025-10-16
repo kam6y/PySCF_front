@@ -451,7 +451,7 @@ export const AgentPage = () => {
       <div className={styles.emptyStateText}>
         Start a conversation with the AI agent to get help with molecular
         design, quantum chemistry calculations, and analysis. Ask questions
-        about your molecules or request assistance with computational chemistry
+        about your molecules or request assistance with quantum computational chemistry
         tasks.
       </div>
     </div>
