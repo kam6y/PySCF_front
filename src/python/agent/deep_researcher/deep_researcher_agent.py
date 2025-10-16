@@ -385,14 +385,14 @@ def _create_supervisor_wrapper(research_graph):
             messages = state.get("messages", [])
             if not messages:
                 logger.error("No messages received from Supervisor")
-                return {"messages": [AIMessage(content="Error: No research topic provided", name="research_expert")]}
+                return {"messages": [AIMessage(content="Error: No research topic provided", name="deep_researcher")]}
 
             # LangGraphベストプラクティス: メッセージタイプでフィルタリング
             # 転送メッセージ（ToolMessage）を除外し、実際のユーザークエリ（HumanMessage）のみを取得
             human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
             if not human_messages:
                 logger.error("No HumanMessage found in message history")
-                return {"messages": [AIMessage(content="Error: 有効なリサーチトピックが見つかりませんでした", name="research_expert")]}
+                return {"messages": [AIMessage(content="Error: 有効なリサーチトピックが見つかりませんでした", name="deep_researcher")]}
 
             user_query = human_messages[-1].content
             logger.info(f"Deep Research received query: {user_query}")
@@ -437,30 +437,30 @@ def _create_supervisor_wrapper(research_graph):
             if not final_report:
                 final_report = "Research completed but no report was generated."
 
-            logger.info(f"Deep Research completed. Report length: {len(final_report)} characters")
+            logger.info(f"Deep Researcher completed. Report length: {len(final_report)} characters")
 
             # Return as AIMessage
-            return {"messages": [AIMessage(content=final_report, name="research_expert")]}
+            return {"messages": [AIMessage(content=final_report, name="deep_researcher")]}
 
         except Exception as e:
-            logger.error(f"Error in Deep Research wrapper: {str(e)}", exc_info=True)
+            logger.error(f"Error in Deep Researcher wrapper: {str(e)}", exc_info=True)
             error_message = f"Error during deep research: {str(e)}"
-            return {"messages": [AIMessage(content=error_message, name="research_expert")]}
+            return {"messages": [AIMessage(content=error_message, name="deep_researcher")]}
 
     # Build a simple graph with the wrapper node
     wrapper_builder = StateGraph(MessagesState)
-    wrapper_builder.add_node("research", wrapper_node)
-    wrapper_builder.add_edge(START, "research")
-    wrapper_builder.add_edge("research", END)
+    wrapper_builder.add_node("deep_researcher", wrapper_node)
+    wrapper_builder.add_edge(START, "deep_researcher")
+    wrapper_builder.add_edge("deep_researcher", END)
 
-    return wrapper_builder.compile(name="research_expert")
+    return wrapper_builder.compile(name="deep_researcher")
 
 
-def create_deep_research_agent():
+def create_deep_researcher():
     """
-    Create a Deep Research agent compatible with LangGraph Supervisor.
+    Create a Deep Researcher agent compatible with LangGraph Supervisor.
 
-    This function creates the core Deep Research graph and wraps it in a
+    This function creates the core Deep Researcher graph and wraps it in a
     message-based interface that the Supervisor can interact with.
 
     The agent accepts queries in the format:
@@ -473,27 +473,27 @@ def create_deep_research_agent():
     Raises:
         ValueError: If Gemini API key is not configured
     """
-    # Create the core Deep Research graph
-    core_graph = _create_core_deep_research_graph()
+    # Create the core Deep Researcher graph
+    core_graph = _create_core_deep_researcher_graph()
 
     # Wrap it for Supervisor compatibility
     supervisor_compatible_graph = _create_supervisor_wrapper(core_graph)
 
-    logger.info("Deep Research Agent with Supervisor wrapper created successfully")
+    logger.info("Deep Researcher with Supervisor wrapper created successfully")
     return supervisor_compatible_graph
 
 
-def _create_core_deep_research_graph():
+def _create_core_deep_researcher_graph():
     """
-    Create the core Deep Research graph (internal implementation).
+    Create the core Deep Researcher graph (internal implementation).
 
-    This is the original create_deep_research_agent function, now renamed
+    This is the original create_deep_researcher function, now renamed
     to distinguish it from the public API.
     """
     # Get API key
     api_key = get_gemini_api_key()
     if not api_key:
-        logger.error("Gemini API key not found. Cannot initialize Deep Research Agent.")
+        logger.error("Gemini API key not found. Cannot initialize Deep Researcher.")
         raise ValueError(
             "Gemini API key not configured. Please set GEMINI_API_KEY environment variable "
             "or configure it in application settings."
@@ -506,7 +506,7 @@ def _create_core_deep_research_graph():
         api_key=api_key,
         temperature=0.7  # Slightly higher temperature for creative research
     )
-    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Deep Research Agent")
+    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Deep Researcher")
 
     # Create nodes
     analyze_node = _create_analyze_node(llm)
@@ -537,5 +537,5 @@ def _create_core_deep_research_graph():
     # Compile the graph
     graph = builder.compile()
 
-    logger.info("Core Deep Research graph created successfully")
+    logger.info("Core Deep Researcher graph created successfully")
     return graph

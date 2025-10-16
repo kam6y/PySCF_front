@@ -1,21 +1,21 @@
 """
-Report Writer Tool Module
+Science Analyst Tool Module
 
-This module provides tools for the Report Writer agent to access and analyze
+This module provides tools for the Science Analyst agent to access and analyze
 quantum chemistry calculation results for report generation.
 
-The Report Writer specializes in:
+The Science Analyst specializes in:
 - Retrieving and interpreting calculation results
 - Molecular orbital analysis and visualization
 - Spectroscopy data analysis (IR spectra)
 - Creating comprehensive scientific reports
 
-All tools are imported from the quantum_calc.tools module to maintain
+All tools are imported from the computational_chemist.tools module to maintain
 a single source of truth and avoid code duplication.
 """
 
 # Import calculation result retrieval tools
-from agent.quantum_calc.tools import (
+from agent.computational_chemist.tools import (
     get_calculation_details,
     get_molecular_orbitals,
     generate_orbital_cube,

@@ -14,9 +14,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
 from langgraph_supervisor.handoff import create_forward_message_tool
 from agent.utils import get_gemini_api_key
-from agent.quantum_calc.quantum_calc_worker import create_quantum_calculation_worker
-from agent.research.agent import create_deep_research_agent
-from agent.report_writer.report_writer_worker import create_report_writer
+from agent.computational_chemist import create_computational_chemist
+from agent.deep_researcher import create_deep_researcher
+from agent.science_analyst import create_science_analyst
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -41,25 +41,25 @@ When delegating to workers:
 ✅ Workers automatically detect and respond in the user's language
 
 Examples:
-- User: "TDDFTの応用について調査して" → Pass EXACTLY to research_expert → Response in Japanese
-- User: "Investiga aplicaciones de TDDFT" → Pass EXACTLY to research_expert → Response in Spanish
-- User: "Research TDDFT applications" → Pass EXACTLY to research_expert → Response in English
+- User: "TDDFTの応用について調査して" → Pass EXACTLY to deep_researcher → Response in Japanese
+- User: "Investiga aplicaciones de TDDFT" → Pass EXACTLY to deep_researcher → Response in Spanish
+- User: "Research TDDFT applications" → Pass EXACTLY to deep_researcher → Response in English
 
-**Why this matters**: Research agents use language detection to determine the output language. 
+**Why this matters**: Research agents use language detection to determine the output language.
 Translating queries breaks this detection.
 
 ---
 
 ## Available Workers
 
-### quantum_calculation_worker - Calculation Execution Manager
+### computational_chemist - Computational Chemist (計算化学者)
 **Use for**: Starting calculations, molecular structure preparation, system management
 - Executes quantum chemistry calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF)
 - Converts molecular structures (PubChem, SMILES → XYZ)
 - Manages system resources and settings
 - **Returns**: Calculation IDs and raw data (no interpretation)
 
-### research_expert - Deep Research Specialist
+### deep_researcher - Deep Researcher (深層研究者)
 **Use for**: In-depth literature research, comprehensive topic analysis, multi-source investigation
 - Performs **iterative deep research** with configurable depth (default: 3 iterations)
 - Searches across **multiple sources**: Web (Tavily), arXiv, PubMed
@@ -73,7 +73,7 @@ Translating queries breaks this detection.
 - Deep dive: "Research quantum entanglement in molecular systems, depth 5" → 5 iterations
 - Quick overview: "Research basis set effects, depth 1" → Single iteration
 
-### report_writer - Data Analyst & Report Generator
+### science_analyst - Science Analyst (科学アナリスト)
 **Use for**: Result interpretation, visualizations, comprehensive reports
 - Retrieves and interprets calculation results
 - Analyzes molecular orbitals and spectroscopy data
@@ -87,17 +87,17 @@ Translating queries breaks this detection.
 
 ### Single Worker Tasks
 
-**Calculation Execution** → `quantum_calculation_worker`
+**Calculation Execution** → `computational_chemist`
 - "Run a DFT calculation on water"
 - "Convert this SMILES to XYZ"
 - "List available calculations"
 
-**Deep Research** → `research_expert`
+**Deep Research** → `deep_researcher`
 - "Research TDDFT applications in organic molecules"
 - "Deep dive into CASSCF recent advances, depth 5"
 - "Quick overview of basis set convergence, depth 1"
 
-**Analysis & Reporting** → `report_writer`
+**Analysis & Reporting** → `science_analyst`
 - "Analyze calculation calc_123 and show HOMO"
 - "Generate IR spectrum for calc_456"
 - "Create a report on this calculation"
@@ -105,26 +105,26 @@ Translating queries breaks this detection.
 ### Multi-Worker Workflows
 
 **Calculate + Analyze**
-1. `quantum_calculation_worker` → Execute calculation
-2. `report_writer` → Analyze results, create report
+1. `computational_chemist` → Execute calculation
+2. `science_analyst` → Analyze results, create report
 - Example: "Run DFT on benzene and analyze the orbitals"
 
 **Research + Report**
-1. `research_expert` → Perform deep research
-2. `report_writer` → Further analyze or format results
+1. `deep_researcher` → Perform deep research
+2. `science_analyst` → Further analyze or format results
 - Example: "Research TDDFT applications and create a technical summary"
-- Note: research_expert already creates comprehensive reports, so report_writer is optional
+- Note: deep_researcher already creates comprehensive reports, so science_analyst is optional
 
 **Calculate + Research + Report**
-1. `quantum_calculation_worker` → Execute calculation
-2. `research_expert` → Find relevant papers
-3. `report_writer` → Integrate both into comprehensive report
+1. `computational_chemist` → Execute calculation
+2. `deep_researcher` → Find relevant papers
+3. `science_analyst` → Integrate both into comprehensive report
 - Example: "Calculate water properties and compare with literature"
 
 **Research + Calculate + Report**
-1. `research_expert` → Research methodological best practices
-2. `quantum_calculation_worker` → Execute calculation with insights
-3. `report_writer` → Analyze and compare with literature
+1. `deep_researcher` → Research methodological best practices
+2. `computational_chemist` → Execute calculation with insights
+3. `science_analyst` → Analyze and compare with literature
 - Example: "Research best functionals for excited states, then calculate benzene TDDFT"
 
 ---
@@ -155,21 +155,21 @@ You MUST NOT:
 ❌ Omit ANY portion of the worker's response
 ❌ Comment on or evaluate the worker's output
 
-**ESPECIALLY FOR report_writer**:
-- report_writer generates LONG, DETAILED scientific reports (often 1000+ words)
+**ESPECIALLY FOR science_analyst**:
+- science_analyst generates LONG, DETAILED scientific reports (often 1000+ words)
 - These reports contain multiple sections: Executive Summary, Methodology, Results, Discussion, Conclusions
 - You MUST return the ENTIRE report, not just a notification that it's complete
 - Think of yourself as "Copy-Paste", NOT "Summarize"
 
 **Example - WRONG ❌**:
 User: "Create a report on the water calculation"
-Worker (report_writer) returns: [5000-word detailed scientific report with analysis, tables, orbital visualizations]
+Worker (science_analyst) returns: [5000-word detailed scientific report with analysis, tables, orbital visualizations]
 Supervisor responds: "レポートが完成しました。上記のレポートをご確認ください。"
 👆 THIS IS COMPLETELY WRONG! The detailed report content is lost!
 
 **Example - CORRECT ✅**:
 User: "Create a report on the water calculation"
-Worker (report_writer) returns: [5000-word detailed scientific report]
+Worker (science_analyst) returns: [5000-word detailed scientific report]
 Supervisor responds: [The exact same 5000-word report, word-for-word, with all sections intact]
 👆 THIS IS CORRECT! The complete report is delivered to the user!
 
@@ -189,9 +189,9 @@ forward_message(from_agent="worker_name")
 ```
 
 **Examples**:
-- After report_writer finishes: `forward_message(from_agent="report_writer")`
-- After quantum_calculation_worker finishes: `forward_message(from_agent="quantum_calculation_worker")`
-- After research_expert finishes: `forward_message(from_agent="research_expert")`
+- After science_analyst finishes: `forward_message(from_agent="science_analyst")`
+- After computational_chemist finishes: `forward_message(from_agent="computational_chemist")`
+- After deep_researcher finishes: `forward_message(from_agent="deep_researcher")`
 
 **Why This Is Essential**:
 - Bypasses your own processing - no paraphrasing, no summarization
@@ -207,9 +207,9 @@ def create_supervisor_agent():
     Create a Supervisor agent using LangGraph's create_supervisor.
 
     The Supervisor coordinates between:
-    - Quantum Calculation Worker (quantum chemistry and molecular analysis)
-    - Research Agent (academic literature search)
-    - Report Writer (scientific report generation)
+    - Computational Chemist (quantum chemistry and molecular analysis)
+    - Deep Researcher (academic literature search)
+    - Science Analyst (scientific report generation)
 
     Returns:
         A compiled LangGraph Supervisor workflow ready for execution
@@ -230,24 +230,24 @@ def create_supervisor_agent():
 
     # Create worker agents
     try:
-        quantum_worker = create_quantum_calculation_worker()
-        logger.info("Quantum Calculation Worker initialized")
+        computational_chemist = create_computational_chemist()
+        logger.info("Computational Chemist initialized")
     except Exception as e:
-        logger.error(f"Failed to create Quantum Calculation Worker: {e}", exc_info=True)
+        logger.error(f"Failed to create Computational Chemist: {e}", exc_info=True)
         raise
 
     try:
-        research_worker = create_deep_research_agent()
-        logger.info("Deep Research Agent initialized")
+        deep_researcher = create_deep_researcher()
+        logger.info("Deep Researcher initialized")
     except Exception as e:
-        logger.error(f"Failed to create Research Agent: {e}", exc_info=True)
+        logger.error(f"Failed to create Deep Researcher: {e}", exc_info=True)
         raise
 
     try:
-        report_writer_worker = create_report_writer()
-        logger.info("Report Writer initialized")
+        science_analyst = create_science_analyst()
+        logger.info("Science Analyst initialized")
     except Exception as e:
-        logger.error(f"Failed to create Report Writer: {e}", exc_info=True)
+        logger.error(f"Failed to create Science Analyst: {e}", exc_info=True)
         raise
 
     # Initialize Supervisor LLM with configured model
@@ -264,7 +264,7 @@ def create_supervisor_agent():
 
     # Create supervisor workflow using create_supervisor
     workflow = create_supervisor(
-        [quantum_worker, research_worker, report_writer_worker],
+        [computational_chemist, deep_researcher, science_analyst],
         model=supervisor_llm,
         prompt=SUPERVISOR_PROMPT,
         tools=[forward_tool],  # Add forward_message tool

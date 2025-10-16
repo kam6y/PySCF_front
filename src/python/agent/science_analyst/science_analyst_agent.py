@@ -1,11 +1,11 @@
 """
-Quantum Calculation Worker
+Science Analyst Agent
 
-This module implements the Quantum Calculation Worker agent, which specializes in
-quantum chemistry calculations, molecular analysis, and computational chemistry tasks.
+This module implements the Science Analyst agent, which specializes in creating
+comprehensive scientific reports by synthesizing information from other specialized agents.
 
-The worker uses LangGraph's create_react_agent pattern with Google Gemini for
-intelligent task execution and tool calling.
+The agent uses LangGraph's create_react_agent pattern with Google Gemini for
+intelligent report generation and analysis.
 """
 
 import logging
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def _load_system_prompt() -> str:
-    """Load the system prompt for the Quantum Calculation Worker."""
+    """Load the system prompt for the Science Analyst."""
     try:
         # Try to load system prompt from file
         prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
@@ -45,40 +45,35 @@ def _load_system_prompt() -> str:
 def _get_fallback_system_prompt() -> str:
     """Fallback system prompt in case file loading fails."""
     return (
-        "You are a Quantum Calculation Worker, an AI assistant specialized in molecular analysis "
-        "and quantum chemistry. You have access to tools for calculation management, molecular "
-        "structure analysis, orbital visualization, and more. Use them proactively to help users "
-        "with their computational chemistry tasks."
+        "You are a Science Analyst, an AI assistant specialized in creating comprehensive "
+        "scientific reports for molecular science and computational chemistry. "
+        "You synthesize information from other agents and produce well-structured, "
+        "scientifically accurate reports in Japanese or English based on user preference."
     )
 
 
 def _initialize_tools():
-    """Initialize and return the list of available tools for the Quantum Calculation Worker."""
+    """Initialize and return the list of available tools for the Science Analyst."""
     from . import tools
 
     return [
-        # Calculation management
-        tools.list_all_calculations,
+        # Calculation data retrieval
         tools.get_calculation_details,
-        tools.start_quantum_calculation,
-        tools.delete_calculation,  # HIL-enabled destructive tool
 
-        # Molecular structure tools
-        tools.search_pubchem_by_name,
-        tools.convert_smiles_to_xyz,
-        tools.validate_xyz_format,
+        # Molecular orbital analysis
+        tools.get_molecular_orbitals,
+        tools.generate_orbital_cube,
+        tools.list_cube_files,
+        tools.delete_cube_files,
 
-        # System and settings
-        tools.get_supported_parameters,
-        tools.get_app_settings,
-        tools.update_app_settings,
-        tools.get_system_resources,
+        # Spectroscopy
+        tools.generate_ir_spectrum,
     ]
 
 
 def _create_supervisor_wrapper(core_agent):
     """
-    Create a wrapper that makes the Quantum Calculation Worker compatible with Supervisor's message-based interface.
+    Create a wrapper that makes the Science Analyst compatible with Supervisor's message-based interface.
 
     This wrapper:
     1. Receives messages from Supervisor
@@ -94,16 +89,16 @@ def _create_supervisor_wrapper(core_agent):
             messages = state.get("messages", [])
             if not messages:
                 logger.error("No messages received from Supervisor")
-                return {"messages": [AIMessage(content="Error: No query provided", name="quantum_calculation_worker")]}
+                return {"messages": [AIMessage(content="Error: No query provided", name="science_analyst")]}
 
             # Filter for HumanMessages only (exclude ToolMessage forwarding)
             human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
             if not human_messages:
                 logger.error("No HumanMessage found in message history")
-                return {"messages": [AIMessage(content="Error: 有効なクエリが見つかりませんでした", name="quantum_calculation_worker")]}
+                return {"messages": [AIMessage(content="Error: 有効なクエリが見つかりませんでした", name="science_analyst")]}
 
             user_query = human_messages[-1].content
-            logger.info(f"Quantum Calculation Worker received query: {user_query}")
+            logger.info(f"Science Analyst received query: {user_query}")
 
             # Detect user's language using LLM
             api_key = get_gemini_api_key()
@@ -121,9 +116,9 @@ def _create_supervisor_wrapper(core_agent):
 **Language Code: {user_language}**
 **This is the language the user used in their query.**
 
-When executing calculations, providing data, or explaining results:
+When creating reports, analyzing data, or explaining results:
 - Write ALL content in {language_name}
-- Use appropriate technical terminology for {language_name}
+- Use appropriate scientific terminology for {language_name}
 - Maintain the same language throughout the entire response
 """
 
@@ -140,40 +135,41 @@ When executing calculations, providing data, or explaining results:
             if response_messages:
                 # Get the last AI message
                 final_message = response_messages[-1]
-                logger.info(f"Quantum Calculation Worker completed. Response length: {len(final_message.content)} characters")
-                return {"messages": [AIMessage(content=final_message.content, name="quantum_calculation_worker")]}
+                logger.info(f"Science Analyst completed. Response length: {len(final_message.content)} characters")
+                return {"messages": [AIMessage(content=final_message.content, name="science_analyst")]}
             else:
                 logger.warning("No response from core agent")
-                return {"messages": [AIMessage(content="No response generated", name="quantum_calculation_worker")]}
+                return {"messages": [AIMessage(content="No response generated", name="science_analyst")]}
 
         except Exception as e:
-            logger.error(f"Error in Quantum Calculation Worker wrapper: {str(e)}", exc_info=True)
-            error_message = f"Error during calculation execution: {str(e)}"
-            return {"messages": [AIMessage(content=error_message, name="quantum_calculation_worker")]}
+            logger.error(f"Error in Science Analyst wrapper: {str(e)}", exc_info=True)
+            error_message = f"Error during report generation: {str(e)}"
+            return {"messages": [AIMessage(content=error_message, name="science_analyst")]}
 
     # Build a simple graph with the wrapper node
     wrapper_builder = StateGraph(MessagesState)
-    wrapper_builder.add_node("quantum_calc", wrapper_node)
-    wrapper_builder.add_edge(START, "quantum_calc")
-    wrapper_builder.add_edge("quantum_calc", END)
+    wrapper_builder.add_node("science_analyst", wrapper_node)
+    wrapper_builder.add_edge(START, "science_analyst")
+    wrapper_builder.add_edge("science_analyst", END)
 
-    return wrapper_builder.compile(name="quantum_calculation_worker")
+    return wrapper_builder.compile(name="science_analyst")
 
 
-def create_quantum_calculation_worker():
+def create_science_analyst():
     """
-    Create a Quantum Calculation Worker agent compatible with LangGraph Supervisor.
+    Create a Science Analyst agent compatible with LangGraph Supervisor.
 
-    This function creates the core Quantum Calculation Worker agent and wraps it in a
+    This function creates the core Science Analyst agent and wraps it in a
     message-based interface that the Supervisor can interact with, with
     automatic language detection and adaptation.
 
-    The worker specializes in:
-    - Quantum chemistry calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF)
-    - Molecular structure analysis and visualization in user's language
-    - Geometry optimization and frequency analysis
-    - Molecular orbital and NTO analysis
-    - IR spectrum generation
+    The agent specializes in:
+    - Retrieving and interpreting quantum chemistry calculation results
+    - Analyzing molecular orbitals and spectroscopy data
+    - Creating comprehensive scientific reports in user's language
+    - Synthesizing information from multiple sources
+    - Generating calculation reports and literature reviews
+    - Formatting professional documentation
 
     Returns:
         A compiled LangGraph application compatible with Supervisor workflows
@@ -181,54 +177,55 @@ def create_quantum_calculation_worker():
     Raises:
         ValueError: If Gemini API key is not configured
     """
-    # Create the core Quantum Calculation Worker agent
-    core_agent = _create_core_quantum_calculation_worker()
+    # Create the core Science Analyst agent
+    core_agent = _create_core_science_analyst()
 
     # Wrap it for Supervisor compatibility with language detection
     supervisor_compatible_agent = _create_supervisor_wrapper(core_agent)
 
-    logger.info("Quantum Calculation Worker with Supervisor wrapper and language detection created successfully")
+    logger.info("Science Analyst with Supervisor wrapper and language detection created successfully")
     return supervisor_compatible_agent
 
 
-def _create_core_quantum_calculation_worker():
+def _create_core_science_analyst():
     """
-    Create the core Quantum Calculation Worker agent (internal implementation).
+    Create the core Science Analyst agent (internal implementation).
 
-    This is the original create_quantum_calculation_worker function, now renamed
+    This is the original create_science_analyst function, now renamed
     to distinguish it from the public API.
     """
     # Get API key
     api_key = get_gemini_api_key()
     if not api_key:
-        logger.error("Gemini API key not found. Cannot initialize Quantum Calculation Worker.")
+        logger.error("Gemini API key not found. Cannot initialize Science Analyst.")
         raise ValueError(
             "Gemini API key not configured. Please set GEMINI_API_KEY environment variable "
             "or configure it in application settings."
         )
 
     # Initialize LLM with configured model
+    # Note: Consider using gemini-2.5-pro for higher quality reports if needed
     model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
     llm = ChatGoogleGenerativeAI(
         model=model_name,
         api_key=api_key
     )
-    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Quantum Calculation Worker")
+    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Science Analyst")
 
     # Load system prompt
     system_prompt = _load_system_prompt()
 
-    # Initialize tools
+    # Initialize tools for accessing and analyzing calculation results
     tools = _initialize_tools()
-    logger.debug(f"Initialized {len(tools)} tools for Quantum Calculation Worker")
+    logger.debug(f"Science Analyst initialized with {len(tools)} tools for result analysis")
 
     # Create ReAct agent using LangGraph prebuilt
     agent = create_react_agent(
         model=llm,
         tools=tools,
-        name="quantum_calculation_worker",
+        name="science_analyst",
         prompt=system_prompt
     )
 
-    logger.info("Core Quantum Calculation Worker agent created successfully")
+    logger.info("Core Science Analyst agent created successfully")
     return agent

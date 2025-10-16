@@ -11,7 +11,7 @@ from flask_pydantic import validate
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 from generated_models import AgentChatRequest, ExecuteConfirmedActionRequest, AgentActionType
-from agent.quantum_calc import tools
+from agent.computational_chemist import tools
 from agent.graph import get_compiled_graph
 
 # Set up logging

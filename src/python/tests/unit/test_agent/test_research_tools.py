@@ -9,7 +9,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime
 
-from agent.research.tools import search_arxiv
+from agent.deep_researcher.tools import search_arxiv
 
 
 # ============================================================================
@@ -314,7 +314,7 @@ def test_search_arxiv_uses_relevance_sorting(mock_search_class, mock_client_clas
     search_arxiv("test")
 
     # ASSERT
-    from agent.research.tools import arxiv
+    from agent.deep_researcher.tools import arxiv
     mock_search_class.assert_called_once()
     call_kwargs = mock_search_class.call_args.kwargs
     assert call_kwargs['sort_by'] == arxiv.SortCriterion.Relevance
