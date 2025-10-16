@@ -9,7 +9,7 @@ import pytest
 import json
 from unittest.mock import MagicMock, patch
 
-from agent.computational_chemist import tools
+from agent.quantum_calculator import tools
 from services.exceptions import ServiceError, NotFoundError, ValidationError
 
 

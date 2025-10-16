@@ -3,8 +3,9 @@ LangGraph Multi-Agent Supervisor
 
 This module implements the multi-agent architecture using LangGraph's Supervisor pattern.
 It provides a stateful graph that coordinates specialized worker agents:
-- Quantum Calculation Worker: Handles quantum chemistry and molecular analysis
-- Research Agent: Handles academic paper search and literature reviews
+- Quantum Calculator: Handles quantum chemistry calculations and molecular analysis
+- Literature Surveyor: Handles academic paper search and literature surveys
+- Science Analyst: Handles scientific report generation and data interpretation
 
 The Supervisor intelligently delegates tasks to the appropriate worker based on
 the user's intent and coordinates complex workflows.

@@ -1,7 +1,7 @@
 """
-Deep Research Agent Module
+Literature Surveyor Agent Module
 
-This module implements a Deep Research agent that performs iterative, in-depth
+This module implements a Literature Surveyor agent that performs iterative, in-depth
 investigation of topics using multiple search tools (arXiv, Tavily, PubMed).
 
 The agent uses LangGraph's StateGraph for custom iteration control, allowing it to:
@@ -10,7 +10,7 @@ The agent uses LangGraph's StateGraph for custom iteration control, allowing it 
 3. Perform searches across multiple sources
 4. Synthesize all findings into a comprehensive report
 
-This replaces the simple ReAct agent with a more sophisticated deep research workflow.
+This replaces the simple ReAct agent with a more sophisticated literature survey workflow.
 """
 
 import logging
@@ -38,9 +38,9 @@ from agent.utils import get_gemini_api_key, detect_language_cached, get_language
 logger = logging.getLogger(__name__)
 
 
-# State schema for Deep Research workflow
-class DeepResearchState(TypedDict):
-    """State for the deep research iteration loop."""
+# State schema for Literature Survey workflow
+class LiteratureSurveyState(TypedDict):
+    """State for the literature survey iteration loop."""
     # Input
     topic: str                          # Original research topic
     depth: int                          # Maximum iterations
@@ -72,7 +72,7 @@ def _create_analyze_node(llm: ChatGoogleGenerativeAI):
     prompt_dir = Path(__file__).parent / "prompts"
     analyze_prompt = load_prompt(prompt_dir, "analyze_prompt.txt")
 
-    def analyze_findings(state: DeepResearchState) -> dict:
+    def analyze_findings(state: LiteratureSurveyState) -> dict:
         """Analyze current findings and decide next steps."""
         try:
             logger.info(f"Analyzing findings (iteration {state['current_iteration']}/{state['depth']})")
@@ -171,7 +171,7 @@ def _create_search_node():
     2. Searches across 6 sources: Tavily (web), arXiv, PubMed, ChemRxiv, OpenAlex, Semantic Scholar
     3. Accumulates results in findings
     """
-    def search_knowledge(state: DeepResearchState) -> dict:
+    def search_knowledge(state: LiteratureSurveyState) -> dict:
         """Execute searches across all available sources."""
         try:
             next_topic = state.get('next_search_topic')
@@ -281,7 +281,7 @@ def _create_synthesize_node(llm: ChatGoogleGenerativeAI):
     prompt_dir = Path(__file__).parent / "prompts"
     synthesize_prompt = load_prompt(prompt_dir, "synthesize_prompt.txt")
 
-    def synthesize_report(state: DeepResearchState) -> dict:
+    def synthesize_report(state: LiteratureSurveyState) -> dict:
         """Synthesize all findings into a comprehensive report."""
         try:
             logger.info("Synthesizing final report from all findings")
@@ -341,7 +341,7 @@ Generate the report now:
     return synthesize_report
 
 
-def _should_continue_research(state: DeepResearchState) -> Literal["search", "synthesize"]:
+def _should_continue_research(state: LiteratureSurveyState) -> Literal["search", "synthesize"]:
     """
     Conditional edge function to determine next node.
 
@@ -357,32 +357,32 @@ def _should_continue_research(state: DeepResearchState) -> Literal["search", "sy
 
 def _create_supervisor_wrapper(research_graph):
     """
-    Create a wrapper that makes the Deep Research graph compatible with Supervisor's message-based interface.
+    Create a wrapper that makes the Literature Survey graph compatible with Supervisor's message-based interface.
 
     This wrapper:
     1. Receives messages from Supervisor
     2. Extracts topic and depth from the latest message
-    3. Invokes the Deep Research graph
+    3. Invokes the Literature Survey graph
     4. Returns the final_report as a message
     """
     def wrapper_node(state: MessagesState) -> dict:
-        """Wrapper node that converts messages to DeepResearchState and back."""
+        """Wrapper node that converts messages to LiteratureSurveyState and back."""
         try:
             # Get the latest message from Supervisor
             messages = state.get("messages", [])
             if not messages:
                 logger.error("No messages received from Supervisor")
-                return {"messages": [AIMessage(content="Error: No research topic provided", name="deep_researcher")]}
+                return {"messages": [AIMessage(content="Error: No research topic provided", name="literature_surveyor")]}
 
             # LangGraphベストプラクティス: メッセージタイプでフィルタリング
             # 転送メッセージ（ToolMessage）を除外し、実際のユーザークエリ（HumanMessage）のみを取得
             human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
             if not human_messages:
                 logger.error("No HumanMessage found in message history")
-                return {"messages": [AIMessage(content="Error: 有効なリサーチトピックが見つかりませんでした", name="deep_researcher")]}
+                return {"messages": [AIMessage(content="Error: 有効なリサーチトピックが見つかりませんでした", name="literature_surveyor")]}
 
             user_query = human_messages[-1].content
-            logger.info(f"Deep Research received query: {user_query}")
+            logger.info(f"Literature Surveyor received query: {user_query}")
 
             # Detect user's language using LLM with caching
             api_key = get_gemini_api_key()
@@ -400,8 +400,8 @@ def _create_supervisor_wrapper(research_graph):
 
             logger.info(f"Extracted topic: '{topic}', depth: {depth}, language: {user_language}")
 
-            # Initialize Deep Research state
-            initial_state: DeepResearchState = {
+            # Initialize Literature Survey state
+            initial_state: LiteratureSurveyState = {
                 "topic": topic,
                 "depth": depth,
                 "user_language": user_language,
@@ -414,8 +414,8 @@ def _create_supervisor_wrapper(research_graph):
                 "final_report": ""
             }
 
-            # Invoke the Deep Research graph
-            logger.info(f"Starting Deep Research with depth={depth}, language={user_language}")
+            # Invoke the Literature Survey graph
+            logger.info(f"Starting Literature Survey with depth={depth}, language={user_language}")
             result = research_graph.invoke(initial_state, config={"recursion_limit": depth * 3 + 10})
 
             # Extract final report
@@ -424,30 +424,30 @@ def _create_supervisor_wrapper(research_graph):
             if not final_report:
                 final_report = "Research completed but no report was generated."
 
-            logger.info(f"Deep Researcher completed. Report length: {len(final_report)} characters")
+            logger.info(f"Literature Surveyor completed. Report length: {len(final_report)} characters")
 
             # Return as AIMessage
-            return {"messages": [AIMessage(content=final_report, name="deep_researcher")]}
+            return {"messages": [AIMessage(content=final_report, name="literature_surveyor")]}
 
         except Exception as e:
-            logger.error(f"Error in Deep Researcher wrapper: {str(e)}", exc_info=True)
-            error_message = f"Error during deep research: {str(e)}"
-            return {"messages": [AIMessage(content=error_message, name="deep_researcher")]}
+            logger.error(f"Error in Literature Surveyor wrapper: {str(e)}", exc_info=True)
+            error_message = f"Error during literature survey: {str(e)}"
+            return {"messages": [AIMessage(content=error_message, name="literature_surveyor")]}
 
     # Build a simple graph with the wrapper node
     wrapper_builder = StateGraph(MessagesState)
-    wrapper_builder.add_node("deep_researcher", wrapper_node)
-    wrapper_builder.add_edge(START, "deep_researcher")
-    wrapper_builder.add_edge("deep_researcher", END)
+    wrapper_builder.add_node("literature_surveyor", wrapper_node)
+    wrapper_builder.add_edge(START, "literature_surveyor")
+    wrapper_builder.add_edge("literature_surveyor", END)
 
-    return wrapper_builder.compile(name="deep_researcher")
+    return wrapper_builder.compile(name="literature_surveyor")
 
 
-def create_deep_researcher():
+def create_literature_surveyor():
     """
-    Create a Deep Researcher agent compatible with LangGraph Supervisor.
+    Create a Literature Surveyor agent compatible with LangGraph Supervisor.
 
-    This function creates the core Deep Researcher graph and wraps it in a
+    This function creates the core Literature Surveyor graph and wraps it in a
     message-based interface that the Supervisor can interact with.
 
     The agent accepts queries in the format:
@@ -460,27 +460,27 @@ def create_deep_researcher():
     Raises:
         ValueError: If Gemini API key is not configured
     """
-    # Create the core Deep Researcher graph
-    core_graph = _create_core_deep_researcher_graph()
+    # Create the core Literature Surveyor graph
+    core_graph = _create_core_literature_surveyor_graph()
 
     # Wrap it for Supervisor compatibility
     supervisor_compatible_graph = _create_supervisor_wrapper(core_graph)
 
-    logger.info("Deep Researcher with Supervisor wrapper created successfully")
+    logger.info("Literature Surveyor with Supervisor wrapper created successfully")
     return supervisor_compatible_graph
 
 
-def _create_core_deep_researcher_graph():
+def _create_core_literature_surveyor_graph():
     """
-    Create the core Deep Researcher graph (internal implementation).
+    Create the core Literature Surveyor graph (internal implementation).
 
-    This is the original create_deep_researcher function, now renamed
+    This is the original create_literature_surveyor function, now renamed
     to distinguish it from the public API.
     """
     # Get API key
     api_key = get_gemini_api_key()
     if not api_key:
-        logger.error("Gemini API key not found. Cannot initialize Deep Researcher.")
+        logger.error("Gemini API key not found. Cannot initialize Literature Surveyor.")
         raise ValueError(
             "Gemini API key not configured. Please set GEMINI_API_KEY environment variable "
             "or configure it in application settings."
@@ -493,7 +493,7 @@ def _create_core_deep_researcher_graph():
         api_key=api_key,
         temperature=0.7  # Slightly higher temperature for creative research
     )
-    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Deep Researcher")
+    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Literature Surveyor")
 
     # Create nodes
     analyze_node = _create_analyze_node(llm)
@@ -501,7 +501,7 @@ def _create_core_deep_researcher_graph():
     synthesize_node = _create_synthesize_node(llm)
 
     # Build the graph
-    builder = StateGraph(DeepResearchState)
+    builder = StateGraph(LiteratureSurveyState)
 
     # Add nodes
     builder.add_node("analyze", analyze_node)
@@ -524,5 +524,5 @@ def _create_core_deep_researcher_graph():
     # Compile the graph
     graph = builder.compile()
 
-    logger.info("Core Deep Researcher graph created successfully")
+    logger.info("Core Literature Surveyor graph created successfully")
     return graph

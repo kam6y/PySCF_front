@@ -1,7 +1,7 @@
 """
-Computational Chemist Agent
+Quantum Calculator Agent
 
-This module implements the Computational Chemist agent, which specializes in
+This module implements the Quantum Calculator agent, which specializes in
 quantum chemistry calculations, molecular analysis, and computational chemistry tasks.
 
 The agent uses LangGraph's create_react_agent pattern with Google Gemini for
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 def _initialize_tools():
-    """Initialize and return the list of available tools for the Computational Chemist."""
+    """Initialize and return the list of available tools for the Quantum Calculator."""
     from . import tools
 
     return [
@@ -48,7 +48,7 @@ def _initialize_tools():
 
 def _create_supervisor_wrapper(core_agent):
     """
-    Create a wrapper that makes the Computational Chemist compatible with Supervisor's message-based interface.
+    Create a wrapper that makes the Quantum Calculator compatible with Supervisor's message-based interface.
 
     This wrapper:
     1. Receives messages from Supervisor
@@ -64,16 +64,16 @@ def _create_supervisor_wrapper(core_agent):
             messages = state.get("messages", [])
             if not messages:
                 logger.error("No messages received from Supervisor")
-                return {"messages": [AIMessage(content="Error: No query provided", name="computational_chemist")]}
+                return {"messages": [AIMessage(content="Error: No query provided", name="quantum_calculator")]}
 
             # Filter for HumanMessages only (exclude ToolMessage forwarding)
             human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
             if not human_messages:
                 logger.error("No HumanMessage found in message history")
-                return {"messages": [AIMessage(content="Error: 有効なクエリが見つかりませんでした", name="computational_chemist")]}
+                return {"messages": [AIMessage(content="Error: 有効なクエリが見つかりませんでした", name="quantum_calculator")]}
 
             user_query = human_messages[-1].content
-            logger.info(f"Computational Chemist received query: {user_query}")
+            logger.info(f"Quantum Calculator received query: {user_query}")
 
             # Detect user's language using LLM with caching
             api_key = get_gemini_api_key()
@@ -110,31 +110,31 @@ When executing calculations, providing data, or explaining results:
             if response_messages:
                 # Get the last AI message
                 final_message = response_messages[-1]
-                logger.info(f"Computational Chemist completed. Response length: {len(final_message.content)} characters")
-                return {"messages": [AIMessage(content=final_message.content, name="computational_chemist")]}
+                logger.info(f"Quantum Calculator completed. Response length: {len(final_message.content)} characters")
+                return {"messages": [AIMessage(content=final_message.content, name="quantum_calculator")]}
             else:
                 logger.warning("No response from core agent")
-                return {"messages": [AIMessage(content="No response generated", name="computational_chemist")]}
+                return {"messages": [AIMessage(content="No response generated", name="quantum_calculator")]}
 
         except Exception as e:
-            logger.error(f"Error in Computational Chemist wrapper: {str(e)}", exc_info=True)
+            logger.error(f"Error in Quantum Calculator wrapper: {str(e)}", exc_info=True)
             error_message = f"Error during calculation execution: {str(e)}"
-            return {"messages": [AIMessage(content=error_message, name="computational_chemist")]}
+            return {"messages": [AIMessage(content=error_message, name="quantum_calculator")]}
 
     # Build a simple graph with the wrapper node
     wrapper_builder = StateGraph(MessagesState)
-    wrapper_builder.add_node("computational_chemist", wrapper_node)
-    wrapper_builder.add_edge(START, "computational_chemist")
-    wrapper_builder.add_edge("computational_chemist", END)
+    wrapper_builder.add_node("quantum_calculator", wrapper_node)
+    wrapper_builder.add_edge(START, "quantum_calculator")
+    wrapper_builder.add_edge("quantum_calculator", END)
 
-    return wrapper_builder.compile(name="computational_chemist")
+    return wrapper_builder.compile(name="quantum_calculator")
 
 
-def create_computational_chemist():
+def create_quantum_calculator():
     """
-    Create a Computational Chemist agent compatible with LangGraph Supervisor.
+    Create a Quantum Calculator agent compatible with LangGraph Supervisor.
 
-    This function creates the core Computational Chemist agent and wraps it in a
+    This function creates the core Quantum Calculator agent and wraps it in a
     message-based interface that the Supervisor can interact with, with
     automatic language detection and adaptation.
 
@@ -151,27 +151,27 @@ def create_computational_chemist():
     Raises:
         ValueError: If Gemini API key is not configured
     """
-    # Create the core Computational Chemist agent
-    core_agent = _create_core_computational_chemist()
+    # Create the core Quantum Calculator agent
+    core_agent = _create_core_quantum_calculator()
 
     # Wrap it for Supervisor compatibility with language detection
     supervisor_compatible_agent = _create_supervisor_wrapper(core_agent)
 
-    logger.info("Computational Chemist with Supervisor wrapper and language detection created successfully")
+    logger.info("Quantum Calculator with Supervisor wrapper and language detection created successfully")
     return supervisor_compatible_agent
 
 
-def _create_core_computational_chemist():
+def _create_core_quantum_calculator():
     """
-    Create the core Computational Chemist agent (internal implementation).
+    Create the core Quantum Calculator agent (internal implementation).
 
-    This is the original create_computational_chemist function, now renamed
+    This is the original create_quantum_calculator function, now renamed
     to distinguish it from the public API.
     """
     # Get API key
     api_key = get_gemini_api_key()
     if not api_key:
-        logger.error("Gemini API key not found. Cannot initialize Computational Chemist.")
+        logger.error("Gemini API key not found. Cannot initialize Quantum Calculator.")
         raise ValueError(
             "Gemini API key not configured. Please set GEMINI_API_KEY environment variable "
             "or configure it in application settings."
@@ -183,7 +183,7 @@ def _create_core_computational_chemist():
         model=model_name,
         api_key=api_key
     )
-    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Computational Chemist")
+    logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Quantum Calculator")
 
     # Load system prompt using unified utility function
     prompt_dir = Path(__file__).parent / "prompts"
@@ -191,24 +191,24 @@ def _create_core_computational_chemist():
     if not system_prompt:
         # Fallback prompt if file not found
         system_prompt = (
-            "You are a Computational Chemist, an AI assistant specialized in molecular analysis "
+            "You are a Quantum Calculator, an AI assistant specialized in molecular analysis "
             "and quantum chemistry. You have access to tools for calculation management, molecular "
             "structure analysis, orbital visualization, and more. Use them proactively to help users "
             "with their computational chemistry tasks."
         )
-        logger.warning("Using fallback system prompt for Computational Chemist")
+        logger.warning("Using fallback system prompt for Quantum Calculator")
 
     # Initialize tools
     tools = _initialize_tools()
-    logger.debug(f"Initialized {len(tools)} tools for Computational Chemist")
+    logger.debug(f"Initialized {len(tools)} tools for Quantum Calculator")
 
     # Create ReAct agent using LangGraph prebuilt
     agent = create_react_agent(
         model=llm,
         tools=tools,
-        name="computational_chemist",
+        name="quantum_calculator",
         prompt=system_prompt
     )
 
-    logger.info("Core Computational Chemist agent created successfully")
+    logger.info("Core Quantum Calculator agent created successfully")
     return agent

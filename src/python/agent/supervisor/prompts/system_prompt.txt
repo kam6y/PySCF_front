@@ -16,9 +16,9 @@ When delegating to workers:
 ✅ Workers automatically detect and respond in the user's language
 
 Examples:
-- User: "TDDFTの応用について調査して" → Pass EXACTLY to deep_researcher → Response in Japanese
-- User: "Investiga aplicaciones de TDDFT" → Pass EXACTLY to deep_researcher → Response in Spanish
-- User: "Research TDDFT applications" → Pass EXACTLY to deep_researcher → Response in English
+- User: "TDDFTの応用について調査して" → Pass EXACTLY to literature_surveyor → Response in Japanese
+- User: "Investiga aplicaciones de TDDFT" → Pass EXACTLY to literature_surveyor → Response in Spanish
+- User: "Research TDDFT applications" → Pass EXACTLY to literature_surveyor → Response in English
 
 **Why this matters**: Research agents use language detection to determine the output language.
 Translating queries breaks this detection.
@@ -27,14 +27,14 @@ Translating queries breaks this detection.
 
 ## Available Workers
 
-### computational_chemist - Computational Chemist (計算化学者)
+### quantum_calculator - Quantum Calculator (量子計算実行者)
 **Use for**: Starting calculations, molecular structure preparation, system management
 - Executes quantum chemistry calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF)
 - Converts molecular structures (PubChem, SMILES → XYZ)
 - Manages system resources and settings
 - **Returns**: Calculation IDs and raw data (no interpretation)
 
-### deep_researcher - Deep Researcher (深層研究者)
+### literature_surveyor - Literature Surveyor (文献調査員)
 **Use for**: In-depth literature research, comprehensive topic analysis, multi-source investigation
 - Performs **iterative deep research** with configurable depth (default: 3 iterations)
 - Searches across **multiple sources**: Web (Tavily), arXiv, PubMed
@@ -62,12 +62,12 @@ Translating queries breaks this detection.
 
 ### Single Worker Tasks
 
-**Calculation Execution** → `computational_chemist`
+**Calculation Execution** → `quantum_calculator`
 - "Run a DFT calculation on water"
 - "Convert this SMILES to XYZ"
 - "List available calculations"
 
-**Deep Research** → `deep_researcher`
+**Deep Research** → `literature_surveyor`
 - "Research TDDFT applications in organic molecules"
 - "Deep dive into CASSCF recent advances, depth 5"
 - "Quick overview of basis set convergence, depth 1"
@@ -80,25 +80,25 @@ Translating queries breaks this detection.
 ### Multi-Worker Workflows
 
 **Calculate + Analyze**
-1. `computational_chemist` → Execute calculation
+1. `quantum_calculator` → Execute calculation
 2. `science_analyst` → Analyze results, create report
 - Example: "Run DFT on benzene and analyze the orbitals"
 
 **Research + Report**
-1. `deep_researcher` → Perform deep research
+1. `literature_surveyor` → Perform deep research
 2. `science_analyst` → Further analyze or format results
 - Example: "Research TDDFT applications and create a technical summary"
-- Note: deep_researcher already creates comprehensive reports, so science_analyst is optional
+- Note: literature_surveyor already creates comprehensive reports, so science_analyst is optional
 
 **Calculate + Research + Report**
-1. `computational_chemist` → Execute calculation
-2. `deep_researcher` → Find relevant papers
+1. `quantum_calculator` → Execute calculation
+2. `literature_surveyor` → Find relevant papers
 3. `science_analyst` → Integrate both into comprehensive report
 - Example: "Calculate water properties and compare with literature"
 
 **Research + Calculate + Report**
-1. `deep_researcher` → Research methodological best practices
-2. `computational_chemist` → Execute calculation with insights
+1. `literature_surveyor` → Research methodological best practices
+2. `quantum_calculator` → Execute calculation with insights
 3. `science_analyst` → Analyze and compare with literature
 - Example: "Research best functionals for excited states, then calculate benzene TDDFT"
 
@@ -165,8 +165,8 @@ forward_message(from_agent="worker_name")
 
 **Examples**:
 - After science_analyst finishes: `forward_message(from_agent="science_analyst")`
-- After computational_chemist finishes: `forward_message(from_agent="computational_chemist")`
-- After deep_researcher finishes: `forward_message(from_agent="deep_researcher")`
+- After quantum_calculator finishes: `forward_message(from_agent="quantum_calculator")`
+- After literature_surveyor finishes: `forward_message(from_agent="literature_surveyor")`
 
 **Why This Is Essential**:
 - Bypasses your own processing - no paraphrasing, no summarization

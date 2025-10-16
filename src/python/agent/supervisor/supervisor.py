@@ -15,8 +15,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
 from langgraph_supervisor.handoff import create_forward_message_tool
 from agent.utils import get_gemini_api_key, load_prompt
-from agent.computational_chemist import create_computational_chemist
-from agent.deep_researcher import create_deep_researcher
+from agent.quantum_calculator import create_quantum_calculator
+from agent.literature_surveyor import create_literature_surveyor
 from agent.science_analyst import create_science_analyst
 
 # Set up logging
@@ -28,8 +28,8 @@ def create_supervisor_agent():
     Create a Supervisor agent using LangGraph's create_supervisor.
 
     The Supervisor coordinates between:
-    - Computational Chemist (quantum chemistry and molecular analysis)
-    - Deep Researcher (academic literature search)
+    - Quantum Calculator (quantum chemistry and molecular analysis)
+    - Literature Surveyor (academic literature search)
     - Science Analyst (scientific report generation)
 
     Returns:
@@ -51,17 +51,17 @@ def create_supervisor_agent():
 
     # Create worker agents
     try:
-        computational_chemist = create_computational_chemist()
-        logger.info("Computational Chemist initialized")
+        quantum_calculator = create_quantum_calculator()
+        logger.info("Quantum Calculator initialized")
     except Exception as e:
-        logger.error(f"Failed to create Computational Chemist: {e}", exc_info=True)
+        logger.error(f"Failed to create Quantum Calculator: {e}", exc_info=True)
         raise
 
     try:
-        deep_researcher = create_deep_researcher()
-        logger.info("Deep Researcher initialized")
+        literature_surveyor = create_literature_surveyor()
+        logger.info("Literature Surveyor initialized")
     except Exception as e:
-        logger.error(f"Failed to create Deep Researcher: {e}", exc_info=True)
+        logger.error(f"Failed to create Literature Surveyor: {e}", exc_info=True)
         raise
 
     try:
@@ -91,7 +91,7 @@ def create_supervisor_agent():
         system_prompt = (
             "You are a Supervisor coordinating specialized AI agents for molecular science "
             "and computational chemistry research. Analyze user requests, delegate to the "
-            "appropriate specialist (computational_chemist, deep_researcher, or science_analyst), "
+            "appropriate specialist (quantum_calculator, literature_surveyor, or science_analyst), "
             "and orchestrate multi-step workflows. Use the forward_message tool to relay worker "
             "responses without modification."
         )
@@ -99,7 +99,7 @@ def create_supervisor_agent():
 
     # Create supervisor workflow using create_supervisor
     workflow = create_supervisor(
-        [computational_chemist, deep_researcher, science_analyst],
+        [quantum_calculator, literature_surveyor, science_analyst],
         model=supervisor_llm,
         prompt=system_prompt,
         tools=[forward_tool],  # Add forward_message tool
