@@ -50,6 +50,40 @@ def get_gemini_api_key() -> Optional[str]:
     return None
 
 
+def get_tavily_api_key() -> Optional[str]:
+    """
+    Get Tavily API key from environment variable or settings file.
+
+    Priority:
+        1. Environment variable: TAVILY_API_KEY
+        2. Settings file: settings.tavily_api_key
+        3. None (fallback)
+
+    Returns:
+        Optional[str]: API key if found, None otherwise
+    """
+    import os
+    from quantum_calc.settings_manager import get_current_settings
+
+    # Priority 1: Environment variable
+    api_key = os.environ.get("TAVILY_API_KEY")
+    if api_key:
+        logger.debug("Using Tavily API key from environment variable")
+        return api_key
+
+    # Priority 2: Settings file
+    try:
+        settings = get_current_settings()
+        if settings.tavily_api_key:
+            logger.debug("Using Tavily API key from settings file")
+            return settings.tavily_api_key
+    except Exception as e:
+        logger.warning(f"Failed to load settings for API key: {e}")
+
+    # Priority 3: None (fallback)
+    return None
+
+
 def detect_language(text: str, llm: ChatGoogleGenerativeAI) -> str:
     """
     Detect the language of the given text using LLM.
@@ -88,6 +122,62 @@ Return ONLY the 2-letter language code, nothing else:"""
     except Exception as e:
         logger.error(f"Error detecting language: {e}, defaulting to 'en'")
         return 'en'
+
+
+# Language detection cache: {text_hash: (language_code, timestamp)}
+_language_cache: dict[int, tuple[str, float]] = {}
+_CACHE_DURATION_SECONDS = 3600  # 1 hour
+
+
+def detect_language_cached(text: str, llm: ChatGoogleGenerativeAI, cache_duration: int = _CACHE_DURATION_SECONDS) -> str:
+    """
+    Detect the language of the given text using LLM, with memory caching.
+
+    This function caches language detection results to avoid redundant LLM API calls
+    within the same session. The cache is based on a hash of the input text and has
+    a configurable expiration time.
+
+    Args:
+        text: Text to analyze
+        llm: LLM instance for detection
+        cache_duration: Cache validity duration in seconds (default: 3600 = 1 hour)
+
+    Returns:
+        Language code (e.g., 'ja', 'en', 'es', 'zh', 'fr')
+    """
+    import time
+
+    # Generate cache key from text hash
+    text_hash = hash(text.lower().strip())
+
+    # Check cache
+    if text_hash in _language_cache:
+        cached_lang, cached_time = _language_cache[text_hash]
+        time_elapsed = time.time() - cached_time
+
+        # Return cached result if still valid
+        if time_elapsed < cache_duration:
+            logger.debug(f"Language detection cache hit: {cached_lang} (cached {time_elapsed:.1f}s ago)")
+            return cached_lang
+        else:
+            logger.debug(f"Language detection cache expired (age: {time_elapsed:.1f}s)")
+
+    # Cache miss or expired - perform actual detection
+    logger.debug("Language detection cache miss, calling LLM")
+    detected_lang = detect_language(text, llm)
+
+    # Update cache
+    _language_cache[text_hash] = (detected_lang, time.time())
+
+    # Clean up old cache entries (keep only last 100)
+    if len(_language_cache) > 100:
+        # Remove oldest entries
+        sorted_entries = sorted(_language_cache.items(), key=lambda x: x[1][1])
+        for old_hash, _ in sorted_entries[:-50]:  # Keep newest 50
+            del _language_cache[old_hash]
+        logger.debug("Language detection cache cleaned up")
+
+    return detected_lang
 
 
 def load_prompt(prompt_dir: Path, filename: str) -> str:

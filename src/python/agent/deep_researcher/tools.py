@@ -85,23 +85,13 @@ def search_tavily(query: str, max_results: int = 5) -> str:
         >>> result = search_tavily("TDDFT applications 2024", max_results=3)
     """
     try:
-        import os
         from langchain_tavily import TavilySearch
-        from quantum_calc.settings_manager import get_current_settings
+        from agent.utils import get_tavily_api_key
 
         logger.info(f"Searching Tavily with query: '{query}', max_results: {max_results}")
 
-        # Get Tavily API key from settings or environment
-        api_key = None
-        try:
-            settings = get_current_settings()
-            api_key = settings.tavily_api_key
-        except Exception as e:
-            logger.debug(f"Could not load settings for Tavily API key: {e}")
-
-        # Fallback to environment variable
-        if not api_key:
-            api_key = os.environ.get("TAVILY_API_KEY")
+        # Get Tavily API key using unified utility function
+        api_key = get_tavily_api_key()
 
         if not api_key:
             logger.warning("Tavily API key not configured")

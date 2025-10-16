@@ -16,40 +16,10 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph, START, END, MessagesState
 
-from agent.utils import get_gemini_api_key, detect_language, get_language_name
+from agent.utils import get_gemini_api_key, detect_language_cached, get_language_name, load_prompt
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
-
-def _load_system_prompt() -> str:
-    """Load the system prompt for the Science Analyst."""
-    try:
-        # Try to load system prompt from file
-        prompt_path = Path(__file__).parent / "prompts" / "system_prompt.txt"
-
-        if prompt_path.exists():
-            with open(prompt_path, 'r', encoding='utf-8') as f:
-                prompt = f.read()
-            logger.debug(f"Loaded system prompt from {prompt_path}")
-            return prompt
-        else:
-            logger.warning(f"System prompt file not found at {prompt_path}, using fallback")
-            return _get_fallback_system_prompt()
-
-    except Exception as e:
-        logger.error(f"Failed to load system prompt from file: {e}, using fallback")
-        return _get_fallback_system_prompt()
-
-
-def _get_fallback_system_prompt() -> str:
-    """Fallback system prompt in case file loading fails."""
-    return (
-        "You are a Science Analyst, an AI assistant specialized in creating comprehensive "
-        "scientific reports for molecular science and computational chemistry. "
-        "You synthesize information from other agents and produce well-structured, "
-        "scientifically accurate reports in Japanese or English based on user preference."
-    )
 
 
 def _initialize_tools():
@@ -100,11 +70,11 @@ def _create_supervisor_wrapper(core_agent):
             user_query = human_messages[-1].content
             logger.info(f"Science Analyst received query: {user_query}")
 
-            # Detect user's language using LLM
+            # Detect user's language using LLM with caching
             api_key = get_gemini_api_key()
             model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
             llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
-            user_language = detect_language(user_query, llm)
+            user_language = detect_language_cached(user_query, llm)
             language_name = get_language_name(user_language)
             logger.info(f"Detected user language: {user_language} ({language_name})")
 
@@ -212,8 +182,18 @@ def _create_core_science_analyst():
     )
     logger.info(f"Initialized ChatGoogleGenerativeAI with {model_name} for Science Analyst")
 
-    # Load system prompt
-    system_prompt = _load_system_prompt()
+    # Load system prompt using unified utility function
+    prompt_dir = Path(__file__).parent / "prompts"
+    system_prompt = load_prompt(prompt_dir, "system_prompt.txt")
+    if not system_prompt:
+        # Fallback prompt if file not found
+        system_prompt = (
+            "You are a Science Analyst, an AI assistant specialized in creating comprehensive "
+            "scientific reports for molecular science and computational chemistry. "
+            "You synthesize information from other agents and produce well-structured, "
+            "scientifically accurate reports in Japanese or English based on user preference."
+        )
+        logger.warning("Using fallback system prompt for Science Analyst")
 
     # Initialize tools for accessing and analyzing calculation results
     tools = _initialize_tools()

@@ -32,7 +32,7 @@ from .tools import (
     search_openalex,
     search_semantic_scholar
 )
-from agent.utils import get_gemini_api_key, detect_language, get_language_name
+from agent.utils import get_gemini_api_key, detect_language_cached, get_language_name, load_prompt
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -60,21 +60,6 @@ class DeepResearchState(TypedDict):
     final_report: str                   # Synthesized final report
 
 
-def _load_prompt(filename: str) -> str:
-    """Load a prompt from the prompts directory."""
-    try:
-        prompt_path = Path(__file__).parent / "prompts" / filename
-        if prompt_path.exists():
-            with open(prompt_path, 'r', encoding='utf-8') as f:
-                return f.read()
-        else:
-            logger.warning(f"Prompt file not found: {prompt_path}")
-            return ""
-    except Exception as e:
-        logger.error(f"Failed to load prompt {filename}: {e}")
-        return ""
-
-
 def _create_analyze_node(llm: ChatGoogleGenerativeAI):
     """
     Create the analysis node that decides what to search next.
@@ -84,7 +69,8 @@ def _create_analyze_node(llm: ChatGoogleGenerativeAI):
     2. Identifies knowledge gaps
     3. Decides next search topic or concludes the research
     """
-    analyze_prompt = _load_prompt("analyze_prompt.txt")
+    prompt_dir = Path(__file__).parent / "prompts"
+    analyze_prompt = load_prompt(prompt_dir, "analyze_prompt.txt")
 
     def analyze_findings(state: DeepResearchState) -> dict:
         """Analyze current findings and decide next steps."""
@@ -292,7 +278,8 @@ def _create_synthesize_node(llm: ChatGoogleGenerativeAI):
     2. Synthesizes them into a coherent report
     3. Includes citations and key insights
     """
-    synthesize_prompt = _load_prompt("synthesize_prompt.txt")
+    prompt_dir = Path(__file__).parent / "prompts"
+    synthesize_prompt = load_prompt(prompt_dir, "synthesize_prompt.txt")
 
     def synthesize_report(state: DeepResearchState) -> dict:
         """Synthesize all findings into a comprehensive report."""
@@ -397,11 +384,11 @@ def _create_supervisor_wrapper(research_graph):
             user_query = human_messages[-1].content
             logger.info(f"Deep Research received query: {user_query}")
 
-            # Detect user's language using LLM
+            # Detect user's language using LLM with caching
             api_key = get_gemini_api_key()
             model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
             llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
-            user_language = detect_language(user_query, llm)
+            user_language = detect_language_cached(user_query, llm)
             logger.info(f"Detected user language: {user_language}")
 
             # Extract depth from query (e.g., "research topic, depth 5")
