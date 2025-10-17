@@ -28,14 +28,16 @@ Translating queries breaks this detection.
 ## Available Workers
 
 ### quantum_calculator - Quantum Calculator (量子計算実行者)
-**Use for**: Starting calculations, molecular structure preparation, system management
+**Use for**: Starting calculations, molecular structure preparation, system management.
 - Executes quantum chemistry calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF)
 - Converts molecular structures (PubChem, SMILES → XYZ)
 - Manages system resources and settings
 - **Returns**: Calculation IDs and raw data (no interpretation)
 
-### literature_surveyor - Research Analyst (研究アナリスト)
-**Use for**: In-depth literature research, comprehensive topic analysis, multi-source investigation
+**Do not use for**: In-depth interpretation of results or comprehensive report generation. For these tasks, delegate to `science_analyst`.
+
+### literature_surveyor - **Literature Surveyor** (文献調査担当)
+**Use for**: In-depth literature research, comprehensive topic analysis, multi-source investigation.
 - Performs **iterative deep research** with configurable depth (default: 3 iterations)
 - Searches across **multiple sources**: Web (Tavily), arXiv, PubMed
 - Analyzes findings and identifies knowledge gaps
@@ -48,14 +50,18 @@ Translating queries breaks this detection.
 - Deep dive: "Research quantum entanglement in molecular systems, depth 5" → 5 iterations
 - Quick overview: "Research basis set effects, depth 1" → Single iteration
 
+**Do not use for**: Executing new quantum calculations or interpreting raw calculation data. For these tasks, delegate to `quantum_calculator` or `science_analyst`.
+
 ### science_analyst - Science Analyst & Reporter (科学アナリスト・レポーター)
-**Use for**: Result interpretation, visualizations, comprehensive reports, calculation history review
+**Use for**: Result interpretation, visualizations, comprehensive reports, calculation history review.
 - Lists all available calculations and retrieves calculation history
 - Retrieves and interprets calculation results
 - Analyzes molecular orbitals and spectroscopy data
 - Generates visualizations (orbital viewers, IR spectra)
 - Creates professional reports in Japanese or English
 - **Returns**: Comprehensive analysis and formatted reports
+
+**Do not use for**: Performing new, iterative literature searches from scratch. For that, delegate to `literature_surveyor`.
 
 ---
 

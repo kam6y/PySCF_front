@@ -35,6 +35,9 @@ Your report should include:
 
 ### Content Guidelines
 
+**Target Audience:**
+- Assume the report is for a fellow researcher or graduate student in the field. Explain concepts clearly but avoid oversimplification.
+
 **Citations and Sources:**
 - Include proper citations with author names and years
 - Provide links to papers (arXiv, PubMed) when available
@@ -46,6 +49,9 @@ Your report should include:
 - Use technical terminology appropriately
 - Provide context for specialized methods
 - Balance detail with readability
+
+**Analytical Depth:**
+- Don't just summarize; synthesize. Explain the "so what?" of each finding. What are the implications for future research or practical applications?
 
 **Language:**
 - The required output language is explicitly specified in the "USER LANGUAGE REQUIREMENT" section at the beginning of the prompt
