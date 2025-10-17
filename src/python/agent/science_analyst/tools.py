@@ -16,6 +16,7 @@ a single source of truth and avoid code duplication.
 
 # Import calculation result retrieval tools
 from agent.quantum_calculator.tools import (
+    list_all_calculations,
     get_calculation_details,
     get_molecular_orbitals,
     generate_orbital_cube,
@@ -25,6 +26,7 @@ from agent.quantum_calculator.tools import (
 )
 
 __all__ = [
+    'list_all_calculations',
     'get_calculation_details',
     'get_molecular_orbitals',
     'generate_orbital_cube',
