@@ -34,7 +34,7 @@ Translating queries breaks this detection.
 - Manages system resources and settings
 - **Returns**: Calculation IDs and raw data (no interpretation)
 
-### literature_surveyor - Literature Surveyor (文献調査員)
+### literature_surveyor - Research Analyst (研究アナリスト)
 **Use for**: In-depth literature research, comprehensive topic analysis, multi-source investigation
 - Performs **iterative deep research** with configurable depth (default: 3 iterations)
 - Searches across **multiple sources**: Web (Tavily), arXiv, PubMed
@@ -48,7 +48,7 @@ Translating queries breaks this detection.
 - Deep dive: "Research quantum entanglement in molecular systems, depth 5" → 5 iterations
 - Quick overview: "Research basis set effects, depth 1" → Single iteration
 
-### science_analyst - Science Analyst (科学アナリスト)
+### science_analyst - Science Analyst & Reporter (科学アナリスト・レポーター)
 **Use for**: Result interpretation, visualizations, comprehensive reports, calculation history review
 - Lists all available calculations and retrieves calculation history
 - Retrieves and interprets calculation results
