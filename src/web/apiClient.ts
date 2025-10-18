@@ -37,6 +37,17 @@ type ExecuteConfirmedActionRequest =
 type ExecuteConfirmedActionResponse =
   components['schemas']['ExecuteConfirmedActionResponse'];
 
+// Chat History API types
+type ChatSessionSummary = components['schemas']['ChatSessionSummary'];
+type ChatSession = components['schemas']['ChatSession'];
+type ChatMessage = components['schemas']['ChatMessage'];
+type ChatSessionDetail = components['schemas']['ChatSessionDetail'];
+type ChatHistoryListResponse = components['schemas']['ChatHistoryListResponse'];
+type ChatSessionResponse = components['schemas']['ChatSessionResponse'];
+type ChatSessionDetailResponse = components['schemas']['ChatSessionDetailResponse'];
+type CreateChatSessionRequest = components['schemas']['CreateChatSessionRequest'];
+type UpdateChatSessionRequest = components['schemas']['UpdateChatSessionRequest'];
+
 // Settings API types
 type AppSettings = components['schemas']['AppSettings'];
 type SettingsResponse = components['schemas']['SettingsResponse'];
@@ -484,6 +495,7 @@ export const chatWithAgent = (
 export const streamChatWithAgent = (
   message: string,
   history: AgentChatRequest['history'],
+  sessionId: string | null,
   callbacks: {
     onMessage: (chunk: string) => void;
     onClose: () => void;
@@ -497,35 +509,18 @@ export const streamChatWithAgent = (
   const ctrl = new AbortController();
   let isStreamClosed = false; // 重複イベント防止フラグ
 
-  // デバッグ用ログ（開発環境のみ）
-  const debug = (message: string, data?: any) => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[SSE Debug] ${message}`, data || '');
-    }
-  };
-
-  debug('Starting SSE stream', {
-    messageLength: message.length,
-    historyLength: history?.length || 0,
-  });
-
   fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'text/event-stream',
     },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, session_id: sessionId }),
     signal: ctrl.signal,
 
     onopen: async response => {
-      debug('SSE connection opened', { status: response.status });
       if (!response.ok) {
         const errorText = await response.text();
-        debug('SSE connection failed', {
-          status: response.status,
-          error: errorText,
-        });
         callbacks.onError(
           new Error(`Failed to connect: ${response.status} ${errorText}`)
         );
@@ -535,25 +530,16 @@ export const streamChatWithAgent = (
 
     onmessage(event) {
       if (isStreamClosed) {
-        debug('Received message after stream closed, ignoring');
         return;
       }
 
       try {
         const parsedData = JSON.parse(event.data);
-        debug('Received SSE message', {
-          type: parsedData.type,
-          hasText: !!parsedData.payload?.text,
-        });
 
         if (parsedData.type === 'chunk' && parsedData.payload?.text) {
           callbacks.onMessage(parsedData.payload.text);
         } else if (parsedData.type === 'agent_status' && parsedData.payload) {
           // New event type: Agent status update
-          debug('Agent status update received', {
-            status: parsedData.payload.status,
-            agent: parsedData.payload.agent,
-          });
           if (callbacks.onAgentStatus) {
             callbacks.onAgentStatus(
               parsedData.payload.status,
@@ -561,16 +547,12 @@ export const streamChatWithAgent = (
             );
           }
         } else if (parsedData.type === 'done') {
-          debug('Stream completed');
           if (!isStreamClosed) {
             isStreamClosed = true;
             callbacks.onClose();
           }
           ctrl.abort(); // End the connection
         } else if (parsedData.type === 'error') {
-          debug('Stream error received', {
-            error: parsedData.payload?.message,
-          });
           if (!isStreamClosed) {
             isStreamClosed = true;
             callbacks.onError(
@@ -581,11 +563,8 @@ export const streamChatWithAgent = (
             );
           }
           ctrl.abort();
-        } else {
-          debug('Unknown message type received', parsedData);
         }
       } catch (e) {
-        debug('Failed to parse SSE message', { error: e, rawData: event.data });
         if (!isStreamClosed) {
           isStreamClosed = true;
           callbacks.onError(new Error('Failed to parse message from stream.'));
@@ -595,7 +574,6 @@ export const streamChatWithAgent = (
     },
 
     onclose() {
-      debug('SSE connection closed');
       // onClose は onmessage の 'done' イベントで既に呼ばれている可能性があるため、
       // 重複呼び出しを防止
       if (!isStreamClosed) {
@@ -605,7 +583,6 @@ export const streamChatWithAgent = (
     },
 
     onerror(err) {
-      debug('SSE connection error', { error: err });
       if (!isStreamClosed) {
         isStreamClosed = true;
         callbacks.onError(err instanceof Error ? err : new Error(String(err)));
@@ -649,4 +626,103 @@ export const executeConfirmedAgentAction = (
       }),
     }
   );
+};
+
+// --- Chat History API Functions ---
+
+/**
+ * Get all chat sessions
+ */
+export const getChatSessions = (): Promise<ChatHistoryListResponse['data']> => {
+  return request<ChatHistoryListResponse['data']>('/api/chat-history/sessions', {
+    method: 'GET',
+  });
+};
+
+/**
+ * Create a new chat session
+ */
+export const createChatSession = (
+  name?: string
+): Promise<ChatSessionResponse['data']> => {
+  return request<ChatSessionResponse['data']>('/api/chat-history/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+};
+
+/**
+ * Get chat session details
+ */
+export const getChatSessionDetail = (
+  sessionId: string
+): Promise<ChatSessionDetailResponse['data']> => {
+  if (!sessionId || sessionId.trim() === '') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid session ID provided.',
+        400,
+        'Bad Request',
+        `/api/chat-history/sessions/${sessionId}`,
+        null,
+        false
+      )
+    );
+  }
+
+  return request<ChatSessionDetailResponse['data']>(
+    `/api/chat-history/sessions/${sessionId}`,
+    { method: 'GET' }
+  );
+};
+
+/**
+ * Update chat session name
+ */
+export const updateChatSession = (
+  sessionId: string,
+  name: string
+): Promise<ChatSessionResponse['data']> => {
+  if (!sessionId || sessionId.trim() === '') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid session ID provided.',
+        400,
+        'Bad Request',
+        `/api/chat-history/sessions/${sessionId}`,
+        null,
+        false
+      )
+    );
+  }
+
+  return request<ChatSessionResponse['data']>(
+    `/api/chat-history/sessions/${sessionId}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }
+  );
+};
+
+/**
+ * Delete a chat session
+ */
+export const deleteChatSession = (sessionId: string): Promise<void> => {
+  if (!sessionId || sessionId.trim() === '') {
+    return Promise.reject(
+      new ApiError(
+        'Invalid session ID provided.',
+        400,
+        'Bad Request',
+        `/api/chat-history/sessions/${sessionId}`,
+        null,
+        false
+      )
+    );
+  }
+
+  return request<void>(`/api/chat-history/sessions/${sessionId}`, {
+    method: 'DELETE',
+  });
 };

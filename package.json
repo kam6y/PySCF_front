@@ -44,10 +44,8 @@
   "author": "kam6y",
   "electronmon": {
     "patterns": [
-      "dist/**/*"
-    ],
-    "ignore": [
-      "**/*.map"
+      "dist/**/*",
+      "!data/**"
     ],
     "delay": 500
   },

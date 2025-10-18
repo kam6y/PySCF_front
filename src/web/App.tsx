@@ -14,6 +14,9 @@ import { useAppState } from './hooks/useAppState';
 import { useCalculationData } from './hooks/useCalculationData';
 import { useCalculationActions } from './hooks/useCalculationActions';
 import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
+import { useChatHistoryStore } from './store/chatHistoryStore';
+import { useAgentStore } from './store/agentStore';
+import { useGetChatSessionDetail } from './hooks/useChatHistoryQueries';
 
 export const App = () => {
   // 統合された状態管理
@@ -48,6 +51,25 @@ export const App = () => {
 
   const handleCalculationSelect = (calculationId: string) => {
     appState.actions.handleCalculationSelect(calculationId);
+  };
+
+  // チャット履歴のハンドラー
+  const setActiveSessionId = useChatHistoryStore(state => state.setActiveSessionId);
+  const setHistory = useAgentStore(state => state.setHistory);
+
+  const handleChatSessionSelect = async (sessionId: string) => {
+    try {
+      // セッションIDを設定
+      setActiveSessionId(sessionId);
+
+      // AI Agentモードに切り替え
+      appState.ui.setAIAgentEnabled(true);
+
+      // セッション詳細を取得してagentStoreのhistoryを更新
+      // （実際の読み込みはAgentPageで行う）
+    } catch (error) {
+      console.error('Failed to load chat session:', error);
+    }
   };
 
   const renderCurrentPage = () => {
@@ -175,6 +197,9 @@ export const App = () => {
         onUserMenuToggle={appState.ui.toggleUserMenu}
         isUserMenuOpen={appState.ui.isUserMenuOpen}
         onSettingsOpen={appState.ui.openSettings}
+        sidebarView={appState.ui.sidebarView}
+        onSidebarViewChange={appState.ui.setSidebarView}
+        onChatSessionSelect={handleChatSessionSelect}
       />
 
       <main

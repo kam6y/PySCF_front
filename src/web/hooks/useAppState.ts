@@ -17,10 +17,12 @@ export const useAppState = () => {
       // Sidebar
       isSidebarOpen: uiState.isSidebarOpen,
       isDropdownOpen: uiState.isDropdownOpen,
+      sidebarView: uiState.sidebarView,
       toggleSidebar: uiState.toggleSidebar,
       closeSidebar: uiState.closeSidebar,
       toggleDropdown: uiState.toggleDropdown,
       closeDropdown: uiState.closeDropdown,
+      setSidebarView: uiState.setSidebarView,
 
       // Page navigation
       currentPage: uiState.currentPage,

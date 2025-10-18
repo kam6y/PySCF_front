@@ -300,6 +300,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat-history/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all chat sessions
+         * @description Retrieve a list of all chat history sessions, ordered by most recent update
+         */
+        get: operations["getChatSessions"];
+        put?: never;
+        /**
+         * Create a new chat session
+         * @description Create a new chat history session with an optional name
+         */
+        post: operations["createChatSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat-history/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get chat session details
+         * @description Retrieve a specific chat session with all messages
+         */
+        get: operations["getChatSession"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete chat session
+         * @description Delete a chat session and all its messages
+         */
+        delete: operations["deleteChatSession"];
+        options?: never;
+        head?: never;
+        /**
+         * Update chat session
+         * @description Update chat session metadata (e.g., name)
+         */
+        patch: operations["updateChatSession"];
+        trace?: never;
+    };
     "/api/agent/chat": {
         parameters: {
             query?: never;
@@ -1505,6 +1557,8 @@ export interface components {
                     text?: string;
                 }[];
             }[];
+            /** @description Optional chat session ID for persisting conversation history */
+            session_id?: string | null;
         };
         AgentChatResponse: {
             /** @example true */
@@ -1528,6 +1582,120 @@ export interface components {
                 action_type?: components["schemas"]["AgentActionType"];
                 /** @description ID of the affected calculation */
                 calculation_id?: string;
+            };
+        };
+        ChatMessage: {
+            /**
+             * @description Unique message ID (UUID)
+             * @example msg_550e8400-e29b-41d4-a716-446655440000
+             */
+            id: string;
+            /**
+             * @description Associated chat session ID
+             * @example session_550e8400-e29b-41d4-a716-446655440000
+             */
+            session_id: string;
+            /**
+             * @description Message sender role
+             * @enum {string}
+             */
+            role: "user" | "model";
+            /** @description Message content */
+            content: string;
+            /**
+             * Format: date-time
+             * @description Message creation timestamp
+             */
+            created_at: string;
+        };
+        ChatSession: {
+            /**
+             * @description Unique session ID (UUID)
+             * @example session_550e8400-e29b-41d4-a716-446655440000
+             */
+            id: string;
+            /**
+             * @description Session name/title
+             * @example 水分子のDFT計算
+             */
+            name: string;
+            /**
+             * Format: date-time
+             * @description Session creation timestamp
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description Last update timestamp
+             */
+            updated_at: string;
+        };
+        ChatSessionSummary: {
+            /** @description Unique session ID */
+            id: string;
+            /** @description Session name/title */
+            name: string;
+            /** @description Number of messages in this session */
+            message_count: number;
+            /**
+             * Format: date-time
+             * @description Session creation timestamp
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description Last update timestamp
+             */
+            updated_at: string;
+            /** @description Preview of the last message (first 100 characters) */
+            last_message_preview?: string | null;
+        };
+        ChatSessionDetail: {
+            session: components["schemas"]["ChatSession"];
+            /** @description All messages in this session, ordered by creation time */
+            messages: components["schemas"]["ChatMessage"][];
+        };
+        CreateChatSessionRequest: {
+            /**
+             * @description Session name/title
+             * @default 新しいチャット
+             */
+            name: string;
+        };
+        UpdateChatSessionRequest: {
+            /** @description Updated session name */
+            name: string;
+        };
+        ChatHistoryListResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description List of chat sessions */
+                sessions: components["schemas"]["ChatSessionSummary"][];
+                /** @description Total number of sessions */
+                total_count: number;
+            };
+        };
+        ChatSessionResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                session: components["schemas"]["ChatSession"];
+            };
+        };
+        ChatSessionDetailResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["ChatSessionDetail"];
+        };
+        ChatSessionDeleteResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description Deletion confirmation message */
+                message: string;
+                /** @description ID of the deleted session */
+                deleted_id: string;
             };
         };
     };
@@ -2246,6 +2414,204 @@ export interface operations {
                 };
             };
             /** @description Failed to retrieve system resource status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getChatSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat sessions retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatHistoryListResponse"];
+                };
+            };
+            /** @description Failed to retrieve chat sessions */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateChatSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Chat session created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to create chat session */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chat session ID */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat session retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionDetailResponse"];
+                };
+            };
+            /** @description Chat session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to retrieve chat session */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chat session ID */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat session deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionDeleteResponse"];
+                };
+            };
+            /** @description Chat session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete chat session */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chat session ID */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateChatSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Chat session updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionResponse"];
+                };
+            };
+            /** @description Chat session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to update chat session */
             500: {
                 headers: {
                     [name: string]: unknown;

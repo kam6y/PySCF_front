@@ -157,6 +157,37 @@
   color: #333;
 }
 
+/* Sidebar View Tabs */
+.sidebarViewTabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.sidebarViewTab {
+  flex: 1;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: 16px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: -2px;
+}
+
+.sidebarViewTab:hover {
+  color: #111827;
+  background: #f8f9fa;
+}
+
+.sidebarViewTab.active {
+  color: #50D4F5;
+  border-bottom-color: #50D4F5;
+}
+
 /* Calculations Section */
 .sidebarCalculations {
   display: flex;

@@ -2,9 +2,12 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import { useQueryClient } from '@tanstack/react-query';
 import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAgentStore, ChatHistory, AgentStatus } from '../store/agentStore';
+import { useChatHistoryStore } from '../store/chatHistoryStore';
+import { useCreateChatSession, useGetChatSessionDetail, chatHistoryKeys } from '../hooks/useChatHistoryQueries';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { InlineOrbitalViewer } from '../components/InlineOrbitalViewer';
 import styles from './AgentPage.module.css';
@@ -45,10 +48,23 @@ export const AgentPage = () => {
   const history = useAgentStore(state => state.history);
   const currentAgentStatus = useAgentStore(state => state.currentAgentStatus);
   const addMessage = useAgentStore(state => state.addMessage);
+  const addMessages = useAgentStore(state => state.addMessages);
   const updateMessage = useAgentStore(state => state.updateMessage);
   const setHistory = useAgentStore(state => state.setHistory);
   const clearHistory = useAgentStore(state => state.clearHistory);
   const setAgentStatus = useAgentStore(state => state.setAgentStatus);
+
+  // チャット履歴ストア（セッションID管理を一元化）
+  const activeSessionId = useChatHistoryStore(state => state.activeSessionId);
+  const setActiveSessionId = useChatHistoryStore(state => state.setActiveSessionId);
+  const clearActiveSession = useChatHistoryStore(state => state.clearActiveSession);
+
+  // TanStack Query
+  const queryClient = useQueryClient();
+
+  // チャット履歴のクエリ
+  const createChatSession = useCreateChatSession();
+  const { data: sessionDetailData } = useGetChatSessionDetail(activeSessionId);
 
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -60,42 +76,32 @@ export const AgentPage = () => {
   // 重複送信を防止するためのRef（setStateは非同期なので、useRefで同期的に管理）
   const isSendingRef = useRef(false);
 
+  // 前回のセッションIDを追跡（競合状態を回避）
+  const prevSessionIdRef = useRef<string | null>(null);
+
   // Confirmation modal state
   const [confirmationRequest, setConfirmationRequest] =
     useState<ConfirmationRequest | null>(null);
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
 
-  // Clear history confirmation modal state
-  const [isClearConfirmationOpen, setIsClearConfirmationOpen] = useState(false);
+  // New chat confirmation modal state
+  const [isNewChatConfirmationOpen, setIsNewChatConfirmationOpen] = useState(false);
 
   // Parse confirmation request from AI message
   const parseConfirmationRequest = useCallback(
     (text: string): ConfirmationRequest | null => {
       try {
-        console.log(
-          '[ConfirmationParser] Parsing text for confirmation request'
-        );
-        console.log('[ConfirmationParser] Text length:', text.length);
-        console.log(
-          '[ConfirmationParser] Text preview:',
-          text.substring(0, 500)
-        );
-
         // Try to extract JSON from markdown code blocks first (```json ... ```)
         const jsonBlockRegex = /```json\s*(\{[\s\S]*?\})\s*```/;
         const jsonBlockMatch = text.match(jsonBlockRegex);
         if (jsonBlockMatch?.[1]) {
-          console.log('[ConfirmationParser] Found JSON in code block');
           const parsed = JSON.parse(jsonBlockMatch[1]);
           if (
             parsed.requires_confirmation === true &&
             parsed.action &&
             parsed.calculation_id
           ) {
-            console.log(
-              '[ConfirmationParser] Valid confirmation request found in code block'
-            );
             return parsed as ConfirmationRequest;
           }
         }
@@ -108,12 +114,6 @@ export const AgentPage = () => {
         const matches = text.match(jsonPatternRegex);
 
         if (matches) {
-          console.log(
-            '[ConfirmationParser] Found',
-            matches.length,
-            'potential JSON matches'
-          );
-
           // Try to parse each match
           for (const match of matches) {
             try {
@@ -123,16 +123,9 @@ export const AgentPage = () => {
                 parsed.action &&
                 parsed.calculation_id
               ) {
-                console.log(
-                  '[ConfirmationParser] Valid confirmation request found'
-                );
                 return parsed as ConfirmationRequest;
               }
             } catch (parseError) {
-              console.debug(
-                '[ConfirmationParser] Failed to parse match:',
-                parseError
-              );
               continue;
             }
           }
@@ -144,12 +137,6 @@ export const AgentPage = () => {
         const allMatches = text.match(allJsonRegex);
 
         if (allMatches) {
-          console.log(
-            '[ConfirmationParser] Trying lenient parsing with',
-            allMatches.length,
-            'matches'
-          );
-
           for (const match of allMatches) {
             try {
               const parsed = JSON.parse(match);
@@ -158,9 +145,6 @@ export const AgentPage = () => {
                 parsed.action &&
                 parsed.calculation_id
               ) {
-                console.log(
-                  '[ConfirmationParser] Valid confirmation request found with lenient parsing'
-                );
                 return parsed as ConfirmationRequest;
               }
             } catch (parseError) {
@@ -170,7 +154,6 @@ export const AgentPage = () => {
           }
         }
 
-        console.log('[ConfirmationParser] No valid confirmation request found');
         return null;
       } catch (e) {
         console.error(
@@ -253,29 +236,79 @@ export const AgentPage = () => {
     addMessage(cancelMessage);
   }, [addMessage]);
 
-  // Handle clear history confirmation
-  const handleClearHistoryRequest = useCallback(() => {
-    setIsClearConfirmationOpen(true);
-  }, []);
+  // Load session detail when activeSessionId changes
+  // This effect handles three scenarios:
+  // 1. Switching to a new session → Load history from database
+  // 2. Clearing session (null) → Clear history display
+  // 3. During message streaming → Skip to preserve real-time updates
+  useEffect(() => {
+    // Guard: Don't modify history during message streaming to preserve real-time updates
+    if (isLoading) {
+      return;
+    }
 
-  const handleClearHistoryConfirm = useCallback(() => {
+    // Guard: Only process if session ID actually changed
+    const hasSessionChanged = activeSessionId !== prevSessionIdRef.current;
+    if (!hasSessionChanged) {
+      return;
+    }
+
+    // Case 1: Session was cleared (null) - immediately clear history
+    if (!activeSessionId) {
+      prevSessionIdRef.current = null;
+      clearHistory();
+      return;
+    }
+
+    // Case 2: Switched to a new session - load history from database
+    // Wait for sessionDetailData to be available before loading
+    if (sessionDetailData) {
+      prevSessionIdRef.current = activeSessionId;
+      const loadedHistory: ChatHistory[] = sessionDetailData.messages.map(msg => ({
+        role: msg.role as 'user' | 'model',
+        parts: [{ text: msg.content }],
+      }));
+      setHistory(loadedHistory);
+    }
+    // Note: If sessionDetailData is not ready yet, this effect will re-run
+    // when it becomes available (dependency array includes sessionDetailData)
+  }, [activeSessionId, sessionDetailData, setHistory, clearHistory, isLoading, queryClient]);
+
+  // Handle new chat confirm (defined first to avoid reference error)
+  const handleNewChatConfirm = useCallback(async () => {
+    // 現在の会話をクリア
     clearHistory();
-    setIsClearConfirmationOpen(false);
+    clearActiveSession();
+    // prevSessionIdRefもリセット
+    prevSessionIdRef.current = null;
+    setIsNewChatConfirmationOpen(false);
+
     addNotification({
       type: 'success',
-      title: 'History Cleared',
-      message: 'Conversation history has been cleared.',
+      title: 'New Chat Started',
+      message: 'Started a new conversation.',
       autoClose: true,
       duration: 3000,
     });
-  }, [clearHistory, addNotification]);
+  }, [clearHistory, clearActiveSession, addNotification, setIsNewChatConfirmationOpen]);
 
-  const handleClearHistoryCancel = useCallback(() => {
-    setIsClearConfirmationOpen(false);
-  }, []);
+  // Handle new chat request
+  const handleNewChatRequest = useCallback(() => {
+    if (history.length > 0) {
+      // 会話がある場合は確認モーダルを表示
+      setIsNewChatConfirmationOpen(true);
+    } else {
+      // 会話がない場合は直接新しいチャットを開始
+      handleNewChatConfirm();
+    }
+  }, [history.length, handleNewChatConfirm, setIsNewChatConfirmationOpen]);
+
+  const handleNewChatCancel = useCallback(() => {
+    setIsNewChatConfirmationOpen(false);
+  }, [setIsNewChatConfirmationOpen]);
 
   // メッセージ送信処理
-  const handleSendMessage = useCallback(() => {
+  const handleSendMessage = useCallback(async () => {
     const trimmedMessage = currentMessage.trim();
 
     // 重複送信を防止（同期的にチェック）
@@ -285,6 +318,56 @@ export const AgentPage = () => {
 
     // 送信中フラグを即座に設定（同期的）
     isSendingRef.current = true;
+
+    // チャットセッションの作成（最初のメッセージ送信時のみ）
+    let sessionIdToUse = activeSessionId;
+    if (!activeSessionId && history.length === 0) {
+      try {
+        // セッション名を生成（制御文字・改行を削除し、最初の50文字をタイトルとして使用）
+        // 1. 制御文字を除去（\x00-\x1F, \x7F-\x9F）
+        let cleanedMessage = trimmedMessage.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ');
+        // 2. 複数の連続した空白を1つにまとめる
+        cleanedMessage = cleanedMessage.replace(/\s+/g, ' ').trim();
+        // 3. 先頭と末尾の句読点を除去
+        cleanedMessage = cleanedMessage.replace(/^[.,!?;:]+|[.,!?;:]+$/g, '');
+        // 4. 最大長チェック（50文字）
+        const sessionName = cleanedMessage.length > 50
+          ? cleanedMessage.substring(0, 47).trim() + '...'
+          : cleanedMessage || '新しいチャット'; // 空の場合はデフォルト名
+
+        const result = await createChatSession.mutateAsync(sessionName);
+        sessionIdToUse = result.session.id;
+
+        // セッションIDを即座に設定（送信完了を待たずに設定して整合性を保つ）
+        setActiveSessionId(sessionIdToUse);
+
+        // 新しいセッションを作成した直後は、prevSessionIdRefも更新して
+        // useEffectが空の履歴をロードしようとするのを防ぐ
+        prevSessionIdRef.current = sessionIdToUse;
+
+        // キャッシュに新規セッションの詳細を即座に追加（404エラーを防ぐ）
+        queryClient.setQueryData(
+          chatHistoryKeys.sessionDetail(sessionIdToUse),
+          {
+            session: result.session,
+            messages: [], // 空のメッセージ配列で初期化
+          }
+        );
+      } catch (error) {
+        // セッション作成に失敗しても、会話は継続可能
+        // ただし、会話履歴はデータベースに保存されない（一時的な会話として扱う）
+        console.warn('Failed to create chat session:', error);
+        addNotification({
+          type: 'info',
+          title: 'Session Not Saved',
+          message: 'Unable to save this conversation. You can continue chatting, but the history will not be saved.',
+          autoClose: false,
+          duration: 0,
+        });
+        // Continue without session_id (conversation won't be saved, but chat continues)
+        sessionIdToUse = null;
+      }
+    }
 
     const userMessage: ChatHistory = {
       role: 'user',
@@ -300,9 +383,10 @@ export const AgentPage = () => {
       tempId: tempMessageId, // 一意識別子を追加
     };
 
-    // ユーザーメッセージとAIのプレースホルダーを履歴に追加
-    addMessage(userMessage);
-    addMessage(aiPlaceholder);
+    // ユーザーメッセージとAIのプレースホルダーを一括で履歴に追加
+    // 一括追加により、状態更新の原子性を保証
+    addMessages([userMessage, aiPlaceholder]);
+
     const aiMessageIndex = history.length + 1; // AIメッセージのインデックス
     setCurrentMessage('');
     setIsLoading(true);
@@ -311,6 +395,7 @@ export const AgentPage = () => {
     streamChatWithAgent(
       trimmedMessage,
       history, // ストリーム開始前の履歴を渡す
+      sessionIdToUse, // session_idを渡す
       {
         onMessage: chunk => {
           const currentHistory = useAgentStore.getState().history;
@@ -341,6 +426,7 @@ export const AgentPage = () => {
           setIsLoading(false);
           isSendingRef.current = false; // 送信完了フラグをリセット
           setAgentStatus({ agent: null, status: 'idle' }); // ステータスをリセット
+
           const currentHistory = useAgentStore.getState().history;
           const lastIndex = currentHistory.length - 1;
           const lastMessage = currentHistory[lastIndex];
@@ -364,8 +450,17 @@ export const AgentPage = () => {
               setIsConfirmationModalOpen(true);
             }
           }
+
+          // AI応答がデータベースに保存された後、セッション詳細のキャッシュを無効化
+          // これにより、次回の履歴確認時に最新データがフェッチされる
+          if (sessionIdToUse) {
+            queryClient.invalidateQueries({
+              queryKey: chatHistoryKeys.sessionDetail(sessionIdToUse),
+            });
+          }
         },
         onError: err => {
+          console.error('AI Agent Error:', err);
           setIsLoading(false);
           isSendingRef.current = false; // エラー時も送信フラグをリセット
           setAgentStatus({ agent: null, status: 'idle' }); // エラー時もステータスをリセット
@@ -397,7 +492,19 @@ export const AgentPage = () => {
         },
       }
     );
-  }, [currentMessage, history, isLoading, addNotification, setAgentStatus]);
+  }, [
+    currentMessage,
+    history,
+    isLoading,
+    addMessages,
+    updateMessage,
+    addNotification,
+    setAgentStatus,
+    createChatSession,
+    activeSessionId,
+    setActiveSessionId,
+    parseConfirmationRequest,
+  ]);
 
   // Enterで送信（Shift+Enterで改行）
   const handleKeyDown = useCallback(
@@ -480,32 +587,30 @@ export const AgentPage = () => {
 
   return (
     <div className={styles.agentPageContainer}>
-      {/* Clear button */}
-      {history.length > 0 && (
-        <div className={styles.clearButtonContainer}>
-          <button
-            className={styles.clearButton}
-            onClick={handleClearHistoryRequest}
-            title="Clear conversation history"
+      {/* New Chat button */}
+      <div className={styles.clearButtonContainer}>
+        <button
+          className={styles.clearButton}
+          onClick={handleNewChatRequest}
+          title="Start a new chat"
+        >
+          <svg
+            width="16"
+            height="16"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
           >
-            <svg
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            Clear History
-          </button>
-        </div>
-      )}
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+          New Chat
+        </button>
+      </div>
 
       <div className={styles.chatWindow} ref={chatWindowRef}>
         {history.length === 0 ? (
@@ -914,15 +1019,15 @@ export const AgentPage = () => {
         isLoading={isExecutingAction}
       />
 
-      {/* Clear History Confirmation Modal */}
+      {/* New Chat Confirmation Modal */}
       <ConfirmationModal
-        isOpen={isClearConfirmationOpen}
-        title="Clear Conversation History"
-        message="Are you sure you want to clear all conversation history? This action cannot be undone."
-        confirmButtonText="Clear"
+        isOpen={isNewChatConfirmationOpen}
+        title="Start New Chat"
+        message="Starting a new chat will clear the current conversation. Do you want to continue?"
+        confirmButtonText="New Chat"
         cancelButtonText="Cancel"
-        onConfirm={handleClearHistoryConfirm}
-        onCancel={handleClearHistoryCancel}
+        onConfirm={handleNewChatConfirm}
+        onCancel={handleNewChatCancel}
         isLoading={false}
       />
     </div>

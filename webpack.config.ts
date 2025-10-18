@@ -1,5 +1,6 @@
 /** エディタで補完を効かせるために型定義をインポート */
 import type { Configuration } from "webpack";
+import webpack from "webpack";
 
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
@@ -25,6 +26,12 @@ const common: Configuration = {
     // 画像などのアセット類は "dist/assets" フォルダへ配置する
     assetModuleFilename: "assets/[name][ext]",
   },
+  plugins: [
+    // 環境変数をバンドルに注入
+    new webpack.DefinePlugin({
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+    }),
+  ],
   module: {
     // ファイル種別ごとのコンパイル & バンドルのルール
     rules: [
@@ -115,6 +122,10 @@ const renderer: Configuration = {
     app: "./src/web/index.tsx",
   },
   plugins: [
+    // 環境変数をバンドルに注入（common からコピー）
+    new webpack.DefinePlugin({
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+    }),
     // CSS を JS へバンドルせず別ファイルとして出力するプラグイン
     new MiniCssExtractPlugin(),
     /**

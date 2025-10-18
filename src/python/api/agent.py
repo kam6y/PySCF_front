@@ -13,6 +13,7 @@ from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 from generated_models import AgentChatRequest, ExecuteConfirmedActionRequest, AgentActionType
 from agent.quantum_calculator import tools
 from agent.graph import get_compiled_graph
+from services.chat_history_service import get_chat_history_service
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -161,7 +162,7 @@ def _convert_dict_to_langchain_format(history: List[Dict[str, Any]]) -> List[Bas
     return converted
 
 
-def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
+def _create_supervisor_stream(message: str, history: list, session_id: str = None) -> Iterator[str]:
     """
     Create an SSE stream for Supervisor multi-agent responses with worker status tracking.
 
@@ -178,10 +179,25 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
     Args:
         message: User's message
         history: Chat history in frontend format (dict list)
+        session_id: Optional session ID for persisting conversation history
 
     Yields:
         SSE formatted strings
     """
+    # Save user message to database if session_id is provided
+    if session_id:
+        try:
+            chat_service = get_chat_history_service()
+            chat_service.add_message(session_id, "user", message)
+            logger.debug(f"Saved user message to session: {session_id}")
+        except Exception as e:
+            logger.warning(f"Failed to save user message to session {session_id}: {e}")
+
+    # Accumulate AI response for saving to database
+    accumulated_response = []
+    # Track whether DB save was successful (for fallback logic)
+    db_save_successful = False
+
     try:
         logger.debug(f"Starting LangGraph Supervisor stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
 
@@ -270,6 +286,10 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                                     # Stream the supervisor's response (with markdown normalization)
                                     normalized_content = _normalize_markdown_codeblocks(last_message.content)
                                     logger.info(f"Streaming supervisor response, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
+
+                                    # Accumulate for saving
+                                    accumulated_response.append(normalized_content)
+
                                     yield _format_sse_event("chunk", {"text": normalized_content})
             else:
                 # Regular dict format (parent graph without namespace)
@@ -308,29 +328,62 @@ def _create_supervisor_stream(message: str, history: list) -> Iterator[str]:
                                 # Stream the response (with markdown normalization)
                                 normalized_content = _normalize_markdown_codeblocks(last_message.content)
                                 logger.info(f"Streaming response from {node_name}, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
+
+                                # Accumulate for saving
+                                accumulated_response.append(normalized_content)
+
                                 yield _format_sse_event("chunk", {"text": normalized_content})
 
         logger.debug("Stream completed successfully")
+
+        # Save AI response to database BEFORE sending completion event
+        # This ensures database write completes before frontend invalidates cache
+        if session_id and accumulated_response:
+            try:
+                complete_response = ''.join(accumulated_response)
+                chat_service = get_chat_history_service()
+                chat_service.add_message(session_id, "model", complete_response)
+                db_save_successful = True
+                logger.info(f"Saved AI response to session: {session_id} (length: {len(complete_response)} chars)")
+            except Exception as e:
+                logger.error(f"Failed to save AI response to session {session_id}: {e}", exc_info=True)
+                # Don't fail the stream due to DB error, continue with completion event
+
+        # Send completion event AFTER database write completes
+        # This ensures 'done' is sent when the stream completes normally and DB is updated
+        logger.debug("Sending stream completion event")
+        yield _format_sse_event("done")
 
     except GeneratorExit:
         # Client disconnected - clean up gracefully
         logger.info("Client disconnected from SSE stream (GeneratorExit)")
         # Don't yield anything here - the connection is already closed
+        # Yielding after GeneratorExit causes RuntimeError
         raise  # Re-raise to properly close the generator
+
     except Exception as e:
         logger.error(f"Error during LangGraph Supervisor streaming: {e}", exc_info=True)
+        # Add error message to accumulated response
+        error_msg = f"\n\n[Error: {str(e)}]"
+        accumulated_response.append(error_msg)
+
         try:
             yield _format_sse_event("error", {"message": f"An error occurred during the stream: {str(e)}"})
         except (BrokenPipeError, ConnectionResetError, GeneratorExit):
             # Connection already closed, can't send error message
             logger.debug("Unable to send error message - connection closed")
+
     finally:
-        logger.debug("Sending stream completion event")
-        try:
-            yield _format_sse_event("done")
-        except (BrokenPipeError, ConnectionResetError, GeneratorExit):
-            # Connection already closed, can't send completion event
-            logger.debug("Unable to send completion event - connection closed")
+        # Fallback: Save AI response to database if not already saved
+        # This runs only if an error occurred before the normal save point
+        if session_id and accumulated_response and not db_save_successful:
+            try:
+                complete_response = ''.join(accumulated_response)
+                chat_service = get_chat_history_service()
+                chat_service.add_message(session_id, "model", complete_response)
+                logger.warning(f"Fallback save: AI response saved to session {session_id} after error (length: {len(complete_response)} chars)")
+            except Exception as e:
+                logger.error(f"Fallback save failed for session {session_id}: {e}", exc_info=True)
 
 
 # Create agent blueprint
@@ -349,12 +402,13 @@ def chat_with_agent(body: AgentChatRequest):
         if len(body.message) > MAX_MESSAGE_LENGTH:
             raise ValueError(f"Message is too long (maximum {MAX_MESSAGE_LENGTH} characters)")
 
-        logger.info(f"Processing agent chat request - Message length: {len(body.message)}, History entries: {len(body.history or [])}")
+        session_id = body.session_id if hasattr(body, 'session_id') else None
+        logger.info(f"Processing agent chat request - Message length: {len(body.message)}, History entries: {len(body.history or [])}, Session ID: {session_id}")
         logger.debug(f"Message preview: {body.message[:100]}{'...' if len(body.message) > 100 else ''}")
 
         # Use LangGraph Supervisor multi-agent system
         return Response(
-            stream_with_context(_create_supervisor_stream(body.message, body.history or [])),
+            stream_with_context(_create_supervisor_stream(body.message, body.history or [], session_id)),
             content_type='text/event-stream'
         )
 

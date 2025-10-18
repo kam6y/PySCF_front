@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import { DropdownOption } from '../components/DropdownMenu';
 
+export type SidebarView = 'instances' | 'chats';
+
 interface UIState {
   // Sidebar状態
   isSidebarOpen: boolean;
   isDropdownOpen: boolean;
+  sidebarView: SidebarView;
 
   // Page navigation状態
   currentPage: DropdownOption;
@@ -24,6 +27,7 @@ interface UIState {
   closeSidebar: () => void;
   toggleDropdown: () => void;
   closeDropdown: () => void;
+  setSidebarView: (view: SidebarView) => void;
 
   // Page navigation actions
   setCurrentPage: (page: DropdownOption) => void;
@@ -55,6 +59,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Initial state
   isSidebarOpen: false,
   isDropdownOpen: false,
+  sidebarView: 'instances',
   currentPage: 'calculation-settings',
   isAIAgentEnabled: false,
   searchQuery: '',
@@ -67,6 +72,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   toggleDropdown: () =>
     set(state => ({ isDropdownOpen: !state.isDropdownOpen })),
   closeDropdown: () => set({ isDropdownOpen: false }),
+  setSidebarView: (view: SidebarView) => set({ sidebarView: view }),
 
   // Page navigation actions
   setCurrentPage: (page: DropdownOption) => set({ currentPage: page }),

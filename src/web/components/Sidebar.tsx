@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { CalculationSummary } from '../types/api-types';
 import { useGetCalculationDetails } from '../hooks/useCalculationQueries';
+import { useDeleteChatSession } from '../hooks/useChatHistoryQueries';
+import { useChatHistoryStore } from '../store/chatHistoryStore';
+import { useAgentStore } from '../store/agentStore';
+import { ChatHistoryList } from './ChatHistoryList';
+import { ConfirmationModal } from './ConfirmationModal';
+import { SidebarView } from '../store/uiStore';
 import styles from './Sidebar.module.css';
 
 // Status display configuration
@@ -185,14 +191,14 @@ interface CalculationCardProps {
   calculation: CalculationSummary;
   isActive: boolean;
   onSelect: (calculationId: string) => void;
-  onDelete: (calculationId: string) => Promise<void>;
+  onRequestDelete: (calculationId: string, calculationName: string) => void;
 }
 
 const CalculationCard: React.FC<CalculationCardProps> = ({
   calculation,
   isActive,
   onSelect,
-  onDelete,
+  onRequestDelete,
 }) => {
   const { data: detailsData, isLoading: detailsLoading } =
     useGetCalculationDetails(calculation.id);
@@ -253,9 +259,7 @@ const CalculationCard: React.FC<CalculationCardProps> = ({
           className={styles.deleteBtn}
           onClick={e => {
             e.stopPropagation();
-            if (confirm(`Delete calculation "${calculation.name}"?`)) {
-              onDelete(calculation.id);
-            }
+            onRequestDelete(calculation.id, calculation.name);
           }}
         >
           <svg
@@ -295,6 +299,9 @@ interface SidebarProps {
   onUserMenuToggle: () => void;
   isUserMenuOpen: boolean;
   onSettingsOpen: () => void;
+  sidebarView: SidebarView;
+  onSidebarViewChange: (view: SidebarView) => void;
+  onChatSessionSelect: (sessionId: string) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -312,31 +319,98 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onUserMenuToggle,
   isUserMenuOpen,
   onSettingsOpen,
+  sidebarView,
+  onSidebarViewChange,
+  onChatSessionSelect,
 }) => {
+  // Confirmation modal state for individual calculation deletion
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [calculationToDelete, setCalculationToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // Confirmation modal state for bulk calculation deletion
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [calculationsToDelete, setCalculationsToDelete] = useState<CalculationSummary[]>([]);
+
+  // Confirmation modal state for chat deletion
+  const [isChatDeleteModalOpen, setIsChatDeleteModalOpen] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // Chat history hooks
+  const deleteChatSession = useDeleteChatSession();
+  const activeSessionId = useChatHistoryStore(state => state.activeSessionId);
+  const clearActiveSession = useChatHistoryStore(state => state.clearActiveSession);
+  const clearHistory = useAgentStore(state => state.clearHistory);
+
+  // Chat delete handlers
+  const handleRequestChatDelete = (sessionId: string, sessionName: string) => {
+    setChatToDelete({ id: sessionId, name: sessionName });
+    setIsChatDeleteModalOpen(true);
+  };
+
+  const handleConfirmChatDelete = async () => {
+    if (!chatToDelete) return;
+
+    // 削除するセッションが現在アクティブなセッションの場合、状態をクリア
+    if (chatToDelete.id === activeSessionId) {
+      clearActiveSession();
+      clearHistory();
+    }
+
+    await deleteChatSession.mutateAsync(chatToDelete.id);
+    setIsChatDeleteModalOpen(false);
+    setChatToDelete(null);
+  };
+
+  const handleCancelChatDelete = () => {
+    setIsChatDeleteModalOpen(false);
+    setChatToDelete(null);
+  };
+
   // Bulk delete handler for error instances
-  const handleBulkDeleteError = async (
+  const handleBulkDeleteError = (
     errorCalculations: CalculationSummary[]
   ) => {
     if (errorCalculations.length === 0) return;
+    setCalculationsToDelete(errorCalculations);
+    setIsBulkDeleteModalOpen(true);
+  };
 
-    const count = errorCalculations.length;
-    const confirmed = confirm(
-      `Do you want to delete ${count} error instances? This operation cannot be undone.`
-    );
-
-    if (!confirmed) return;
-
+  const handleConfirmBulkDelete = async () => {
     try {
       // Delete all error calculations in parallel
       await Promise.all(
-        errorCalculations.map(calculation =>
+        calculationsToDelete.map(calculation =>
           onCalculationDelete(calculation.id)
         )
       );
+      setIsBulkDeleteModalOpen(false);
+      setCalculationsToDelete([]);
     } catch (error) {
       console.error('一括削除中にエラーが発生しました:', error);
       alert('Failed to delete some instances.');
     }
+  };
+
+  const handleCancelBulkDelete = () => {
+    setIsBulkDeleteModalOpen(false);
+    setCalculationsToDelete([]);
+  };
+
+  const handleRequestDelete = (calculationId: string, calculationName: string) => {
+    setCalculationToDelete({ id: calculationId, name: calculationName });
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!calculationToDelete) return;
+    await onCalculationDelete(calculationToDelete.id);
+    setIsDeleteModalOpen(false);
+    setCalculationToDelete(null);
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setCalculationToDelete(null);
   };
 
   return (
@@ -396,77 +470,101 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Main Content Area */}
           <div className={styles.sidebarMainContent}>
             <div className={styles.sidebarHeader}>
-              <h3>Instances</h3>
+              <div className={styles.sidebarViewTabs}>
+                <button
+                  className={`${styles.sidebarViewTab} ${
+                    sidebarView === 'instances' ? styles.active : ''
+                  }`}
+                  onClick={() => onSidebarViewChange('instances')}
+                >
+                  Instances
+                </button>
+                <button
+                  className={`${styles.sidebarViewTab} ${
+                    sidebarView === 'chats' ? styles.active : ''
+                  }`}
+                  onClick={() => onSidebarViewChange('chats')}
+                >
+                  Chats
+                </button>
+              </div>
             </div>
 
             <div className={styles.sidebarCalculations}>
-              {calculationsLoading ? (
-                <div className={styles.sidebarLoading}>
-                  <p>Loading instances...</p>
-                </div>
-              ) : calculationsError ? (
-                <div className={styles.sidebarError}>
-                  <p>Error: {calculationsError}</p>
-                </div>
-              ) : calculations.length === 0 ? (
-                <div className={styles.sidebarEmpty}>
-                  <p>No instances yet</p>
-                  <p>Click the + button to create one</p>
-                </div>
-              ) : (
-                groupCalculationsByStatus(calculations).map(group => (
-                  <div key={group.status} className={styles.statusSection}>
-                    <div className={styles.statusSectionHeader}>
-                      <div className={styles.statusSectionInfo}>
-                        <span className={styles.statusSectionIcon}>
-                          {group.config.icon}
-                        </span>
-                        <h4 className={styles.statusSectionTitle}>
-                          {group.config.label}
-                        </h4>
-                      </div>
-                      {group.status === 'error' &&
-                        group.calculations.length > 0 && (
-                          <button
-                            className={styles.bulkDeleteButton}
-                            onClick={e => {
-                              e.stopPropagation();
-                              handleBulkDeleteError(group.calculations);
-                            }}
-                            title={`Bulk delete ${group.calculations.length} error instances`}
-                          >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <polyline points="3,6 5,6 21,6"></polyline>
-                              <path d="m5,6 1,14 c0,1 1,2 2,2 h8 c1,0 2,-1 2,-2 l1,-14"></path>
-                              <path d="m10,11 v6"></path>
-                              <path d="m14,11 v6"></path>
-                              <path d="m7,6 V4 c0,-1 1,-2 2,-2 h6 c1,0 2,1 2,2 v2"></path>
-                            </svg>
-                          </button>
-                        )}
-                    </div>
-                    <div className={styles.statusSectionCalculations}>
-                      {group.calculations.map(calculation => (
-                        <CalculationCard
-                          key={calculation.id}
-                          calculation={calculation}
-                          isActive={calculation.id === activeCalculationId}
-                          onSelect={onCalculationSelect}
-                          onDelete={onCalculationDelete}
-                        />
-                      ))}
-                    </div>
+              {sidebarView === 'instances' ? (
+                calculationsLoading ? (
+                  <div className={styles.sidebarLoading}>
+                    <p>Loading instances...</p>
                   </div>
-                ))
+                ) : calculationsError ? (
+                  <div className={styles.sidebarError}>
+                    <p>Error: {calculationsError}</p>
+                  </div>
+                ) : calculations.length === 0 ? (
+                  <div className={styles.sidebarEmpty}>
+                    <p>No instances yet</p>
+                    <p>Click the + button to create one</p>
+                  </div>
+                ) : (
+                  groupCalculationsByStatus(calculations).map(group => (
+                    <div key={group.status} className={styles.statusSection}>
+                      <div className={styles.statusSectionHeader}>
+                        <div className={styles.statusSectionInfo}>
+                          <span className={styles.statusSectionIcon}>
+                            {group.config.icon}
+                          </span>
+                          <h4 className={styles.statusSectionTitle}>
+                            {group.config.label}
+                          </h4>
+                        </div>
+                        {group.status === 'error' &&
+                          group.calculations.length > 0 && (
+                            <button
+                              className={styles.bulkDeleteButton}
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleBulkDeleteError(group.calculations);
+                              }}
+                              title={`Bulk delete ${group.calculations.length} error instances`}
+                            >
+                              <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polyline points="3,6 5,6 21,6"></polyline>
+                                <path d="m5,6 1,14 c0,1 1,2 2,2 h8 c1,0 2,-1 2,-2 l1,-14"></path>
+                                <path d="m10,11 v6"></path>
+                                <path d="m14,11 v6"></path>
+                                <path d="m7,6 V4 c0,-1 1,-2 2,-2 h6 c1,0 2,1 2,2 v2"></path>
+                              </svg>
+                            </button>
+                          )}
+                      </div>
+                      <div className={styles.statusSectionCalculations}>
+                        {group.calculations.map(calculation => (
+                          <CalculationCard
+                            key={calculation.id}
+                            calculation={calculation}
+                            isActive={calculation.id === activeCalculationId}
+                            onSelect={onCalculationSelect}
+                            onRequestDelete={handleRequestDelete}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )
+              ) : (
+                <ChatHistoryList
+                  onSessionSelect={onChatSessionSelect}
+                  onRequestDelete={handleRequestChatDelete}
+                />
               )}
             </div>
           </div>
@@ -515,6 +613,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
       </aside>
+
+      {/* Delete Confirmation Modal (Single Calculation) */}
+      <ConfirmationModal
+        isOpen={isDeleteModalOpen}
+        title="Delete Calculation"
+        message={`Are you sure you want to delete "${calculationToDelete?.name}"? This action cannot be undone.`}
+        confirmButtonText="Delete"
+        cancelButtonText="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        isLoading={false}
+      />
+
+      {/* Bulk Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isBulkDeleteModalOpen}
+        title="Bulk Delete Error Instances"
+        message={`Do you want to delete ${calculationsToDelete.length} error instances? This operation cannot be undone.`}
+        confirmButtonText="Delete All"
+        cancelButtonText="Cancel"
+        onConfirm={handleConfirmBulkDelete}
+        onCancel={handleCancelBulkDelete}
+        isLoading={false}
+      />
+
+      {/* Chat Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isChatDeleteModalOpen}
+        title="Delete Chat"
+        message={`Are you sure you want to delete "${chatToDelete?.name}"? This action cannot be undone.`}
+        confirmButtonText="Delete"
+        cancelButtonText="Cancel"
+        onConfirm={handleConfirmChatDelete}
+        onCancel={handleCancelChatDelete}
+        isLoading={deleteChatSession.isPending}
+      />
     </>
   );
 };

@@ -11,6 +11,7 @@ from .settings import settings_bp
 from .system import system_bp
 from .quantum import quantum_bp
 from .agent import agent_bp
+from .chat_history import chat_history_bp
 
 # List of all blueprints to register with the main app
 all_blueprints = [
@@ -20,7 +21,8 @@ all_blueprints = [
     settings_bp,
     system_bp,
     quantum_bp,
-    agent_bp
+    agent_bp,
+    chat_history_bp
 ]
 
 

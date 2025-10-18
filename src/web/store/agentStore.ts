@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
 // 会話履歴の型定義
 export type ChatHistory = {
@@ -16,7 +15,7 @@ export type AgentStatus = {
 };
 
 interface AgentState {
-  // 会話履歴
+  // 会話履歴（メモリキャッシュのみ、永続化はDBで行う）
   history: ChatHistory[];
 
   // エージェントステータス
@@ -24,51 +23,50 @@ interface AgentState {
 
   // アクション
   addMessage: (message: ChatHistory) => void;
+  addMessages: (messages: ChatHistory[]) => void;
   updateMessage: (index: number, update: Partial<ChatHistory>) => void;
   setHistory: (history: ChatHistory[]) => void;
   clearHistory: () => void;
   setAgentStatus: (status: AgentStatus) => void;
 }
 
-export const useAgentStore = create<AgentState>()(
-  persist(
-    (set, get) => ({
-      // 初期状態
-      history: [],
-      currentAgentStatus: { agent: null, status: 'idle' },
+// 永続化を削除し、メモリキャッシュとしてのみ使用
+// 会話履歴の永続化はSQLiteデータベースで一元管理
+// セッションIDの管理はchatHistoryStoreで一元化
+export const useAgentStore = create<AgentState>((set, get) => ({
+  // 初期状態
+  history: [],
+  currentAgentStatus: { agent: null, status: 'idle' },
 
-      // メッセージを履歴に追加
-      addMessage: (message: ChatHistory) =>
-        set(state => ({
-          history: [...state.history, message],
-        })),
+  // メッセージを履歴に追加
+  addMessage: (message: ChatHistory) =>
+    set(state => ({
+      history: [...state.history, message],
+    })),
 
-      // 特定のインデックスのメッセージを更新（ストリーミング用）
-      updateMessage: (index: number, update: Partial<ChatHistory>) =>
-        set(state => {
-          const newHistory = [...state.history];
-          if (index >= 0 && index < newHistory.length) {
-            newHistory[index] = { ...newHistory[index], ...update };
-          }
-          return { history: newHistory };
-        }),
+  // 複数のメッセージを一度に履歴に追加（状態更新の原子性を保証）
+  addMessages: (messages: ChatHistory[]) =>
+    set(state => ({
+      history: [...state.history, ...messages],
+    })),
 
-      // 履歴全体を設定（置き換え）
-      setHistory: (history: ChatHistory[]) => set({ history }),
-
-      // 会話履歴をクリア
-      clearHistory: () => set({ history: [] }),
-
-      // エージェントステータスを設定
-      setAgentStatus: (status: AgentStatus) =>
-        set({ currentAgentStatus: status }),
+  // 特定のインデックスのメッセージを更新（ストリーミング用）
+  updateMessage: (index: number, update: Partial<ChatHistory>) =>
+    set(state => {
+      const newHistory = [...state.history];
+      if (index >= 0 && index < newHistory.length) {
+        newHistory[index] = { ...newHistory[index], ...update };
+      }
+      return { history: newHistory };
     }),
-    {
-      name: 'pyscf-agent-storage', // localStorageのキー名
-      // isStreaming、tempId、currentAgentStatusは永続化しない
-      partialize: state => ({
-        history: state.history.map(({ isStreaming, tempId, ...rest }) => rest),
-      }),
-    }
-  )
-);
+
+  // 履歴全体を設定（置き換え）
+  setHistory: (history: ChatHistory[]) => set({ history }),
+
+  // 会話履歴をクリア
+  clearHistory: () => set({ history: [] }),
+
+  // エージェントステータスを設定
+  setAgentStatus: (status: AgentStatus) =>
+    set({ currentAgentStatus: status }),
+}));
