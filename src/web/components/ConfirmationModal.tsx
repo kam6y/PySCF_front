@@ -10,6 +10,7 @@ interface ConfirmationModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
+  variant?: 'destructive' | 'default';
 }
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -21,6 +22,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onConfirm,
   onCancel,
   isLoading = false,
+  variant = 'destructive',
 }) => {
   if (!isOpen) return null;
 
@@ -61,7 +63,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             {cancelButtonText}
           </button>
           <button
-            className={styles.confirmButton}
+            className={`${styles.confirmButton} ${variant === 'default' ? styles.confirmButtonDefault : styles.confirmButtonDestructive}`}
             onClick={onConfirm}
             disabled={isLoading}
           >

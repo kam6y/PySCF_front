@@ -7,7 +7,7 @@ import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAgentStore, ChatHistory, AgentStatus } from '../store/agentStore';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
-import { useCreateChatSession, useGetChatSessionDetail, chatHistoryKeys } from '../hooks/useChatHistoryQueries';
+import { useCreateChatSession, useGetChatSessionDetail, useUpdateChatSession, chatHistoryKeys } from '../hooks/useChatHistoryQueries';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { InlineOrbitalViewer } from '../components/InlineOrbitalViewer';
 import styles from './AgentPage.module.css';
@@ -65,10 +65,15 @@ export const AgentPage = () => {
   // チャット履歴のクエリ
   const createChatSession = useCreateChatSession();
   const { data: sessionDetailData } = useGetChatSessionDetail(activeSessionId);
+  const updateChatSession = useUpdateChatSession();
 
   const [currentMessage, setCurrentMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // タイトル編集用の状態
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
   const chatWindowRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const addNotification = useNotificationStore(state => state.addNotification);
@@ -306,6 +311,93 @@ export const AgentPage = () => {
   const handleNewChatCancel = useCallback(() => {
     setIsNewChatConfirmationOpen(false);
   }, [setIsNewChatConfirmationOpen]);
+
+  // タイトル編集の開始
+  const handleStartEditTitle = useCallback(() => {
+    if (sessionDetailData?.session?.name) {
+      setEditedTitle(sessionDetailData.session.name);
+      setIsEditingTitle(true);
+    }
+  }, [sessionDetailData]);
+
+  // タイトル編集のキャンセル
+  const handleCancelEditTitle = useCallback(() => {
+    setIsEditingTitle(false);
+    setEditedTitle('');
+  }, []);
+
+  // タイトルの保存
+  const handleSaveTitle = useCallback(async () => {
+    const trimmedTitle = editedTitle.trim();
+
+    // バリデーション
+    if (!trimmedTitle) {
+      addNotification({
+        type: 'error',
+        title: 'Invalid Title',
+        message: 'Title cannot be empty.',
+        autoClose: true,
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (trimmedTitle.length > 100) {
+      addNotification({
+        type: 'error',
+        title: 'Invalid Title',
+        message: 'Title must be 100 characters or less.',
+        autoClose: true,
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (!activeSessionId) {
+      return;
+    }
+
+    try {
+      await updateChatSession.mutateAsync({
+        sessionId: activeSessionId,
+        name: trimmedTitle,
+      });
+
+      setIsEditingTitle(false);
+      setEditedTitle('');
+
+      addNotification({
+        type: 'success',
+        title: 'Title Updated',
+        message: 'Conversation title has been updated.',
+        autoClose: true,
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('Failed to update title:', error);
+      addNotification({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Failed to update conversation title. Please try again.',
+        autoClose: true,
+        duration: 5000,
+      });
+    }
+  }, [editedTitle, activeSessionId, updateChatSession, addNotification]);
+
+  // Enter キーで保存、Escape キーでキャンセル
+  const handleTitleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSaveTitle();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancelEditTitle();
+      }
+    },
+    [handleSaveTitle, handleCancelEditTitle]
+  );
 
   // メッセージ送信処理
   const handleSendMessage = useCallback(async () => {
@@ -587,30 +679,85 @@ export const AgentPage = () => {
 
   return (
     <div className={styles.agentPageContainer}>
-      {/* New Chat button */}
-      <div className={styles.clearButtonContainer}>
-        <button
-          className={styles.clearButton}
-          onClick={handleNewChatRequest}
-          title="Start a new chat"
-        >
-          <svg
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-          New Chat
-        </button>
-      </div>
+      {/* Title and New Chat button container - only show when there's an active session */}
+      {activeSessionId && sessionDetailData?.session && (
+        <div className={styles.headerContainer}>
+          {/* Conversation Title */}
+          <div className={styles.titleContainer}>
+            {isEditingTitle ? (
+              <div className={styles.titleEditMode}>
+                <input
+                  type="text"
+                  className={styles.titleInput}
+                  value={editedTitle}
+                  onChange={(e) => setEditedTitle(e.target.value)}
+                  onKeyDown={handleTitleKeyDown}
+                  autoFocus
+                  maxLength={100}
+                />
+                <div className={styles.titleActionButtons}>
+                  <button
+                    className={styles.titleSaveButton}
+                    onClick={handleSaveTitle}
+                    title="Save"
+                  >
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button
+                    className={styles.titleCancelButton}
+                    onClick={handleCancelEditTitle}
+                    title="Cancel"
+                  >
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className={styles.titleDisplay}>
+                <h2 className={styles.titleText}>{sessionDetailData.session.name}</h2>
+                <button
+                  className={styles.editButton}
+                  onClick={handleStartEditTitle}
+                  title="Edit title"
+                >
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* New Chat button */}
+          <div className={styles.clearButtonContainer}>
+            <button
+              className={styles.clearButton}
+              onClick={handleNewChatRequest}
+              title="Start a new chat"
+            >
+              <svg
+                width="18"
+                height="18"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 4v16m8-8H4"
+                />
+              </svg>
+              New Chat
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className={styles.chatWindow} ref={chatWindowRef}>
         {history.length === 0 ? (
@@ -1024,12 +1171,13 @@ export const AgentPage = () => {
       <ConfirmationModal
         isOpen={isNewChatConfirmationOpen}
         title="Start New Chat"
-        message="Starting a new chat will clear the current conversation. Do you want to continue?"
-        confirmButtonText="New Chat"
+        message="Your current conversation will be saved to history. Would you like to start a new chat?"
+        confirmButtonText="Start New Chat"
         cancelButtonText="Cancel"
         onConfirm={handleNewChatConfirm}
         onCancel={handleNewChatCancel}
         isLoading={false}
+        variant="default"
       />
     </div>
   );

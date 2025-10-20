@@ -4,7 +4,6 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #f9fafb;
   position: relative;
 }
 
@@ -427,12 +426,139 @@
   color: #005cc5;
 }
 
-/* Clear button styles */
-.clearButtonContainer {
+/* Header container for title and buttons */
+.headerContainer {
   position: absolute;
-  top: 12px;
+  top: 0px;
+  left: 20px;
   right: 20px;
   z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* Title container */
+.titleContainer {
+  flex: 1;
+  min-width: 0; /* Allow text truncation */
+}
+
+/* Title display (non-editing mode) */
+.titleDisplay {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min-content;
+  background-color: white;
+  border-radius: 0px 0px 8px 0px;
+  padding: 6px 14px;
+}
+
+.titleText {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
+}
+
+/* Edit button */
+.editButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.editButton:hover {
+  background-color: #e5e7eb;
+  color: #374151;
+  border-color: #9ca3af;
+}
+
+/* Title edit mode */
+.titleEditMode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titleInput {
+  flex: 1;
+  padding: 6px 12px;
+  font-size: 17px;
+  font-weight: 500;
+  color: #1f2937;
+  border: 2px solid #3b82f6;
+  border-radius: 6px;
+  outline: none;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  min-width: 200px;
+  max-width: 500px;
+}
+
+/* Title action buttons */
+.titleActionButtons {
+  display: flex;
+  gap: 4px;
+}
+
+.titleSaveButton,
+.titleCancelButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.titleSaveButton {
+  background-color: #50D4F5;
+  color: white;
+  border-color: #50D4F5;
+}
+
+.titleSaveButton:hover {
+  background-color: #22b9e7;
+  border-color: #22b9e7;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(80, 212, 245, 0.3);
+}
+
+.titleCancelButton {
+  background-color: #f3f4f6;
+  color: #6b7280;
+  border-color: #d1d5db;
+}
+
+.titleCancelButton:hover {
+  background-color: #e5e7eb;
+  color: #374151;
+  border-color: #9ca3af;
+}
+
+/* Clear button styles */
+.clearButtonContainer {
+  flex-shrink: 0;
 }
 
 .clearButton {
@@ -445,7 +571,7 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   transition: all 0.2s ease;
 }

@@ -124,12 +124,25 @@
 }
 
 .confirmButton {
-  background-color: #dc2626;
   color: white;
 }
 
-.confirmButton:hover:not(:disabled) {
+.confirmButtonDestructive {
+  background-color: #dc2626;
+}
+
+.confirmButtonDestructive:hover:not(:disabled) {
   background-color: #b91c1c;
+}
+
+.confirmButtonDefault {
+  background-color: #50D4F5;
+}
+
+.confirmButtonDefault:hover:not(:disabled) {
+  background-color: #22b9e7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
 }
 
 .confirmButton:disabled {
