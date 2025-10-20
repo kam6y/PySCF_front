@@ -1647,8 +1647,6 @@ export interface components {
              * @description Last update timestamp
              */
             updated_at: string;
-            /** @description Preview of the last message (first 100 characters) */
-            last_message_preview?: string | null;
         };
         ChatSessionDetail: {
             session: components["schemas"]["ChatSession"];

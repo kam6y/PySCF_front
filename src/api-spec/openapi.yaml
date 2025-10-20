@@ -2616,10 +2616,6 @@ components:
           type: string
           format: date-time
           description: Last update timestamp
-        last_message_preview:
-          type: string
-          nullable: true
-          description: Preview of the last message (first 100 characters)
 
     ChatSessionDetail:
       type: object

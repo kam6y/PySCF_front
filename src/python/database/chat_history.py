@@ -260,10 +260,7 @@ class ChatHistoryDatabase:
                     s.name,
                     s.created_at,
                     s.updated_at,
-                    COUNT(m.id) as message_count,
-                    (SELECT content FROM chat_messages
-                     WHERE session_id = s.id
-                     ORDER BY created_at DESC LIMIT 1) as last_message
+                    COUNT(m.id) as message_count
                 FROM chat_sessions s
                 LEFT JOIN chat_messages m ON s.id = m.session_id
                 GROUP BY s.id
@@ -271,16 +268,7 @@ class ChatHistoryDatabase:
                 LIMIT ? OFFSET ?
             """, (limit, offset))
 
-            sessions = []
-            for row in cursor.fetchall():
-                session_dict = dict(row)
-                # Add preview of last message (first 100 chars)
-                last_message = session_dict.pop('last_message', None)
-                session_dict['last_message_preview'] = (
-                    last_message[:100] + '...' if last_message and len(last_message) > 100
-                    else last_message
-                )
-                sessions.append(session_dict)
+            sessions = [dict(row) for row in cursor.fetchall()]
 
             # Get total count
             cursor.execute("SELECT COUNT(*) FROM chat_sessions")

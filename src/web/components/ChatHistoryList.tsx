@@ -82,9 +82,6 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
                 {session.message_count} {session.message_count === 1 ? 'message' : 'messages'}
               </div>
             </div>
-            {session.last_message_preview && (
-              <div className={styles.chatPreview}>{session.last_message_preview}</div>
-            )}
           </div>
           <div className={styles.chatActions}>
             <button
