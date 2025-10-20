@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CalculationSummary } from '../types/api-types';
+import { CalculationSummary, ChatSessionSummary } from '../types/api-types';
 import { useGetCalculationDetails } from '../hooks/useCalculationQueries';
 import { useDeleteChatSession } from '../hooks/useChatHistoryQueries';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
@@ -302,6 +302,7 @@ interface SidebarProps {
   sidebarView: SidebarView;
   onSidebarViewChange: (view: SidebarView) => void;
   onChatSessionSelect: (sessionId: string) => void;
+  filteredChatSessions: ChatSessionSummary[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -322,6 +323,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   sidebarView,
   onSidebarViewChange,
   onChatSessionSelect,
+  filteredChatSessions,
 }) => {
   // Confirmation modal state for individual calculation deletion
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -564,6 +566,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <ChatHistoryList
                   onSessionSelect={onChatSessionSelect}
                   onRequestDelete={handleRequestChatDelete}
+                  filteredSessions={filteredChatSessions}
+                  searchQuery={searchQuery}
                 />
               )}
             </div>

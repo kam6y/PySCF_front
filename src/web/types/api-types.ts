@@ -63,6 +63,11 @@ export type IRSpectrumData = components['schemas']['IRSpectrumData'];
 export type IRSpectrumDetails = components['schemas']['IRSpectrumDetails'];
 export type IRSpectrumMetadata = components['schemas']['IRSpectrumMetadata'];
 
+// Chat history data models
+export type ChatSession = components['schemas']['ChatSession'];
+export type ChatSessionSummary = components['schemas']['ChatSessionSummary'];
+export type ChatSessionDetail = components['schemas']['ChatSessionDetail'];
+
 // Operation types for reference
 export type Operations = {
   healthCheck: operations['healthCheck'];

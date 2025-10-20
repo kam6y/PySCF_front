@@ -1,4 +1,5 @@
 import React from 'react';
+import { ChatSessionSummary } from '../types/api-types';
 import { useGetChatSessions } from '../hooks/useChatHistoryQueries';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
 import styles from './ChatHistoryList.module.css';
@@ -6,13 +7,17 @@ import styles from './ChatHistoryList.module.css';
 interface ChatHistoryListProps {
   onSessionSelect: (sessionId: string) => void;
   onRequestDelete: (sessionId: string, sessionName: string) => void;
+  filteredSessions: ChatSessionSummary[];
+  searchQuery: string;
 }
 
 export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
   onSessionSelect,
-  onRequestDelete
+  onRequestDelete,
+  filteredSessions,
+  searchQuery
 }) => {
-  const { data, isLoading, error, refetch } = useGetChatSessions();
+  const { isLoading, error, refetch } = useGetChatSessions();
   const activeSessionId = useChatHistoryStore(state => state.activeSessionId);
 
   const handleSessionClick = (sessionId: string) => {
@@ -47,7 +52,18 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
     );
   }
 
-  if (!data || data.sessions.length === 0) {
+  // 検索結果が空の場合の表示
+  if (searchQuery && filteredSessions.length === 0) {
+    return (
+      <div className={styles.emptyContainer}>
+        <p>No matching chats found</p>
+        <p className={styles.emptyHint}>Try a different search term</p>
+      </div>
+    );
+  }
+
+  // データが空の場合の表示
+  if (filteredSessions.length === 0) {
     return (
       <div className={styles.emptyContainer}>
         <p>No chat history yet</p>
@@ -58,7 +74,7 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
 
   return (
     <div className={styles.chatHistoryList}>
-      {data.sessions.map(session => (
+      {filteredSessions.map(session => (
         <div
           key={session.id}
           className={`${styles.chatHistoryCard} ${

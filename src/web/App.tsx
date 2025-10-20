@@ -16,7 +16,7 @@ import { useCalculationActions } from './hooks/useCalculationActions';
 import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
 import { useChatHistoryStore } from './store/chatHistoryStore';
 import { useAgentStore } from './store/agentStore';
-import { useGetChatSessionDetail } from './hooks/useChatHistoryQueries';
+import { useGetChatSessionDetail, useGetChatSessions } from './hooks/useChatHistoryQueries';
 
 export const App = () => {
   // 統合された状態管理
@@ -24,12 +24,15 @@ export const App = () => {
   const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
 
+  // チャットセッションのデータ取得
+  const { data: chatSessionsData } = useGetChatSessions();
+
   // 統合WebSocketによるリアルタイム更新（グローバル + アクティブ計算監視）
   useUnifiedWebSocket({
     activeCalculationId: calculationData.activeCalculation?.id || null,
   });
 
-  // 検索機能によるフィルタリング
+  // 検索機能によるフィルタリング（計算インスタンス）
   const filteredCalculations = useMemo(() => {
     const searchQuery = appState.ui.searchQuery;
     if (!searchQuery.trim()) {
@@ -43,6 +46,22 @@ export const App = () => {
         calc.status.toLowerCase().includes(query)
     );
   }, [calculationData.sidebarCalculations, appState.ui.searchQuery]);
+
+  // 検索機能によるフィルタリング（チャットセッション）
+  const filteredChatSessions = useMemo(() => {
+    const searchQuery = appState.ui.searchQuery;
+    const sessions = chatSessionsData?.sessions || [];
+
+    if (!searchQuery.trim()) {
+      return sessions;
+    }
+
+    const query = searchQuery.toLowerCase();
+    return sessions.filter(
+      session =>
+        session.name.toLowerCase().includes(query)
+    );
+  }, [chatSessionsData?.sessions, appState.ui.searchQuery]);
 
   // イベントハンドラー（統合されたアクションを使用）
   const handleSearchChange = (query: string) => {
@@ -200,6 +219,7 @@ export const App = () => {
         sidebarView={appState.ui.sidebarView}
         onSidebarViewChange={appState.ui.setSidebarView}
         onChatSessionSelect={handleChatSessionSelect}
+        filteredChatSessions={filteredChatSessions}
       />
 
       <main
