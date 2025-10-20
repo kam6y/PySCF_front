@@ -63,11 +63,30 @@ Translating queries breaks this detection.
 
 **Do not use for**: Performing new, iterative literature searches from scratch. For that, delegate to `literature_surveyor`.
 
+### molecular_designer - Molecular Designer (分子設計担当)
+**Use for**: Proposing new molecules, generating structural analogs, cheminformatics tasks.
+- Generates candidate molecules (SMILES) based on scaffolds or design goals
+- Uses RDKit to propose structures with strategic modifications:
+  - Extending conjugation (for longer wavelength absorption)
+  - Adding electron-donating/withdrawing groups (for HOMO-LUMO tuning)
+  - Creating push-pull structures (donor + acceptor pairs)
+  - Introducing heteroatoms (N, O, S substitutions)
+- Predicts simple properties (MW, LogP, TPSA, Lipinski's Rule of Five)
+- **Returns**: List of candidate SMILES with design rationale for each
+
+**Do not use for**: Executing quantum calculations or 3D structure optimization. For that, delegate to `quantum_calculator`.
+
 ---
 
 ## Routing Guidelines
 
 ### Single Worker Tasks
+
+**Molecular Design** → `molecular_designer`
+- "Design molecules similar to benzene with longer absorption wavelengths"
+- "Generate analogs of this SMILES with better solubility"
+- "Propose push-pull structures based on c1ccccc1"
+- "Predict properties for these SMILES: [list]"
 
 **Calculation Execution** → `quantum_calculator`
 - "Run a DFT calculation on water"
@@ -88,6 +107,12 @@ Translating queries breaks this detection.
 - "Summarize all recent calculations"
 
 ### Multi-Worker Workflows
+
+**Design + Calculate + Analyze**
+1. `molecular_designer` → Generate candidate SMILES
+2. `quantum_calculator` → Execute calculations on candidates
+3. `science_analyst` → Compare results, create report
+- Example: "Design molecules with longer absorption wavelengths than benzene and calculate their TDDFT properties"
 
 **Calculate + Analyze**
 1. `quantum_calculator` → Execute calculation

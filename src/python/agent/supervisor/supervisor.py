@@ -18,6 +18,7 @@ from agent.utils import get_gemini_api_key, load_prompt
 from agent.quantum_calculator import create_quantum_calculator
 from agent.literature_surveyor import create_literature_surveyor
 from agent.science_analyst import create_science_analyst
+from agent.molecular_designer import create_molecular_designer
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ def create_supervisor_agent():
     - Quantum Calculator (quantum chemistry and molecular analysis)
     - Literature Surveyor (academic literature search)
     - Science Analyst (scientific report generation)
+    - Molecular Designer (molecular structure generation and design)
 
     Returns:
         A compiled LangGraph Supervisor workflow ready for execution
@@ -71,6 +73,13 @@ def create_supervisor_agent():
         logger.error(f"Failed to create Science Analyst: {e}", exc_info=True)
         raise
 
+    try:
+        molecular_designer = create_molecular_designer()
+        logger.info("Molecular Designer initialized")
+    except Exception as e:
+        logger.error(f"Failed to create Molecular Designer: {e}", exc_info=True)
+        raise
+
     # Initialize Supervisor LLM with configured model
     model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
     supervisor_llm = ChatGoogleGenerativeAI(
@@ -99,7 +108,7 @@ def create_supervisor_agent():
 
     # Create supervisor workflow using create_supervisor
     workflow = create_supervisor(
-        [quantum_calculator, literature_surveyor, science_analyst],
+        [quantum_calculator, literature_surveyor, science_analyst, molecular_designer],
         model=supervisor_llm,
         prompt=system_prompt,
         tools=[forward_tool],  # Add forward_message tool
