@@ -991,6 +991,7 @@ export const AgentPage = () => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
+                style={{ transform: 'rotate(90deg)' }}
               >
                 <path
                   strokeLinecap="round"

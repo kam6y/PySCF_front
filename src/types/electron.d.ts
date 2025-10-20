@@ -10,6 +10,7 @@ export interface ElectronAPI {
   openExternalUrl: (
     url: string
   ) => Promise<{ success: boolean; error?: string }>;
+  showAboutDialog: () => Promise<void>;
 }
 
 declare global {

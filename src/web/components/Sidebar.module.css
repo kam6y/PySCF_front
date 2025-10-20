@@ -456,12 +456,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px;
+  padding: 12px 20px;
   background: #50D4F5;
   color: white;
 }
 
-.userName {
+.menuLabel {
   font-weight: 600;
   font-size: 16px;
 }
@@ -470,6 +470,10 @@
   font-size: 16px;
   transition: transform 0.2s ease;
   font-weight: bold;
+  transform-origin: center center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .userMenuToggle.rotated {

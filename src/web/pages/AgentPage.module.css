@@ -54,7 +54,7 @@
 
 .inputArea {
   display: flex;
-  padding: 16px 20px;
+  padding: 16px 20px 0 20px;
   border-top: 1px solid #e5e7eb;
   background-color: white;
   gap: 12px;
@@ -88,13 +88,13 @@
 
 .sendButton {
   padding: 12px 20px;
-  background-color: #3b82f6;
+  background-color: #50D4F5;
   color: white;
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  transition: background-color 0.2s ease;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -103,7 +103,9 @@
 }
 
 .sendButton:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: #22b9e7;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
 }
 
 .sendButton:disabled {

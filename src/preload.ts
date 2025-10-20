@@ -17,4 +17,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getFlaskPort: () => ipcRenderer.invoke('get-flask-port'),
   openExternalUrl: (url: string) =>
     ipcRenderer.invoke('open-external-url', url),
+  showAboutDialog: () => ipcRenderer.invoke('show-about-dialog'),
 });

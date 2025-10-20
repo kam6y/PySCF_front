@@ -72,13 +72,13 @@
 .chatHistoryCard:hover {
   border-color: #f8eb7d;
   transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(248, 235, 125, 0.3);
+  box-shadow: 0 4px 12px rgba(248, 235, 125, 0.7);
 }
 
 .chatHistoryCard.active {
   border-color: #f8eb7d;
   background: #fffef8;
-  box-shadow: 0 4px 12px rgba(248, 235, 125, 0.15);
+  box-shadow: 0 2px 8px rgba(248, 235, 125, 0.15);
 }
 
 /* Chat Info */

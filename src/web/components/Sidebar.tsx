@@ -587,12 +587,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     Settings
                   </button>
-                  <button className={styles.userMenuItem}>Profile</button>
-                  <button className={styles.userMenuItem}>About</button>
+                  <button
+                    className={styles.userMenuItem}
+                    onClick={() => {
+                      window.electronAPI.showAboutDialog();
+                    }}
+                  >
+                    About
+                  </button>
                 </div>
               )}
               <div className={styles.userInfoMain}>
-                <span className={styles.userName}>User name</span>
+                <span className={styles.menuLabel}>menu</span>
                 <span
                   className={`${styles.userMenuToggle} ${isUserMenuOpen ? styles.rotated : ''}`}
                 >
@@ -602,6 +608,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     viewBox="0 0 16 16"
                     fill="none"
                     xmlns="http://www.w3.org/2000/svg"
+                    style={{ transformOrigin: 'center center' }}
                   >
                     <path
                       d="M4 6L8 10L12 6"
