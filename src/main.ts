@@ -285,6 +285,13 @@ const createCleanEnvironment = (
   cleanEnv.CONDA_DEFAULT_ENV = 'pyscf-env';
   cleanEnv.PYSCF_SERVER_PORT = String(serverPort);
 
+  // パッケージ環境用の設定ファイルパスを環境変数で渡す
+  // config.pyがprocess.resourcesPathを認識できるようにする
+  if (app.isPackaged) {
+    cleanEnv.PYSCF_RESOURCES_PATH = process.resourcesPath;
+    console.log(`Setting PYSCF_RESOURCES_PATH=${process.resourcesPath}`);
+  }
+
   // macOS ARM64のNumPy初期化問題対策
   if (process.platform === 'darwin' && process.arch === 'arm64') {
     cleanEnv.OPENBLAS_CORETYPE = 'ARMV8';

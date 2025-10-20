@@ -53,32 +53,51 @@ class ServerConfig:
         Raises:
             ConfigurationError: If config file cannot be found.
         """
-        # Start from current file's directory and walk up
-        current_dir = Path(__file__).parent
+        logger.debug("Starting config file search...")
+        search_paths = []
 
-        # Walk up the directory tree to find config/server-config.json
-        for _ in range(5):  # Limit search to 5 levels up
+        # Priority 1: Environment variable (for packaged apps)
+        # main.ts sets PYSCF_RESOURCES_PATH to process.resourcesPath in packaged mode
+        resources_path = os.getenv('PYSCF_RESOURCES_PATH')
+        if resources_path:
+            env_config_path = Path(resources_path) / "config" / "server-config.json"
+            search_paths.append(("Environment variable (PYSCF_RESOURCES_PATH)", env_config_path))
+            if env_config_path.exists():
+                logger.info(f"Found config file at: {env_config_path} (from PYSCF_RESOURCES_PATH)")
+                return str(env_config_path)
+
+        # Priority 2: Walk up the directory tree (for development)
+        current_dir = Path(__file__).parent
+        for i in range(5):  # Limit search to 5 levels up
             config_path = current_dir / ".." / "config" / "server-config.json"
             config_path = config_path.resolve()
+            search_paths.append((f"Parent directory level {i+1}", config_path))
             if config_path.exists():
-                logger.info(f"Found config file at: {config_path}")
+                logger.info(f"Found config file at: {config_path} (development mode)")
                 return str(config_path)
             current_dir = current_dir.parent
 
-        # Fallback paths
+        # Priority 3: Additional fallback paths
         fallback_paths = [
-            Path(__file__).parent.parent.parent / "config" / "server-config.json",
-            Path.cwd() / "config" / "server-config.json",
+            ("Relative from __file__", Path(__file__).parent.parent.parent / "config" / "server-config.json"),
+            ("Current working directory", Path.cwd() / "config" / "server-config.json"),
         ]
+        search_paths.extend(fallback_paths)
 
-        for path in fallback_paths:
+        for description, path in fallback_paths:
             if path.exists():
-                logger.info(f"Found config file at: {path}")
+                logger.info(f"Found config file at: {path} ({description})")
                 return str(path)
+
+        # Config file not found - log all attempted paths for debugging
+        logger.error("Config file not found. Searched the following locations:")
+        for description, path in search_paths:
+            logger.error(f"  - {description}: {path} (exists: {path.exists()})")
 
         raise ConfigurationError(
             "Could not find config/server-config.json. "
-            "Please ensure the configuration file exists in the project root."
+            "Please ensure the configuration file exists in the project root. "
+            f"Searched {len(search_paths)} locations."
         )
 
     def _load_config(self) -> None:
@@ -405,11 +424,31 @@ def get_server_config() -> ServerConfig:
     if _server_config is None:
         try:
             _server_config = ServerConfig()
+            logger.info("Successfully initialized ServerConfig from file")
         except ConfigurationError as e:
             logger.error(f"Failed to load configuration: {e}")
             logger.warning("Using fallback configuration")
-            # Create a temporary config with fallback values
-            _server_config = ServerConfig.__new__(ServerConfig)
-            _server_config._config = get_fallback_config()
-            _server_config.config_path = "fallback"
+
+            # Create a properly initialized ServerConfig with fallback values
+            # This is safer than using __new__ directly
+            try:
+                # Create a temporary config file path
+                import tempfile
+                fallback_config = get_fallback_config()
+
+                # Write fallback config to a temporary file
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                    json.dump(fallback_config, f)
+                    temp_config_path = f.name
+
+                # Initialize ServerConfig with the temporary file
+                _server_config = ServerConfig(config_path=temp_config_path)
+                logger.info(f"Initialized ServerConfig with fallback configuration from {temp_config_path}")
+            except Exception as fallback_error:
+                logger.critical(f"Failed to initialize fallback configuration: {fallback_error}")
+                # Last resort: create minimal config object
+                _server_config = ServerConfig.__new__(ServerConfig)
+                _server_config._config = get_fallback_config()
+                _server_config.config_path = "minimal-fallback"
+                logger.warning("Using minimal fallback configuration (last resort)")
     return _server_config
