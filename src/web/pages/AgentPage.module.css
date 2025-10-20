@@ -449,9 +449,11 @@
 }
 
 .clearButton:hover {
-  background-color: #ef4444;
-  color: white;
-  border-color: #ef4444;
+  background-color: #e5e7eb;
+  color: #374151;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .clearButton svg {

@@ -474,7 +474,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className={styles.sidebarHeader}>
               <div className={styles.sidebarViewTabs}>
                 <button
-                  className={`${styles.sidebarViewTab} ${
+                  className={`${styles.sidebarViewTab} ${styles.instancesTab} ${
                     sidebarView === 'instances' ? styles.active : ''
                   }`}
                   onClick={() => onSidebarViewChange('instances')}
@@ -482,7 +482,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   Instances
                 </button>
                 <button
-                  className={`${styles.sidebarViewTab} ${
+                  className={`${styles.sidebarViewTab} ${styles.chatsTab} ${
                     sidebarView === 'chats' ? styles.active : ''
                   }`}
                   onClick={() => onSidebarViewChange('chats')}

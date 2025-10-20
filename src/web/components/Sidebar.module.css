@@ -47,8 +47,7 @@
 .sidebarTopSection {
   padding: 20px;
   padding-top: 52px; /* Account for header height (40px) + extra spacing */
-  padding-bottom: 15px;
-  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 12px;
 }
 
 .createNewButton {
@@ -147,7 +146,7 @@
 }
 
 .sidebarHeader {
-  padding: 15px 0;
+  padding-bottom: 8px;
 }
 
 .sidebarHeader h3 {
@@ -183,9 +182,20 @@
   background: #f8f9fa;
 }
 
-.sidebarViewTab.active {
+/* Instances tab (cyan) */
+.instancesTab.active {
   color: #50D4F5;
   border-bottom-color: #50D4F5;
+  text-shadow: 0 0 0.5px #50D4F5, 0 0 0.5px #50D4F5;
+  letter-spacing: 0.3px;
+}
+
+/* Chats tab (yellow) */
+.chatsTab.active {
+  color: #e3cf4f;
+  border-bottom-color: #f8eb7d;
+  text-shadow: 0 0 0.5px #e3cf4f, 0 0 0.5px #e3cf4f;
+  letter-spacing: 0.3px;
 }
 
 /* Calculations Section */

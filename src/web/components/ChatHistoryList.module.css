@@ -29,8 +29,8 @@
 .retryButton {
   margin-top: 12px;
   padding: 8px 16px;
-  background: #50D4F5;
-  color: white;
+  background: #f8eb7d;
+  color: #333;
   border: none;
   border-radius: 6px;
   font-size: 13px;
@@ -40,9 +40,9 @@
 }
 
 .retryButton:hover {
-  background: #3eb8d8;
+  background: #f5e55a;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(80, 212, 245, 0.3);
+  box-shadow: 0 2px 8px rgba(248, 235, 125, 0.3);
 }
 
 .emptyContainer p {
@@ -70,15 +70,15 @@
 }
 
 .chatHistoryCard:hover {
-  border-color: #50D4F5;
+  border-color: #f8eb7d;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
+  box-shadow: 0 6px 14px rgba(248, 235, 125, 0.3);
 }
 
 .chatHistoryCard.active {
-  border-color: #50D4F5;
-  background: #f8fdff;
-  box-shadow: 0 2px 8px rgba(80, 212, 245, 0.15);
+  border-color: #f8eb7d;
+  background: #fffef8;
+  box-shadow: 0 4px 12px rgba(248, 235, 125, 0.15);
 }
 
 /* Chat Info */
