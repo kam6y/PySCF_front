@@ -579,8 +579,12 @@ class CalculationProcessManager:
             )
             self.calculation_queue.append(queued_calc)
             self.calculation_queue.sort(key=lambda x: x.created_at)
-            
+
             logger.info(f"Added calculation {calculation_id} to queue (position {len(self.calculation_queue)}): {reason}")
+
+            # Send WebSocket notification for waiting status
+            self._send_websocket_notification(calculation_id, 'waiting', None)
+
             return True, 'waiting', reason
         
         # allocation_status == AllocationStatus.CAN_START - start immediately
@@ -606,8 +610,12 @@ class CalculationProcessManager:
             
             # Add callback to clean up completed futures and process queue
             future.add_done_callback(lambda f: self._cleanup_future(calculation_id, f))
-            
+
             logger.info(f"Started calculation {calculation_id} immediately with {user_cpu_cores} CPU cores and {user_memory_mb} MB memory ({len(self.active_futures)}/{self.max_parallel_instances} slots used)")
+
+            # Send WebSocket notification for running status
+            self._send_websocket_notification(calculation_id, 'running', None)
+
             return True, 'running', None
             
         except Exception as e:
@@ -643,13 +651,19 @@ class CalculationProcessManager:
             if future.exception():
                 error_message = str(future.exception())
                 logger.error(f"Calculation {calculation_id} failed with exception: {error_message}")
+                # Send WebSocket notification for exception error
+                self._send_websocket_notification(calculation_id, 'error', error_message)
             else:
                 success, calc_error = future.result()
                 if success:
                     logger.info(f"Calculation {calculation_id} completed successfully")
+                    # Send WebSocket notification for successful completion
+                    self._send_websocket_notification(calculation_id, 'completed', None)
                 else:
                     error_message = calc_error
                     logger.warning(f"Calculation {calculation_id} failed: {error_message}")
+                    # Send WebSocket notification for calculation error
+                    self._send_websocket_notification(calculation_id, 'error', error_message)
             
             # Call completion callbacks
             if calculation_id in self.completion_callbacks:
