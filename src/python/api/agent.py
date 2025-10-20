@@ -21,6 +21,34 @@ logger = logging.getLogger(__name__)
 # Constants
 MAX_MESSAGE_LENGTH = 100000  # Maximum allowed message length in characters
 
+# Global cache for compiled graph (lazy-loaded on first request)
+# This prevents re-compilation on every request and ensures initialization
+# happens only once, avoiding potential file system side effects on subsequent requests
+_compiled_graph_cache = None
+
+
+def _get_or_create_compiled_graph():
+    """
+    Get the compiled graph, creating it if necessary.
+
+    This function implements lazy loading with caching to ensure:
+    1. Graph is compiled only once during the application lifecycle
+    2. First-time initialization side effects (file creation, module loading) occur
+       on the first request rather than at import time
+    3. Subsequent requests use the cached graph for better performance
+
+    Returns:
+        Compiled LangGraph supervisor application
+    """
+    global _compiled_graph_cache
+
+    if _compiled_graph_cache is None:
+        logger.info("Compiling supervisor graph (first-time initialization)")
+        _compiled_graph_cache = get_compiled_graph()
+        logger.info("Supervisor graph compiled and cached successfully")
+
+    return _compiled_graph_cache
+
 
 def _is_internal_transfer_message(content: str) -> bool:
     """
@@ -201,8 +229,8 @@ def _create_supervisor_stream(message: str, history: list, session_id: str = Non
     try:
         logger.debug(f"Starting LangGraph Supervisor stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
 
-        # Get compiled supervisor graph
-        graph_app = get_compiled_graph()
+        # Get compiled supervisor graph (cached after first call)
+        graph_app = _get_or_create_compiled_graph()
 
         # Convert history to LangChain format
         langchain_history = _convert_dict_to_langchain_format(history)

@@ -289,7 +289,13 @@ const createCleanEnvironment = (
   // config.pyがprocess.resourcesPathを認識できるようにする
   if (app.isPackaged) {
     cleanEnv.PYSCF_RESOURCES_PATH = process.resourcesPath;
+    cleanEnv.PYSCF_ENV = 'production';
     console.log(`Setting PYSCF_RESOURCES_PATH=${process.resourcesPath}`);
+  } else {
+    // 開発環境では明示的にPYSCF_ENVを設定
+    // これにより、chat_history.dbなどのファイルがプロジェクトルートのdata/に作成される
+    cleanEnv.PYSCF_ENV = 'development';
+    console.log('Setting PYSCF_ENV=development for consistent file paths');
   }
 
   // macOS ARM64のNumPy初期化問題対策
