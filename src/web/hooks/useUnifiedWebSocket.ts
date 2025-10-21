@@ -31,6 +31,8 @@ export const useUnifiedWebSocket = ({
   const lastUpdateTimestamps = useRef<Map<string, number>>(new Map());
   const currentActiveCalculationId = useRef<string | null>(null);
   const disconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isConnectingRef = useRef<boolean>(false);
+  const isMountedRef = useRef<boolean>(false);
 
   // 重複更新防止チェック
   const isDuplicateUpdate = useCallback((calculationId: string): boolean => {
@@ -322,6 +324,12 @@ export const useUnifiedWebSocket = ({
   // WebSocket切断
   const disconnect = useCallback(() => {
     clearDisconnectTimer();
+
+    // 接続処理中の場合はフラグをリセット
+    if (isConnectingRef.current) {
+      isConnectingRef.current = false;
+    }
+
     if (socketRef.current) {
       const socket = socketRef.current;
       try {
@@ -350,6 +358,17 @@ export const useUnifiedWebSocket = ({
       );
       return;
     }
+
+    // 接続処理中の場合はスキップ
+    if (isConnectingRef.current) {
+      console.log(
+        '[UnifiedWebSocket] Connection already in progress, skipping'
+      );
+      return;
+    }
+
+    // 接続処理を開始
+    isConnectingRef.current = true;
 
     // 既存の接続があれば切断
     disconnect();
@@ -383,6 +402,7 @@ export const useUnifiedWebSocket = ({
         console.log(
           '[UnifiedWebSocket] Connected, joining global_updates room'
         );
+        isConnectingRef.current = false;
         socket.emit('join_global_updates');
       });
 
@@ -397,6 +417,8 @@ export const useUnifiedWebSocket = ({
 
       socket.on('connect_error', (error: Error) => {
         console.error('[UnifiedWebSocket] Connection error:', error);
+        isConnectingRef.current = false;
+
         let errorMessage = 'Failed to connect to monitoring server.';
 
         if (error.message.includes('timeout')) {
@@ -441,6 +463,8 @@ export const useUnifiedWebSocket = ({
       });
     } catch (error) {
       console.error('[UnifiedWebSocket] Failed to create connection:', error);
+      isConnectingRef.current = false;
+
       let errorMessage = 'Failed to start monitoring.';
 
       if (error instanceof Error) {
@@ -486,8 +510,26 @@ export const useUnifiedWebSocket = ({
 
   // WebSocket接続の管理
   useEffect(() => {
-    connect();
-    return () => disconnect();
+    isMountedRef.current = true;
+
+    // StrictModeでの二重実行を考慮して、少し遅延させる
+    const connectTimer = setTimeout(() => {
+      if (isMountedRef.current) {
+        connect();
+      }
+    }, 50);
+
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(connectTimer);
+
+      // StrictModeでの即座の切断を防ぐため、少し遅延させる
+      disconnectTimerRef.current = setTimeout(() => {
+        if (!isMountedRef.current) {
+          disconnect();
+        }
+      }, 100);
+    };
   }, [connect, disconnect]);
 
   // アクティブ計算IDの変更監視

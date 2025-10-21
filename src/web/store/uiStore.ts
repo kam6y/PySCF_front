@@ -51,6 +51,7 @@ const getPageTitle = (page: DropdownOption): string => {
   const titles: Record<DropdownOption, string> = {
     'calculation-settings': 'Calculation Settings',
     'calculation-results': 'Calculation Results',
+    'draw-molecule': 'Draw Molecule',
   };
   return titles[page] || 'PySCF_front';
 };

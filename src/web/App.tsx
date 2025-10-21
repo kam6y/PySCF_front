@@ -10,6 +10,7 @@ import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
 import { CalculationResultsPage } from './pages/CalculationResultsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AgentPage } from './pages/AgentPage';
+import { DrawMoleculePage } from './pages/DrawMoleculePage';
 import { useAppState } from './hooks/useAppState';
 import { useCalculationData } from './hooks/useCalculationData';
 import { useCalculationActions } from './hooks/useCalculationActions';
@@ -123,6 +124,8 @@ export const App = () => {
             onCalculationUpdate={calculationActions.handleCalculationUpdate}
           />
         );
+      case 'draw-molecule':
+        return <DrawMoleculePage />;
       default:
         return (
           <CalculationSettingsPage

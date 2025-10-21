@@ -121,10 +121,39 @@ const renderer: Configuration = {
     // React アプリのエントリーファイル
     app: "./src/web/index.tsx",
   },
+  resolve: {
+    extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],
+    fallback: {
+      // Node.jsモジュールのブラウザ用ポリフィルを設定
+      process: "process/browser",
+      util: "util/",
+      assert: "assert/",
+      stream: "stream-browserify",
+      buffer: "buffer/",
+    },
+  },
+  module: {
+    ...common.module,
+    rules: [
+      ...(common.module?.rules || []),
+      // ESMモジュール（.mjs）での拡張子なしインポートを許可
+      {
+        test: /\.m?js$/,
+        resolve: {
+          fullySpecified: false,
+        },
+      },
+    ],
+  },
   plugins: [
     // 環境変数をバンドルに注入（common からコピー）
     new webpack.DefinePlugin({
       "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+    }),
+    // processとBufferをグローバルに提供
+    new webpack.ProvidePlugin({
+      process: "process/browser",
+      Buffer: ["buffer", "Buffer"],
     }),
     // CSS を JS へバンドルせず別ファイルとして出力するプラグイン
     new MiniCssExtractPlugin(),

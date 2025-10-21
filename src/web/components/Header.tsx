@@ -87,6 +87,23 @@ export const Header: React.FC<HeaderProps> = ({
             />
           </>
         );
+      case 'draw-molecule':
+        return (
+          <>
+            {/* Pen/pencil icon for drawing molecules */}
+            <path
+              d="M11.5 1.5L14.5 4.5L5.5 13.5L2 14.5L3 11L12 2L11.5 1.5Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+            <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+            <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+            <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+          </>
+        );
       default:
         return getPageIcon('calculation-settings');
     }
