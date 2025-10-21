@@ -179,22 +179,13 @@ export const DrawMoleculePage: React.FC = () => {
 
   return (
     <div className={styles.pageContainer}>
-      <div className={styles.pageHeader}>
-        <h2 className={styles.pageTitle}>Draw Molecule</h2>
-        <p className={styles.pageDescription}>
-          Draw your molecule structure and convert it to XYZ coordinates for quantum calculations
-        </p>
-      </div>
-
-      <div className={styles.pageContent}>
-        {/* Ketcher エディタ */}
-        <div className={styles.editorContainer}>
-          <Editor
-            staticResourcesUrl=""
-            structServiceProvider={structServiceProvider}
-            errorHandler={handleError}
-            onInit={handleOnInit}
-          />
+      {/* ヘッダーとボタンを横並びに */}
+      <div className={styles.headerRow}>
+        <div className={styles.pageHeader}>
+          <h2 className={styles.pageTitle}>Draw Molecule</h2>
+          <p className={styles.pageDescription}>
+            Draw your molecule structure and convert it to XYZ coordinates for quantum calculations
+          </p>
         </div>
 
         {/* アクションボタン */}
@@ -213,6 +204,18 @@ export const DrawMoleculePage: React.FC = () => {
           >
             {isConverting ? 'Converting...' : 'Convert to XYZ & Continue'}
           </button>
+        </div>
+      </div>
+
+      <div className={styles.pageContent}>
+        {/* Ketcher エディタ */}
+        <div className={styles.editorContainer}>
+          <Editor
+            staticResourcesUrl=""
+            structServiceProvider={structServiceProvider}
+            errorHandler={handleError}
+            onInit={handleOnInit}
+          />
         </div>
 
         {/* エラー表示 */}
@@ -242,17 +245,6 @@ export const DrawMoleculePage: React.FC = () => {
             <span className={styles.errorText}>{convertError}</span>
           </div>
         )}
-
-        {/* 使用方法のヒント */}
-        <div className={styles.hintsContainer}>
-          <h3 className={styles.hintsTitle}>How to use:</h3>
-          <ol className={styles.hintsList}>
-            <li>Draw your molecule using the tools in the editor above</li>
-            <li>Click "Convert to XYZ & Continue" to generate 3D coordinates</li>
-            <li>You'll be automatically redirected to the Calculation Settings page</li>
-            <li>Configure your quantum calculation parameters and start the calculation</li>
-          </ol>
-        </div>
       </div>
     </div>
   );
