@@ -124,12 +124,16 @@ export const CalculationResultsPage = ({
       <div className="page-content">
         <h1>Quantum Chemistry Calculation Results</h1>
 
-        {/* Calculation Summary */}
+        {/* ========================================
+            1️⃣ OVERVIEW SECTION - Integrated Summary and Energy
+            ======================================== */}
         <section
-          className={`${styles.calculationSection} ${styles.summarySection}`}
+          className={`${styles.calculationSection} ${styles.overviewSection}`}
         >
-          <h2>Calculation Summary</h2>
-          <div className={styles.summaryGrid}>
+          <h2 className={styles.primaryHeader}>Calculation Overview</h2>
+
+          {/* Basic Information */}
+          <div className={styles.overviewGrid}>
             <div>
               <strong>Molecule:</strong> {(parameters as any).name || 'Unknown'}
             </div>
@@ -157,28 +161,342 @@ export const CalculationResultsPage = ({
               {results.converged ? '✅ Converged' : '❌ Not Converged'}
             </div>
           </div>
-        </section>
 
-        {/* Energy Results */}
-        <section
-          className={`${styles.calculationSection} ${styles.energySection}`}
-        >
-          <h2>Energy Results</h2>
-          <div className={styles.energyResult}>
-            <strong>SCF Energy:</strong>{' '}
-            <code>{results.scf_energy?.toFixed(8) || 'N/A'} hartree</code>
+          {/* Primary Energy Result - Prominently Displayed */}
+          <div className={styles.primaryEnergyResult}>
+            <div className={styles.energyLabel}>Primary Energy Result</div>
+            <div className={styles.energyValue}>
+              {(() => {
+                // Display the most relevant energy for the calculation method
+                if (parameters.calculation_method === 'CCSD_T' && (results as any).ccsd_t_total_energy) {
+                  return (
+                    <>
+                      <strong>CCSD(T) Total Energy:</strong>{' '}
+                      <code>{(results as any).ccsd_t_total_energy.toFixed(8)} hartree</code>
+                    </>
+                  );
+                } else if (parameters.calculation_method === 'CCSD' && (results as any).ccsd_total_energy) {
+                  return (
+                    <>
+                      <strong>CCSD Total Energy:</strong>{' '}
+                      <code>{(results as any).ccsd_total_energy.toFixed(8)} hartree</code>
+                    </>
+                  );
+                } else if (parameters.calculation_method === 'CASSCF' && (results as any).casscf_energy) {
+                  return (
+                    <>
+                      <strong>CASSCF Energy:</strong>{' '}
+                      <code>{(results as any).casscf_energy.toFixed(8)} hartree</code>
+                    </>
+                  );
+                } else if (parameters.calculation_method === 'CASCI' && (results as any).casci_energy) {
+                  return (
+                    <>
+                      <strong>CASCI Energy:</strong>{' '}
+                      <code>{(results as any).casci_energy.toFixed(8)} hartree</code>
+                    </>
+                  );
+                } else {
+                  return (
+                    <>
+                      <strong>SCF Energy:</strong>{' '}
+                      <code>{results.scf_energy?.toFixed(8) || 'N/A'} hartree</code>
+                    </>
+                  );
+                }
+              })()}
+            </div>
           </div>
         </section>
 
+        {/* ========================================
+            2️⃣ MOLECULAR STRUCTURE SECTION
+            ======================================== */}
+        <section className={`${styles.calculationSection} ${styles.structureSection}`}>
+          {(() => {
+            // Check if geometry optimization was performed
+            const optimizeGeometry =
+              (parameters as any).optimize_geometry !== false;
+
+            if (!optimizeGeometry) {
+              return (
+                <>
+                  <h2 className={styles.primaryHeader}>Initial Molecular Structure</h2>
+                  <div className={styles.sectionDescription}>
+                    ℹ️ No geometry optimization performed - using initial
+                    structure
+                  </div>
+                </>
+              );
+            }
+
+            // Determine optimization method based on calculation method
+            switch (parameters.calculation_method) {
+              case 'MP2':
+                return (
+                  <>
+                    <h2 className={styles.primaryHeader}>MP2-Optimized Molecular Structure</h2>
+                    <div className={styles.sectionDescription}>
+                      ℹ️ Geometry optimized using MP2 method
+                    </div>
+                  </>
+                );
+              case 'HF':
+                return (
+                  <>
+                    <h2 className={styles.primaryHeader}>HF-Optimized Molecular Structure</h2>
+                    <div className={styles.sectionDescription}>
+                      ℹ️ Geometry optimized using Hartree-Fock method
+                    </div>
+                  </>
+                );
+              case 'CCSD':
+              case 'CCSD_T':
+                return (
+                  <>
+                    <h2 className={styles.primaryHeader}>Initial Molecular Structure</h2>
+                    <div className={styles.sectionDescription}>
+                      ℹ️ CCSD calculations use initial geometry (no
+                      optimization)
+                    </div>
+                  </>
+                );
+              case 'CASCI':
+              case 'CASSCF':
+                return (
+                  <>
+                    <h2 className={styles.primaryHeader}>Initial Molecular Structure</h2>
+                    <div className={styles.sectionDescription}>
+                      ℹ️ CASCI/CASSCF calculations use initial geometry (no
+                      optimization)
+                    </div>
+                  </>
+                );
+              case 'TDDFT':
+                return (
+                  <>
+                    <h2 className={styles.primaryHeader}>Initial Molecular Structure</h2>
+                    <div className={styles.sectionDescription}>
+                      ℹ️ TDDFT calculations use initial geometry (no
+                      optimization)
+                    </div>
+                  </>
+                );
+              default:
+                // DFT and other methods
+                return (
+                  <>
+                    <h2 className={styles.primaryHeader}>DFT-Optimized Molecular Structure</h2>
+                    <div className={styles.sectionDescription}>
+                      ℹ️ Geometry optimized using DFT method
+                    </div>
+                  </>
+                );
+            }
+          })()}
+          <div className={styles.molecularStructureInfo}>
+            <strong>Number of Atoms:</strong> {results.atom_count}
+          </div>
+          <div className={styles.xyzCoordinatesContainer}>
+            <strong>XYZ Coordinates:</strong>
+            <pre className={styles.xyzCoordinates}>
+              {results.optimized_geometry}
+            </pre>
+          </div>
+        </section>
+
+        {/* ========================================
+            3️⃣ ELECTRONIC PROPERTIES SECTION - New Unified Section
+            ======================================== */}
+        {((results.mulliken_charges && results.mulliken_charges.length > 0) ||
+          ((results as any).mulliken_spin_analysis && (results as any).mulliken_spin_analysis.available)) && (
+          <section className={`${styles.calculationSection} ${styles.electronicPropertiesSection}`}>
+            <h2 className={styles.primaryHeader}>Electronic Properties</h2>
+
+            {/* Mulliken Charge Analysis */}
+            {results.mulliken_charges && results.mulliken_charges.length > 0 && (
+            <div className={styles.propertySubsection}>
+              <h3>Mulliken Charge Analysis</h3>
+              <div className={styles.sectionDescription}>
+                Partial charges of each atom by Mulliken population analysis.
+                Positive values indicate electron deficiency (positive charge),
+                negative values indicate electron excess (negative charge).
+              </div>
+              <div className={styles.tableContainer}>
+                <table className={styles.mullikenChargeTable}>
+                  <thead>
+                    <tr>
+                      <th>Atom Number</th>
+                      <th>Element</th>
+                      <th>Mulliken Charge (e)</th>
+                      <th>Charge Character</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {results.mulliken_charges.map(
+                      (chargeData: any, index: number) => {
+                        const isPositive = chargeData.charge > 0;
+
+                        return (
+                          <tr key={index}>
+                            <td>{chargeData.atom_index + 1}</td>
+                            <td style={{ fontWeight: 'bold' }}>
+                              {chargeData.element}
+                            </td>
+                            <td
+                              className={`${styles.chargeValueCell} ${
+                                isPositive
+                                  ? styles.chargeValueCellPositive
+                                  : styles.chargeValueCellNegative
+                              }`}
+                            >
+                              {chargeData.charge > 0 ? '+' : ''}
+                              {chargeData.charge.toFixed(4)}
+                            </td>
+                            <td
+                              className={
+                                isPositive
+                                  ? styles.chargeCharacterPositive
+                                  : styles.chargeCharacterNegative
+                              }
+                            >
+                              {isPositive ? 'Positive (δ+)' : 'Negative (δ−)'}
+                            </td>
+                          </tr>
+                        );
+                      }
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className={styles.chargeSummary}>
+                <strong>Total Charge:</strong>{' '}
+                <code>
+                  {results.mulliken_charges
+                    .reduce((sum: number, charge: any) => sum + charge.charge, 0)
+                    .toFixed(4)}{' '}
+                  e
+                </code>{' '}
+                (Molecular Charge: <code>{results.charge || 0}</code> e)
+              </div>
+            </div>
+          )}
+
+          {/* Mulliken Spin Density Analysis - moved from CASCI/CASSCF section */}
+          {(results as any).mulliken_spin_analysis &&
+            (results as any).mulliken_spin_analysis.available && (
+              <div className={styles.propertySubsection}>
+                <h3>Mulliken Spin Density Analysis</h3>
+                <div className={styles.sectionDescription}>
+                  Mulliken atomic spin densities show the distribution of
+                  unpaired electron density across atoms in open-shell
+                  systems.
+                </div>
+
+                <div className={styles.spinSummary}>
+                  <div className={styles.spinStats}>
+                    <div>
+                      <strong>Total Spin Density:</strong>{' '}
+                      <code>
+                        {(
+                          results as any
+                        ).mulliken_spin_analysis.total_spin_density?.toFixed(
+                          3
+                        ) || 'N/A'}
+                      </code>
+                    </div>
+                    <div>
+                      <strong>Expected Spin:</strong>{' '}
+                      <code>
+                        {(results as any).mulliken_spin_analysis
+                          .expected_spin || 'N/A'}
+                      </code>
+                    </div>
+                    <div>
+                      <strong>Total Absolute Spin:</strong>{' '}
+                      <code>
+                        {(
+                          results as any
+                        ).mulliken_spin_analysis.total_absolute_spin_density?.toFixed(
+                          3
+                        ) || 'N/A'}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+
+                {(results as any).mulliken_spin_analysis
+                  .atomic_spin_densities &&
+                  (results as any).mulliken_spin_analysis
+                    .atomic_spin_densities.length > 0 && (
+                    <div className={styles.atomicSpinSection}>
+                      <h4>Atomic Spin Densities</h4>
+                      <div className={styles.tableContainer}>
+                        <table className={styles.dataTable}>
+                          <thead>
+                            <tr>
+                              <th>Atom</th>
+                              <th>Element</th>
+                              <th className={styles.rightAlign}>
+                                Spin Density
+                              </th>
+                              <th className={styles.rightAlign}>
+                                |Spin Density|
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(
+                              results as any
+                            ).mulliken_spin_analysis.atomic_spin_densities.map(
+                              (atom: any, index: number) => (
+                                <tr key={index}>
+                                  <td>{atom.atom_index + 1}</td>
+                                  <td>{atom.element}</td>
+                                  <td className={styles.rightAlign}>
+                                    <code
+                                      style={{
+                                        color:
+                                          atom.spin_density > 0
+                                            ? '#2e7d32'
+                                            : atom.spin_density < 0
+                                              ? '#d32f2f'
+                                              : 'inherit',
+                                      }}
+                                    >
+                                      {atom.spin_density.toFixed(3)}
+                                    </code>
+                                  </td>
+                                  <td className={styles.rightAlign}>
+                                    <code>
+                                      {atom.abs_spin_density.toFixed(3)}
+                                    </code>
+                                  </td>
+                                </tr>
+                              )
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ========================================
+            4️⃣ METHOD-SPECIFIC ADVANCED RESULTS
+            ======================================== */}
         {/* CASCI/CASSCF Results Section */}
         {(parameters.calculation_method === 'CASCI' ||
           parameters.calculation_method === 'CASSCF') && (
           <section
             className={`${styles.calculationSection} ${styles.casSection}`}
           >
-            <h2>
+            <h2 className={styles.secondaryHeader}>
               {parameters.calculation_method === 'CASCI' ? 'CASCI' : 'CASSCF'}{' '}
-              Results
+              Advanced Results
             </h2>
 
             {/* Energy Information */}
@@ -489,107 +807,6 @@ export const CalculationResultsPage = ({
               </div>
             )}
 
-            {/* Spin Density Analysis (open-shell systems only) */}
-            {(results as any).mulliken_spin_analysis &&
-              (results as any).mulliken_spin_analysis.available && (
-                <div className={styles.analysisSection}>
-                  <h3>Mulliken Spin Density Analysis</h3>
-                  <div className={styles.analysisDescription}>
-                    Mulliken atomic spin densities show the distribution of
-                    unpaired electron density across atoms in open-shell
-                    systems.
-                  </div>
-
-                  <div className={styles.spinSummary}>
-                    <div className={styles.spinStats}>
-                      <div>
-                        <strong>Total Spin Density:</strong>{' '}
-                        <code>
-                          {(
-                            results as any
-                          ).mulliken_spin_analysis.total_spin_density?.toFixed(
-                            3
-                          ) || 'N/A'}
-                        </code>
-                      </div>
-                      <div>
-                        <strong>Expected Spin:</strong>{' '}
-                        <code>
-                          {(results as any).mulliken_spin_analysis
-                            .expected_spin || 'N/A'}
-                        </code>
-                      </div>
-                      <div>
-                        <strong>Total Absolute Spin:</strong>{' '}
-                        <code>
-                          {(
-                            results as any
-                          ).mulliken_spin_analysis.total_absolute_spin_density?.toFixed(
-                            3
-                          ) || 'N/A'}
-                        </code>
-                      </div>
-                    </div>
-                  </div>
-
-                  {(results as any).mulliken_spin_analysis
-                    .atomic_spin_densities &&
-                    (results as any).mulliken_spin_analysis
-                      .atomic_spin_densities.length > 0 && (
-                      <div className={styles.atomicSpinSection}>
-                        <h4>Atomic Spin Densities</h4>
-                        <div className={styles.tableContainer}>
-                          <table className={styles.dataTable}>
-                            <thead>
-                              <tr>
-                                <th>Atom</th>
-                                <th>Element</th>
-                                <th className={styles.rightAlign}>
-                                  Spin Density
-                                </th>
-                                <th className={styles.rightAlign}>
-                                  |Spin Density|
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(
-                                results as any
-                              ).mulliken_spin_analysis.atomic_spin_densities.map(
-                                (atom: any, index: number) => (
-                                  <tr key={index}>
-                                    <td>{atom.atom_index + 1}</td>
-                                    <td>{atom.element}</td>
-                                    <td className={styles.rightAlign}>
-                                      <code
-                                        style={{
-                                          color:
-                                            atom.spin_density > 0
-                                              ? '#2e7d32'
-                                              : atom.spin_density < 0
-                                                ? '#d32f2f'
-                                                : 'inherit',
-                                        }}
-                                      >
-                                        {atom.spin_density.toFixed(3)}
-                                      </code>
-                                    </td>
-                                    <td className={styles.rightAlign}>
-                                      <code>
-                                        {atom.abs_spin_density.toFixed(3)}
-                                      </code>
-                                    </td>
-                                  </tr>
-                                )
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                </div>
-              )}
-
             {/* Orbital Analysis */}
             {(results as any).orbital_overlap_analysis &&
               (results as any).orbital_overlap_analysis.available && (
@@ -758,12 +975,14 @@ export const CalculationResultsPage = ({
           </section>
         )}
 
-        {/* Vibrational Frequency Analysis */}
+        {/* ========================================
+            5️⃣ VIBRATIONAL ANALYSIS SECTION - Unified
+            ======================================== */}
         {results.frequency_analysis_performed && (
           <section
-            className={`${styles.calculationSection} ${styles.frequencySection}`}
+            className={`${styles.calculationSection} ${styles.vibrationalSection}`}
           >
-            <h2>Vibrational Frequency Analysis</h2>
+            <h2 className={styles.primaryHeader}>Vibrational Analysis</h2>
 
             {/* Optimization Quality Assessment */}
             <div className={styles.frequencyStatus}>
@@ -852,85 +1071,85 @@ export const CalculationResultsPage = ({
                   </div>
                 )}
             </div>
+
+            {/* IR Spectrum - Integrated into Vibrational Analysis */}
+            {results.vibrational_frequencies &&
+              results.vibrational_frequencies.length > 0 && (
+                <div className={styles.irSpectrumSubsection}>
+                  <h3>Infrared (IR) Spectrum</h3>
+                  <div className={styles.sectionDescription}>
+                    Theoretical infrared spectrum generated from vibrational
+                    frequency calculations with scale factor corrections and
+                    Lorentzian broadening for realistic peak shapes.
+                  </div>
+                  <IRSpectrumViewer
+                    calculationId={activeCalculation.id}
+                    onError={error => setError(error)}
+                  />
+                </div>
+              )}
           </section>
         )}
 
-        {/* IR Spectrum Analysis */}
-        {results.frequency_analysis_performed &&
-          results.vibrational_frequencies &&
-          results.vibrational_frequencies.length > 0 && (
-            <section
-              className={`${styles.calculationSection} ${styles.irSpectrumSection}`}
-            >
-              <h2>IR Spectrum Analysis</h2>
-              <div className={styles.sectionDescription}>
-                Theoretical infrared spectrum generated from vibrational
-                frequency calculations with scale factor corrections and
-                Lorentzian broadening for realistic peak shapes.
+        {/* ========================================
+            6️⃣ MOLECULAR ORBITALS SECTION - Unified
+            ======================================== */}
+        <section
+          className={`${styles.calculationSection} ${styles.molecularOrbitalsSection}`}
+        >
+          <h2 className={styles.primaryHeader}>Molecular Orbitals</h2>
+
+          {/* Basic Orbital Information */}
+          <div className={styles.orbitalBasicInfo}>
+            <h3>Orbital Information</h3>
+            <div className={styles.orbitalInfoGrid}>
+              <div>
+                <strong>HOMO Index:</strong> <code>{results.homo_index}</code>
               </div>
-              <IRSpectrumViewer
-                calculationId={activeCalculation.id}
-                onError={error => setError(error)}
-              />
-            </section>
-          )}
-
-        {/* Orbital Information */}
-        <section
-          className={`${styles.calculationSection} ${styles.orbitalSection}`}
-        >
-          <h2>Molecular Orbitals</h2>
-          <div className={styles.orbitalInfoGrid}>
-            <div>
-              <strong>HOMO Index:</strong> <code>{results.homo_index}</code>
-            </div>
-            <div>
-              <strong>LUMO Index:</strong> <code>{results.lumo_index}</code>
-            </div>
-            <div>
-              <strong>Occupied Orbitals:</strong>{' '}
-              <code>{results.num_occupied_orbitals}</code>
-            </div>
-            <div>
-              <strong>Virtual Orbitals:</strong>{' '}
-              <code>{results.num_virtual_orbitals}</code>
+              <div>
+                <strong>LUMO Index:</strong> <code>{results.lumo_index}</code>
+              </div>
+              <div>
+                <strong>Occupied Orbitals:</strong>{' '}
+                <code>{results.num_occupied_orbitals}</code>
+              </div>
+              <div>
+                <strong>Virtual Orbitals:</strong>{' '}
+                <code>{results.num_virtual_orbitals}</code>
+              </div>
             </div>
           </div>
-        </section>
 
-        {/* Molecular Orbital Energy Diagram */}
-        <section
-          className={`${styles.calculationSection} ${styles.energyDiagramSection}`}
-        >
-          <h2>Molecular Orbital Energy Level Diagram</h2>
-          <div className={styles.sectionDescription}>
-            Energy levels of molecular orbitals are illustrated. Click on
-            orbitals to view details in 3D visualization.
+          {/* Molecular Orbital Energy Diagram */}
+          <div className={styles.orbitalEnergyDiagram}>
+            <h3>Energy Level Diagram</h3>
+            <div className={styles.sectionDescription}>
+              Energy levels of molecular orbitals are illustrated. Click on
+              orbitals to view details in 3D visualization below.
+            </div>
+            <MolecularOrbitalEnergyDiagram
+              key={`energy-${activeCalculation.id}`}
+              calculationId={activeCalculation.id}
+              selectedOrbitalIndex={selectedOrbitalIndex}
+              onOrbitalSelect={setSelectedOrbitalIndex}
+              onError={error => setError(error)}
+            />
           </div>
-          <MolecularOrbitalEnergyDiagram
-            key={`energy-${activeCalculation.id}`}
-            calculationId={activeCalculation.id}
-            selectedOrbitalIndex={selectedOrbitalIndex}
-            onOrbitalSelect={setSelectedOrbitalIndex}
-            onError={error => setError(error)}
-          />
-        </section>
 
-        {/* Molecular Orbital Visualization */}
-        <section
-          className={`${styles.calculationSection} ${styles.orbitalViewerSection}`}
-        >
-          <h2>Molecular Orbital Visualization</h2>
-          <div className={styles.sectionDescription}>
-            3D visualization of molecular orbitals obtained from quantum
-            chemistry calculations. Select orbitals to view their shapes and
-            distributions.
+          {/* Molecular Orbital 3D Visualization */}
+          <div className={styles.orbitalVisualization}>
+            <h3>3D Orbital Visualization</h3>
+            <div className={styles.sectionDescription}>
+              Interactive 3D visualization of molecular orbitals. Select orbitals
+              from the energy diagram above or use the controls to view their
+              shapes and spatial distributions.
+            </div>
+            <MolecularOrbitalViewer
+              key={activeCalculation.id}
+              calculationId={activeCalculation.id}
+              onError={error => setError(error)}
+            />
           </div>
-          <MolecularOrbitalViewer
-            key={activeCalculation.id}
-            calculationId={activeCalculation.id}
-            onError={error => setError(error)}
-          />
         </section>
 
         {/* TDDFT Results Section */}
@@ -941,7 +1160,7 @@ export const CalculationResultsPage = ({
               <section
                 className={`${styles.calculationSection} ${styles.excitedStatesSection}`}
               >
-                <h2>Excited States Summary</h2>
+                <h2 className={styles.secondaryHeader}>TDDFT Advanced Results - Excited States</h2>
                 <div className={styles.excitedStatesGrid}>
                   <div>
                     <strong>Number of States:</strong>{' '}
@@ -1328,7 +1547,7 @@ export const CalculationResultsPage = ({
           <section
             className={`${styles.calculationSection} ${styles.ccsdSection}`}
           >
-            <h2>CCSD Results</h2>
+            <h2 className={styles.secondaryHeader}>CCSD Advanced Results</h2>
             <div className={styles.thermochemicalGrid}>
               <div>
                 <strong>HF Energy:</strong>{' '}
@@ -1378,12 +1597,42 @@ export const CalculationResultsPage = ({
           </section>
         )}
 
-        {/* Checkpoint File Information */}
+        {/* ========================================
+            7️⃣ TECHNICAL DETAILS SECTION - Bottom
+            ======================================== */}
         <section
-          className={`${styles.calculationSection} ${styles.checkpointSection}`}
+          className={`${styles.calculationSection} ${styles.technicalDetailsSection}`}
         >
-          <h2>Checkpoint File Information</h2>
-          <div>
+          <h2 className={styles.primaryHeader}>Technical Details</h2>
+
+          {/* Calculation Parameters */}
+          <div className={styles.technicalSubsection}>
+            <h3>Calculation Parameters</h3>
+            <div className={styles.parametersGrid}>
+              <div>
+                <strong>Max SCF Cycles:</strong> {results.max_cycle}
+              </div>
+              <div>
+                <strong>CPU Cores:</strong> {parameters.cpu_cores || 'Default'}
+              </div>
+              <div>
+                <strong>Memory:</strong>{' '}
+                {parameters.memory_mb ? `${parameters.memory_mb} MB` : 'Default'}
+              </div>
+              <div>
+                <strong>Solvent Method:</strong> {parameters.solvent_method}
+              </div>
+              {parameters.solvent !== '-' && (
+                <div>
+                  <strong>Solvent:</strong> {parameters.solvent}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Checkpoint File Information */}
+          <div className={styles.technicalSubsection}>
+            <h3>Checkpoint File Information</h3>
             <div className={styles.checkpointInfo}>
               <strong>Working Directory:</strong>{' '}
               <code>{results.working_directory}</code>
@@ -1419,196 +1668,6 @@ export const CalculationResultsPage = ({
                     function information
                   </p>
                 </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Mulliken Charges */}
-        {results.mulliken_charges && results.mulliken_charges.length > 0 && (
-          <section className={styles.calculationSection}>
-            <h2>Mulliken Charge Analysis</h2>
-            <div className={styles.sectionDescription}>
-              Partial charges of each atom by Mulliken population analysis.
-              Positive values indicate electron deficiency (positive charge),
-              negative values indicate electron excess (negative charge).
-            </div>
-            <div className={styles.tableContainer}>
-              <table className={styles.mullikenChargeTable}>
-                <thead>
-                  <tr>
-                    <th>Atom Number</th>
-                    <th>Element</th>
-                    <th>Mulliken Charge (e)</th>
-                    <th>Charge Character</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.mulliken_charges.map(
-                    (chargeData: any, index: number) => {
-                      const isPositive = chargeData.charge > 0;
-
-                      return (
-                        <tr key={index}>
-                          <td>{chargeData.atom_index + 1}</td>
-                          <td style={{ fontWeight: 'bold' }}>
-                            {chargeData.element}
-                          </td>
-                          <td
-                            className={`${styles.chargeValueCell} ${
-                              isPositive
-                                ? styles.chargeValueCellPositive
-                                : styles.chargeValueCellNegative
-                            }`}
-                          >
-                            {chargeData.charge > 0 ? '+' : ''}
-                            {chargeData.charge.toFixed(4)}
-                          </td>
-                          <td
-                            className={
-                              isPositive
-                                ? styles.chargeCharacterPositive
-                                : styles.chargeCharacterNegative
-                            }
-                          >
-                            {isPositive ? 'Positive (δ+)' : 'Negative (δ−)'}
-                          </td>
-                        </tr>
-                      );
-                    }
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <div className={styles.chargeSummary}>
-              <strong>Total Charge:</strong>{' '}
-              <code>
-                {results.mulliken_charges
-                  .reduce((sum: number, charge: any) => sum + charge.charge, 0)
-                  .toFixed(4)}{' '}
-                e
-              </code>{' '}
-              (Molecular Charge: <code>{results.charge || 0}</code> e)
-            </div>
-          </section>
-        )}
-
-        {/* Molecular Structure */}
-        <section className={styles.calculationSection}>
-          {(() => {
-            // Check if geometry optimization was performed
-            const optimizeGeometry =
-              (parameters as any).optimize_geometry !== false;
-
-            if (!optimizeGeometry) {
-              return (
-                <>
-                  <h2>Initial Geometry</h2>
-                  <div className={styles.sectionDescription}>
-                    ℹ️ No geometry optimization performed - using initial
-                    structure
-                  </div>
-                </>
-              );
-            }
-
-            // Determine optimization method based on calculation method
-            switch (parameters.calculation_method) {
-              case 'MP2':
-                return (
-                  <>
-                    <h2>MP2-Optimized Geometry</h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ Geometry optimized using MP2 method
-                    </div>
-                  </>
-                );
-              case 'HF':
-                return (
-                  <>
-                    <h2>HF-Optimized Geometry</h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ Geometry optimized using Hartree-Fock method
-                    </div>
-                  </>
-                );
-              case 'CCSD':
-              case 'CCSD_T':
-                return (
-                  <>
-                    <h2>Initial Geometry</h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ CCSD calculations use initial geometry (no
-                      optimization)
-                    </div>
-                  </>
-                );
-              case 'CASCI':
-              case 'CASSCF':
-                return (
-                  <>
-                    <h2>Initial Geometry</h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ CASCI/CASSCF calculations use initial geometry (no
-                      optimization)
-                    </div>
-                  </>
-                );
-              case 'TDDFT':
-                return (
-                  <>
-                    <h2>Initial Geometry</h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ TDDFT calculations use initial geometry (no
-                      optimization)
-                    </div>
-                  </>
-                );
-              default:
-                // DFT and other methods
-                return (
-                  <>
-                    <h2>DFT-Optimized Geometry</h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ Geometry optimized using DFT method
-                    </div>
-                  </>
-                );
-            }
-          })()}
-          <div className={styles.molecularStructureInfo}>
-            <strong>Number of Atoms:</strong> {results.atom_count}
-          </div>
-          <div className={styles.xyzCoordinatesContainer}>
-            <strong>XYZ Coordinates:</strong>
-            <pre className={styles.xyzCoordinates}>
-              {results.optimized_geometry}
-            </pre>
-          </div>
-        </section>
-
-        {/* Calculation Parameters */}
-        <section
-          className={`${styles.calculationSection} ${styles.parametersSection}`}
-        >
-          <h2>Calculation Parameters</h2>
-          <div className={styles.parametersGrid}>
-            <div>
-              <strong>Max SCF Cycles:</strong> {results.max_cycle}
-            </div>
-            <div>
-              <strong>CPU Cores:</strong> {parameters.cpu_cores || 'Default'}
-            </div>
-            <div>
-              <strong>Memory:</strong>{' '}
-              {parameters.memory_mb ? `${parameters.memory_mb} MB` : 'Default'}
-            </div>
-            <div>
-              <strong>Solvent Method:</strong> {parameters.solvent_method}
-            </div>
-            {parameters.solvent !== '-' && (
-              <div>
-                <strong>Solvent:</strong> {parameters.solvent}
               </div>
             )}
           </div>

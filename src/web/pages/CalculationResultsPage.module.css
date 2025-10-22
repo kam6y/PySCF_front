@@ -99,6 +99,28 @@
   transform: translateY(-1px);
 }
 
+/* Hierarchical Headers */
+.primaryHeader {
+  color: #1a1a1a;
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 24px 0;
+  padding-left: 16px;
+  padding-bottom: 12px;
+  border-left: 5px solid #50D4F5;
+  border-bottom: 2px solid #f0f0f0;
+  letter-spacing: -0.02em;
+}
+
+.secondaryHeader {
+  color: #333;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  padding-left: 12px;
+  border-left: 4px solid #50D4F5;
+}
+
 .calculationSection h2 {
   color: #333;
   font-size: 20px;
@@ -122,8 +144,118 @@
   margin: 16px 0 10px 0;
 }
 
+/* ========================================
+   NEW SECTION-SPECIFIC STYLES
+   ======================================== */
+
+/* 1. Overview Section - Same as other sections */
+.overviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.primaryEnergyResult {
+  margin-top: 24px;
+  padding: 20px;
+  background: #f0f8ff;
+  border-radius: 6px;
+  border: 1px solid #50D4F5;
+}
+
+.energyLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.energyValue {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.energyValue code {
+  font-size: 18px;
+  color: #333;
+}
+
+/* 2. Electronic Properties Section */
+.electronicPropertiesSection {
+  background: #fafbfc;
+}
+
+.propertySubsection {
+  margin-bottom: 28px;
+  padding: 20px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.propertySubsection:last-child {
+  margin-bottom: 0;
+}
+
+/* 3. Molecular Orbitals Section */
+.molecularOrbitalsSection {
+  background: #fafbfc;
+}
+
+.orbitalBasicInfo,
+.orbitalEnergyDiagram,
+.orbitalVisualization {
+  margin-bottom: 28px;
+  padding: 20px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.orbitalBasicInfo:last-child,
+.orbitalEnergyDiagram:last-child,
+.orbitalVisualization:last-child {
+  margin-bottom: 0;
+}
+
+/* 4. Vibrational Analysis Section */
+.vibrationalSection {
+  background: #fafbfc;
+}
+
+.irSpectrumSubsection {
+  margin-top: 28px;
+  padding: 20px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+/* 5. Technical Details Section */
+.technicalDetailsSection {
+  background: #f8f9fa;
+  border-color: #d0d0d0;
+}
+
+.technicalSubsection {
+  margin-bottom: 24px;
+  padding: 18px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.technicalSubsection:last-child {
+  margin-bottom: 0;
+}
+
 /* Grid Layouts */
 .summaryGrid,
+.overviewGrid,
 .thermochemicalGrid,
 .orbitalInfoGrid,
 .excitedStatesGrid,
@@ -139,6 +271,7 @@
 }
 
 .summaryGrid > div,
+.overviewGrid > div,
 .thermochemicalGrid > div,
 .orbitalInfoGrid > div,
 .excitedStatesGrid > div,
@@ -155,6 +288,7 @@
 }
 
 .summaryGrid > div:hover,
+.overviewGrid > div:hover,
 .thermochemicalGrid > div:hover,
 .orbitalInfoGrid > div:hover,
 .excitedStatesGrid > div:hover,
