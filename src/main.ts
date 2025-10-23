@@ -8,10 +8,11 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 
-let mainWindow: BrowserWindow;
+let mainWindow: BrowserWindow | null = null;
 let pythonProcess: ChildProcess | null = null;
 let flaskPort: number | null = null;
 let isQuitting = false;
+let isCreatingWindow = false;
 let serverConfig: any = null;
 
 const execFilePromise = promisify(execFile);
@@ -313,6 +314,13 @@ const createCleanEnvironment = (
  */
 const startPythonServer = async (): Promise<void> => {
   return new Promise(async (resolve, reject) => {
+    // 重複実行防止: 既にサーバーが起動している場合はスキップ
+    if (pythonProcess && !pythonProcess.killed && flaskPort) {
+      console.log('Python server already running, skipping startup');
+      resolve();
+      return;
+    }
+
     console.log('Starting Python Flask server...');
 
     const serverSettings = serverConfig.server;
@@ -615,24 +623,6 @@ const stopPythonServer = (): void => {
 };
 
 /**
- * 既存のウィンドウをフォーカス・表示する関数
- */
-const focusExistingWindow = (): boolean => {
-  const existingWindows = BrowserWindow.getAllWindows();
-  if (existingWindows.length > 0) {
-    const window = existingWindows[0];
-    if (window.isMinimized()) {
-      window.restore();
-    }
-    window.focus();
-    window.show();
-    console.log('Focused existing window instead of creating new one');
-    return true;
-  }
-  return false;
-};
-
-/**
  * Aboutダイアログを表示する関数
  */
 const showAboutDialog = (): void => {
@@ -780,13 +770,17 @@ const createApplicationMenu = (): void => {
 };
 
 const createWindow = async () => {
-  // パッケージ環境でのシングルウィンドウ制限
-  if (app.isPackaged) {
-    if (focusExistingWindow()) {
-      console.log('Single window restriction active - using existing window');
-      return;
+  // ガード条件: 既に作成中または既存ウィンドウがある場合は何もしない
+  if (isCreatingWindow || mainWindow) {
+    console.log('Window creation already in progress or window already exists');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.focus();
     }
+    return;
   }
+
+  isCreatingWindow = true;
+  console.log('Starting window creation...');
 
   try {
     await startPythonServer();
@@ -802,6 +796,8 @@ const createWindow = async () => {
     );
     app.quit();
     return;
+  } finally {
+    isCreatingWindow = false;
   }
 
   mainWindow = new BrowserWindow({
@@ -831,7 +827,7 @@ const createWindow = async () => {
 
     // DevToolsでAutofillエラーを抑制
     mainWindow.webContents.once('devtools-opened', () => {
-      mainWindow.webContents.devToolsWebContents
+      mainWindow?.webContents.devToolsWebContents
         ?.executeJavaScript(
           `
         // Autofill機能を無効化
@@ -852,36 +848,59 @@ const createWindow = async () => {
 
   // レンダラープロセスにFlaskサーバーのポートを通知
   mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow.webContents.send('set-flask-port', flaskPort);
+    mainWindow?.webContents.send('set-flask-port', flaskPort);
+  });
+
+  // ウィンドウが閉じられた時の処理
+  mainWindow.on('closed', () => {
+    console.log('Main window closed');
+    mainWindow = null;
   });
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 };
 
-app.whenReady().then(() => {
-  createApplicationMenu();
-  createWindow();
-});
+// シングルインスタンスロックを取得
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // 既に別のインスタンスが起動している場合は即座に終了
+  console.log('Another instance is already running. Exiting...');
+  app.quit();
+} else {
+  // 2つ目のインスタンスが起動しようとした時の処理
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    console.log('Second instance detected. Focusing existing window...');
+    // 既存のウィンドウをフォーカス
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      mainWindow.show();
+    } else {
+      console.log('Main window not available, creating new window...');
+      createWindow();
+    }
+  });
+
+  // アプリが準備できたら通常の起動処理
+  app.whenReady().then(() => {
+    createApplicationMenu();
+    createWindow();
+  });
+}
 
 app.on('window-all-closed', () => {
   stopPythonServer();
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  app.quit();
 });
 
 app.on('activate', () => {
-  if (app.isPackaged) {
-    // パッケージ環境ではシングルウィンドウ制限により、既存ウィンドウをフォーカスするか何もしない
-    if (!focusExistingWindow()) {
-      // 既存ウィンドウがない場合のみ新しいウィンドウを作成
-      createWindow();
-    }
-  } else {
-    // 開発環境では従来通りの動作
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+  // ウィンドウがない場合のみ新しいウィンドウを作成
+  // シングルインスタンスロックにより、複数プロセスの起動は防止される
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
   }
 });
 
@@ -920,7 +939,9 @@ ipcMain.handle('show-about-dialog', () => {
 // IPC handler for selecting a folder
 ipcMain.handle('dialog:select-folder', async () => {
   try {
-    const result = await dialog.showOpenDialog(mainWindow, {
+    const result = await dialog.showOpenDialog(
+      mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any,
+      {
       properties: ['openDirectory', 'createDirectory'],
       title: 'Select Calculations Directory',
       buttonLabel: 'Select',

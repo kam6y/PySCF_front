@@ -105,7 +105,8 @@
     "appId": "com.kam6y.pyscf_front",
     "productName": "Pyscf_front",
     "files": [
-      "dist/**/*"
+      "dist/**/*",
+      "!node_modules/**/*"
     ],
     "extraResources": [
       {
