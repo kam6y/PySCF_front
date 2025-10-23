@@ -67,6 +67,5 @@ export const useAgentStore = create<AgentState>((set, get) => ({
   clearHistory: () => set({ history: [] }),
 
   // エージェントステータスを設定
-  setAgentStatus: (status: AgentStatus) =>
-    set({ currentAgentStatus: status }),
+  setAgentStatus: (status: AgentStatus) => set({ currentAgentStatus: status }),
 }));

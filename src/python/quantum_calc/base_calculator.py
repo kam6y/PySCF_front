@@ -240,10 +240,13 @@ class BaseCalculator(ABC):
             
             if self._requires_orbital_analysis():
                 self._perform_orbital_analysis()
-            
+
+            if self._requires_mulliken_analysis():
+                self._perform_mulliken_analysis()
+
             if self._requires_frequency_analysis():
                 self._perform_frequency_analysis()
-            
+
             return self._prepare_final_results(specific_results)
             
         except Exception as e:
@@ -959,7 +962,11 @@ class BaseCalculator(ABC):
     def _requires_frequency_analysis(self) -> bool:
         """Whether this calculation requires frequency analysis."""
         return True
-    
+
+    def _requires_mulliken_analysis(self) -> bool:
+        """Whether this calculation requires Mulliken population analysis."""
+        return True
+
     # ===== Common Validation and Helper Methods =====
     
     def _validate_active_space_parameters(self, ncas: int, nelecas: int) -> Tuple[int, int]:

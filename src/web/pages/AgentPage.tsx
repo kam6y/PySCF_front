@@ -7,7 +7,12 @@ import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAgentStore, ChatHistory, AgentStatus } from '../store/agentStore';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
-import { useCreateChatSession, useGetChatSessionDetail, useUpdateChatSession, chatHistoryKeys } from '../hooks/useChatHistoryQueries';
+import {
+  useCreateChatSession,
+  useGetChatSessionDetail,
+  useUpdateChatSession,
+  chatHistoryKeys,
+} from '../hooks/useChatHistoryQueries';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { InlineOrbitalViewer } from '../components/InlineOrbitalViewer';
 import styles from './AgentPage.module.css';
@@ -56,8 +61,12 @@ export const AgentPage = () => {
 
   // チャット履歴ストア（セッションID管理を一元化）
   const activeSessionId = useChatHistoryStore(state => state.activeSessionId);
-  const setActiveSessionId = useChatHistoryStore(state => state.setActiveSessionId);
-  const clearActiveSession = useChatHistoryStore(state => state.clearActiveSession);
+  const setActiveSessionId = useChatHistoryStore(
+    state => state.setActiveSessionId
+  );
+  const clearActiveSession = useChatHistoryStore(
+    state => state.clearActiveSession
+  );
 
   // TanStack Query
   const queryClient = useQueryClient();
@@ -91,7 +100,8 @@ export const AgentPage = () => {
   const [isExecutingAction, setIsExecutingAction] = useState(false);
 
   // New chat confirmation modal state
-  const [isNewChatConfirmationOpen, setIsNewChatConfirmationOpen] = useState(false);
+  const [isNewChatConfirmationOpen, setIsNewChatConfirmationOpen] =
+    useState(false);
 
   // Parse confirmation request from AI message
   const parseConfirmationRequest = useCallback(
@@ -269,15 +279,24 @@ export const AgentPage = () => {
     // Wait for sessionDetailData to be available before loading
     if (sessionDetailData) {
       prevSessionIdRef.current = activeSessionId;
-      const loadedHistory: ChatHistory[] = sessionDetailData.messages.map(msg => ({
-        role: msg.role as 'user' | 'model',
-        parts: [{ text: msg.content }],
-      }));
+      const loadedHistory: ChatHistory[] = sessionDetailData.messages.map(
+        msg => ({
+          role: msg.role as 'user' | 'model',
+          parts: [{ text: msg.content }],
+        })
+      );
       setHistory(loadedHistory);
     }
     // Note: If sessionDetailData is not ready yet, this effect will re-run
     // when it becomes available (dependency array includes sessionDetailData)
-  }, [activeSessionId, sessionDetailData, setHistory, clearHistory, isLoading, queryClient]);
+  }, [
+    activeSessionId,
+    sessionDetailData,
+    setHistory,
+    clearHistory,
+    isLoading,
+    queryClient,
+  ]);
 
   // Handle new chat confirm (defined first to avoid reference error)
   const handleNewChatConfirm = useCallback(async () => {
@@ -295,7 +314,12 @@ export const AgentPage = () => {
       autoClose: true,
       duration: 3000,
     });
-  }, [clearHistory, clearActiveSession, addNotification, setIsNewChatConfirmationOpen]);
+  }, [
+    clearHistory,
+    clearActiveSession,
+    addNotification,
+    setIsNewChatConfirmationOpen,
+  ]);
 
   // Handle new chat request
   const handleNewChatRequest = useCallback(() => {
@@ -417,15 +441,19 @@ export const AgentPage = () => {
       try {
         // セッション名を生成（制御文字・改行を削除し、最初の50文字をタイトルとして使用）
         // 1. 制御文字を除去（\x00-\x1F, \x7F-\x9F）
-        let cleanedMessage = trimmedMessage.replace(/[\x00-\x1F\x7F-\x9F]/g, ' ');
+        let cleanedMessage = trimmedMessage.replace(
+          /[\x00-\x1F\x7F-\x9F]/g,
+          ' '
+        );
         // 2. 複数の連続した空白を1つにまとめる
         cleanedMessage = cleanedMessage.replace(/\s+/g, ' ').trim();
         // 3. 先頭と末尾の句読点を除去
         cleanedMessage = cleanedMessage.replace(/^[.,!?;:]+|[.,!?;:]+$/g, '');
         // 4. 最大長チェック（50文字）
-        const sessionName = cleanedMessage.length > 50
-          ? cleanedMessage.substring(0, 47).trim() + '...'
-          : cleanedMessage || '新しいチャット'; // 空の場合はデフォルト名
+        const sessionName =
+          cleanedMessage.length > 50
+            ? cleanedMessage.substring(0, 47).trim() + '...'
+            : cleanedMessage || '新しいチャット'; // 空の場合はデフォルト名
 
         const result = await createChatSession.mutateAsync(sessionName);
         sessionIdToUse = result.session.id;
@@ -452,7 +480,8 @@ export const AgentPage = () => {
         addNotification({
           type: 'info',
           title: 'Session Not Saved',
-          message: 'Unable to save this conversation. You can continue chatting, but the history will not be saved.',
+          message:
+            'Unable to save this conversation. You can continue chatting, but the history will not be saved.',
           autoClose: false,
           duration: 0,
         });
@@ -650,8 +679,8 @@ export const AgentPage = () => {
       <div className={styles.emptyStateText}>
         Start a conversation with the AI agent to get help with molecular
         design, quantum chemistry calculations, and analysis. Ask questions
-        about your molecules or request assistance with quantum computational chemistry
-        tasks.
+        about your molecules or request assistance with quantum computational
+        chemistry tasks.
       </div>
     </div>
   );
@@ -690,7 +719,7 @@ export const AgentPage = () => {
                   type="text"
                   className={styles.titleInput}
                   value={editedTitle}
-                  onChange={(e) => setEditedTitle(e.target.value)}
+                  onChange={e => setEditedTitle(e.target.value)}
                   onKeyDown={handleTitleKeyDown}
                   autoFocus
                   maxLength={100}
@@ -701,8 +730,19 @@ export const AgentPage = () => {
                     onClick={handleSaveTitle}
                     title="Save"
                   >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    <svg
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
                     </svg>
                   </button>
                   <button
@@ -710,22 +750,46 @@ export const AgentPage = () => {
                     onClick={handleCancelEditTitle}
                     title="Cancel"
                   >
-                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </div>
               </div>
             ) : (
               <div className={styles.titleDisplay}>
-                <h2 className={styles.titleText}>{sessionDetailData.session.name}</h2>
+                <h2 className={styles.titleText}>
+                  {sessionDetailData.session.name}
+                </h2>
                 <button
                   className={styles.editButton}
                   onClick={handleStartEditTitle}
                   title="Edit title"
                 >
-                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  <svg
+                    width="16"
+                    height="16"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                    />
                   </svg>
                 </button>
               </div>

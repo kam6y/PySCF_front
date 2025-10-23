@@ -191,7 +191,7 @@
 
 .propertySubsection {
   margin-bottom: 28px;
-  padding: 20px;
+  padding: 20px 20px 0 20px;
   background: white;
   border-radius: 6px;
   border: 1px solid #e5e7eb;
@@ -993,4 +993,55 @@
   text-align: center;
   color: #666;
   font-style: italic;
+}
+
+/* Mulliken Charge Visualization Section */
+.chargeVisualizationSection {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 2px solid #e0e0e0;
+}
+
+.chargeVisualizationSection h4 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.chargeVisualizationSection .sectionDescription {
+  margin-bottom: 15px;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* Toggle Header for Mulliken Charge List */
+.toggleHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 0;
+  user-select: none;
+  margin-bottom: 16px;
+}
+
+.toggleHeader h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.toggleIcon {
+  color: #666;
+  margin-left: 12px;
+  transition: transform 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+}
+
+.toggleIcon.rotated {
+  transform: rotate(180deg);
 }

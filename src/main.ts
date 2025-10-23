@@ -655,8 +655,23 @@ GitHub: ${packageJson.homepage}`;
     detail: aboutMessage,
     buttons: ['OK'],
     icon: app.isPackaged
-      ? path.join(process.resourcesPath, 'src', 'assets', 'icon', 'mac', 'Pyscf_front.icns')
-      : path.join(__dirname, '..', 'src', 'assets', 'icon', 'mac', 'Pyscf_front.icns'),
+      ? path.join(
+          process.resourcesPath,
+          'src',
+          'assets',
+          'icon',
+          'mac',
+          'Pyscf_front.icns'
+        )
+      : path.join(
+          __dirname,
+          '..',
+          'src',
+          'assets',
+          'icon',
+          'mac',
+          'Pyscf_front.icns'
+        ),
   });
 };
 
@@ -940,12 +955,13 @@ ipcMain.handle('show-about-dialog', () => {
 ipcMain.handle('dialog:select-folder', async () => {
   try {
     const result = await dialog.showOpenDialog(
-      mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any,
+      mainWindow && !mainWindow.isDestroyed() ? mainWindow : (undefined as any),
       {
-      properties: ['openDirectory', 'createDirectory'],
-      title: 'Select Calculations Directory',
-      buttonLabel: 'Select',
-    });
+        properties: ['openDirectory', 'createDirectory'],
+        title: 'Select Calculations Directory',
+        buttonLabel: 'Select',
+      }
+    );
 
     if (result.canceled || result.filePaths.length === 0) {
       return { canceled: true, filePath: null };

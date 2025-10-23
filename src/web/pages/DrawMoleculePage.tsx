@@ -14,7 +14,7 @@ import { useNotificationStore } from '../store/notificationStore';
 
 // Miewをwindowに設定（Ketcherが3D表示に使用）
 if (typeof window !== 'undefined') {
-  import('miew').then((Miew) => {
+  import('miew').then(Miew => {
     (window as any).Miew = Miew.default || Miew;
   });
 }
@@ -28,14 +28,14 @@ export const DrawMoleculePage: React.FC = () => {
   const [convertError, setConvertError] = useState<string | null>(null);
 
   // Zustandストア
-  const setCurrentPage = useUIStore((state) => state.setCurrentPage);
+  const setCurrentPage = useUIStore(state => state.setCurrentPage);
   const setStagedCalculation = useCalculationStore(
-    (state) => state.setStagedCalculation
+    state => state.setStagedCalculation
   );
   const setActiveCalculationId = useCalculationStore(
-    (state) => state.setActiveCalculationId
+    state => state.setActiveCalculationId
   );
-  const addNotification = useNotificationStore((state) => state.addNotification);
+  const addNotification = useNotificationStore(state => state.addNotification);
 
   // Ketcherインスタンスの初期化
   const handleOnInit = (ketcher: Ketcher) => {
@@ -143,7 +143,8 @@ export const DrawMoleculePage: React.FC = () => {
         throw new Error('Failed to convert SMILES to XYZ');
       }
     } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during conversion';
+      const errorMessage =
+        error.message || 'An error occurred during conversion';
       setConvertError(errorMessage);
       addNotification({
         type: 'error',
@@ -184,7 +185,8 @@ export const DrawMoleculePage: React.FC = () => {
         <div className={styles.pageHeader}>
           <h2 className={styles.pageTitle}>Draw Molecule</h2>
           <p className={styles.pageDescription}>
-            Draw your molecule structure and convert it to XYZ coordinates for quantum calculations
+            Draw your molecule structure and convert it to XYZ coordinates for
+            quantum calculations
           </p>
         </div>
 

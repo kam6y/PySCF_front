@@ -23,7 +23,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   >(undefined);
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
   const [tavilyApiKey, setTavilyApiKey] = useState<string>('');
-  const [calculationsDirectory, setCalculationsDirectory] = useState<string>('');
+  const [calculationsDirectory, setCalculationsDirectory] =
+    useState<string>('');
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
@@ -170,22 +171,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
     const originalGeminiApiKey = originalValues.geminiApiKey || '';
     const originalTavilyApiKey = originalValues.tavilyApiKey || '';
-    const originalCalculationsDirectory = originalValues.calculationsDirectory || '';
+    const originalCalculationsDirectory =
+      originalValues.calculationsDirectory || '';
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
     const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
     const geminiApiKeyChanged = currentGeminiApiKey !== originalGeminiApiKey;
     const tavilyApiKeyChanged = currentTavilyApiKey !== originalTavilyApiKey;
-    const calculationsDirectoryChanged = currentCalculationsDirectory !== originalCalculationsDirectory;
+    const calculationsDirectoryChanged =
+      currentCalculationsDirectory !== originalCalculationsDirectory;
 
     const hasChanges =
-      parallelChanged || cpuChanged || memoryChanged || geminiApiKeyChanged || tavilyApiKeyChanged || calculationsDirectoryChanged;
+      parallelChanged ||
+      cpuChanged ||
+      memoryChanged ||
+      geminiApiKeyChanged ||
+      tavilyApiKeyChanged ||
+      calculationsDirectoryChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
       console.log('SettingsPage: hasUnsavedChanges check', {
-        current: { currentParallel, currentCpu, currentMemory, currentGeminiApiKey, currentTavilyApiKey },
+        current: {
+          currentParallel,
+          currentCpu,
+          currentMemory,
+          currentGeminiApiKey,
+          currentTavilyApiKey,
+        },
         original: {
           originalParallel,
           originalCpu,
@@ -193,7 +207,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           originalGeminiApiKey,
           originalTavilyApiKey,
         },
-        changes: { parallelChanged, cpuChanged, memoryChanged, geminiApiKeyChanged, tavilyApiKeyChanged },
+        changes: {
+          parallelChanged,
+          cpuChanged,
+          memoryChanged,
+          geminiApiKeyChanged,
+          tavilyApiKeyChanged,
+        },
         hasChanges,
       });
     }
@@ -508,9 +528,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             <div className={styles.settingLabel}>
               <label htmlFor="tavilyApiKey">Tavily API Key</label>
               <p className={styles.settingHelp}>
-                API key for Tavily web search to enable Deep Research functionality.
-                Used by the research agent to search the latest information on the web.
-                Leave empty to disable web search (arXiv and PubMed will still work).
+                API key for Tavily web search to enable Deep Research
+                functionality. Used by the research agent to search the latest
+                information on the web. Leave empty to disable web search (arXiv
+                and PubMed will still work).
               </p>
             </div>
 
@@ -574,7 +595,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   value={calculationsDirectory}
                   readOnly
                   className={styles.textInput}
-                  style={{ fontFamily: 'Monaco, Menlo, Courier New, monospace' }}
+                  style={{
+                    fontFamily: 'Monaco, Menlo, Courier New, monospace',
+                  }}
                 />
                 <button
                   onClick={handleSelectFolder}
@@ -584,7 +607,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   {isSelectingFolder ? 'Selecting...' : 'Change Folder...'}
                 </button>
               </div>
-              {calculationsDirectory !== originalValues.calculationsDirectory && (
+              {calculationsDirectory !==
+                originalValues.calculationsDirectory && (
                 <div className={styles.warningBox}>
                   <span className={styles.warningIcon}>⚠</span>
                   <span className={styles.warningText}>

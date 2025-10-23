@@ -9,6 +9,10 @@ export interface AtomSpec {
   x?: number;
   y?: number;
   z?: number;
+  properties?: {
+    [key: string]: any;
+    charge?: number;
+  };
 }
 
 export interface StyleSpec {
@@ -155,4 +159,23 @@ declare module '3dmol' {
   ): void;
 
   export const ElementColors: { [element: string]: number };
+
+  export enum SurfaceType {
+    VDW = 1,
+    MS = 2,
+    SAS = 3,
+    SES = 4,
+  }
+
+  export namespace Gradient {
+    class RWB {
+      constructor(min: number, max: number);
+    }
+    class ROYGB {
+      constructor(min: number, max: number);
+    }
+    class Sinebow {
+      constructor(min: number, max: number);
+    }
+  }
 }

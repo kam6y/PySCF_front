@@ -18,7 +18,10 @@ import { useCalculationActions } from './hooks/useCalculationActions';
 import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
 import { useChatHistoryStore } from './store/chatHistoryStore';
 import { useAgentStore } from './store/agentStore';
-import { useGetChatSessionDetail, useGetChatSessions } from './hooks/useChatHistoryQueries';
+import {
+  useGetChatSessionDetail,
+  useGetChatSessions,
+} from './hooks/useChatHistoryQueries';
 import { useAppSettings } from './hooks/useAppSettings';
 
 export const App = () => {
@@ -47,7 +50,9 @@ export const App = () => {
         console.log('[App] First run detected, showing initial setup dialog');
       } else {
         setShowInitialSetup(false);
-        console.log('[App] Setup already completed, skipping initial setup dialog');
+        console.log(
+          '[App] Setup already completed, skipping initial setup dialog'
+        );
       }
     }
   }, [settings]);
@@ -101,9 +106,8 @@ export const App = () => {
     }
 
     const query = searchQuery.toLowerCase();
-    return sessions.filter(
-      session =>
-        session.name.toLowerCase().includes(query)
+    return sessions.filter(session =>
+      session.name.toLowerCase().includes(query)
     );
   }, [chatSessionsData?.sessions, appState.ui.searchQuery]);
 
@@ -117,7 +121,9 @@ export const App = () => {
   };
 
   // チャット履歴のハンドラー
-  const setActiveSessionId = useChatHistoryStore(state => state.setActiveSessionId);
+  const setActiveSessionId = useChatHistoryStore(
+    state => state.setActiveSessionId
+  );
   const setHistory = useAgentStore(state => state.setHistory);
 
   const handleChatSessionSelect = async (sessionId: string) => {

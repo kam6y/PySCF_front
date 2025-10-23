@@ -327,20 +327,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   // Confirmation modal state for individual calculation deletion
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [calculationToDelete, setCalculationToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [calculationToDelete, setCalculationToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Confirmation modal state for bulk calculation deletion
   const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
-  const [calculationsToDelete, setCalculationsToDelete] = useState<CalculationSummary[]>([]);
+  const [calculationsToDelete, setCalculationsToDelete] = useState<
+    CalculationSummary[]
+  >([]);
 
   // Confirmation modal state for chat deletion
   const [isChatDeleteModalOpen, setIsChatDeleteModalOpen] = useState(false);
-  const [chatToDelete, setChatToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [chatToDelete, setChatToDelete] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
 
   // Chat history hooks
   const deleteChatSession = useDeleteChatSession();
   const activeSessionId = useChatHistoryStore(state => state.activeSessionId);
-  const clearActiveSession = useChatHistoryStore(state => state.clearActiveSession);
+  const clearActiveSession = useChatHistoryStore(
+    state => state.clearActiveSession
+  );
   const clearHistory = useAgentStore(state => state.clearHistory);
 
   // Chat delete handlers
@@ -369,9 +379,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   // Bulk delete handler for error instances
-  const handleBulkDeleteError = (
-    errorCalculations: CalculationSummary[]
-  ) => {
+  const handleBulkDeleteError = (errorCalculations: CalculationSummary[]) => {
     if (errorCalculations.length === 0) return;
     setCalculationsToDelete(errorCalculations);
     setIsBulkDeleteModalOpen(true);
@@ -398,7 +406,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setCalculationsToDelete([]);
   };
 
-  const handleRequestDelete = (calculationId: string, calculationName: string) => {
+  const handleRequestDelete = (
+    calculationId: string,
+    calculationName: string
+  ) => {
     setCalculationToDelete({ id: calculationId, name: calculationName });
     setIsDeleteModalOpen(true);
   };

@@ -12,7 +12,6 @@ import { useGetOrbitals } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
 import styles from './MolecularOrbitalEnergyDiagram.module.css';
 
-
 interface MolecularOrbitalEnergyDiagramProps {
   calculationId: string;
   onError?: (error: string) => void;
@@ -199,7 +198,11 @@ export const MolecularOrbitalEnergyDiagram: React.FC<
 
   // 初期ビューの設定とデータ変更時のリセット
   useEffect(() => {
-    if (viewerRef.current && processedOrbitals.length > 0 && viewerSize.width > 0) {
+    if (
+      viewerRef.current &&
+      processedOrbitals.length > 0 &&
+      viewerSize.width > 0
+    ) {
       // 二重のrequestAnimationFrameでDOMの準備完了を確実に待つ
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {

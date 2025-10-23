@@ -44,9 +44,12 @@ type ChatMessage = components['schemas']['ChatMessage'];
 type ChatSessionDetail = components['schemas']['ChatSessionDetail'];
 type ChatHistoryListResponse = components['schemas']['ChatHistoryListResponse'];
 type ChatSessionResponse = components['schemas']['ChatSessionResponse'];
-type ChatSessionDetailResponse = components['schemas']['ChatSessionDetailResponse'];
-type CreateChatSessionRequest = components['schemas']['CreateChatSessionRequest'];
-type UpdateChatSessionRequest = components['schemas']['UpdateChatSessionRequest'];
+type ChatSessionDetailResponse =
+  components['schemas']['ChatSessionDetailResponse'];
+type CreateChatSessionRequest =
+  components['schemas']['CreateChatSessionRequest'];
+type UpdateChatSessionRequest =
+  components['schemas']['UpdateChatSessionRequest'];
 
 // Settings API types
 type AppSettings = components['schemas']['AppSettings'];
@@ -634,9 +637,12 @@ export const executeConfirmedAgentAction = (
  * Get all chat sessions
  */
 export const getChatSessions = (): Promise<ChatHistoryListResponse['data']> => {
-  return request<ChatHistoryListResponse['data']>('/api/chat-history/sessions', {
-    method: 'GET',
-  });
+  return request<ChatHistoryListResponse['data']>(
+    '/api/chat-history/sessions',
+    {
+      method: 'GET',
+    }
+  );
 };
 
 /**

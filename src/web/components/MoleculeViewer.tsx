@@ -192,10 +192,13 @@ export const MoleculeViewer = forwardRef<
           viewer.addModel(xyzData, 'xyz');
 
           // Apply default ball-and-stick style
-          viewer.setStyle({}, {
-            stick: { radius: 0.15, colorscheme: 'default' },
-            sphere: { radius: 0.3, colorscheme: 'default' }
-          });
+          viewer.setStyle(
+            {},
+            {
+              stick: { radius: 0.15, colorscheme: 'default' },
+              sphere: { radius: 0.3, colorscheme: 'default' },
+            }
+          );
 
           updateOverlays(viewer);
           viewer.zoomTo();

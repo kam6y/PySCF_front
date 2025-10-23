@@ -15,7 +15,7 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
   onSessionSelect,
   onRequestDelete,
   filteredSessions,
-  searchQuery
+  searchQuery,
 }) => {
   const { isLoading, error, refetch } = useGetChatSessions();
   const activeSessionId = useChatHistoryStore(state => state.activeSessionId);
@@ -24,7 +24,11 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
     onSessionSelect(sessionId);
   };
 
-  const handleDeleteSession = (sessionId: string, sessionName: string, e: React.MouseEvent) => {
+  const handleDeleteSession = (
+    sessionId: string,
+    sessionName: string,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
     onRequestDelete(sessionId, sessionName);
   };
@@ -42,10 +46,7 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
       <div className={styles.errorContainer}>
         <p>Error loading chat history</p>
         <p className={styles.errorMessage}>{(error as Error).message}</p>
-        <button
-          className={styles.retryButton}
-          onClick={() => refetch()}
-        >
+        <button className={styles.retryButton} onClick={() => refetch()}>
           Retry
         </button>
       </div>
@@ -67,7 +68,9 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
     return (
       <div className={styles.emptyContainer}>
         <p>No chat history yet</p>
-        <p className={styles.emptyHint}>Start a conversation to create your first chat</p>
+        <p className={styles.emptyHint}>
+          Start a conversation to create your first chat
+        </p>
       </div>
     );
   }
@@ -95,14 +98,15 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
                 })}
               </div>
               <div className={styles.chatMessageCount}>
-                {session.message_count} {session.message_count === 1 ? 'message' : 'messages'}
+                {session.message_count}{' '}
+                {session.message_count === 1 ? 'message' : 'messages'}
               </div>
             </div>
           </div>
           <div className={styles.chatActions}>
             <button
               className={styles.deleteBtn}
-              onClick={(e) => handleDeleteSession(session.id, session.name, e)}
+              onClick={e => handleDeleteSession(session.id, session.name, e)}
               aria-label="Delete chat"
             >
               <svg
