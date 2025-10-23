@@ -24,6 +24,24 @@ from agent.molecular_designer import create_molecular_designer
 logger = logging.getLogger(__name__)
 
 
+def _initialize_tools():
+    """
+    Initialize and return the list of available tools for the Supervisor.
+
+    The Supervisor uses these tools to search for and identify calculations,
+    allowing it to provide specific calculation IDs to worker agents.
+
+    Returns:
+        list: List of tool functions for the Supervisor
+    """
+    from .tools import list_all_calculations, find_calculations
+
+    return [
+        list_all_calculations,
+        find_calculations,
+    ]
+
+
 def create_supervisor_agent():
     """
     Create a Supervisor agent using LangGraph's create_supervisor.
@@ -92,6 +110,11 @@ def create_supervisor_agent():
     forward_tool = create_forward_message_tool("supervisor")
     logger.info("Created forward_message tool to bypass supervisor paraphrasing")
 
+    # Initialize Supervisor's tools for calculation search and identification
+    supervisor_tools = _initialize_tools()
+    supervisor_tools.append(forward_tool)  # Add forward_message tool
+    logger.info(f"Initialized {len(supervisor_tools)} tools for Supervisor (including forward_message)")
+
     # Load system prompt using unified utility function
     prompt_dir = Path(__file__).parent / "prompts"
     system_prompt = load_prompt(prompt_dir, "system_prompt.txt")
@@ -111,7 +134,7 @@ def create_supervisor_agent():
         [quantum_calculator, literature_surveyor, science_analyst, molecular_designer],
         model=supervisor_llm,
         prompt=system_prompt,
-        tools=[forward_tool],  # Add forward_message tool
+        tools=supervisor_tools,  # Add all Supervisor tools
     )
 
     logger.info("Supervisor workflow created successfully with forward_message tool")

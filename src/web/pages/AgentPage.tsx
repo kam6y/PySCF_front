@@ -15,6 +15,8 @@ import {
 } from '../hooks/useChatHistoryQueries';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { InlineOrbitalViewer } from '../components/InlineOrbitalViewer';
+import { InlineIRSpectrumViewer } from '../components/InlineIRSpectrumViewer';
+import { InlineMullikenChargeViewer } from '../components/InlineMullikenChargeViewer';
 import styles from './AgentPage.module.css';
 
 // 確認リクエストの型定義
@@ -26,8 +28,8 @@ type ConfirmationRequest = {
   message: string;
 };
 
-// パラメータパース関数（orbital-viewerコードブロック用）
-const parseOrbitalViewerParams = (code: string): Record<string, any> => {
+// パラメータパース関数（汎用的なコードブロックパラメータ用）
+const parseCodeBlockParams = (code: string): Record<string, any> => {
   const params: Record<string, any> = {};
   const lines = code.trim().split('\n');
 
@@ -871,6 +873,7 @@ export const AgentPage = () => {
                                 ),
                               });
 
+                              // Handle orbital-viewer code block
                               if (
                                 className?.includes('language-orbital-viewer')
                               ) {
@@ -879,7 +882,7 @@ export const AgentPage = () => {
                                     codeProps.children
                                   ).replace(/\n$/, '');
                                   const params =
-                                    parseOrbitalViewerParams(codeContent);
+                                    parseCodeBlockParams(codeContent);
 
                                   console.log(
                                     '[Orbital Viewer] Parsed params:',
@@ -956,6 +959,171 @@ export const AgentPage = () => {
                                   );
                                 }
                               }
+
+                              // Handle ir-spectrum code block
+                              if (className?.includes('language-ir-spectrum')) {
+                                try {
+                                  const codeContent = String(
+                                    codeProps.children
+                                  ).replace(/\n$/, '');
+                                  const params =
+                                    parseCodeBlockParams(codeContent);
+
+                                  console.log(
+                                    '[IR Spectrum] Parsed params:',
+                                    params
+                                  );
+
+                                  // Validate required parameters
+                                  if (!params.calculation_id) {
+                                    return (
+                                      <div
+                                        style={{
+                                          padding: '12px',
+                                          backgroundColor: '#fef2f2',
+                                          border: '1px solid #fecaca',
+                                          borderRadius: '8px',
+                                          color: '#dc2626',
+                                          margin: '12px 0',
+                                        }}
+                                      >
+                                        ❌ Invalid ir-spectrum block: missing
+                                        required parameter (calculation_id)
+                                      </div>
+                                    );
+                                  }
+
+                                  // Render InlineIRSpectrumViewer component
+                                  return (
+                                    <InlineIRSpectrumViewer
+                                      calculation_id={params.calculation_id}
+                                      broadening_fwhm={params.broadening_fwhm}
+                                      x_min={params.x_min}
+                                      x_max={params.x_max}
+                                      show_peaks={params.show_peaks}
+                                      height={params.height}
+                                      onError={error => {
+                                        console.error(
+                                          'IR spectrum viewer error:',
+                                          error
+                                        );
+                                        addNotification({
+                                          type: 'error',
+                                          title: 'IR Spectrum Viewer Error',
+                                          message: error,
+                                          autoClose: false,
+                                          duration: 0,
+                                        });
+                                      }}
+                                    />
+                                  );
+                                } catch (error) {
+                                  console.error(
+                                    'Failed to render IR spectrum viewer:',
+                                    error
+                                  );
+                                  return (
+                                    <div
+                                      style={{
+                                        padding: '12px',
+                                        backgroundColor: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        color: '#dc2626',
+                                        margin: '12px 0',
+                                      }}
+                                    >
+                                      ❌ Failed to render IR spectrum viewer:{' '}
+                                      {error instanceof Error
+                                        ? error.message
+                                        : String(error)}
+                                    </div>
+                                  );
+                                }
+                              }
+
+                              // Handle mulliken-charges code block
+                              if (
+                                className?.includes('language-mulliken-charges')
+                              ) {
+                                try {
+                                  const codeContent = String(
+                                    codeProps.children
+                                  ).replace(/\n$/, '');
+                                  const params =
+                                    parseCodeBlockParams(codeContent);
+
+                                  console.log(
+                                    '[Mulliken Charges] Parsed params:',
+                                    params
+                                  );
+
+                                  // Validate required parameters
+                                  if (!params.calculation_id) {
+                                    return (
+                                      <div
+                                        style={{
+                                          padding: '12px',
+                                          backgroundColor: '#fef2f2',
+                                          border: '1px solid #fecaca',
+                                          borderRadius: '8px',
+                                          color: '#dc2626',
+                                          margin: '12px 0',
+                                        }}
+                                      >
+                                        ❌ Invalid mulliken-charges block:
+                                        missing required parameter
+                                        (calculation_id)
+                                      </div>
+                                    );
+                                  }
+
+                                  // Render InlineMullikenChargeViewer component
+                                  return (
+                                    <InlineMullikenChargeViewer
+                                      calculation_id={params.calculation_id}
+                                      height={params.height}
+                                      onError={error => {
+                                        console.error(
+                                          'Mulliken charges viewer error:',
+                                          error
+                                        );
+                                        addNotification({
+                                          type: 'error',
+                                          title:
+                                            'Mulliken Charges Viewer Error',
+                                          message: error,
+                                          autoClose: false,
+                                          duration: 0,
+                                        });
+                                      }}
+                                    />
+                                  );
+                                } catch (error) {
+                                  console.error(
+                                    'Failed to render Mulliken charges viewer:',
+                                    error
+                                  );
+                                  return (
+                                    <div
+                                      style={{
+                                        padding: '12px',
+                                        backgroundColor: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        color: '#dc2626',
+                                        margin: '12px 0',
+                                      }}
+                                    >
+                                      ❌ Failed to render Mulliken charges
+                                      viewer:{' '}
+                                      {error instanceof Error
+                                        ? error.message
+                                        : String(error)}
+                                    </div>
+                                  );
+                                }
+                              }
                             }
 
                             // Default pre rendering
@@ -971,8 +1139,10 @@ export const AgentPage = () => {
                               childrenValue: String(children).substring(0, 100),
                             });
 
-                            // Check if this is an orbital-viewer code block
+                            // Check if this is a special code block
                             const inline = props.inline;
+
+                            // Handle orbital-viewer code block
                             if (
                               !inline &&
                               className?.includes('language-orbital-viewer')
@@ -983,7 +1153,7 @@ export const AgentPage = () => {
                                   ''
                                 );
                                 const params =
-                                  parseOrbitalViewerParams(codeContent);
+                                  parseCodeBlockParams(codeContent);
 
                                 // Validate required parameters
                                 if (
@@ -1048,6 +1218,164 @@ export const AgentPage = () => {
                                     }}
                                   >
                                     ❌ Failed to render orbital viewer:{' '}
+                                    {error instanceof Error
+                                      ? error.message
+                                      : String(error)}
+                                  </div>
+                                );
+                              }
+                            }
+
+                            // Handle ir-spectrum code block
+                            if (
+                              !inline &&
+                              className?.includes('language-ir-spectrum')
+                            ) {
+                              try {
+                                const codeContent = String(children).replace(
+                                  /\n$/,
+                                  ''
+                                );
+                                const params =
+                                  parseCodeBlockParams(codeContent);
+
+                                // Validate required parameters
+                                if (!params.calculation_id) {
+                                  return (
+                                    <div
+                                      style={{
+                                        padding: '12px',
+                                        backgroundColor: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        color: '#dc2626',
+                                        margin: '12px 0',
+                                      }}
+                                    >
+                                      ❌ Invalid ir-spectrum block: missing
+                                      required parameter (calculation_id)
+                                    </div>
+                                  );
+                                }
+
+                                // Render InlineIRSpectrumViewer component
+                                return (
+                                  <InlineIRSpectrumViewer
+                                    calculation_id={params.calculation_id}
+                                    broadening_fwhm={params.broadening_fwhm}
+                                    x_min={params.x_min}
+                                    x_max={params.x_max}
+                                    show_peaks={params.show_peaks}
+                                    height={params.height}
+                                    onError={error => {
+                                      console.error(
+                                        'IR spectrum viewer error:',
+                                        error
+                                      );
+                                      addNotification({
+                                        type: 'error',
+                                        title: 'IR Spectrum Viewer Error',
+                                        message: error,
+                                        autoClose: false,
+                                        duration: 0,
+                                      });
+                                    }}
+                                  />
+                                );
+                              } catch (error) {
+                                console.error(
+                                  'Failed to render IR spectrum viewer:',
+                                  error
+                                );
+                                return (
+                                  <div
+                                    style={{
+                                      padding: '12px',
+                                      backgroundColor: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      borderRadius: '8px',
+                                      color: '#dc2626',
+                                      margin: '12px 0',
+                                    }}
+                                  >
+                                    ❌ Failed to render IR spectrum viewer:{' '}
+                                    {error instanceof Error
+                                      ? error.message
+                                      : String(error)}
+                                  </div>
+                                );
+                              }
+                            }
+
+                            // Handle mulliken-charges code block
+                            if (
+                              !inline &&
+                              className?.includes('language-mulliken-charges')
+                            ) {
+                              try {
+                                const codeContent = String(children).replace(
+                                  /\n$/,
+                                  ''
+                                );
+                                const params =
+                                  parseCodeBlockParams(codeContent);
+
+                                // Validate required parameters
+                                if (!params.calculation_id) {
+                                  return (
+                                    <div
+                                      style={{
+                                        padding: '12px',
+                                        backgroundColor: '#fef2f2',
+                                        border: '1px solid #fecaca',
+                                        borderRadius: '8px',
+                                        color: '#dc2626',
+                                        margin: '12px 0',
+                                      }}
+                                    >
+                                      ❌ Invalid mulliken-charges block: missing
+                                      required parameter (calculation_id)
+                                    </div>
+                                  );
+                                }
+
+                                // Render InlineMullikenChargeViewer component
+                                return (
+                                  <InlineMullikenChargeViewer
+                                    calculation_id={params.calculation_id}
+                                    height={params.height}
+                                    onError={error => {
+                                      console.error(
+                                        'Mulliken charges viewer error:',
+                                        error
+                                      );
+                                      addNotification({
+                                        type: 'error',
+                                        title: 'Mulliken Charges Viewer Error',
+                                        message: error,
+                                        autoClose: false,
+                                        duration: 0,
+                                      });
+                                    }}
+                                  />
+                                );
+                              } catch (error) {
+                                console.error(
+                                  'Failed to render Mulliken charges viewer:',
+                                  error
+                                );
+                                return (
+                                  <div
+                                    style={{
+                                      padding: '12px',
+                                      backgroundColor: '#fef2f2',
+                                      border: '1px solid #fecaca',
+                                      borderRadius: '8px',
+                                      color: '#dc2626',
+                                      margin: '12px 0',
+                                    }}
+                                  >
+                                    ❌ Failed to render Mulliken charges viewer:{' '}
                                     {error instanceof Error
                                       ? error.message
                                       : String(error)}

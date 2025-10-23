@@ -28,7 +28,6 @@ def _initialize_tools():
 
     return [
         # Calculation data retrieval
-        tools.list_all_calculations,
         tools.get_calculation_details,
 
         # Molecular orbital analysis

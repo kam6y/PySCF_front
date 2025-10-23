@@ -463,8 +463,7 @@ export const CalculationResultsPage = ({
                             .toFixed(4)}{' '}
                           e
                         </code>{' '}
-                        (Molecular Charge: <code>{results.charge || 0}</code>{' '}
-                        e)
+                        (Molecular Charge: <code>{results.charge || 0}</code> e)
                       </div>
                     </>
                   )}

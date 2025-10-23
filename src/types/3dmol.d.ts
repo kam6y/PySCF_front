@@ -49,10 +49,11 @@ export interface ViewerSpec {
 }
 
 export interface LabelSpec {
-  position?: { x: number; y: number; z: number };
+  position?: { x: number; y: number; z: number } | { serial: number };
   fontColor?: string;
   backgroundColor?: string;
   backgroundOpacity?: number;
+  showBackground?: boolean;
   fontSize?: number;
   inFront?: boolean;
   bold?: boolean;
@@ -95,7 +96,7 @@ export interface GLViewer {
   addSurface(
     type: string,
     style: any,
-    sel?: AtomSpec,
+    sel?: AtomSpec & { charges?: number[] },
     allsel?: AtomSpec
   ): number;
   removeSurface(surfid: number): GLViewer;
@@ -127,7 +128,7 @@ export interface GLModel {
   addSurface(
     type: string,
     style: any,
-    sel?: AtomSpec,
+    sel?: AtomSpec & { charges?: number[] },
     allsel?: AtomSpec
   ): number;
   removeSurface(surf: number): GLModel;

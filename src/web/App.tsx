@@ -76,6 +76,13 @@ export const App = () => {
   // チャットセッションのデータ取得
   const { data: chatSessionsData } = useGetChatSessions();
 
+  // AIチャット画面を開いた時にサイドバーのタブを"chats"に自動切り替え
+  useEffect(() => {
+    if (appState.ui.isAIAgentEnabled) {
+      appState.ui.setSidebarView('chats');
+    }
+  }, [appState.ui.isAIAgentEnabled, appState.ui.setSidebarView]);
+
   // 統合WebSocketによるリアルタイム更新（グローバル + アクティブ計算監視）
   useUnifiedWebSocket({
     activeCalculationId: calculationData.activeCalculation?.id || null,
