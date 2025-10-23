@@ -123,7 +123,9 @@ class SystemService:
             
             # File manager diagnostics
             try:
-                file_manager = CalculationFileManager()
+                # Load current settings to get calculations directory
+                settings = get_current_settings()
+                file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
                 base_dir = file_manager.get_base_directory()
                 
                 diagnostics['file_manager'] = {

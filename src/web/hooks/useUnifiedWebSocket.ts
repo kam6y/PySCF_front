@@ -412,6 +412,15 @@ export const useUnifiedWebSocket = ({
         console.error('[UnifiedWebSocket] Socket error:', errorData);
         const errorMessage =
           errorData?.error || 'A problem occurred with calculation monitoring.';
+
+        // If calculation not found (likely due to directory change), silently ignore
+        if (errorMessage.includes('not found')) {
+          console.log(
+            '[UnifiedWebSocket] Calculation not found (likely directory changed), ignoring error'
+          );
+          return;
+        }
+
         handleWebSocketError(errorMessage);
       });
 

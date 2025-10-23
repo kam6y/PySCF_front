@@ -301,11 +301,15 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     
     # Import calculator classes and exception types
     from quantum_calc.file_manager import CalculationFileManager
+    from quantum_calc import get_current_settings
     from threadpoolctl import threadpool_info, threadpool_limits
     from pyscf import lib
-    
+
     calculator_classes, exception_types = _import_calculator_classes(process_logger)
-    file_manager = CalculationFileManager()
+
+    # Load current settings to get calculations directory
+    settings = get_current_settings()
+    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
     calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
     
     try:
@@ -804,7 +808,9 @@ class CalculationProcessManager:
         """Update calculation status when transitioning from queue."""
         try:
             from quantum_calc.file_manager import CalculationFileManager
-            file_manager = CalculationFileManager()
+            from quantum_calc import get_current_settings
+            settings = get_current_settings()
+            file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
             calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
             file_manager.save_calculation_status(calc_dir, status)
             
@@ -875,7 +881,9 @@ class CalculationProcessManager:
                 # Update status to cancelled on the file system
                 try:
                     from quantum_calc.file_manager import CalculationFileManager
-                    file_manager = CalculationFileManager()
+                    from quantum_calc import get_current_settings
+                    settings = get_current_settings()
+                    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
                     calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
                     file_manager.save_calculation_status(calc_dir, 'cancelled')
                 except Exception as e:
@@ -892,7 +900,9 @@ class CalculationProcessManager:
                 # Update status to cancelled on the file system
                 try:
                     from quantum_calc.file_manager import CalculationFileManager
-                    file_manager = CalculationFileManager()
+                    from quantum_calc import get_current_settings
+                    settings = get_current_settings()
+                    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
                     calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
                     file_manager.save_calculation_status(calc_dir, 'cancelled')
                 except Exception as e:

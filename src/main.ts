@@ -916,3 +916,23 @@ ipcMain.handle('open-external-url', async (_event, url: string) => {
 ipcMain.handle('show-about-dialog', () => {
   showAboutDialog();
 });
+
+// IPC handler for selecting a folder
+ipcMain.handle('dialog:select-folder', async () => {
+  try {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Calculations Directory',
+      buttonLabel: 'Select',
+    });
+
+    if (result.canceled || result.filePaths.length === 0) {
+      return { canceled: true, filePath: null };
+    }
+
+    return { canceled: false, filePath: result.filePaths[0] };
+  } catch (error) {
+    console.error('Failed to open folder selection dialog:', error);
+    return { canceled: true, filePath: null, error: String(error) };
+  }
+});

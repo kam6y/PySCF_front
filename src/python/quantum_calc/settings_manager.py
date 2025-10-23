@@ -43,13 +43,17 @@ class SettingsManager:
             # Fallback when psutil is not available
             total_cores = multiprocessing.cpu_count()
             total_memory_mb = 4096  # Conservative 4GB estimate
-        
+
+        # Default calculations directory (with PySCF_instances subfolder)
+        default_calc_dir = str(Path.home() / "PySCF_instances")
+
         return AppSettings(
             max_parallel_instances=min(4, total_cores),
             max_cpu_utilization_percent=95.0,
             max_memory_utilization_percent=95.0,
             system_total_cores=total_cores,
             system_total_memory_mb=total_memory_mb,
+            calculations_directory=default_calc_dir,
             gemini_api_key=None,
             tavily_api_key=None
         )

@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, Tuple, List
 
 from quantum_calc import (
-    get_process_manager, get_all_supported_parameters,
+    get_process_manager, get_all_supported_parameters, get_current_settings,
     InputError, GeometryError, ProcessManagerError, CalculationError, FileManagerError
 )
 from quantum_calc.file_manager import CalculationFileManager
@@ -29,11 +29,24 @@ logger = logging.getLogger(__name__)
 
 class QuantumService:
     """Service for quantum chemistry calculation operations."""
-    
+
     def __init__(self):
         """Initialize QuantumService."""
-        self.file_manager = CalculationFileManager()
-    
+        # Load calculations directory from settings
+        settings = get_current_settings()
+        calculations_dir = settings.calculations_directory
+        self.file_manager = CalculationFileManager(base_dir=calculations_dir)
+
+    def update_calculations_directory(self, new_directory: str) -> None:
+        """
+        Update the calculations directory.
+
+        Args:
+            new_directory: New directory path for calculations
+        """
+        logger.info(f"Updating QuantumService calculations directory to: {new_directory}")
+        self.file_manager.set_base_directory(new_directory)
+
     def get_supported_parameters(self) -> Dict[str, Any]:
         """
         Get supported quantum chemistry parameters.

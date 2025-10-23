@@ -23,12 +23,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   >(undefined);
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
   const [tavilyApiKey, setTavilyApiKey] = useState<string>('');
+  const [calculationsDirectory, setCalculationsDirectory] = useState<string>('');
+  const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
     maxCpuUtilization?: number;
     maxMemoryUtilization?: number;
     geminiApiKey?: string;
     tavilyApiKey?: string;
+    calculationsDirectory?: string;
   }>({});
 
   const { settings, isLoading, isUpdating, error, updateSettings } =
@@ -58,6 +61,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           : DEFAULT_MAX_MEMORY_UTILIZATION,
         geminiApiKey: settings.gemini_api_key || '',
         tavilyApiKey: settings.tavily_api_key || '',
+        calculationsDirectory: settings.calculations_directory || '',
       };
 
       if (process.env.NODE_ENV === 'development') {
@@ -69,6 +73,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxMemoryUtilization(newValues.maxMemoryUtilization);
       setGeminiApiKey(newValues.geminiApiKey);
       setTavilyApiKey(newValues.tavilyApiKey);
+      setCalculationsDirectory(newValues.calculationsDirectory);
       setOriginalValues(newValues);
 
       if (process.env.NODE_ENV === 'development') {
@@ -90,6 +95,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
+        calculations_directory: calculationsDirectory,
         gemini_api_key: geminiApiKey || null,
         tavily_api_key: tavilyApiKey || null,
       });
@@ -100,6 +106,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         maxMemoryUtilization,
         geminiApiKey,
         tavilyApiKey,
+        calculationsDirectory,
       };
       setOriginalValues(newValues);
     } catch (error) {
@@ -110,6 +117,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
       setGeminiApiKey(originalValues.geminiApiKey || '');
       setTavilyApiKey(originalValues.tavilyApiKey || '');
+      setCalculationsDirectory(originalValues.calculationsDirectory || '');
     }
   };
 
@@ -119,6 +127,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
     setGeminiApiKey(originalValues.geminiApiKey || '');
     setTavilyApiKey(originalValues.tavilyApiKey || '');
+    setCalculationsDirectory(originalValues.calculationsDirectory || '');
+  };
+
+  const handleSelectFolder = async () => {
+    setIsSelectingFolder(true);
+    try {
+      const result = await window.electronAPI.selectFolder();
+      if (!result.canceled && result.filePath) {
+        // Append /PySCF_instances to the selected path
+        const fullPath = `${result.filePath}/PySCF_instances`;
+        setCalculationsDirectory(fullPath);
+      }
+    } catch (error) {
+      console.error('Failed to select folder:', error);
+    } finally {
+      setIsSelectingFolder(false);
+    }
   };
 
   const hasUnsavedChanges = useMemo(() => {
@@ -135,6 +160,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
     const currentGeminiApiKey = geminiApiKey;
     const currentTavilyApiKey = tavilyApiKey;
+    const currentCalculationsDirectory = calculationsDirectory;
 
     const originalParallel =
       originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
@@ -144,15 +170,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
     const originalGeminiApiKey = originalValues.geminiApiKey || '';
     const originalTavilyApiKey = originalValues.tavilyApiKey || '';
+    const originalCalculationsDirectory = originalValues.calculationsDirectory || '';
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
     const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
     const geminiApiKeyChanged = currentGeminiApiKey !== originalGeminiApiKey;
     const tavilyApiKeyChanged = currentTavilyApiKey !== originalTavilyApiKey;
+    const calculationsDirectoryChanged = currentCalculationsDirectory !== originalCalculationsDirectory;
 
     const hasChanges =
-      parallelChanged || cpuChanged || memoryChanged || geminiApiKeyChanged || tavilyApiKeyChanged;
+      parallelChanged || cpuChanged || memoryChanged || geminiApiKeyChanged || tavilyApiKeyChanged || calculationsDirectoryChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
@@ -177,11 +205,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     maxMemoryUtilization,
     geminiApiKey,
     tavilyApiKey,
+    calculationsDirectory,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
     originalValues?.maxMemoryUtilization,
     originalValues?.geminiApiKey,
     originalValues?.tavilyApiKey,
+    originalValues?.calculationsDirectory,
   ]);
 
   if (isLoading) {
@@ -516,6 +546,53 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   )}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.settingsSection}>
+          <h3>Storage</h3>
+
+          <div className={styles.settingItem}>
+            <div className={styles.settingLabel}>
+              <label htmlFor="calculationsDirectory">
+                Calculation Data Folder
+              </label>
+              <p className={styles.settingHelp}>
+                Location where all calculation instances are stored. A
+                'PySCF_instances' subfolder will be created in the selected
+                directory. Existing data will be moved when changed.
+              </p>
+            </div>
+
+            <div className={styles.settingControl}>
+              <div className={styles.textInputContainer}>
+                <input
+                  id="calculationsDirectory"
+                  type="text"
+                  placeholder="Calculations directory path..."
+                  value={calculationsDirectory}
+                  readOnly
+                  className={styles.textInput}
+                  style={{ fontFamily: 'Monaco, Menlo, Courier New, monospace' }}
+                />
+                <button
+                  onClick={handleSelectFolder}
+                  className={styles.selectButton}
+                  disabled={isUpdating || isSelectingFolder}
+                >
+                  {isSelectingFolder ? 'Selecting...' : 'Change Folder...'}
+                </button>
+              </div>
+              {calculationsDirectory !== originalValues.calculationsDirectory && (
+                <div className={styles.warningBox}>
+                  <span className={styles.warningIcon}>⚠</span>
+                  <span className={styles.warningText}>
+                    Changing this folder will move all existing calculation data
+                    to the new location. This operation may take a while.
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

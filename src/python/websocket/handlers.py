@@ -27,7 +27,9 @@ def send_immediate_websocket_notification(socketio, calculation_id: str, status:
     """Send immediate WebSocket notification to all connected clients for a calculation."""
     # Build complete calculation instance
     try:
-        file_manager = CalculationFileManager()
+        from quantum_calc import get_current_settings
+        settings = get_current_settings()
+        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
         calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
         
         if os.path.exists(calc_dir):
@@ -115,8 +117,10 @@ def register_websocket_handlers(socketio):
             logger.info(f"SocketIO connection attempt for temporary calculation ID: {calculation_id}")
         else:
             logger.info(f"SocketIO connection established for calculation {calculation_id}")
-        
-        file_manager = CalculationFileManager()
+
+        from quantum_calc import get_current_settings
+        settings = get_current_settings()
+        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
         calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
         
         # Calculation directory existence check
@@ -185,20 +189,22 @@ def register_websocket_handlers(socketio):
                 'id': calculation_id
             })
 
-    @socketio.on('leave_calculation') 
+    @socketio.on('leave_calculation')
     def on_leave_calculation(data):
         """Leave a calculation room."""
         calculation_id = data.get('calculation_id')
         if not calculation_id:
             return
-            
+
         room = f'calculation_{calculation_id}'
         leave_room(room)
-        
+
         # Clean up file watcher connection
         if 'file_change_callback' in session:
             try:
-                file_manager = CalculationFileManager()
+                from quantum_calc import get_current_settings
+                settings = get_current_settings()
+                file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
                 watcher = get_websocket_watcher(file_manager.get_base_directory())
                 watcher.remove_connection(calculation_id, session['file_change_callback'])
             except Exception as e:
@@ -220,11 +226,13 @@ def register_websocket_handlers(socketio):
 
     @socketio.on('disconnect')
     def on_disconnect():
-        """Handle client disconnection.""" 
+        """Handle client disconnection."""
         calculation_id = session.get('calculation_id')
         if calculation_id and 'file_change_callback' in session:
             try:
-                file_manager = CalculationFileManager()
+                from quantum_calc import get_current_settings
+                settings = get_current_settings()
+                file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
                 watcher = get_websocket_watcher(file_manager.get_base_directory())
                 watcher.remove_connection(calculation_id, session['file_change_callback'])
                 logger.info(f"Cleaned up file watcher for disconnected client (calculation {calculation_id})")

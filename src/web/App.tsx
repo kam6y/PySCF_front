@@ -1,11 +1,12 @@
 // src/web/App.tsx
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { ToastContainer } from './components/ToastContainer';
+import { InitialSetupDialog } from './components/InitialSetupDialog';
 import { CalculationSettingsPage } from './pages/CalculationSettingsPage';
 import { CalculationResultsPage } from './pages/CalculationResultsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -18,12 +19,54 @@ import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
 import { useChatHistoryStore } from './store/chatHistoryStore';
 import { useAgentStore } from './store/agentStore';
 import { useGetChatSessionDetail, useGetChatSessions } from './hooks/useChatHistoryQueries';
+import { useAppSettings } from './hooks/useAppSettings';
 
 export const App = () => {
   // 統合された状態管理
   const appState = useAppState();
   const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
+
+  // アプリ設定の取得
+  const { settings, updateSettings } = useAppSettings();
+
+  // 初回セットアップダイアログの表示状態
+  const [showInitialSetup, setShowInitialSetup] = useState(false);
+  const [defaultDirectory, setDefaultDirectory] = useState('');
+
+  // 初回起動チェック
+  useEffect(() => {
+    if (settings) {
+      // LocalStorageでセットアップ完了フラグを確認
+      const setupCompleted = localStorage.getItem('pyscf_setup_completed');
+
+      if (!setupCompleted) {
+        // 初回起動の場合、デフォルトディレクトリを設定してダイアログを表示
+        setDefaultDirectory(settings.calculations_directory);
+        setShowInitialSetup(true);
+        console.log('[App] First run detected, showing initial setup dialog');
+      } else {
+        setShowInitialSetup(false);
+        console.log('[App] Setup already completed, skipping initial setup dialog');
+      }
+    }
+  }, [settings]);
+
+  // 初回セットアップ完了時の処理
+  const handleSetupComplete = async (calculationsDirectory: string) => {
+    if (settings) {
+      await updateSettings({
+        ...settings,
+        calculations_directory: calculationsDirectory,
+      });
+    }
+
+    // セットアップ完了フラグをLocalStorageに保存
+    localStorage.setItem('pyscf_setup_completed', 'true');
+    console.log('[App] Initial setup completed, saved flag to localStorage');
+
+    setShowInitialSetup(false);
+  };
 
   // チャットセッションのデータ取得
   const { data: chatSessionsData } = useGetChatSessions();
@@ -265,6 +308,14 @@ export const App = () => {
             <SettingsPage />
           </div>
         </div>
+      )}
+
+      {/* Initial Setup Dialog */}
+      {showInitialSetup && settings && (
+        <InitialSetupDialog
+          onComplete={handleSetupComplete}
+          defaultDirectory={settings.calculations_directory || defaultDirectory}
+        />
       )}
 
       <ToastContainer />

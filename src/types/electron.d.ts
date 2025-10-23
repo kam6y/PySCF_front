@@ -11,6 +11,11 @@ export interface ElectronAPI {
     url: string
   ) => Promise<{ success: boolean; error?: string }>;
   showAboutDialog: () => Promise<void>;
+  selectFolder: () => Promise<{
+    canceled: boolean;
+    filePath: string | null;
+    error?: string;
+  }>;
 }
 
 declare global {

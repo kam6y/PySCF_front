@@ -1851,7 +1851,7 @@ components:
     # Settings-related schemas
     AppSettings:
       type: object
-      required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb]
+      required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb, calculations_directory]
       properties:
         max_parallel_instances:
           type: integer
@@ -1881,6 +1881,10 @@ components:
           minimum: 1
           description: Total system memory in MB (auto-detected)
           example: 16384
+        calculations_directory:
+          type: string
+          description: Directory path where calculation instances are stored
+          example: "/Users/username/PySCF_instances"
         gemini_api_key:
           type: string
           nullable: true

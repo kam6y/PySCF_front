@@ -18,4 +18,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternalUrl: (url: string) =>
     ipcRenderer.invoke('open-external-url', url),
   showAboutDialog: () => ipcRenderer.invoke('show-about-dialog'),
+  selectFolder: () =>
+    ipcRenderer.invoke('dialog:select-folder') as Promise<{
+      canceled: boolean;
+      filePath: string | null;
+      error?: string;
+    }>,
 });

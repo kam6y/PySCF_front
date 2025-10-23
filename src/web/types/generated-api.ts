@@ -1038,6 +1038,11 @@ export interface components {
              */
             system_total_memory_mb: number;
             /**
+             * @description Directory path where calculation instances are stored
+             * @example /Users/username/PySCF_instances
+             */
+            calculations_directory: string;
+            /**
              * @description Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
              * @example null
              */
