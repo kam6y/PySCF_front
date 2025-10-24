@@ -18,8 +18,8 @@ export const InitialSetupDialog: React.FC<InitialSetupDialogProps> = ({
     try {
       const result = await window.electronAPI.selectFolder();
       if (!result.canceled && result.filePath) {
-        // Append /PySCF_instances to the selected path
-        const fullPath = `${result.filePath}/PySCF_instances`;
+        // Append /PySCF_calculations to the selected path
+        const fullPath = `${result.filePath}/PySCF_calculations`;
         setSelectedPath(fullPath);
       }
     } catch (error) {
@@ -46,7 +46,7 @@ export const InitialSetupDialog: React.FC<InitialSetupDialogProps> = ({
 
         <div className={styles.content}>
           <p className={styles.description}>
-            Choose where to store calculation data. A 'PySCF_instances'
+            Choose where to store calculation data. A 'PySCF_calculations'
             subfolder will be created in the selected directory.
           </p>
 

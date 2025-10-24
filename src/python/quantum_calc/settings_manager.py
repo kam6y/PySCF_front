@@ -44,8 +44,8 @@ class SettingsManager:
             total_cores = multiprocessing.cpu_count()
             total_memory_mb = 4096  # Conservative 4GB estimate
 
-        # Default calculations directory (with PySCF_instances subfolder)
-        default_calc_dir = str(Path.home() / "PySCF_instances")
+        # Default calculations directory (with PySCF_calculations subfolder)
+        default_calc_dir = str(Path.home() / "PySCF_calculations")
 
         return AppSettings(
             max_parallel_instances=min(4, total_cores),

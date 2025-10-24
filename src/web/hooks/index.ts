@@ -23,3 +23,6 @@ export {
 // 互換性のため残存（非推奨）
 export { useCalculationOperations } from './useCalculationOperations';
 export type { CalculationOperations } from './useCalculationOperations';
+
+// パフォーマンス最適化フック
+export { useProcessedCalculationResults } from './useProcessedCalculationResults';

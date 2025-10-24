@@ -1038,8 +1038,8 @@ export interface components {
              */
             system_total_memory_mb: number;
             /**
-             * @description Directory path where calculation instances are stored
-             * @example /Users/username/PySCF_instances
+             * @description Directory path where calculation data is stored
+             * @example /Users/username/PySCF_calculations
              */
             calculations_directory: string;
             /**

@@ -136,8 +136,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     try {
       const result = await window.electronAPI.selectFolder();
       if (!result.canceled && result.filePath) {
-        // Append /PySCF_instances to the selected path
-        const fullPath = `${result.filePath}/PySCF_instances`;
+        // Append /PySCF_calculations to the selected path
+        const fullPath = `${result.filePath}/PySCF_calculations`;
         setCalculationsDirectory(fullPath);
       }
     } catch (error) {
@@ -580,8 +580,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 Calculation Data Folder
               </label>
               <p className={styles.settingHelp}>
-                Location where all calculation instances are stored. A
-                'PySCF_instances' subfolder will be created in the selected
+                Location where all calculation data is stored. A
+                'PySCF_calculations' subfolder will be created in the selected
                 directory. Existing data will be moved when changed.
               </p>
             </div>

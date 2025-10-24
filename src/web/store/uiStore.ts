@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { DropdownOption } from '../components/DropdownMenu';
 
-export type SidebarView = 'instances' | 'chats';
+export type SidebarView = 'calculations' | 'chats';
 
 interface UIState {
   // Sidebar状態
@@ -60,7 +60,7 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Initial state
   isSidebarOpen: false,
   isDropdownOpen: false,
-  sidebarView: 'instances',
+  sidebarView: 'calculations',
   currentPage: 'calculation-settings',
   isAIAgentEnabled: false,
   searchQuery: '',

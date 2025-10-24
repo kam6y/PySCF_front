@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import styles from './CalculationResultsPage.module.css';
 import { CalculationInstance } from '../types/api-types';
 import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
@@ -6,6 +6,8 @@ import { MolecularOrbitalEnergyDiagram } from '../components/MolecularOrbitalEne
 import { IRSpectrumViewer } from '../components/IRSpectrumViewer';
 import { CIAnalysisViewer } from '../components/CIAnalysisViewer';
 import { MullikenChargeViewer } from '../components/MullikenChargeViewer';
+import { LazyViewer } from '../components/LazyViewer';
+import { useProcessedCalculationResults } from '../hooks/useProcessedCalculationResults';
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -29,6 +31,18 @@ export const CalculationResultsPage = ({
   useEffect(() => {
     setError(detailsError);
   }, [detailsError]);
+
+  // Optimize event handlers with useCallback
+  const handleSetError = useCallback((errorMessage: string) => {
+    setError(errorMessage);
+  }, []);
+
+  const handleOrbitalSelect = useCallback((orbitalIndex: number) => {
+    setSelectedOrbitalIndex(orbitalIndex);
+  }, []);
+
+  // Process and memoize calculation results data
+  const processedData = useProcessedCalculationResults(activeCalculation);
 
   // Show loading state
   if (isLoadingDetails) {
@@ -108,8 +122,13 @@ export const CalculationResultsPage = ({
     );
   }
 
-  const results = activeCalculation.results;
-  const parameters = activeCalculation.parameters;
+  // Early return if processedData is null (already handled by loading/error states above)
+  if (!processedData) {
+    return null;
+  }
+
+  const { results, parameters, primaryEnergyLabel, primaryEnergyValue } =
+    processedData;
   const completedAt = activeCalculation.updatedAt;
 
   return (
@@ -159,68 +178,8 @@ export const CalculationResultsPage = ({
           <div className={styles.primaryEnergyResult}>
             <div className={styles.energyLabel}>Primary Energy Result</div>
             <div className={styles.energyValue}>
-              {(() => {
-                // Display the most relevant energy for the calculation method
-                if (
-                  parameters.calculation_method === 'CCSD_T' &&
-                  (results as any).ccsd_t_total_energy
-                ) {
-                  return (
-                    <>
-                      <strong>CCSD(T) Total Energy:</strong>{' '}
-                      <code>
-                        {(results as any).ccsd_t_total_energy.toFixed(8)}{' '}
-                        hartree
-                      </code>
-                    </>
-                  );
-                } else if (
-                  parameters.calculation_method === 'CCSD' &&
-                  (results as any).ccsd_total_energy
-                ) {
-                  return (
-                    <>
-                      <strong>CCSD Total Energy:</strong>{' '}
-                      <code>
-                        {(results as any).ccsd_total_energy.toFixed(8)} hartree
-                      </code>
-                    </>
-                  );
-                } else if (
-                  parameters.calculation_method === 'CASSCF' &&
-                  (results as any).casscf_energy
-                ) {
-                  return (
-                    <>
-                      <strong>CASSCF Energy:</strong>{' '}
-                      <code>
-                        {(results as any).casscf_energy.toFixed(8)} hartree
-                      </code>
-                    </>
-                  );
-                } else if (
-                  parameters.calculation_method === 'CASCI' &&
-                  (results as any).casci_energy
-                ) {
-                  return (
-                    <>
-                      <strong>CASCI Energy:</strong>{' '}
-                      <code>
-                        {(results as any).casci_energy.toFixed(8)} hartree
-                      </code>
-                    </>
-                  );
-                } else {
-                  return (
-                    <>
-                      <strong>SCF Energy:</strong>{' '}
-                      <code>
-                        {results.scf_energy?.toFixed(8) || 'N/A'} hartree
-                      </code>
-                    </>
-                  );
-                }
-              })()}
+              <strong>{primaryEnergyLabel}:</strong>{' '}
+              <code>{primaryEnergyValue}</code>
             </div>
           </div>
         </section>
@@ -340,9 +299,7 @@ export const CalculationResultsPage = ({
         {/* ========================================
             3️⃣ ELECTRONIC PROPERTIES SECTION - New Unified Section
             ======================================== */}
-        {((results.mulliken_charges && results.mulliken_charges.length > 0) ||
-          ((results as any).mulliken_spin_analysis &&
-            (results as any).mulliken_spin_analysis.available)) && (
+        {processedData.shouldShowElectronicProperties && (
           <section
             className={`${styles.calculationSection} ${styles.electronicPropertiesSection}`}
           >
@@ -359,10 +316,13 @@ export const CalculationResultsPage = ({
                     on the molecular surface. The surface color represents
                     charge distribution based on Mulliken population analysis.
                   </div>
-                  <MullikenChargeViewer
-                    xyzData={results.optimized_geometry}
-                    mullikenCharges={results.mulliken_charges}
-                  />
+                  <LazyViewer>
+                    <MullikenChargeViewer
+                      key={activeCalculation.id}
+                      xyzData={results.optimized_geometry}
+                      mullikenCharges={results.mulliken_charges}
+                    />
+                  </LazyViewer>
                 </div>
               )}
 
@@ -577,8 +537,7 @@ export const CalculationResultsPage = ({
             4️⃣ METHOD-SPECIFIC ADVANCED RESULTS
             ======================================== */}
         {/* CASCI/CASSCF Results Section */}
-        {(parameters.calculation_method === 'CASCI' ||
-          parameters.calculation_method === 'CASSCF') && (
+        {processedData.shouldShowCASSection && (
           <section
             className={`${styles.calculationSection} ${styles.casSection}`}
           >
@@ -1170,10 +1129,12 @@ export const CalculationResultsPage = ({
                     frequency calculations with scale factor corrections and
                     Lorentzian broadening for realistic peak shapes.
                   </div>
-                  <IRSpectrumViewer
-                    calculationId={activeCalculation.id}
-                    onError={error => setError(error)}
-                  />
+                  <LazyViewer>
+                    <IRSpectrumViewer
+                      calculationId={activeCalculation.id}
+                      onError={handleSetError}
+                    />
+                  </LazyViewer>
                 </div>
               )}
           </section>
@@ -1215,13 +1176,15 @@ export const CalculationResultsPage = ({
               Energy levels of molecular orbitals are illustrated. Click on
               orbitals to view details in 3D visualization below.
             </div>
-            <MolecularOrbitalEnergyDiagram
-              key={`energy-${activeCalculation.id}`}
-              calculationId={activeCalculation.id}
-              selectedOrbitalIndex={selectedOrbitalIndex}
-              onOrbitalSelect={setSelectedOrbitalIndex}
-              onError={error => setError(error)}
-            />
+            <LazyViewer>
+              <MolecularOrbitalEnergyDiagram
+                key={`energy-${activeCalculation.id}`}
+                calculationId={activeCalculation.id}
+                selectedOrbitalIndex={selectedOrbitalIndex}
+                onOrbitalSelect={handleOrbitalSelect}
+                onError={handleSetError}
+              />
+            </LazyViewer>
           </div>
 
           {/* Molecular Orbital 3D Visualization */}
@@ -1232,16 +1195,18 @@ export const CalculationResultsPage = ({
               orbitals from the energy diagram above or use the controls to view
               their shapes and spatial distributions.
             </div>
-            <MolecularOrbitalViewer
-              key={activeCalculation.id}
-              calculationId={activeCalculation.id}
-              onError={error => setError(error)}
-            />
+            <LazyViewer>
+              <MolecularOrbitalViewer
+                key={activeCalculation.id}
+                calculationId={activeCalculation.id}
+                onError={handleSetError}
+              />
+            </LazyViewer>
           </div>
         </section>
 
         {/* TDDFT Results Section */}
-        {parameters.calculation_method === 'TDDFT' &&
+        {processedData.shouldShowTDDFTSection &&
           results.excitation_energies && (
             <>
               {/* Excited States Summary */}
@@ -1632,8 +1597,7 @@ export const CalculationResultsPage = ({
           )}
 
         {/* CCSD Results Section */}
-        {(parameters.calculation_method === 'CCSD' ||
-          parameters.calculation_method === 'CCSD_T') && (
+        {processedData.shouldShowCCSDSection && (
           <section
             className={`${styles.calculationSection} ${styles.ccsdSection}`}
           >

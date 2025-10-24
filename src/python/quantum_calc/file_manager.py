@@ -19,11 +19,11 @@ class CalculationFileManager:
 
     def __init__(self, base_dir: Optional[str] = None):
         if base_dir is None:
-            # Default to ~/PySCF_instances if no base_dir is provided
+            # Default to ~/PySCF_calculations if no base_dir is provided
             home = Path.home()
-            self.base_dir = home / "PySCF_instances"
+            self.base_dir = home / "PySCF_calculations"
         else:
-            # Use the provided path as-is (should already include PySCF_instances)
+            # Use the provided path as-is (should already include PySCF_calculations)
             self.base_dir = Path(base_dir)
 
         self.base_dir.mkdir(parents=True, exist_ok=True)
@@ -353,7 +353,7 @@ class CalculationFileManager:
         Move all calculation data to a new directory.
 
         Args:
-            new_path: Full directory path for calculations (should include PySCF_instances)
+            new_path: Full directory path for calculations (should include PySCF_calculations)
 
         Returns:
             Dictionary with move operation results
@@ -375,9 +375,9 @@ class CalculationFileManager:
             }
 
         # Check if new path is a subdirectory of old path or vice versa
-        # Exception: Allow migration from parent to /PySCF_instances subfolder
+        # Exception: Allow migration from parent to /PySCF_calculations subfolder
         is_migration_to_subfolder = (
-            new_path_obj.name == "PySCF_instances" and
+            new_path_obj.name == "PySCF_calculations" and
             new_path_obj.parent == old_path_obj
         )
 
@@ -492,7 +492,7 @@ class CalculationFileManager:
         Update the base directory path.
 
         Args:
-            new_path: Full directory path for calculations (should include PySCF_instances)
+            new_path: Full directory path for calculations (should include PySCF_calculations)
         """
         self.base_dir = Path(new_path)
         self.base_dir.mkdir(parents=True, exist_ok=True)

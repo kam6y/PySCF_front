@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -17,6 +23,7 @@ import { ConfirmationModal } from '../components/ConfirmationModal';
 import { InlineOrbitalViewer } from '../components/InlineOrbitalViewer';
 import { InlineIRSpectrumViewer } from '../components/InlineIRSpectrumViewer';
 import { InlineMullikenChargeViewer } from '../components/InlineMullikenChargeViewer';
+import { LazyViewer } from '../components/LazyViewer';
 import styles from './AgentPage.module.css';
 
 // 確認リクエストの型定義
@@ -50,7 +57,7 @@ const parseCodeBlockParams = (code: string): Record<string, any> => {
   return params;
 };
 
-export const AgentPage = () => {
+export const AgentPage = React.memo(() => {
   // Zustandストアから会話履歴とエージェントステータスを取得
   const history = useAgentStore(state => state.history);
   const currentAgentStatus = useAgentStore(state => state.currentAgentStatus);
@@ -708,6 +715,502 @@ export const AgentPage = () => {
     return names[agent] || agent;
   };
 
+  // ReactMarkdownのcomponentsをメモ化してリロードを防ぐ
+  const markdownComponents = useMemo(
+    () => ({
+      pre: ({ children, ...props }: any) => {
+        // Debug logging for pre blocks
+        console.log('[Pre Component Debug]', {
+          childrenType: typeof children,
+          children: children,
+        });
+
+        // Check if this pre contains an orbital-viewer code block
+        if (React.isValidElement(children) && children.props) {
+          const codeProps = children.props as any;
+          const className = codeProps.className;
+
+          console.log('[Pre > Code Debug]', {
+            className,
+            hasClassName: !!className,
+            isOrbitalViewer: className?.includes('language-orbital-viewer'),
+          });
+
+          // Handle orbital-viewer code block
+          if (className?.includes('language-orbital-viewer')) {
+            try {
+              const codeContent = String(codeProps.children).replace(/\n$/, '');
+              const params = parseCodeBlockParams(codeContent);
+
+              console.log('[Orbital Viewer] Parsed params:', params);
+
+              // Validate required parameters
+              if (
+                !params.calculation_id ||
+                params.orbital_index === undefined
+              ) {
+                return (
+                  <div
+                    style={{
+                      padding: '12px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      color: '#dc2626',
+                      margin: '12px 0',
+                    }}
+                  >
+                    ❌ Invalid orbital-viewer block: missing required parameters
+                    (calculation_id, orbital_index)
+                  </div>
+                );
+              }
+
+              // Render InlineOrbitalViewer component
+              return (
+                <LazyViewer>
+                  <InlineOrbitalViewer
+                    calculation_id={params.calculation_id}
+                    orbital_index={params.orbital_index}
+                    grid_size={params.grid_size}
+                    isovalue_pos={params.isovalue_pos}
+                    isovalue_neg={params.isovalue_neg}
+                    onError={error => {
+                      console.error('Orbital viewer error:', error);
+                      addNotification({
+                        type: 'error',
+                        title: 'Orbital Viewer Error',
+                        message: error,
+                        autoClose: false,
+                        duration: 0,
+                      });
+                    }}
+                  />
+                </LazyViewer>
+              );
+            } catch (error) {
+              console.error('Failed to render orbital viewer:', error);
+              return (
+                <div
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    margin: '12px 0',
+                  }}
+                >
+                  ❌ Failed to render orbital viewer:{' '}
+                  {error instanceof Error ? error.message : String(error)}
+                </div>
+              );
+            }
+          }
+
+          // Handle ir-spectrum code block
+          if (className?.includes('language-ir-spectrum')) {
+            try {
+              const codeContent = String(codeProps.children).replace(/\n$/, '');
+              const params = parseCodeBlockParams(codeContent);
+
+              console.log('[IR Spectrum] Parsed params:', params);
+
+              // Validate required parameters
+              if (!params.calculation_id) {
+                return (
+                  <div
+                    style={{
+                      padding: '12px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      color: '#dc2626',
+                      margin: '12px 0',
+                    }}
+                  >
+                    ❌ Invalid ir-spectrum block: missing required parameter
+                    (calculation_id)
+                  </div>
+                );
+              }
+
+              // Render InlineIRSpectrumViewer component
+              return (
+                <LazyViewer>
+                  <InlineIRSpectrumViewer
+                    calculation_id={params.calculation_id}
+                    broadening_fwhm={params.broadening_fwhm}
+                    x_min={params.x_min}
+                    x_max={params.x_max}
+                    show_peaks={params.show_peaks}
+                    height={params.height}
+                    onError={error => {
+                      console.error('IR spectrum viewer error:', error);
+                      addNotification({
+                        type: 'error',
+                        title: 'IR Spectrum Viewer Error',
+                        message: error,
+                        autoClose: false,
+                        duration: 0,
+                      });
+                    }}
+                  />
+                </LazyViewer>
+              );
+            } catch (error) {
+              console.error('Failed to render IR spectrum viewer:', error);
+              return (
+                <div
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    margin: '12px 0',
+                  }}
+                >
+                  ❌ Failed to render IR spectrum viewer:{' '}
+                  {error instanceof Error ? error.message : String(error)}
+                </div>
+              );
+            }
+          }
+
+          // Handle mulliken-charges code block
+          if (className?.includes('language-mulliken-charges')) {
+            try {
+              const codeContent = String(codeProps.children).replace(/\n$/, '');
+              const params = parseCodeBlockParams(codeContent);
+
+              console.log('[Mulliken Charges] Parsed params:', params);
+
+              // Validate required parameters
+              if (!params.calculation_id) {
+                return (
+                  <div
+                    style={{
+                      padding: '12px',
+                      backgroundColor: '#fef2f2',
+                      border: '1px solid #fecaca',
+                      borderRadius: '8px',
+                      color: '#dc2626',
+                      margin: '12px 0',
+                    }}
+                  >
+                    ❌ Invalid mulliken-charges block: missing required
+                    parameter (calculation_id)
+                  </div>
+                );
+              }
+
+              // Render InlineMullikenChargeViewer component
+              return (
+                <LazyViewer>
+                  <InlineMullikenChargeViewer
+                    calculation_id={params.calculation_id}
+                    height={params.height}
+                    onError={error => {
+                      console.error('Mulliken charges viewer error:', error);
+                      addNotification({
+                        type: 'error',
+                        title: 'Mulliken Charges Viewer Error',
+                        message: error,
+                        autoClose: false,
+                        duration: 0,
+                      });
+                    }}
+                  />
+                </LazyViewer>
+              );
+            } catch (error) {
+              console.error('Failed to render Mulliken charges viewer:', error);
+              return (
+                <div
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    margin: '12px 0',
+                  }}
+                >
+                  ❌ Failed to render Mulliken charges viewer:{' '}
+                  {error instanceof Error ? error.message : String(error)}
+                </div>
+              );
+            }
+          }
+        }
+
+        // Default pre rendering
+        return <pre {...props}>{children}</pre>;
+      },
+      code: ({ className, children, ...props }: any) => {
+        // Debug logging
+        console.log('[Code Component Debug]', {
+          className,
+          inline: props.inline,
+          node: props.node,
+          childrenType: typeof children,
+          childrenValue: String(children).substring(0, 100),
+        });
+
+        // Check if this is a special code block
+        const inline = props.inline;
+
+        // Handle orbital-viewer code block
+        if (!inline && className?.includes('language-orbital-viewer')) {
+          try {
+            const codeContent = String(children).replace(/\n$/, '');
+            const params = parseCodeBlockParams(codeContent);
+
+            // Validate required parameters
+            if (!params.calculation_id || params.orbital_index === undefined) {
+              return (
+                <div
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    margin: '12px 0',
+                  }}
+                >
+                  ❌ Invalid orbital-viewer block: missing required parameters
+                  (calculation_id, orbital_index)
+                </div>
+              );
+            }
+
+            // Render InlineOrbitalViewer component
+            return (
+              <LazyViewer>
+                <InlineOrbitalViewer
+                  calculation_id={params.calculation_id}
+                  orbital_index={params.orbital_index}
+                  grid_size={params.grid_size}
+                  isovalue_pos={params.isovalue_pos}
+                  isovalue_neg={params.isovalue_neg}
+                  onError={error => {
+                    console.error('Orbital viewer error:', error);
+                    addNotification({
+                      type: 'error',
+                      title: 'Orbital Viewer Error',
+                      message: error,
+                      autoClose: false,
+                      duration: 0,
+                    });
+                  }}
+                />
+              </LazyViewer>
+            );
+          } catch (error) {
+            console.error('Failed to render orbital viewer:', error);
+            return (
+              <div
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#dc2626',
+                  margin: '12px 0',
+                }}
+              >
+                ❌ Failed to render orbital viewer:{' '}
+                {error instanceof Error ? error.message : String(error)}
+              </div>
+            );
+          }
+        }
+
+        // Handle ir-spectrum code block
+        if (!inline && className?.includes('language-ir-spectrum')) {
+          try {
+            const codeContent = String(children).replace(/\n$/, '');
+            const params = parseCodeBlockParams(codeContent);
+
+            // Validate required parameters
+            if (!params.calculation_id) {
+              return (
+                <div
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    margin: '12px 0',
+                  }}
+                >
+                  ❌ Invalid ir-spectrum block: missing required parameter
+                  (calculation_id)
+                </div>
+              );
+            }
+
+            // Render InlineIRSpectrumViewer component
+            return (
+              <LazyViewer>
+                <InlineIRSpectrumViewer
+                  calculation_id={params.calculation_id}
+                  broadening_fwhm={params.broadening_fwhm}
+                  x_min={params.x_min}
+                  x_max={params.x_max}
+                  show_peaks={params.show_peaks}
+                  height={params.height}
+                  onError={error => {
+                    console.error('IR spectrum viewer error:', error);
+                    addNotification({
+                      type: 'error',
+                      title: 'IR Spectrum Viewer Error',
+                      message: error,
+                      autoClose: false,
+                      duration: 0,
+                    });
+                  }}
+                />
+              </LazyViewer>
+            );
+          } catch (error) {
+            console.error('Failed to render IR spectrum viewer:', error);
+            return (
+              <div
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#dc2626',
+                  margin: '12px 0',
+                }}
+              >
+                ❌ Failed to render IR spectrum viewer:{' '}
+                {error instanceof Error ? error.message : String(error)}
+              </div>
+            );
+          }
+        }
+
+        // Handle mulliken-charges code block
+        if (!inline && className?.includes('language-mulliken-charges')) {
+          try {
+            const codeContent = String(children).replace(/\n$/, '');
+            const params = parseCodeBlockParams(codeContent);
+
+            // Validate required parameters
+            if (!params.calculation_id) {
+              return (
+                <div
+                  style={{
+                    padding: '12px',
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #fecaca',
+                    borderRadius: '8px',
+                    color: '#dc2626',
+                    margin: '12px 0',
+                  }}
+                >
+                  ❌ Invalid mulliken-charges block: missing required parameter
+                  (calculation_id)
+                </div>
+              );
+            }
+
+            // Render InlineMullikenChargeViewer component
+            return (
+              <LazyViewer>
+                <InlineMullikenChargeViewer
+                  calculation_id={params.calculation_id}
+                  height={params.height}
+                  onError={error => {
+                    console.error('Mulliken charges viewer error:', error);
+                    addNotification({
+                      type: 'error',
+                      title: 'Mulliken Charges Viewer Error',
+                      message: error,
+                      autoClose: false,
+                      duration: 0,
+                    });
+                  }}
+                />
+              </LazyViewer>
+            );
+          } catch (error) {
+            console.error('Failed to render Mulliken charges viewer:', error);
+            return (
+              <div
+                style={{
+                  padding: '12px',
+                  backgroundColor: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  borderRadius: '8px',
+                  color: '#dc2626',
+                  margin: '12px 0',
+                }}
+              >
+                ❌ Failed to render Mulliken charges viewer:{' '}
+                {error instanceof Error ? error.message : String(error)}
+              </div>
+            );
+          }
+        }
+
+        // Default code block rendering
+        return (
+          <code className={className} {...props}>
+            {children}
+          </code>
+        );
+      },
+      a: ({ href, children, ...props }: any) => {
+        // Handle external links - open in default browser
+        const handleClick = async (e: React.MouseEvent) => {
+          if (
+            href &&
+            (href.startsWith('http://') || href.startsWith('https://'))
+          ) {
+            e.preventDefault();
+            try {
+              const result = await window.electronAPI.openExternalUrl(href);
+              if (!result.success) {
+                console.error('Failed to open URL:', result.error);
+                addNotification({
+                  type: 'error',
+                  title: 'Failed to open link',
+                  message:
+                    result.error || 'Could not open the URL in your browser.',
+                  autoClose: true,
+                  duration: 5000,
+                });
+              }
+            } catch (error) {
+              console.error('Error opening external URL:', error);
+              addNotification({
+                type: 'error',
+                title: 'Failed to open link',
+                message: 'An unexpected error occurred.',
+                autoClose: true,
+                duration: 5000,
+              });
+            }
+          }
+        };
+
+        return (
+          <a href={href} onClick={handleClick} {...props}>
+            {children}
+          </a>
+        );
+      },
+    }),
+    [addNotification]
+  );
+
   return (
     <div className={styles.agentPageContainer}>
       {/* Title and New Chat button container - only show when there's an active session */}
@@ -849,600 +1352,7 @@ export const AgentPage = () => {
                         ]}
                         unwrapDisallowed={true}
                         className={styles.markdown}
-                        components={{
-                          pre: ({ children, ...props }: any) => {
-                            // Debug logging for pre blocks
-                            console.log('[Pre Component Debug]', {
-                              childrenType: typeof children,
-                              children: children,
-                            });
-
-                            // Check if this pre contains an orbital-viewer code block
-                            if (
-                              React.isValidElement(children) &&
-                              children.props
-                            ) {
-                              const codeProps = children.props as any;
-                              const className = codeProps.className;
-
-                              console.log('[Pre > Code Debug]', {
-                                className,
-                                hasClassName: !!className,
-                                isOrbitalViewer: className?.includes(
-                                  'language-orbital-viewer'
-                                ),
-                              });
-
-                              // Handle orbital-viewer code block
-                              if (
-                                className?.includes('language-orbital-viewer')
-                              ) {
-                                try {
-                                  const codeContent = String(
-                                    codeProps.children
-                                  ).replace(/\n$/, '');
-                                  const params =
-                                    parseCodeBlockParams(codeContent);
-
-                                  console.log(
-                                    '[Orbital Viewer] Parsed params:',
-                                    params
-                                  );
-
-                                  // Validate required parameters
-                                  if (
-                                    !params.calculation_id ||
-                                    params.orbital_index === undefined
-                                  ) {
-                                    return (
-                                      <div
-                                        style={{
-                                          padding: '12px',
-                                          backgroundColor: '#fef2f2',
-                                          border: '1px solid #fecaca',
-                                          borderRadius: '8px',
-                                          color: '#dc2626',
-                                          margin: '12px 0',
-                                        }}
-                                      >
-                                        ❌ Invalid orbital-viewer block: missing
-                                        required parameters (calculation_id,
-                                        orbital_index)
-                                      </div>
-                                    );
-                                  }
-
-                                  // Render InlineOrbitalViewer component
-                                  return (
-                                    <InlineOrbitalViewer
-                                      calculation_id={params.calculation_id}
-                                      orbital_index={params.orbital_index}
-                                      grid_size={params.grid_size}
-                                      isovalue_pos={params.isovalue_pos}
-                                      isovalue_neg={params.isovalue_neg}
-                                      onError={error => {
-                                        console.error(
-                                          'Orbital viewer error:',
-                                          error
-                                        );
-                                        addNotification({
-                                          type: 'error',
-                                          title: 'Orbital Viewer Error',
-                                          message: error,
-                                          autoClose: false,
-                                          duration: 0,
-                                        });
-                                      }}
-                                    />
-                                  );
-                                } catch (error) {
-                                  console.error(
-                                    'Failed to render orbital viewer:',
-                                    error
-                                  );
-                                  return (
-                                    <div
-                                      style={{
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '8px',
-                                        color: '#dc2626',
-                                        margin: '12px 0',
-                                      }}
-                                    >
-                                      ❌ Failed to render orbital viewer:{' '}
-                                      {error instanceof Error
-                                        ? error.message
-                                        : String(error)}
-                                    </div>
-                                  );
-                                }
-                              }
-
-                              // Handle ir-spectrum code block
-                              if (className?.includes('language-ir-spectrum')) {
-                                try {
-                                  const codeContent = String(
-                                    codeProps.children
-                                  ).replace(/\n$/, '');
-                                  const params =
-                                    parseCodeBlockParams(codeContent);
-
-                                  console.log(
-                                    '[IR Spectrum] Parsed params:',
-                                    params
-                                  );
-
-                                  // Validate required parameters
-                                  if (!params.calculation_id) {
-                                    return (
-                                      <div
-                                        style={{
-                                          padding: '12px',
-                                          backgroundColor: '#fef2f2',
-                                          border: '1px solid #fecaca',
-                                          borderRadius: '8px',
-                                          color: '#dc2626',
-                                          margin: '12px 0',
-                                        }}
-                                      >
-                                        ❌ Invalid ir-spectrum block: missing
-                                        required parameter (calculation_id)
-                                      </div>
-                                    );
-                                  }
-
-                                  // Render InlineIRSpectrumViewer component
-                                  return (
-                                    <InlineIRSpectrumViewer
-                                      calculation_id={params.calculation_id}
-                                      broadening_fwhm={params.broadening_fwhm}
-                                      x_min={params.x_min}
-                                      x_max={params.x_max}
-                                      show_peaks={params.show_peaks}
-                                      height={params.height}
-                                      onError={error => {
-                                        console.error(
-                                          'IR spectrum viewer error:',
-                                          error
-                                        );
-                                        addNotification({
-                                          type: 'error',
-                                          title: 'IR Spectrum Viewer Error',
-                                          message: error,
-                                          autoClose: false,
-                                          duration: 0,
-                                        });
-                                      }}
-                                    />
-                                  );
-                                } catch (error) {
-                                  console.error(
-                                    'Failed to render IR spectrum viewer:',
-                                    error
-                                  );
-                                  return (
-                                    <div
-                                      style={{
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '8px',
-                                        color: '#dc2626',
-                                        margin: '12px 0',
-                                      }}
-                                    >
-                                      ❌ Failed to render IR spectrum viewer:{' '}
-                                      {error instanceof Error
-                                        ? error.message
-                                        : String(error)}
-                                    </div>
-                                  );
-                                }
-                              }
-
-                              // Handle mulliken-charges code block
-                              if (
-                                className?.includes('language-mulliken-charges')
-                              ) {
-                                try {
-                                  const codeContent = String(
-                                    codeProps.children
-                                  ).replace(/\n$/, '');
-                                  const params =
-                                    parseCodeBlockParams(codeContent);
-
-                                  console.log(
-                                    '[Mulliken Charges] Parsed params:',
-                                    params
-                                  );
-
-                                  // Validate required parameters
-                                  if (!params.calculation_id) {
-                                    return (
-                                      <div
-                                        style={{
-                                          padding: '12px',
-                                          backgroundColor: '#fef2f2',
-                                          border: '1px solid #fecaca',
-                                          borderRadius: '8px',
-                                          color: '#dc2626',
-                                          margin: '12px 0',
-                                        }}
-                                      >
-                                        ❌ Invalid mulliken-charges block:
-                                        missing required parameter
-                                        (calculation_id)
-                                      </div>
-                                    );
-                                  }
-
-                                  // Render InlineMullikenChargeViewer component
-                                  return (
-                                    <InlineMullikenChargeViewer
-                                      calculation_id={params.calculation_id}
-                                      height={params.height}
-                                      onError={error => {
-                                        console.error(
-                                          'Mulliken charges viewer error:',
-                                          error
-                                        );
-                                        addNotification({
-                                          type: 'error',
-                                          title:
-                                            'Mulliken Charges Viewer Error',
-                                          message: error,
-                                          autoClose: false,
-                                          duration: 0,
-                                        });
-                                      }}
-                                    />
-                                  );
-                                } catch (error) {
-                                  console.error(
-                                    'Failed to render Mulliken charges viewer:',
-                                    error
-                                  );
-                                  return (
-                                    <div
-                                      style={{
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '8px',
-                                        color: '#dc2626',
-                                        margin: '12px 0',
-                                      }}
-                                    >
-                                      ❌ Failed to render Mulliken charges
-                                      viewer:{' '}
-                                      {error instanceof Error
-                                        ? error.message
-                                        : String(error)}
-                                    </div>
-                                  );
-                                }
-                              }
-                            }
-
-                            // Default pre rendering
-                            return <pre {...props}>{children}</pre>;
-                          },
-                          code: ({ className, children, ...props }: any) => {
-                            // Debug logging
-                            console.log('[Code Component Debug]', {
-                              className,
-                              inline: props.inline,
-                              node: props.node,
-                              childrenType: typeof children,
-                              childrenValue: String(children).substring(0, 100),
-                            });
-
-                            // Check if this is a special code block
-                            const inline = props.inline;
-
-                            // Handle orbital-viewer code block
-                            if (
-                              !inline &&
-                              className?.includes('language-orbital-viewer')
-                            ) {
-                              try {
-                                const codeContent = String(children).replace(
-                                  /\n$/,
-                                  ''
-                                );
-                                const params =
-                                  parseCodeBlockParams(codeContent);
-
-                                // Validate required parameters
-                                if (
-                                  !params.calculation_id ||
-                                  params.orbital_index === undefined
-                                ) {
-                                  return (
-                                    <div
-                                      style={{
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '8px',
-                                        color: '#dc2626',
-                                        margin: '12px 0',
-                                      }}
-                                    >
-                                      ❌ Invalid orbital-viewer block: missing
-                                      required parameters (calculation_id,
-                                      orbital_index)
-                                    </div>
-                                  );
-                                }
-
-                                // Render InlineOrbitalViewer component
-                                return (
-                                  <InlineOrbitalViewer
-                                    calculation_id={params.calculation_id}
-                                    orbital_index={params.orbital_index}
-                                    grid_size={params.grid_size}
-                                    isovalue_pos={params.isovalue_pos}
-                                    isovalue_neg={params.isovalue_neg}
-                                    onError={error => {
-                                      console.error(
-                                        'Orbital viewer error:',
-                                        error
-                                      );
-                                      addNotification({
-                                        type: 'error',
-                                        title: 'Orbital Viewer Error',
-                                        message: error,
-                                        autoClose: false,
-                                        duration: 0,
-                                      });
-                                    }}
-                                  />
-                                );
-                              } catch (error) {
-                                console.error(
-                                  'Failed to render orbital viewer:',
-                                  error
-                                );
-                                return (
-                                  <div
-                                    style={{
-                                      padding: '12px',
-                                      backgroundColor: '#fef2f2',
-                                      border: '1px solid #fecaca',
-                                      borderRadius: '8px',
-                                      color: '#dc2626',
-                                      margin: '12px 0',
-                                    }}
-                                  >
-                                    ❌ Failed to render orbital viewer:{' '}
-                                    {error instanceof Error
-                                      ? error.message
-                                      : String(error)}
-                                  </div>
-                                );
-                              }
-                            }
-
-                            // Handle ir-spectrum code block
-                            if (
-                              !inline &&
-                              className?.includes('language-ir-spectrum')
-                            ) {
-                              try {
-                                const codeContent = String(children).replace(
-                                  /\n$/,
-                                  ''
-                                );
-                                const params =
-                                  parseCodeBlockParams(codeContent);
-
-                                // Validate required parameters
-                                if (!params.calculation_id) {
-                                  return (
-                                    <div
-                                      style={{
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '8px',
-                                        color: '#dc2626',
-                                        margin: '12px 0',
-                                      }}
-                                    >
-                                      ❌ Invalid ir-spectrum block: missing
-                                      required parameter (calculation_id)
-                                    </div>
-                                  );
-                                }
-
-                                // Render InlineIRSpectrumViewer component
-                                return (
-                                  <InlineIRSpectrumViewer
-                                    calculation_id={params.calculation_id}
-                                    broadening_fwhm={params.broadening_fwhm}
-                                    x_min={params.x_min}
-                                    x_max={params.x_max}
-                                    show_peaks={params.show_peaks}
-                                    height={params.height}
-                                    onError={error => {
-                                      console.error(
-                                        'IR spectrum viewer error:',
-                                        error
-                                      );
-                                      addNotification({
-                                        type: 'error',
-                                        title: 'IR Spectrum Viewer Error',
-                                        message: error,
-                                        autoClose: false,
-                                        duration: 0,
-                                      });
-                                    }}
-                                  />
-                                );
-                              } catch (error) {
-                                console.error(
-                                  'Failed to render IR spectrum viewer:',
-                                  error
-                                );
-                                return (
-                                  <div
-                                    style={{
-                                      padding: '12px',
-                                      backgroundColor: '#fef2f2',
-                                      border: '1px solid #fecaca',
-                                      borderRadius: '8px',
-                                      color: '#dc2626',
-                                      margin: '12px 0',
-                                    }}
-                                  >
-                                    ❌ Failed to render IR spectrum viewer:{' '}
-                                    {error instanceof Error
-                                      ? error.message
-                                      : String(error)}
-                                  </div>
-                                );
-                              }
-                            }
-
-                            // Handle mulliken-charges code block
-                            if (
-                              !inline &&
-                              className?.includes('language-mulliken-charges')
-                            ) {
-                              try {
-                                const codeContent = String(children).replace(
-                                  /\n$/,
-                                  ''
-                                );
-                                const params =
-                                  parseCodeBlockParams(codeContent);
-
-                                // Validate required parameters
-                                if (!params.calculation_id) {
-                                  return (
-                                    <div
-                                      style={{
-                                        padding: '12px',
-                                        backgroundColor: '#fef2f2',
-                                        border: '1px solid #fecaca',
-                                        borderRadius: '8px',
-                                        color: '#dc2626',
-                                        margin: '12px 0',
-                                      }}
-                                    >
-                                      ❌ Invalid mulliken-charges block: missing
-                                      required parameter (calculation_id)
-                                    </div>
-                                  );
-                                }
-
-                                // Render InlineMullikenChargeViewer component
-                                return (
-                                  <InlineMullikenChargeViewer
-                                    calculation_id={params.calculation_id}
-                                    height={params.height}
-                                    onError={error => {
-                                      console.error(
-                                        'Mulliken charges viewer error:',
-                                        error
-                                      );
-                                      addNotification({
-                                        type: 'error',
-                                        title: 'Mulliken Charges Viewer Error',
-                                        message: error,
-                                        autoClose: false,
-                                        duration: 0,
-                                      });
-                                    }}
-                                  />
-                                );
-                              } catch (error) {
-                                console.error(
-                                  'Failed to render Mulliken charges viewer:',
-                                  error
-                                );
-                                return (
-                                  <div
-                                    style={{
-                                      padding: '12px',
-                                      backgroundColor: '#fef2f2',
-                                      border: '1px solid #fecaca',
-                                      borderRadius: '8px',
-                                      color: '#dc2626',
-                                      margin: '12px 0',
-                                    }}
-                                  >
-                                    ❌ Failed to render Mulliken charges viewer:{' '}
-                                    {error instanceof Error
-                                      ? error.message
-                                      : String(error)}
-                                  </div>
-                                );
-                              }
-                            }
-
-                            // Default code block rendering
-                            return (
-                              <code className={className} {...props}>
-                                {children}
-                              </code>
-                            );
-                          },
-                          a: ({ href, children, ...props }: any) => {
-                            // Handle external links - open in default browser
-                            const handleClick = async (e: React.MouseEvent) => {
-                              if (
-                                href &&
-                                (href.startsWith('http://') ||
-                                  href.startsWith('https://'))
-                              ) {
-                                e.preventDefault();
-                                try {
-                                  const result =
-                                    await window.electronAPI.openExternalUrl(
-                                      href
-                                    );
-                                  if (!result.success) {
-                                    console.error(
-                                      'Failed to open URL:',
-                                      result.error
-                                    );
-                                    addNotification({
-                                      type: 'error',
-                                      title: 'Failed to open link',
-                                      message:
-                                        result.error ||
-                                        'Could not open the URL in your browser.',
-                                      autoClose: true,
-                                      duration: 5000,
-                                    });
-                                  }
-                                } catch (error) {
-                                  console.error(
-                                    'Error opening external URL:',
-                                    error
-                                  );
-                                  addNotification({
-                                    type: 'error',
-                                    title: 'Failed to open link',
-                                    message: 'An unexpected error occurred.',
-                                    autoClose: true,
-                                    duration: 5000,
-                                  });
-                                }
-                              }
-                            };
-
-                            return (
-                              <a href={href} onClick={handleClick} {...props}>
-                                {children}
-                              </a>
-                            );
-                          },
-                        }}
+                        components={markdownComponents}
                       >
                         {entry.parts[0].text}
                       </ReactMarkdown>
@@ -1573,4 +1483,4 @@ export const AgentPage = () => {
       />
     </div>
   );
-};
+});

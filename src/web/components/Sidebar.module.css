@@ -182,8 +182,8 @@
   background: #f8f9fa;
 }
 
-/* Instances tab (cyan) */
-.instancesTab.active {
+/* Calculations tab (cyan) */
+.calculationsTab.active {
   color: #50D4F5;
   border-bottom-color: #50D4F5;
   text-shadow: 0 0 0.5px #50D4F5, 0 0 0.5px #50D4F5;

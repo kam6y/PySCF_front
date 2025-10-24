@@ -397,7 +397,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setCalculationsToDelete([]);
     } catch (error) {
       console.error('一括削除中にエラーが発生しました:', error);
-      alert('Failed to delete some instances.');
+      alert('Failed to delete some calculations.');
     }
   };
 
@@ -443,7 +443,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Top Section - Create button and Search */}
           <div className={styles.sidebarTopSection}>
             <button className={styles.createNewButton} onClick={onCreateNew}>
-              + Make a instance
+              + New Calculation
             </button>
             <div className={styles.searchContainer}>
               <svg
@@ -485,12 +485,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className={styles.sidebarHeader}>
               <div className={styles.sidebarViewTabs}>
                 <button
-                  className={`${styles.sidebarViewTab} ${styles.instancesTab} ${
-                    sidebarView === 'instances' ? styles.active : ''
+                  className={`${styles.sidebarViewTab} ${styles.calculationsTab} ${
+                    sidebarView === 'calculations' ? styles.active : ''
                   }`}
-                  onClick={() => onSidebarViewChange('instances')}
+                  onClick={() => onSidebarViewChange('calculations')}
                 >
-                  Instances
+                  Calculations
                 </button>
                 <button
                   className={`${styles.sidebarViewTab} ${styles.chatsTab} ${
@@ -504,10 +504,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className={styles.sidebarCalculations}>
-              {sidebarView === 'instances' ? (
+              {sidebarView === 'calculations' ? (
                 calculationsLoading ? (
                   <div className={styles.sidebarLoading}>
-                    <p>Loading instances...</p>
+                    <p>Loading calculations...</p>
                   </div>
                 ) : calculationsError ? (
                   <div className={styles.sidebarError}>
@@ -515,7 +515,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 ) : calculations.length === 0 ? (
                   <div className={styles.sidebarEmpty}>
-                    <p>No instances yet</p>
+                    <p>No calculations yet</p>
                     <p>Click the + button to create one</p>
                   </div>
                 ) : (
@@ -538,7 +538,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                 e.stopPropagation();
                                 handleBulkDeleteError(group.calculations);
                               }}
-                              title={`Bulk delete ${group.calculations.length} error instances`}
+                              title={`Bulk delete ${group.calculations.length} error calculations`}
                             >
                               <svg
                                 width="14"
@@ -651,8 +651,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Bulk Delete Confirmation Modal */}
       <ConfirmationModal
         isOpen={isBulkDeleteModalOpen}
-        title="Bulk Delete Error Instances"
-        message={`Do you want to delete ${calculationsToDelete.length} error instances? This operation cannot be undone.`}
+        title="Bulk Delete Error Calculations"
+        message={`Do you want to delete ${calculationsToDelete.length} error calculations? This operation cannot be undone.`}
         confirmButtonText="Delete All"
         cancelButtonText="Cancel"
         onConfirm={handleConfirmBulkDelete}
