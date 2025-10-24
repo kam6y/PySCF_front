@@ -102,6 +102,19 @@ export interface GLViewer {
   removeSurface(surfid: number): GLViewer;
   removeAllSurfaces(): GLViewer;
 
+  addVolumetricData(
+    data: string,
+    format: string,
+    spec: {
+      isoval?: number;
+      color?: string;
+      opacity?: number;
+      voldata?: any;
+      volscheme?: any;
+    }
+  ): any;
+  addIsosurface(volumedata: any, spec: any): any;
+
   spin(axis?: string, speed?: number): GLViewer;
   stopAnimate(): GLViewer;
 

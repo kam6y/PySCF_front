@@ -9,8 +9,8 @@ import {
 import { OrbitalInfo } from '../types/api-types';
 import styles from './MolecularOrbitalViewer.module.css';
 
-// 3dmolライブラリをインポート
-import * as $3Dmol from '3dmol';
+// 3Dmol.jsはCDNから読み込まれ、グローバル変数として利用可能
+declare const $3Dmol: any;
 
 interface MolecularOrbitalViewerProps {
   calculationId: string;
