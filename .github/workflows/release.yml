@@ -14,9 +14,7 @@ jobs:
             platform: linux
           - os: macos-latest
             platform: darwin
-          - os: windows-latest
-            platform: win32
-    
+
     runs-on: ${{ matrix.os }}
     
     steps:
@@ -40,13 +38,19 @@ jobs:
     
     - name: Install Node.js dependencies
       run: npm ci
-    
-    - name: Generate code and build application
+
+    - name: Verify conda environment
+      shell: bash -l {0}
+      run: |
+        conda activate pyscf-env
+        npm run verify-env
+
+    - name: Build application
       shell: bash -l {0}
       run: |
         conda activate pyscf-env
         npm run build
-    
+
     - name: Package application
       shell: bash -l {0}
       run: |
@@ -54,15 +58,15 @@ jobs:
         npm run package
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
+
     - name: Upload release artifacts
       uses: actions/upload-artifact@v4
       with:
         name: release-${{ matrix.platform }}
         path: |
-          dist/
-          python_dist/
-          release/
+          dist/*.AppImage
+          dist/*.dmg
+          dist/*.zip
         retention-days: 30
 
   create-release:

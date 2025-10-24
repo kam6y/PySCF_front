@@ -10,8 +10,8 @@ jobs:
   test-and-build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    
+        os: [ubuntu-latest, macos-latest]
+
     runs-on: ${{ matrix.os }}
     
     steps:
@@ -44,36 +44,39 @@ jobs:
     
     - name: Install Node.js dependencies
       run: npm ci
-    
+
+    - name: Verify conda environment
+      shell: bash -l {0}
+      run: |
+        conda activate pyscf-env
+        npm run verify-env
+
     - name: Generate code from OpenAPI spec
       shell: bash -l {0}
       run: |
         conda activate pyscf-env
         npm run codegen
-    
+
     - name: Run Python tests
       shell: bash -l {0}
       run: |
         conda activate pyscf-env
         cd src/python
         python -m pytest tests/ -v
-    
-    - name: Build Python backend
+
+    - name: Build application (production)
       shell: bash -l {0}
       run: |
         conda activate pyscf-env
-        npm run build:python
-    
-    - name: Build frontend (production)
-      run: npm run build:webpack
-    
+        npm run build
+
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
         name: build-artifacts-${{ matrix.os }}
         path: |
           dist/
-          python_dist/
+          conda_env/
         retention-days: 7
 
   lint-and-type-check:
