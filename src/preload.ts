@@ -24,4 +24,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
       filePath: string | null;
       error?: string;
     }>,
+  getPlatform: () => ipcRenderer.invoke('get-platform'),
 });

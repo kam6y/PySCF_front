@@ -16,6 +16,7 @@ export interface ElectronAPI {
     filePath: string | null;
     error?: string;
   }>;
+  getPlatform: () => Promise<string>;
 }
 
 declare global {

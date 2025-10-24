@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DropdownMenu, DropdownOption } from './DropdownMenu';
 import { AIAgentSwitch } from './AIAgentSwitch';
 import styles from './Header.module.css';
@@ -28,6 +28,21 @@ export const Header: React.FC<HeaderProps> = ({
   isAIAgentEnabled,
   onAIAgentToggle,
 }) => {
+  const [platform, setPlatform] = useState<string>('');
+
+  // Get platform information on mount
+  useEffect(() => {
+    const fetchPlatform = async () => {
+      try {
+        const platformName = await window.electronAPI.getPlatform();
+        setPlatform(platformName);
+      } catch (error) {
+        console.error('Failed to get platform:', error);
+      }
+    };
+    fetchPlatform();
+  }, []);
+
   // Get page icon based on current page
   const getPageIcon = (page: DropdownOption) => {
     switch (page) {
@@ -119,7 +134,9 @@ export const Header: React.FC<HeaderProps> = ({
           <h1 className={styles.appTitle}>PySCF_front</h1>
         </div>
         {/* Right Section */}
-        <div className={styles.headerRight}>
+        <div
+          className={`${styles.headerRight} ${platform === 'linux' ? styles.headerRightLinux : ''}`}
+        >
           <button
             className={`${styles.dropdownButton} ${isDropdownOpen ? styles.active : ''}`}
             onClick={onDropdownToggle}

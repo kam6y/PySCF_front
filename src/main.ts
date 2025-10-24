@@ -927,6 +927,9 @@ app.on('before-quit', () => {
 // IPC handler for renderer to get port (fallback)
 ipcMain.handle('get-flask-port', () => flaskPort);
 
+// IPC handler for getting platform information
+ipcMain.handle('get-platform', () => process.platform);
+
 // IPC handler for opening external URLs in default browser
 ipcMain.handle('open-external-url', async (_event, url: string) => {
   try {

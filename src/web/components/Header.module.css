@@ -55,6 +55,11 @@
   -webkit-app-region: no-drag;
 }
 
+/* Linux specific styles - add padding to avoid window controls overlap */
+.headerRightLinux {
+  padding-right: 100px;
+}
+
 .dropdownButton {
   display: flex;
   align-items: center;
