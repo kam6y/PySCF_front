@@ -5,7 +5,6 @@ import { Editor } from 'ketcher-react';
 import { StandaloneStructServiceProvider } from 'ketcher-standalone';
 import { Ketcher } from 'ketcher-core';
 import 'ketcher-react/dist/index.css';
-import 'miew/dist/miew.min.css';
 import styles from './DrawMoleculePage.module.css';
 import { convertSmilesToXyz } from '../apiClient';
 import { useUIStore } from '../store/uiStore';

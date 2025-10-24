@@ -139,6 +139,88 @@ The packaging process creates platform-specific installers in the `dist/` direct
 -   `PySCF_front-win32-x64.exe` (For Windows)
 -   `PySCF_front-linux-x86_64.AppImage` (For Linux)
 
+### Building for Linux on Windows
+
+There are two methods for building Linux applications on Windows:
+
+#### Method 1: Using Docker (Recommended)
+
+This is the simplest method, requiring only Docker Desktop with WSL2 backend.
+
+**Prerequisites:**
+- Docker Desktop installed and running
+- WSL2 enabled
+
+**Build Command:**
+```bash
+# Build Docker image and create Linux package (one command)
+npm run package:linux:docker
+```
+
+This command automatically:
+1. Builds a Docker image with all necessary dependencies
+2. Runs the build inside a Linux container
+3. Outputs the AppImage to the `dist/` directory on your host machine
+
+**Advanced Usage:**
+```bash
+# Build Docker image only
+npm run docker:build
+
+# Run build with existing image (faster for subsequent builds)
+npm run docker:package
+```
+
+#### Method 2: Using WSL Directly
+
+For more control, you can build directly in WSL (Windows Subsystem for Linux):
+
+**Prerequisites:**
+1. **WSL2** installed with a Linux distribution (Ubuntu recommended)
+2. **Miniforge** installed in WSL environment
+3. **Node.js** installed in WSL environment
+
+**Setup in WSL**
+```bash
+# Access WSL
+wsl
+
+# Install Miniforge in WSL
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
+
+# Initialize conda
+source $HOME/miniforge3/etc/profile.d/conda.sh
+
+# Navigate to your project directory (example)
+cd /mnt/c/Users/YOUR_USERNAME/Documents/PySCF_front
+
+# Install Node.js dependencies
+npm install
+
+# Create conda environment from environment.yml
+conda env create -f .github/environment.yml
+
+# Activate the environment
+conda activate pyscf-env
+
+# Verify the setup
+npm run verify-env
+```
+
+#### Building Linux Application
+```bash
+# In WSL, with pyscf-env activated
+conda activate pyscf-env
+
+# Build and package for Linux
+npm run package:linux
+```
+
+The built AppImage will be available in the `dist/` directory.
+
+**Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, PyInstaller, and electron-builder) in the Linux environment.
+
 ---
 
 ## Troubleshooting

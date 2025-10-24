@@ -35,6 +35,7 @@ dependencies:
     - flask-sock==0.7.0
     # Code generation and build tools
     - datamodel-code-generator==0.33.0
+    - pyinstaller==6.11.1
     # File system monitoring
     - watchdog==6.0.0
     # Testing framework for Flask
