@@ -25,4 +25,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       error?: string;
     }>,
   getPlatform: () => ipcRenderer.invoke('get-platform'),
+  isFullScreen: () => ipcRenderer.invoke('get-fullscreen'),
+  onFullScreenChange: (callback: (isFullScreen: boolean) => void) => {
+    const handler = (_event: any, isFullScreen: boolean) =>
+      callback(isFullScreen);
+    ipcRenderer.on('fullscreen-changed', handler);
+    // Return a cleanup function
+    return () => {
+      ipcRenderer.removeListener('fullscreen-changed', handler);
+    };
+  },
 });

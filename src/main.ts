@@ -866,6 +866,15 @@ const createWindow = async () => {
     mainWindow?.webContents.send('set-flask-port', flaskPort);
   });
 
+  // 全画面状態の変更をレンダラープロセスに通知
+  mainWindow.on('enter-full-screen', () => {
+    mainWindow?.webContents.send('fullscreen-changed', true);
+  });
+
+  mainWindow.on('leave-full-screen', () => {
+    mainWindow?.webContents.send('fullscreen-changed', false);
+  });
+
   // ウィンドウが閉じられた時の処理
   mainWindow.on('closed', () => {
     console.log('Main window closed');
@@ -929,6 +938,14 @@ ipcMain.handle('get-flask-port', () => flaskPort);
 
 // IPC handler for getting platform information
 ipcMain.handle('get-platform', () => process.platform);
+
+// IPC handler for getting fullscreen state
+ipcMain.handle('get-fullscreen', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    return mainWindow.isFullScreen();
+  }
+  return false;
+});
 
 // IPC handler for opening external URLs in default browser
 ipcMain.handle('open-external-url', async (_event, url: string) => {

@@ -46,7 +46,7 @@
 /* Top Section */
 .sidebarTopSection {
   padding: 20px;
-  padding-top: 52px; /* Account for header height (40px) + extra spacing */
+  padding-top: 48px; /* Account for header height (40px) + extra spacing */
   padding-bottom: 12px;
 }
 

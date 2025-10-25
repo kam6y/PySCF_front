@@ -10,7 +10,6 @@
 .independentSidebarToggle {
   position: fixed;
   top: 6px;
-  left: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -23,6 +22,21 @@
   cursor: pointer;
   transition: all 0.3s ease-out;
   z-index: 1002;
+}
+
+/* macOS: Position after window control buttons */
+.independentSidebarToggle.platformMac {
+  left: 80px;
+}
+
+/* macOS fullscreen: Position near the left edge (no window controls) */
+.independentSidebarToggle.platformMacFullScreen {
+  left: 24px;
+}
+
+/* Linux: Position near the left edge */
+.independentSidebarToggle.platformLinux {
+  left: 24px;
 }
 
 .independentSidebarToggle:hover {

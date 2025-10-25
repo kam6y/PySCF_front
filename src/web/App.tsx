@@ -37,6 +37,42 @@ export const App = () => {
   const [showInitialSetup, setShowInitialSetup] = useState(false);
   const [defaultDirectory, setDefaultDirectory] = useState('');
 
+  // プラットフォーム情報の取得
+  const [platform, setPlatform] = useState<string>('');
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const fetchPlatform = async () => {
+      try {
+        const platformName = await window.electronAPI.getPlatform();
+        setPlatform(platformName);
+      } catch (error) {
+        console.error('Failed to get platform:', error);
+      }
+    };
+    fetchPlatform();
+  }, []);
+
+  // 全画面状態の取得と監視
+  useEffect(() => {
+    const fetchFullScreen = async () => {
+      try {
+        const fullScreen = await window.electronAPI.isFullScreen();
+        setIsFullScreen(fullScreen);
+      } catch (error) {
+        console.error('Failed to get fullscreen state:', error);
+      }
+    };
+    fetchFullScreen();
+
+    // 全画面状態の変更を監視
+    const cleanup = window.electronAPI.onFullScreenChange((fullScreen) => {
+      setIsFullScreen(fullScreen);
+    });
+
+    return cleanup;
+  }, []);
+
   // 初回起動チェック
   useEffect(() => {
     if (settings) {
@@ -204,7 +240,13 @@ export const App = () => {
   return (
     <div className={styles.appContainer}>
       <button
-        className={`${styles.independentSidebarToggle} ${appState.ui.isSidebarOpen ? styles.sidebarOpen : ''}`}
+        className={`${styles.independentSidebarToggle} ${appState.ui.isSidebarOpen ? styles.sidebarOpen : ''} ${
+          platform === 'linux'
+            ? styles.platformLinux
+            : platform === 'darwin' && isFullScreen
+              ? styles.platformMacFullScreen
+              : styles.platformMac
+        }`}
         onClick={appState.ui.toggleSidebar}
         aria-label="Toggle sidebar"
       >

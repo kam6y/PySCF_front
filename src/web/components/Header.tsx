@@ -29,6 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   onAIAgentToggle,
 }) => {
   const [platform, setPlatform] = useState<string>('');
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
 
   // Get platform information on mount
   useEffect(() => {
@@ -41,6 +42,26 @@ export const Header: React.FC<HeaderProps> = ({
       }
     };
     fetchPlatform();
+  }, []);
+
+  // Get and monitor fullscreen state
+  useEffect(() => {
+    const fetchFullScreen = async () => {
+      try {
+        const fullScreen = await window.electronAPI.isFullScreen();
+        setIsFullScreen(fullScreen);
+      } catch (error) {
+        console.error('Failed to get fullscreen state:', error);
+      }
+    };
+    fetchFullScreen();
+
+    // Monitor fullscreen state changes
+    const cleanup = window.electronAPI.onFullScreenChange((fullScreen) => {
+      setIsFullScreen(fullScreen);
+    });
+
+    return cleanup;
   }, []);
 
   // Get page icon based on current page
@@ -127,7 +148,13 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={styles.appHeader}>
       <div
-        className={`${styles.headerContainer} ${isSidebarOpen ? styles.sidebarOpen : ''}`}
+        className={`${styles.headerContainer} ${isSidebarOpen ? styles.sidebarOpen : ''} ${
+          platform === 'linux'
+            ? styles.platformLinux
+            : platform === 'darwin' && isFullScreen
+              ? styles.platformMacFullScreen
+              : styles.platformMac
+        }`}
       >
         {/* Left Section */}
         <div className={styles.headerLeft}>
