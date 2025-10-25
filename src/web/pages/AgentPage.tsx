@@ -99,6 +99,9 @@ export const AgentPage = React.memo(() => {
   // 重複送信を防止するためのRef（setStateは非同期なので、useRefで同期的に管理）
   const isSendingRef = useRef(false);
 
+  // ストリームのキャンセル関数を保存するRef
+  const abortStreamRef = useRef<(() => void) | null>(null);
+
   // 前回のセッションIDを追跡（競合状態を回避）
   const prevSessionIdRef = useRef<string | null>(null);
 
@@ -432,6 +435,44 @@ export const AgentPage = React.memo(() => {
     [handleSaveTitle, handleCancelEditTitle]
   );
 
+  // メッセージ送信のキャンセル処理
+  const handleCancelMessage = useCallback(() => {
+    console.log('[AgentPage] Cancelling message send...');
+
+    // ストリームを中断
+    if (abortStreamRef.current) {
+      abortStreamRef.current();
+      abortStreamRef.current = null;
+    }
+
+    // 状態をリセット
+    setIsLoading(false);
+    isSendingRef.current = false;
+    setAgentStatus({ agent: null, status: 'idle' });
+
+    // 最後のメッセージ（AIのプレースホルダー）を削除
+    const currentHistory = useAgentStore.getState().history;
+    if (
+      currentHistory.length > 0 &&
+      currentHistory[currentHistory.length - 1].role === 'model' &&
+      currentHistory[currentHistory.length - 1].isStreaming
+    ) {
+      // 最後のストリーミング中のメッセージを削除
+      setHistory(currentHistory.slice(0, -1));
+    }
+
+    // 通知を表示
+    addNotification({
+      type: 'info',
+      title: 'Message Sending Cancelled',
+      message: 'The message sending has been cancelled',
+      autoClose: true,
+      duration: 3000,
+    });
+
+    console.log('[AgentPage] Message send cancelled successfully');
+  }, [setAgentStatus, setHistory, addNotification]);
+
   // メッセージ送信処理
   const handleSendMessage = useCallback(async () => {
     const trimmedMessage = currentMessage.trim();
@@ -522,7 +563,8 @@ export const AgentPage = React.memo(() => {
     setIsLoading(true);
     setError(null);
 
-    streamChatWithAgent(
+    // ストリームを開始し、キャンセル関数を保存
+    const abortFunction = streamChatWithAgent(
       trimmedMessage,
       history, // ストリーム開始前の履歴を渡す
       sessionIdToUse, // session_idを渡す
@@ -555,6 +597,7 @@ export const AgentPage = React.memo(() => {
         onClose: () => {
           setIsLoading(false);
           isSendingRef.current = false; // 送信完了フラグをリセット
+          abortStreamRef.current = null; // キャンセル関数をクリア
           setAgentStatus({ agent: null, status: 'idle' }); // ステータスをリセット
 
           const currentHistory = useAgentStore.getState().history;
@@ -581,11 +624,14 @@ export const AgentPage = React.memo(() => {
             }
           }
 
-          // AI応答がデータベースに保存された後、セッション詳細のキャッシュを無効化
-          // これにより、次回の履歴確認時に最新データがフェッチされる
+          // AI応答がデータベースに保存された後、セッション詳細とセッション一覧のキャッシュを無効化
+          // これにより、次回の履歴確認時に最新データがフェッチされ、サイドバーのメッセージ数も即座に更新される
           if (sessionIdToUse) {
             queryClient.invalidateQueries({
               queryKey: chatHistoryKeys.sessionDetail(sessionIdToUse),
+            });
+            queryClient.invalidateQueries({
+              queryKey: chatHistoryKeys.sessions(),
             });
           }
         },
@@ -593,6 +639,7 @@ export const AgentPage = React.memo(() => {
           console.error('AI Agent Error:', err);
           setIsLoading(false);
           isSendingRef.current = false; // エラー時も送信フラグをリセット
+          abortStreamRef.current = null; // エラー時もキャンセル関数をクリア
           setAgentStatus({ agent: null, status: 'idle' }); // エラー時もステータスをリセット
           setError(err.message);
           const currentHistory = useAgentStore.getState().history;
@@ -622,6 +669,9 @@ export const AgentPage = React.memo(() => {
         },
       }
     );
+
+    // キャンセル関数を保存
+    abortStreamRef.current = abortFunction;
   }, [
     currentMessage,
     history,
@@ -1410,8 +1460,8 @@ export const AgentPage = React.memo(() => {
         />
         <button
           className={styles.sendButton}
-          onClick={handleSendMessage}
-          disabled={isLoading || !currentMessage.trim()}
+          onClick={isLoading ? handleCancelMessage : handleSendMessage}
+          disabled={!isLoading && !currentMessage.trim()}
         >
           {isLoading ? (
             <>
@@ -1421,16 +1471,15 @@ export const AgentPage = React.memo(() => {
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
-                className={styles.loadingIndicator}
               >
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
-              Sending...
+              Cancel
             </>
           ) : (
             <>
