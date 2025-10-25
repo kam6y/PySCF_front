@@ -113,9 +113,12 @@ export const App = () => {
   const { data: chatSessionsData } = useGetChatSessions();
 
   // AIチャット画面を開いた時にサイドバーのタブを"chats"に自動切り替え
+  // AI Agent ページがOFFの場合は"calculations"に戻す
   useEffect(() => {
     if (appState.ui.isAIAgentEnabled) {
       appState.ui.setSidebarView('chats');
+    } else {
+      appState.ui.setSidebarView('calculations');
     }
   }, [appState.ui.isAIAgentEnabled, appState.ui.setSidebarView]);
 
