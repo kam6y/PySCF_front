@@ -141,7 +141,7 @@ class PubChemClient:
         try:
             counts_line = lines[3].strip()
             num_atoms = int(counts_line[:3].strip())
-            
+
             atom_block = lines[4 : 4 + num_atoms]
             for line in atom_block:
                 parts = line.split()
@@ -156,5 +156,67 @@ class PubChemClient:
         except (ValueError, IndexError) as e:
             logger.error(f"Failed to parse SDF data: {e}")
             raise PubChemError("Could not parse SDF atom block.")
-            
+
         return atoms
+
+    def get_compound_smiles(self, query: str, search_type: str = "name") -> Dict[str, Any]:
+        """
+        Get the canonical SMILES and properties for a compound.
+
+        Args:
+            query: Search query (compound name, CID, or formula)
+            search_type: Type of search ('name', 'cid', or 'formula'). Default: 'name'
+
+        Returns:
+            Dict containing SMILES and compound information:
+            {
+                'cid': int,
+                'smiles': str,
+                'iupac_name': str,
+                'molecular_formula': str,
+                'molecular_weight': float
+            }
+
+        Raises:
+            PubChemNotFoundError: If compound not found
+            PubChemError: For other API errors
+        """
+        try:
+            # Find CID first
+            cid = self._find_cid(query, search_type)
+            if cid is None:
+                raise PubChemNotFoundError(f"No compound found for query: {query}")
+
+            # Get SMILES and properties
+            # Note: When requesting IsomericSMILES, PubChem returns it as "SMILES" in the response
+            prop_url = f"{self.BASE_URL}/compound/cid/{cid}/property/IsomericSMILES,IUPACName,MolecularFormula,MolecularWeight/JSON"
+            response = self._make_request(prop_url)
+            data = response.json()
+
+            logger.debug(f"PubChem response for CID {cid}: {data}")
+
+            props = data.get('PropertyTable', {}).get('Properties', [{}])[0]
+
+            # PubChem returns SMILES as "SMILES" when we request "IsomericSMILES"
+            smiles = props.get('SMILES')
+
+            result = {
+                'cid': cid,
+                'smiles': smiles,
+                'iupac_name': props.get('IUPACName', 'Unknown'),
+                'molecular_formula': props.get('MolecularFormula', 'Unknown'),
+                'molecular_weight': props.get('MolecularWeight')
+            }
+
+            if not result['smiles']:
+                logger.error(f"No SMILES in response. Available properties: {props.keys()}")
+                raise PubChemError(f"No SMILES found for CID {cid}. Available properties: {list(props.keys())}")
+
+            logger.info(f"Retrieved SMILES for '{query}' (CID: {cid}): {result['smiles']}")
+            return result
+
+        except PubChemNotFoundError:
+            raise
+        except (ValueError, KeyError, TypeError) as e:
+            logger.error(f"Error processing SMILES data for query '{query}': {e}")
+            raise PubChemError(f"Failed to process SMILES data: {e}")

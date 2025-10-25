@@ -27,6 +27,8 @@ def _initialize_tools():
     from . import tools
 
     return [
+        # PubChem SMILES search (CRITICAL - must use this for compound names)
+        tools.search_compound_smiles_pubchem,
         # Molecular generation
         tools.generate_analogs_rdkit,
         tools.predict_simple_properties_rdkit,

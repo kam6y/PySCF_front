@@ -15,6 +15,9 @@ from langchain_core.tools import tool
 from rdkit import Chem
 from rdkit.Chem import AllChem, Descriptors, BRICS, Recap
 
+from services.pubchem_service import PubChemService
+from services.exceptions import NotFoundError, ValidationError, ServiceError
+
 # Logger configuration
 logger = logging.getLogger(__name__)
 
@@ -77,67 +80,106 @@ def generate_analogs_rdkit(base_smiles: str, num_to_generate: int = 10, design_s
 
     try:
         # Validate base SMILES
-        mol = Chem.MolFromSmiles(base_smiles)
-        if not mol:
+        base_mol = Chem.MolFromSmiles(base_smiles)
+        if not base_mol:
             return _validation_error(f"Invalid SMILES string: {base_smiles}")
 
         logger.info(f"Generating analogs for {base_smiles} with strategy: {design_strategy}")
 
-        # Define modification rules based on strategy
+        # Get canonical SMILES for base molecule
+        canonical_base = Chem.MolToSmiles(base_mol)
+
+        # Collect all candidates
         candidates = []
 
-        if design_strategy == "diverse" or design_strategy == "conjugation":
-            # Extend conjugation systems
-            candidates.extend([
-                {"smiles": "c1c(C=C)cccc1", "rationale": "Added vinyl group to extend conjugation"},
-                {"smiles": "c1c(C#C)cccc1", "rationale": "Added ethynyl group for extended conjugation"},
-                {"smiles": "c1ccc(cc1)c2ccccc2", "rationale": "Added phenyl ring to create biphenyl system"},
-                {"smiles": "c1ccc(cc1)C=Cc2ccccc2", "rationale": "Created stilbene-like structure with extended conjugation"},
-            ])
+        # Functional groups to add based on strategy
+        conjugation_groups = [
+            ("C=C", "vinyl", "Added vinyl group to extend conjugation"),
+            ("C#C", "ethynyl", "Added ethynyl group for extended conjugation"),
+            ("c1ccccc1", "phenyl", "Added phenyl ring to extend conjugation"),
+        ]
 
-        if design_strategy == "diverse" or design_strategy == "push_pull":
-            # Push-pull structures (electron donor + acceptor)
-            candidates.extend([
-                {"smiles": "c1c(N)ccc(C#N)cc1", "rationale": "Push-pull: Amino (donor) and cyano (acceptor)"},
-                {"smiles": "c1c(N(C)C)ccc(C#N)cc1", "rationale": "Push-pull: Dimethylamino (strong donor) and cyano (acceptor)"},
-                {"smiles": "c1c(O)ccc(C(=O)O)cc1", "rationale": "Push-pull: Hydroxyl (donor) and carboxyl (acceptor)"},
-                {"smiles": "c1c(N)ccc(C(F)(F)F)cc1", "rationale": "Push-pull: Amino (donor) and trifluoromethyl (acceptor)"},
-            ])
+        push_pull_pairs = [
+            ("N", "C#N", "amino (donor)", "cyano (acceptor)", "Push-pull: Amino (donor) and cyano (acceptor)"),
+            ("N(C)C", "C#N", "dimethylamino (donor)", "cyano (acceptor)", "Push-pull: Dimethylamino (strong donor) and cyano (acceptor)"),
+            ("O", "N(=O)=O", "hydroxyl (donor)", "nitro (acceptor)", "Push-pull: Hydroxyl (donor) and nitro (acceptor)"),
+            ("N", "C(F)(F)F", "amino (donor)", "trifluoromethyl (acceptor)", "Push-pull: Amino (donor) and trifluoromethyl (acceptor)"),
+            ("OC", "C(=O)O", "methoxy (donor)", "carboxyl (acceptor)", "Push-pull: Methoxy (donor) and carboxyl (acceptor)"),
+        ]
 
-        if design_strategy == "diverse" or design_strategy == "heteroatom":
-            # Heteroatom substitution
-            candidates.extend([
-                {"smiles": "c1ncccc1", "rationale": "Replaced C with N to create pyridine"},
-                {"smiles": "c1ccoc1", "rationale": "Created furan ring (oxygen-containing heterocycle)"},
-                {"smiles": "c1ccsc1", "rationale": "Created thiophene ring (sulfur-containing heterocycle)"},
-                {"smiles": "c1c2c(ccc1)nc(cc2)", "rationale": "Created quinoline (benzopyridine) structure"},
-            ])
+        donor_groups = [
+            ("N", "amino", "Added amino group (strong electron donor, raises HOMO)"),
+            ("O", "hydroxyl", "Added hydroxyl group (moderate electron donor)"),
+            ("OC", "methoxy", "Added methoxy group (moderate electron donor)"),
+            ("C", "methyl", "Added methyl group (weak electron donor via hyperconjugation)"),
+        ]
+
+        acceptor_groups = [
+            ("C#N", "cyano", "Added cyano group (strong electron acceptor, lowers LUMO)"),
+            ("N(=O)=O", "nitro", "Added nitro group (very strong electron acceptor)"),
+            ("C(F)(F)F", "trifluoromethyl", "Added trifluoromethyl group (strong electron acceptor)"),
+            ("C(=O)C", "acetyl", "Added acetyl group (moderate electron acceptor)"),
+            ("C(=O)O", "carboxyl", "Added carboxyl group (moderate electron acceptor)"),
+        ]
+
+        # Strategy-based generation
+        if design_strategy == "conjugation" or design_strategy == "diverse":
+            # Add conjugation-extending groups
+            for group_smiles, group_name, rationale in conjugation_groups:
+                analog = _try_add_group_to_aromatic_h(base_mol, group_smiles, rationale)
+                if analog:
+                    candidates.append(analog)
+                    if len(candidates) >= num_to_generate:
+                        break
+
+        if design_strategy == "push_pull" or design_strategy == "diverse":
+            # Add push-pull substituents
+            for donor, acceptor, donor_name, acceptor_name, rationale in push_pull_pairs:
+                analog = _try_add_push_pull_substituents(base_mol, donor, acceptor, rationale)
+                if analog:
+                    candidates.append(analog)
+                    if len(candidates) >= num_to_generate:
+                        break
+
+        if design_strategy == "heteroatom" or design_strategy == "diverse":
+            # Replace aromatic CH with heteroatoms
+            heteroatom_analogs = _try_heteroatom_substitution(base_mol, num_to_generate)
+            candidates.extend(heteroatom_analogs)
+            if len(candidates) >= num_to_generate:
+                candidates = candidates[:num_to_generate]
 
         if design_strategy == "diverse":
-            # Additional diverse modifications
-            candidates.extend([
-                {"smiles": "c1c(F)cccc1", "rationale": "Added fluorine (electron-withdrawing)"},
-                {"smiles": "c1c(Cl)cccc1", "rationale": "Added chlorine (electron-withdrawing)"},
-                {"smiles": "c1c(O)cccc1", "rationale": "Added hydroxyl (electron-donating)"},
-                {"smiles": "c1c(C)cccc1", "rationale": "Added methyl (electron-donating)"},
-                {"smiles": "c1c(OC)cccc1", "rationale": "Added methoxy (electron-donating)"},
-                {"smiles": "c1c(C(=O)C)cccc1", "rationale": "Added acetyl (electron-withdrawing)"},
-            ])
+            # Add electron donors
+            for group_smiles, group_name, rationale in donor_groups:
+                if len(candidates) >= num_to_generate:
+                    break
+                analog = _try_add_group_to_aromatic_h(base_mol, group_smiles, rationale)
+                if analog:
+                    candidates.append(analog)
 
-        # Validate all generated SMILES
+            # Add electron acceptors
+            for group_smiles, group_name, rationale in acceptor_groups:
+                if len(candidates) >= num_to_generate:
+                    break
+                analog = _try_add_group_to_aromatic_h(base_mol, group_smiles, rationale)
+                if analog:
+                    candidates.append(analog)
+
+        # Deduplicate by SMILES
+        seen_smiles = {canonical_base}  # Exclude base molecule
         validated_candidates = []
-        for candidate in candidates[:num_to_generate]:
-            test_mol = Chem.MolFromSmiles(candidate["smiles"])
-            if test_mol:
+        for candidate in candidates:
+            if candidate["smiles"] not in seen_smiles:
+                seen_smiles.add(candidate["smiles"])
                 validated_candidates.append(candidate)
-            else:
-                logger.warning(f"Generated invalid SMILES: {candidate['smiles']}")
+                if len(validated_candidates) >= num_to_generate:
+                    break
 
         logger.info(f"Successfully generated {len(validated_candidates)} valid analogs")
 
         return json.dumps({
             "success": True,
-            "base_smiles": base_smiles,
+            "base_smiles": canonical_base,
             "design_strategy": design_strategy,
             "generated_candidates": validated_candidates,
             "total_generated": len(validated_candidates)
@@ -149,6 +191,214 @@ def generate_analogs_rdkit(base_smiles: str, num_to_generate: int = 10, design_s
             "success": False,
             "error": f"An unexpected error occurred: {str(e)}"
         }, ensure_ascii=False, indent=2)
+
+
+def _try_add_group_to_aromatic_h(base_mol: Chem.Mol, group_smiles: str, rationale: str) -> Optional[Dict[str, str]]:
+    """
+    Try to add a functional group to an aromatic hydrogen position.
+
+    Args:
+        base_mol: Base molecule
+        group_smiles: SMILES of the group to add
+        rationale: Design rationale
+
+    Returns:
+        Dict with 'smiles' and 'rationale' if successful, None otherwise
+    """
+    try:
+        # Find aromatic carbons with hydrogens
+        aromatic_ch_pattern = Chem.MolFromSmarts('[cH]')
+        if not aromatic_ch_pattern:
+            return None
+
+        matches = base_mol.GetSubstructMatches(aromatic_ch_pattern)
+        if not matches:
+            # Try aliphatic carbons if no aromatic CH found
+            aliphatic_ch_pattern = Chem.MolFromSmarts('[CH]')
+            if aliphatic_ch_pattern:
+                matches = base_mol.GetSubstructMatches(aliphatic_ch_pattern)
+
+        if not matches:
+            return None
+
+        # Try to substitute at the first match
+        atom_idx = matches[0][0]
+
+        # Create editable copy
+        edit_mol = Chem.RWMol(base_mol)
+
+        # Parse functional group
+        group_mol = Chem.MolFromSmiles(group_smiles)
+        if not group_mol:
+            return None
+
+        # Add functional group atoms to molecule
+        group_start_idx = edit_mol.GetNumAtoms()
+        for atom in group_mol.GetAtoms():
+            edit_mol.AddAtom(Chem.Atom(atom.GetAtomicNum()))
+
+        # Add bonds within the functional group
+        for bond in group_mol.GetBonds():
+            begin_idx = bond.GetBeginAtomIdx() + group_start_idx
+            end_idx = bond.GetEndAtomIdx() + group_start_idx
+            edit_mol.AddBond(begin_idx, end_idx, bond.GetBondType())
+
+        # Connect functional group to base molecule
+        edit_mol.AddBond(atom_idx, group_start_idx, Chem.BondType.SINGLE)
+
+        # Sanitize and validate
+        try:
+            Chem.SanitizeMol(edit_mol)
+            new_smiles = Chem.MolToSmiles(edit_mol)
+            return {"smiles": new_smiles, "rationale": rationale}
+        except Exception:
+            return None
+
+    except Exception as e:
+        logger.debug(f"Failed to add group {group_smiles}: {e}")
+        return None
+
+
+def _try_add_push_pull_substituents(base_mol: Chem.Mol, donor_smiles: str, acceptor_smiles: str, rationale: str) -> Optional[Dict[str, str]]:
+    """
+    Try to add push-pull substituents (donor and acceptor) to aromatic positions.
+
+    Args:
+        base_mol: Base molecule
+        donor_smiles: SMILES of electron donor group
+        acceptor_smiles: SMILES of electron acceptor group
+        rationale: Design rationale
+
+    Returns:
+        Dict with 'smiles' and 'rationale' if successful, None otherwise
+    """
+    try:
+        # Find aromatic carbons with hydrogens
+        aromatic_ch_pattern = Chem.MolFromSmarts('[cH]')
+        if not aromatic_ch_pattern:
+            return None
+
+        matches = base_mol.GetSubstructMatches(aromatic_ch_pattern)
+        if len(matches) < 2:
+            return None
+
+        # Try to add at two different positions (ideally para or meta)
+        atom_idx_1 = matches[0][0]
+        atom_idx_2 = matches[min(len(matches) - 1, 2)][0]  # Try to get some separation
+
+        # Create editable copy
+        edit_mol = Chem.RWMol(base_mol)
+
+        # Add donor group
+        donor_mol = Chem.MolFromSmiles(donor_smiles)
+        if not donor_mol:
+            return None
+
+        donor_start_idx = edit_mol.GetNumAtoms()
+        for atom in donor_mol.GetAtoms():
+            edit_mol.AddAtom(Chem.Atom(atom.GetAtomicNum()))
+
+        for bond in donor_mol.GetBonds():
+            begin_idx = bond.GetBeginAtomIdx() + donor_start_idx
+            end_idx = bond.GetEndAtomIdx() + donor_start_idx
+            edit_mol.AddBond(begin_idx, end_idx, bond.GetBondType())
+
+        edit_mol.AddBond(atom_idx_1, donor_start_idx, Chem.BondType.SINGLE)
+
+        # Add acceptor group
+        acceptor_mol = Chem.MolFromSmiles(acceptor_smiles)
+        if not acceptor_mol:
+            return None
+
+        acceptor_start_idx = edit_mol.GetNumAtoms()
+        for atom in acceptor_mol.GetAtoms():
+            edit_mol.AddAtom(Chem.Atom(atom.GetAtomicNum()))
+
+        for bond in acceptor_mol.GetBonds():
+            begin_idx = bond.GetBeginAtomIdx() + acceptor_start_idx
+            end_idx = bond.GetEndAtomIdx() + acceptor_start_idx
+            edit_mol.AddBond(begin_idx, end_idx, bond.GetBondType())
+
+        edit_mol.AddBond(atom_idx_2, acceptor_start_idx, Chem.BondType.SINGLE)
+
+        # Sanitize and validate
+        try:
+            Chem.SanitizeMol(edit_mol)
+            new_smiles = Chem.MolToSmiles(edit_mol)
+            return {"smiles": new_smiles, "rationale": rationale}
+        except Exception:
+            return None
+
+    except Exception as e:
+        logger.debug(f"Failed to add push-pull groups: {e}")
+        return None
+
+
+def _try_heteroatom_substitution(base_mol: Chem.Mol, max_candidates: int = 5) -> List[Dict[str, str]]:
+    """
+    Try to substitute aromatic CH with heteroatoms (N, O, S).
+
+    Args:
+        base_mol: Base molecule
+        max_candidates: Maximum number of candidates to generate
+
+    Returns:
+        List of dicts with 'smiles' and 'rationale'
+    """
+    candidates = []
+
+    try:
+        # Find aromatic carbons
+        aromatic_c_pattern = Chem.MolFromSmarts('[c]')
+        if not aromatic_c_pattern:
+            return candidates
+
+        matches = base_mol.GetSubstructMatches(aromatic_c_pattern)
+        if not matches:
+            return candidates
+
+        # Try substituting with different heteroatoms
+        heteroatoms = [
+            (7, "N", "nitrogen"),  # Nitrogen
+            (8, "O", "oxygen"),    # Oxygen
+            (16, "S", "sulfur"),   # Sulfur
+        ]
+
+        for atom_num, symbol, name in heteroatoms:
+            if len(candidates) >= max_candidates:
+                break
+
+            # Try substituting the first aromatic carbon
+            atom_idx = matches[0][0]
+
+            # Create editable copy
+            edit_mol = Chem.RWMol(base_mol)
+
+            # Get the carbon atom
+            carbon_atom = edit_mol.GetAtomWithIdx(atom_idx)
+
+            # Check if substitution makes sense (e.g., not already heteroatom)
+            if carbon_atom.GetAtomicNum() == 6:  # Is carbon
+                # Replace with heteroatom
+                carbon_atom.SetAtomicNum(atom_num)
+                carbon_atom.SetFormalCharge(0)
+
+                # Try to sanitize
+                try:
+                    Chem.SanitizeMol(edit_mol)
+                    new_smiles = Chem.MolToSmiles(edit_mol)
+                    candidates.append({
+                        "smiles": new_smiles,
+                        "rationale": f"Replaced aromatic carbon with {name} to create heteroaromatic system"
+                    })
+                except Exception:
+                    logger.debug(f"Failed to substitute with {name}")
+                    continue
+
+    except Exception as e:
+        logger.debug(f"Error in heteroatom substitution: {e}")
+
+    return candidates
 
 
 @tool
@@ -628,149 +878,39 @@ def substitute_side_chains_rdkit(
 
         logger.info(f"Using {len(functional_groups)} functional groups from categories: {selected_categories}")
 
-        # Find substitution sites based on the specified type
-        substitutable_atoms = []
-        for atom in mol.GetAtoms():
-            atom_idx = atom.GetIdx()
+        # Get canonical base SMILES
+        canonical_base = Chem.MolToSmiles(mol)
 
-            # Check if atom is suitable for substitution
-            if substitution_sites == "aromatic_hydrogens":
-                # Only aromatic carbons with explicit or implicit hydrogens
-                if atom.GetIsAromatic() and atom.GetSymbol() == 'C':
-                    num_h = atom.GetTotalNumHs()
-                    if num_h > 0:
-                        substitutable_atoms.append(atom_idx)
-
-            elif substitution_sites == "aliphatic_hydrogens":
-                # Only aliphatic carbons with hydrogens
-                if not atom.GetIsAromatic() and atom.GetSymbol() == 'C':
-                    num_h = atom.GetTotalNumHs()
-                    if num_h > 0:
-                        substitutable_atoms.append(atom_idx)
-
-            elif substitution_sites == "all_hydrogens":
-                # Any carbon with hydrogens
-                if atom.GetSymbol() == 'C':
-                    num_h = atom.GetTotalNumHs()
-                    if num_h > 0:
-                        substitutable_atoms.append(atom_idx)
-
-        if not substitutable_atoms:
-            return _validation_error(
-                f"No suitable substitution sites found in the molecule for {substitution_sites}"
-            )
-
-        logger.info(f"Found {len(substitutable_atoms)} substitutable atom positions")
-
-        # Generate substituted molecules
+        # Generate substituted molecules using the helper function
         substituted_molecules = []
-        count = 0
+        seen_smiles = {canonical_base}  # Exclude base molecule
 
-        for atom_idx in substitutable_atoms:
-            if count >= max_substitutions:
+        for func_group in functional_groups:
+            if len(substituted_molecules) >= max_substitutions:
                 break
 
-            for func_group in functional_groups:
-                if count >= max_substitutions:
-                    break
+            # Build rationale
+            rationale = f"{func_group['description']} (category: {func_group['category']})"
 
-                try:
-                    # Create editable molecule
-                    edit_mol = Chem.RWMol(mol)
+            # Try to add the functional group
+            result = _try_add_group_to_aromatic_h(mol, func_group["smiles"], rationale)
 
-                    # Add the functional group
-                    func_group_mol = Chem.MolFromSmiles(func_group["smiles"])
-                    if not func_group_mol:
-                        logger.warning(f"Invalid functional group SMILES: {func_group['smiles']}")
-                        continue
-
-                    # Insert functional group at the specified atom
-                    # This is a simplified approach: add the functional group as a substituent
-                    combined_mol = Chem.CombineMols(edit_mol, func_group_mol)
-
-                    # Try to create a bond between the target atom and the functional group
-                    # The functional group is added at the end, so its first atom is at len(mol.GetAtoms())
-                    new_mol = Chem.RWMol(combined_mol)
-                    func_start_idx = mol.GetNumAtoms()
-
-                    # Add bond between target atom and first atom of functional group
-                    new_mol.AddBond(atom_idx, func_start_idx, Chem.BondType.SINGLE)
-
-                    # Sanitize and validate
-                    try:
-                        Chem.SanitizeMol(new_mol)
-                        new_smiles = Chem.MolToSmiles(new_mol)
-
-                        # Check if this is a valid and new molecule
-                        if new_smiles != smiles:
-                            substituted_molecules.append({
-                                "smiles": new_smiles,
-                                "functional_group": func_group["name"],
-                                "category": func_group["category"],
-                                "substitution_site": f"atom_{atom_idx}",
-                                "rationale": func_group["description"]
-                            })
-                            count += 1
-                            logger.debug(f"Generated: {new_smiles} with {func_group['name']}")
-
-                    except Exception as sanitize_error:
-                        logger.debug(f"Sanitization failed for {func_group['name']} at atom {atom_idx}: {sanitize_error}")
-                        continue
-
-                except Exception as e:
-                    logger.debug(f"Could not substitute {func_group['name']} at atom {atom_idx}: {e}")
-                    continue
+            if result and result["smiles"] not in seen_smiles:
+                # Add additional metadata
+                substituted_molecules.append({
+                    "smiles": result["smiles"],
+                    "functional_group": func_group["name"],
+                    "category": func_group["category"],
+                    "rationale": result["rationale"]
+                })
+                seen_smiles.add(result["smiles"])
+                logger.debug(f"Generated: {result['smiles']} with {func_group['name']}")
 
         logger.info(f"Successfully generated {len(substituted_molecules)} substituted molecules")
 
-        # If we couldn't generate any molecules through the direct approach,
-        # fall back to a simpler SMARTS-based replacement for aromatic hydrogens
-        if len(substituted_molecules) == 0 and substitution_sites == "aromatic_hydrogens":
-            logger.info("Attempting fallback method using SMARTS replacement")
-
-            for func_group in functional_groups[:max_substitutions]:
-                try:
-                    # Simple approach: for aromatic systems, use ReplaceSubstructs
-                    # Find aromatic CH and replace with C-R
-                    pattern = Chem.MolFromSmarts('[cH]')  # aromatic carbon with hydrogen
-                    if not pattern:
-                        continue
-
-                    matches = mol.GetSubstructMatches(pattern)
-                    if not matches:
-                        continue
-
-                    # Take the first match
-                    match = matches[0]
-                    atom_idx = match[0]
-
-                    # Create a simple substituted version
-                    # This is a simplified representation
-                    base_smiles = Chem.MolToSmiles(mol)
-
-                    # For aromatic systems, approximate substitution
-                    # For benzene-like molecules, we can use simple string templates
-                    if "c1ccccc1" in base_smiles:
-                        substituted_smiles = base_smiles.replace("c1ccccc1", f"c1ccc({func_group['smiles']})cc1", 1)
-
-                        # Validate the new SMILES
-                        test_mol = Chem.MolFromSmiles(substituted_smiles)
-                        if test_mol:
-                            substituted_molecules.append({
-                                "smiles": substituted_smiles,
-                                "functional_group": func_group["name"],
-                                "category": func_group["category"],
-                                "substitution_site": "aromatic_position",
-                                "rationale": func_group["description"]
-                            })
-
-                except Exception as e:
-                    logger.debug(f"Fallback substitution failed for {func_group['name']}: {e}")
-                    continue
-
         result = {
             "success": True,
-            "base_smiles": smiles,
+            "base_smiles": canonical_base,
             "substitution_sites": substitution_sites,
             "categories_used": selected_categories,
             "substituted_molecules": substituted_molecules,
@@ -781,6 +921,90 @@ def substitute_side_chains_rdkit(
 
     except Exception as e:
         logger.error(f"Error in substitute_side_chains_rdkit: {e}", exc_info=True)
+        return json.dumps({
+            "success": False,
+            "error": f"An unexpected error occurred: {str(e)}"
+        }, ensure_ascii=False, indent=2)
+
+
+@tool
+def search_compound_smiles_pubchem(compound_name_en: str) -> str:
+    """
+    Search PubChem for a compound by its English name and retrieve the canonical SMILES representation.
+
+    **IMPORTANT**: This tool ONLY accepts compound names in English. If the user provides a
+    compound name in another language (e.g., Japanese, Spanish), you MUST translate it to
+    English before calling this tool.
+
+    This tool is critical for ensuring accurate molecular structure representation when
+    users specify compound names or molecular scaffolds. Always use this tool when:
+    - A user requests a molecule by name (e.g., "azulene", "naphthalene", "benzene")
+    - You need to verify the correct SMILES for a molecular scaffold
+    - You are unsure about the SMILES representation of a compound
+
+    **Examples:**
+    - User says "アズレン" → Translate to "azulene" → Call this tool with "azulene"
+    - User says "ナフタレン" → Translate to "naphthalene" → Call this tool with "naphthalene"
+    - User says "benzene" → Directly call this tool with "benzene"
+
+    Args:
+        compound_name_en (str): The compound name in English.
+                               Example: "azulene", "naphthalene", "benzene"
+                               MUST be in English.
+
+    Returns:
+        str: JSON string containing the canonical SMILES and compound information.
+             On success: {
+                 "success": true,
+                 "smiles": "...",
+                 "compound_info": {
+                     "cid": 123,
+                     "iupac_name": "...",
+                     "molecular_formula": "...",
+                     "molecular_weight": 123.45
+                 }
+             }
+             On error: {"success": false, "error": "..."}
+    """
+    # Input validation
+    if not compound_name_en or not isinstance(compound_name_en, str):
+        return _validation_error("compound_name_en parameter is required and must be a non-empty string.")
+
+    if not compound_name_en.strip():
+        return _validation_error("compound_name_en cannot be empty or whitespace only.")
+
+    try:
+        logger.info(f"Searching PubChem for compound: {compound_name_en}")
+
+        # Use PubChemService to retrieve SMILES
+        pubchem_service = PubChemService()
+        result = pubchem_service.get_compound_smiles(compound_name_en, search_type='name')
+
+        logger.info(f"Successfully retrieved SMILES for '{compound_name_en}': {result['smiles']}")
+
+        return json.dumps({
+            "success": True,
+            "smiles": result['smiles'],
+            "compound_info": result['compound_info']
+        }, ensure_ascii=False, indent=2)
+
+    except NotFoundError as e:
+        logger.warning(f"Compound not found: {compound_name_en}")
+        return json.dumps({
+            "success": False,
+            "error": f"Compound not found in PubChem: {compound_name_en}. Please check the spelling or try a different name."
+        }, ensure_ascii=False, indent=2)
+    except ValidationError as e:
+        logger.error(f"Validation error for compound search: {e}")
+        return _validation_error(str(e))
+    except ServiceError as e:
+        logger.error(f"PubChem service error: {e}")
+        return json.dumps({
+            "success": False,
+            "error": f"PubChem service error: {str(e)}"
+        }, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"Error in search_compound_smiles_pubchem: {e}", exc_info=True)
         return json.dumps({
             "success": False,
             "error": f"An unexpected error occurred: {str(e)}"
