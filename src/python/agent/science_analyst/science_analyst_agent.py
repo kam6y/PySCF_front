@@ -25,7 +25,12 @@ logger = logging.getLogger(__name__)
 def _initialize_tools():
     """Initialize and return the list of available tools for the Science Analyst."""
     from agent.common_tools.analysis_tools import (
+        list_all_calculations,
+        find_calculations,
         get_calculation_details,
+        get_supported_parameters,
+        get_app_settings,
+        get_system_resources,
         get_molecular_orbitals,
         generate_orbital_cube,
         list_cube_files,
@@ -33,16 +38,22 @@ def _initialize_tools():
     )
 
     return [
-        # Calculation data retrieval (analysis tools only)
+        # Calculation data retrieval (analysis tools)
+        list_all_calculations,
+        find_calculations,
         get_calculation_details,
 
-        # Molecular orbital analysis (analysis tools only)
+        # System and settings analysis (analysis tools)
+        get_supported_parameters,
+        get_app_settings,
+        get_system_resources,
+
+        # Molecular orbital analysis (analysis tools)
         get_molecular_orbitals,
         generate_orbital_cube,
         list_cube_files,
-        # Note: delete_cube_files removed - Science Analyst focuses on analysis, not deletion
 
-        # Spectroscopy (analysis tools only)
+        # Spectroscopy (analysis tools)
         generate_ir_spectrum,
     ]
 

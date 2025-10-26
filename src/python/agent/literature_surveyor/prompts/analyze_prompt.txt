@@ -30,7 +30,7 @@ When continuing research, your next search topic should:
 - **Differ from previous searches** (explore new angles)
 - Address **identified knowledge gaps**
 - Use **English keywords** for database compatibility
-- Target one of these sources: Web (Tavily), arXiv, or PubMed
+- Target one of these sources: Web (Tavily), arXiv, PubMed, ChemRxiv, OpenAlex, or Semantic Scholar
 
 ## Examples
 

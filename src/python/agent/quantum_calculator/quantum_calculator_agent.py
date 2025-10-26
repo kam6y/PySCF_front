@@ -32,13 +32,6 @@ def _initialize_tools():
         search_pubchem_by_name,
         update_app_settings,
     )
-    from agent.common_tools.analysis_tools import (
-        list_all_calculations,
-        get_calculation_details,
-        get_supported_parameters,
-        get_app_settings,
-        get_system_resources,
-    )
 
     return [
         # Calculation execution and management (execution tools)
@@ -50,15 +43,8 @@ def _initialize_tools():
         convert_smiles_to_xyz,
         validate_xyz_format,
 
-        # Calculation data retrieval (analysis tools)
-        list_all_calculations,
-        get_calculation_details,
-
-        # System and settings (analysis + execution tools)
-        get_supported_parameters,
-        get_app_settings,
+        # System and settings (execution tools)
         update_app_settings,
-        get_system_resources,
     ]
 
 
