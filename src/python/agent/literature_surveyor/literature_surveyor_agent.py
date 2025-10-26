@@ -32,7 +32,7 @@ from .tools import (
     search_openalex,
     search_semantic_scholar
 )
-from agent.utils import get_gemini_api_key, detect_language_cached, get_language_name, load_prompt
+from agent.utils import get_gemini_api_key, extract_language_from_messages, get_language_name, load_prompt
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -384,12 +384,9 @@ def _create_supervisor_wrapper(research_graph):
             user_query = human_messages[-1].content
             logger.info(f"Literature Surveyor received query: {user_query}")
 
-            # Detect user's language using LLM with caching
-            api_key = get_gemini_api_key()
-            model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
-            llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
-            user_language = detect_language_cached(user_query, llm)
-            logger.info(f"Detected user language: {user_language}")
+            # Extract user's language from Supervisor's marker message
+            user_language = extract_language_from_messages(messages)
+            logger.info(f"Using language: {user_language}")
 
             # Extract depth from query (e.g., "research topic, depth 5")
             depth_match = re.search(r'depth\s*[=:]?\s*(\d+)', user_query, re.IGNORECASE)

@@ -232,3 +232,33 @@ def get_language_name(lang_code: str) -> str:
         str: Full language name with native script, or the code itself if not found
     """
     return LANGUAGE_NAMES.get(lang_code, lang_code)
+
+
+def extract_language_from_messages(messages: list) -> str:
+    """
+    Extract language code from messages inserted by Supervisor.
+
+    The Supervisor inserts a SystemMessage with format "DETECTED_LANGUAGE:xx"
+    to share the detected language with all workers, avoiding redundant
+    language detection LLM calls.
+
+    Args:
+        messages: List of messages (MessagesState)
+
+    Returns:
+        str: Language code (e.g., 'ja', 'en'), defaults to 'en' if not found
+    """
+    from langchain_core.messages import SystemMessage
+
+    # Search for DETECTED_LANGUAGE marker in SystemMessages
+    for msg in messages:
+        if isinstance(msg, SystemMessage):
+            content = msg.content
+            if isinstance(content, str) and content.startswith("DETECTED_LANGUAGE:"):
+                lang_code = content.split(":", 1)[1].strip()
+                logger.debug(f"Extracted language from Supervisor: {lang_code}")
+                return lang_code
+
+    # Default to English if no language marker found
+    logger.debug("No language marker found in messages, defaulting to 'en'")
+    return 'en'

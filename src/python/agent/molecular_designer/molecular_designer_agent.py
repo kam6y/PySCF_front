@@ -16,7 +16,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph, START, END, MessagesState
 
-from agent.utils import get_gemini_api_key, detect_language_cached, get_language_name, load_prompt
+from agent.utils import get_gemini_api_key, extract_language_from_messages, get_language_name, load_prompt
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -69,13 +69,10 @@ def _create_supervisor_wrapper(core_agent):
             user_query = human_messages[-1].content
             logger.info(f"Molecular Designer received query: {user_query}")
 
-            # Detect user's language using LLM with caching
-            api_key = get_gemini_api_key()
-            model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
-            llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
-            user_language = detect_language_cached(user_query, llm)
+            # Extract user's language from Supervisor's marker message
+            user_language = extract_language_from_messages(messages)
             language_name = get_language_name(user_language)
-            logger.info(f"Detected user language: {user_language} ({language_name})")
+            logger.info(f"Using language: {user_language} ({language_name})")
 
             # Enhance messages with language instruction
             # Create a system message with language requirement

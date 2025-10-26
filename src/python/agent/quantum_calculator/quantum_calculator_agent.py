@@ -16,7 +16,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 from langgraph.graph import StateGraph, START, END, MessagesState
 
-from agent.utils import get_gemini_api_key, detect_language_cached, get_language_name, load_prompt
+from agent.utils import get_gemini_api_key, extract_language_from_messages, get_language_name, load_prompt
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -24,25 +24,41 @@ logger = logging.getLogger(__name__)
 
 def _initialize_tools():
     """Initialize and return the list of available tools for the Quantum Calculator."""
-    from . import tools
+    from agent.common_tools.execution_tools import (
+        start_quantum_calculation,
+        delete_calculation,
+        convert_smiles_to_xyz,
+        validate_xyz_format,
+        search_pubchem_by_name,
+        update_app_settings,
+    )
+    from agent.common_tools.analysis_tools import (
+        list_all_calculations,
+        get_calculation_details,
+        get_supported_parameters,
+        get_app_settings,
+        get_system_resources,
+    )
 
     return [
-        # Calculation management
-        tools.list_all_calculations,
-        tools.get_calculation_details,
-        tools.start_quantum_calculation,
-        tools.delete_calculation,  # HIL-enabled destructive tool
+        # Calculation execution and management (execution tools)
+        start_quantum_calculation,
+        delete_calculation,  # HIL-enabled destructive tool
 
-        # Molecular structure tools
-        tools.search_pubchem_by_name,
-        tools.convert_smiles_to_xyz,
-        tools.validate_xyz_format,
+        # Molecular structure tools (execution tools)
+        search_pubchem_by_name,
+        convert_smiles_to_xyz,
+        validate_xyz_format,
 
-        # System and settings
-        tools.get_supported_parameters,
-        tools.get_app_settings,
-        tools.update_app_settings,
-        tools.get_system_resources,
+        # Calculation data retrieval (analysis tools)
+        list_all_calculations,
+        get_calculation_details,
+
+        # System and settings (analysis + execution tools)
+        get_supported_parameters,
+        get_app_settings,
+        update_app_settings,
+        get_system_resources,
     ]
 
 
@@ -75,13 +91,10 @@ def _create_supervisor_wrapper(core_agent):
             user_query = human_messages[-1].content
             logger.info(f"Quantum Calculator received query: {user_query}")
 
-            # Detect user's language using LLM with caching
-            api_key = get_gemini_api_key()
-            model_name = current_app.config['AI_AGENT'].get('model_name', 'gemini-2.5-flash')
-            llm = ChatGoogleGenerativeAI(model=model_name, api_key=api_key)
-            user_language = detect_language_cached(user_query, llm)
+            # Extract user's language from Supervisor's marker message
+            user_language = extract_language_from_messages(messages)
             language_name = get_language_name(user_language)
-            logger.info(f"Detected user language: {user_language} ({language_name})")
+            logger.info(f"Using language: {user_language} ({language_name})")
 
             # Enhance messages with language instruction
             # Create a system message with language requirement
