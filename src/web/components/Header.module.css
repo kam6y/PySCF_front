@@ -53,7 +53,7 @@
 
 /* Linux: No margin needed (no window control buttons on the left) */
 .platformLinux .appTitle {
-  margin-left: 48px;
+  margin-left: 64px;
 }
 
 /* Reduce title margin when sidebar is open */

@@ -29,10 +29,33 @@ console.log('Building Docker image for Linux package...');
 console.log(`Project root: ${projectRoot}`);
 console.log(`Dist path: ${dockerDistPath}`);
 
+// Check if project is in OneDrive (Windows only)
+if (process.platform === 'win32' && projectRoot.includes('OneDrive')) {
+  console.warn('\n⚠️  WARNING: Project is located in OneDrive folder');
+  console.warn('This may cause build issues due to file sync conflicts.');
+  console.warn('Consider moving the project outside OneDrive for better stability.\n');
+}
+
+// Parse command line arguments
+const args = process.argv.slice(2);
+const useNoCache = args.includes('--no-cache');
+const useClean = args.includes('--clean');
+
 try {
+  // Clean Docker build cache if requested
+  if (useClean) {
+    console.log('\n=== Step 0a: Cleaning Docker build cache ===');
+    try {
+      execSync('docker builder prune -f', { stdio: 'inherit' });
+      console.log('Docker build cache cleaned');
+    } catch (error) {
+      console.warn('⚠️  Warning: Could not clean Docker cache:', error.message);
+    }
+  }
+
   // Clean dist directory if it exists
   if (fs.existsSync(distPath)) {
-    console.log('\n=== Step 0: Cleaning dist directory ===');
+    console.log('\n=== Step 0b: Cleaning dist directory ===');
     try {
       // Try to remove with retries (helps with OneDrive sync issues)
       fs.rmSync(distPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
@@ -45,6 +68,7 @@ try {
       console.warn('  1. Manually delete the dist folder in File Explorer');
       console.warn('  2. Pause OneDrive sync temporarily');
       console.warn('  3. Move the project outside OneDrive');
+      console.warn('  4. Run with --clean flag to clear Docker cache');
       console.warn('\nPress Ctrl+C to cancel, or we will continue in 5 seconds...\n');
 
       // Give user time to cancel if they want to try manual cleanup
@@ -54,9 +78,25 @@ try {
 
   // Build Docker image
   console.log('\n=== Step 1: Building Docker image ===');
-  execSync('docker build -t pyscf-front-builder .', {
+
+  // Construct build command with options
+  const buildFlags = [];
+  if (useNoCache) {
+    buildFlags.push('--no-cache');
+    console.log('Using --no-cache flag (slower but avoids cache issues)');
+  }
+
+  const buildCmd = `docker build ${buildFlags.join(' ')} -t pyscf-front-builder .`;
+  console.log(`Command: ${buildCmd}\n`);
+
+  // Use legacy builder (DOCKER_BUILDKIT=0) to avoid BuildKit cache issues
+  execSync(buildCmd, {
     stdio: 'inherit',
-    cwd: projectRoot
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      DOCKER_BUILDKIT: '0' // Disable BuildKit to avoid cache corruption issues
+    }
   });
 
   console.log('\n=== Step 2: Running build in container ===');
