@@ -14,7 +14,7 @@ from flask import current_app
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
-from langgraph_supervisor.handoff import create_forward_message_tool, create_handoff_tool
+from langgraph_supervisor.handoff import create_handoff_tool
 from agent.utils import get_gemini_api_key, load_prompt, detect_language_cached
 from agent.quantum_calculator import create_quantum_calculator
 from agent.literature_surveyor import create_literature_surveyor
@@ -110,9 +110,9 @@ def create_supervisor_agent():
     )
     logger.info(f"Supervisor LLM initialized with {model_name}")
 
-    # Create forward message tool to prevent supervisor from paraphrasing worker responses
-    forward_tool = create_forward_message_tool("supervisor")
-    logger.info("Created forward_message tool to bypass supervisor paraphrasing")
+    # Note: We no longer use forward_message tool
+    # The supervisor now adds value by summarizing findings and providing context
+    logger.info("Supervisor configured to add contextual value to worker responses")
 
     # Create custom handoff tools with explicit descriptions
     handoff_tools = [
@@ -164,9 +164,8 @@ def create_supervisor_agent():
 
     # Initialize Supervisor's tools for calculation search and identification
     supervisor_tools = _initialize_tools()
-    supervisor_tools.append(forward_tool)  # Add forward_message tool
     supervisor_tools.extend(handoff_tools)  # Add custom handoff tools
-    logger.info(f"Initialized {len(supervisor_tools)} tools for Supervisor (including forward_message and custom handoffs)")
+    logger.info(f"Initialized {len(supervisor_tools)} tools for Supervisor (including custom handoffs)")
 
     # Load system prompt using unified utility function
     prompt_dir = Path(__file__).parent / "prompts"
@@ -176,9 +175,10 @@ def create_supervisor_agent():
         system_prompt = (
             "You are a Supervisor coordinating specialized AI agents for molecular science "
             "and quantum computational chemistry research. Analyze user requests, delegate to the "
-            "appropriate specialist (quantum_calculator, literature_surveyor, or science_analyst), "
-            "and orchestrate multi-step workflows. Use the forward_message tool to relay worker "
-            "responses without modification."
+            "appropriate specialist (quantum_calculator, literature_surveyor, science_analyst, "
+            "or molecular_designer), and orchestrate multi-step workflows. When workers complete "
+            "their tasks, add context by summarizing key findings, explaining current status, "
+            "suggesting next steps, and including the full worker response between *** separators."
         )
         logger.warning("Using fallback system prompt for Supervisor")
 
@@ -190,7 +190,7 @@ def create_supervisor_agent():
         tools=supervisor_tools,  # Add all Supervisor tools
     )
 
-    logger.info("Supervisor workflow created successfully with forward_message tool")
+    logger.info("Supervisor workflow created successfully with intelligent coordination")
     return workflow
 
 
