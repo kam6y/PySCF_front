@@ -11,7 +11,7 @@ from flask_pydantic import validate
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
 from generated_models import AgentChatRequest, ExecuteConfirmedActionRequest, AgentActionType
-from agent.quantum_calculator import tools
+from agent.common_tools.execution_tools import _execute_confirmed_deletion
 from agent.graph import get_compiled_graph
 from services.chat_history_service import get_chat_history_service
 
@@ -296,6 +296,13 @@ def _create_supervisor_stream(message: str, history: list, session_id: str = Non
                             if messages:
                                 # Get the last message
                                 last_message = messages[-1]
+
+                                # Log tool calls for debugging transfer execution
+                                if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+                                    for tool_call in last_message.tool_calls:
+                                        tool_name = tool_call.get('name', 'unknown') if isinstance(tool_call, dict) else getattr(tool_call, 'name', 'unknown')
+                                        logger.info(f"Supervisor calling tool: {tool_name}")
+
                                 if hasattr(last_message, "content") and last_message.content:
                                     # Filter out internal transfer messages
                                     if _is_internal_transfer_message(last_message.content):
@@ -338,6 +345,13 @@ def _create_supervisor_stream(message: str, history: list, session_id: str = Non
                         messages = data["messages"]
                         if messages:
                             last_message = messages[-1]
+
+                            # Log tool calls for debugging transfer execution
+                            if hasattr(last_message, "tool_calls") and last_message.tool_calls:
+                                for tool_call in last_message.tool_calls:
+                                    tool_name = tool_call.get('name', 'unknown') if isinstance(tool_call, dict) else getattr(tool_call, 'name', 'unknown')
+                                    logger.info(f"Supervisor calling tool: {tool_name}")
+
                             if hasattr(last_message, "content") and last_message.content:
                                 # Filter out internal transfer messages
                                 if _is_internal_transfer_message(last_message.content):
@@ -471,7 +485,7 @@ def execute_confirmed_action(body: ExecuteConfirmedActionRequest):
             logger.info(f"Executing confirmed deletion for calculation: {body.calculation_id}")
 
             # Execute the confirmed deletion using the internal function
-            result = tools._execute_confirmed_deletion(body.calculation_id)
+            result = _execute_confirmed_deletion(body.calculation_id)
 
             if result['success']:
                 logger.info(f"Deletion successful: {result['message']}")

@@ -152,11 +152,12 @@ def search_pubmed(query: str, max_results: int = 5) -> str:
     """
     try:
         from Bio import Entrez
-        
+        from agent.utils import get_research_email
+
         logger.info(f"Searching PubMed with query: '{query}', max_results: {max_results}")
-        
+
         # Set email for Entrez (required by NCBI)
-        Entrez.email = "pyscf-research-agent@example.com"
+        Entrez.email = get_research_email()
         
         # Search PubMed
         search_handle = Entrez.esearch(
@@ -353,11 +354,12 @@ def search_openalex(query: str, max_results: int = 5) -> str:
     try:
         from pyalex import Works
         import pyalex
+        from agent.utils import get_research_email
 
         logger.info(f"Searching OpenAlex with query: '{query}', max_results: {max_results}")
 
         # Configure polite pool for better performance
-        pyalex.config.email = "pyscf-research-agent@example.com"
+        pyalex.config.email = get_research_email()
 
         # Perform search
         search_results = Works().search(query).get()

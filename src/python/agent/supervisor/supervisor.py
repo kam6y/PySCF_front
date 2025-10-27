@@ -14,7 +14,7 @@ from flask import current_app
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph_supervisor import create_supervisor
-from langgraph_supervisor.handoff import create_forward_message_tool
+from langgraph_supervisor.handoff import create_forward_message_tool, create_handoff_tool
 from agent.utils import get_gemini_api_key, load_prompt, detect_language_cached
 from agent.quantum_calculator import create_quantum_calculator
 from agent.literature_surveyor import create_literature_surveyor
@@ -114,10 +114,59 @@ def create_supervisor_agent():
     forward_tool = create_forward_message_tool("supervisor")
     logger.info("Created forward_message tool to bypass supervisor paraphrasing")
 
+    # Create custom handoff tools with explicit descriptions
+    handoff_tools = [
+        create_handoff_tool(
+            agent_name="quantum_calculator",
+            name="transfer_to_quantum_calculator",
+            description=(
+                "Transfer/delegate the task to quantum_calculator agent. "
+                "Use this when the user requests quantum chemistry calculations, "
+                "molecular structure preparation, or system management. "
+                "IMPORTANT: Calling this tool executes the transfer - "
+                "do not just describe the transfer in text."
+            )
+        ),
+        create_handoff_tool(
+            agent_name="literature_surveyor",
+            name="transfer_to_literature_surveyor",
+            description=(
+                "Transfer/delegate the task to literature_surveyor agent. "
+                "Use this when the user requests academic literature research. "
+                "IMPORTANT: Calling this tool executes the transfer - "
+                "do not just describe the transfer in text."
+            )
+        ),
+        create_handoff_tool(
+            agent_name="science_analyst",
+            name="transfer_to_science_analyst",
+            description=(
+                "Transfer/delegate the task to science_analyst agent. "
+                "Use this when the user requests result interpretation, "
+                "report generation, or data analysis. "
+                "IMPORTANT: Calling this tool executes the transfer - "
+                "do not just describe the transfer in text."
+            )
+        ),
+        create_handoff_tool(
+            agent_name="molecular_designer",
+            name="transfer_to_molecular_designer",
+            description=(
+                "Transfer/delegate the task to molecular_designer agent. "
+                "Use this when the user requests molecular design or "
+                "structure generation tasks. "
+                "IMPORTANT: Calling this tool executes the transfer - "
+                "do not just describe the transfer in text."
+            )
+        ),
+    ]
+    logger.info(f"Created {len(handoff_tools)} custom handoff tools")
+
     # Initialize Supervisor's tools for calculation search and identification
     supervisor_tools = _initialize_tools()
     supervisor_tools.append(forward_tool)  # Add forward_message tool
-    logger.info(f"Initialized {len(supervisor_tools)} tools for Supervisor (including forward_message)")
+    supervisor_tools.extend(handoff_tools)  # Add custom handoff tools
+    logger.info(f"Initialized {len(supervisor_tools)} tools for Supervisor (including forward_message and custom handoffs)")
 
     # Load system prompt using unified utility function
     prompt_dir = Path(__file__).parent / "prompts"

@@ -69,28 +69,116 @@ class CalculationFileManager:
         
         return "Unnamed Calculation"
 
-    def list_calculations(self) -> list:
-        """List all calculation directories."""
+    def list_calculations(
+        self,
+        name_query: Optional[str] = None,
+        status: Optional[str] = None,
+        calculation_method: Optional[str] = None,
+        basis_function: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None
+    ) -> list:
+        """
+        List calculation directories with optional filtering.
+
+        Args:
+            name_query: Partial match search in calculation name (case-insensitive)
+            status: Filter by status ("completed", "running", "error", etc.)
+            calculation_method: Filter by calculation method ("DFT", "HF", "MP2", etc.)
+            basis_function: Filter by basis set (case-insensitive)
+            date_from: Start date for date range filtering (ISO format: YYYY-MM-DD)
+            date_to: End date for date range filtering (ISO format: YYYY-MM-DD)
+
+        Returns:
+            List of calculation dictionaries matching the filter criteria, sorted by date (newest first)
+        """
         if not self.base_dir.exists():
             return []
-        
+
+        # Helper function to parse ISO date strings
+        def parse_date(date_str: str) -> Optional[datetime]:
+            """Parse ISO date string to datetime object."""
+            try:
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                return None
+
+        # Parse date filters once
+        date_from_dt = parse_date(date_from) if date_from else None
+        date_to_dt = parse_date(date_to) if date_to else None
+
         calculations = []
         for item in self.base_dir.iterdir():
-            if item.is_dir():
-                params = self.read_calculation_parameters(str(item))
-                # Use robust fallback logic for display names
-                display_name = self._get_display_name(item.name, params)
-                status = self.read_calculation_status(str(item))
-                
-                calculations.append({
-                    'id': item.name, # Use directory name as the unique ID
-                    'name': display_name, # Use this for display purposes
-                    'path': str(item),
-                    'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
-                    'has_checkpoint': (item / "calculation.chk").exists(),
-                    'status': status
-                })
-        
+            if not item.is_dir():
+                continue
+
+            params = self.read_calculation_parameters(str(item))
+            display_name = self._get_display_name(item.name, params)
+            calc_status = self.read_calculation_status(str(item))
+
+            # Apply filters - skip this calculation if it doesn't match
+
+            # Filter by name (case-insensitive partial match)
+            if name_query:
+                if name_query.lower() not in display_name.lower():
+                    continue
+
+            # Filter by status (exact match, case-insensitive)
+            if status:
+                if calc_status.lower() != status.lower():
+                    continue
+
+            # Filter by calculation_method (requires params)
+            if calculation_method and params:
+                calc_method = params.get('calculation_method', '')
+                if calc_method.lower() != calculation_method.lower():
+                    continue
+            elif calculation_method:
+                # No params available, can't match
+                continue
+
+            # Filter by basis_function (requires params)
+            if basis_function and params:
+                calc_basis = params.get('basis_function', '')
+                if calc_basis.lower() != basis_function.lower():
+                    continue
+            elif basis_function:
+                # No params available, can't match
+                continue
+
+            # Filter by date range (requires params with created_at)
+            if (date_from_dt or date_to_dt) and params:
+                created_at = params.get('created_at')
+                if not created_at:
+                    continue
+
+                calc_date = parse_date(created_at)
+                if not calc_date:
+                    continue
+
+                # Check date range
+                if date_from_dt and calc_date < date_from_dt:
+                    continue
+                if date_to_dt and calc_date > date_to_dt:
+                    continue
+            elif (date_from_dt or date_to_dt):
+                # No params or created_at available, can't match
+                continue
+
+            # All filters passed - add to results
+            calculations.append({
+                'id': item.name,  # Use directory name as the unique ID
+                'name': display_name,  # Use this for display purposes
+                'path': str(item),
+                'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
+                'has_checkpoint': (item / "calculation.chk").exists(),
+                'status': calc_status,
+                # Include additional fields for better search results
+                'calculation_method': params.get('calculation_method') if params else None,
+                'basis_function': params.get('basis_function') if params else None,
+                'created_at': params.get('created_at') if params else None
+            })
+
         return sorted(calculations, key=lambda x: x['date'], reverse=True)
 
     def save_geometry(self, calc_dir: str, xyz_string: str, filename: str = "optimized_geometry.xyz"):

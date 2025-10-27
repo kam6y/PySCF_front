@@ -215,19 +215,42 @@ class QuantumService:
             logger.error(f"Permission error during calculation setup: {e}")
             raise PermissionDeniedError('System permission error. Please contact administrator.')
     
-    def list_calculations(self) -> Dict[str, Any]:
+    def list_calculations(
+        self,
+        name_query: Optional[str] = None,
+        status: Optional[str] = None,
+        calculation_method: Optional[str] = None,
+        basis_function: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
-        List all available calculations.
-        
+        List available calculations with optional filtering.
+
+        Args:
+            name_query: Partial match search in calculation name (case-insensitive)
+            status: Filter by status ("completed", "running", "error", etc.)
+            calculation_method: Filter by calculation method ("DFT", "HF", "MP2", etc.)
+            basis_function: Filter by basis set (case-insensitive)
+            date_from: Start date for date range filtering (ISO format: YYYY-MM-DD)
+            date_to: End date for date range filtering (ISO format: YYYY-MM-DD)
+
         Returns:
             Dict containing list of calculations and metadata
-            
+
         Raises:
             ServiceError: If listing fails
         """
         try:
-            calculations = self.file_manager.list_calculations()
-            
+            calculations = self.file_manager.list_calculations(
+                name_query=name_query,
+                status=status,
+                calculation_method=calculation_method,
+                basis_function=basis_function,
+                date_from=date_from,
+                date_to=date_to
+            )
+
             return {
                 'base_directory': self.file_manager.get_base_directory(),
                 'calculations': calculations,

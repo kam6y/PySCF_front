@@ -55,7 +55,8 @@ class SettingsManager:
             system_total_memory_mb=total_memory_mb,
             calculations_directory=default_calc_dir,
             gemini_api_key=None,
-            tavily_api_key=None
+            tavily_api_key=None,
+            research_email="pyscf-research-agent@example.com"
         )
     
     def load_settings(self) -> AppSettings:

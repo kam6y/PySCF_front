@@ -111,9 +111,12 @@ def find_calculations(
     """
     Search for calculations using flexible filtering criteria.
 
-    This function searches through all saved calculations and filters them based on
+    This function searches through saved calculations and filters them based on
     the provided criteria. All parameters are optional - you can combine them as needed.
     Performs case-insensitive partial matching for name_query.
+
+    Filtering is performed at the file system level for optimal performance,
+    so even with thousands of calculations, this function remains efficient.
 
     Args:
         name_query (str, optional): Partial match search in calculation name.
@@ -162,92 +165,29 @@ def find_calculations(
              }
     """
     try:
-        # Get all calculations
-        logger.debug("Fetching all calculations for filtering")
-        all_calculations_json = list_all_calculations()
-        all_calculations_result = json.loads(all_calculations_json)
+        # Call service layer with filters - filtering happens at file system level
+        logger.debug(f"Searching calculations with filters: name={name_query}, status={status}, "
+                    f"method={calculation_method}, basis={basis_function}, "
+                    f"date_from={date_from}, date_to={date_to}")
 
-        if not all_calculations_result.get('success'):
-            return all_calculations_json  # Return error from base function
+        quantum_service = get_quantum_service()
+        result = quantum_service.list_calculations(
+            name_query=name_query,
+            status=status,
+            calculation_method=calculation_method,
+            basis_function=basis_function,
+            date_from=date_from,
+            date_to=date_to
+        )
 
-        # Extract calculations list from the nested data structure
-        # Structure: {"success": true, "data": {"calculations": [...], "count": N, "base_directory": "..."}}
-        data = all_calculations_result.get('data', {})
-        calculations = data.get('calculations', [])
-        logger.info(f"Retrieved {len(calculations)} total calculations for filtering")
+        # Extract calculations list from the result
+        # Structure: {"calculations": [...], "count": N, "base_directory": "..."}
+        calculations = result.get('calculations', [])
+        count = len(calculations)
 
-        # Apply filters
-        filtered = calculations
-
-        # Filter by name (case-insensitive partial match)
-        if name_query:
-            name_lower = name_query.lower()
-            filtered = [
-                calc for calc in filtered
-                if name_lower in calc.get('name', '').lower()
-            ]
-            logger.debug(f"After name filter '{name_query}': {len(filtered)} calculations")
-
-        # Filter by status (exact match)
-        if status:
-            filtered = [
-                calc for calc in filtered
-                if calc.get('status', '').lower() == status.lower()
-            ]
-            logger.debug(f"After status filter '{status}': {len(filtered)} calculations")
-
-        # Filter by calculation_method (case-insensitive exact match)
-        if calculation_method:
-            filtered = [
-                calc for calc in filtered
-                if calc.get('calculation_method', '').lower() == calculation_method.lower()
-            ]
-            logger.debug(f"After method filter '{calculation_method}': {len(filtered)} calculations")
-
-        # Filter by basis_function (case-insensitive exact match)
-        if basis_function:
-            filtered = [
-                calc for calc in filtered
-                if calc.get('basis_function', '').lower() == basis_function.lower()
-            ]
-            logger.debug(f"After basis filter '{basis_function}': {len(filtered)} calculations")
-
-        # Filter by date range
-        if date_from or date_to:
-            def parse_date(date_str: str) -> Optional[datetime]:
-                """Parse ISO date string to datetime object."""
-                try:
-                    return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-                except (ValueError, AttributeError):
-                    return None
-
-            date_from_dt = parse_date(date_from) if date_from else None
-            date_to_dt = parse_date(date_to) if date_to else None
-
-            filtered_by_date = []
-            for calc in filtered:
-                created_at = calc.get('created_at')
-                if not created_at:
-                    continue
-
-                calc_date = parse_date(created_at)
-                if not calc_date:
-                    continue
-
-                # Check date range
-                if date_from_dt and calc_date < date_from_dt:
-                    continue
-                if date_to_dt and calc_date > date_to_dt:
-                    continue
-
-                filtered_by_date.append(calc)
-
-            filtered = filtered_by_date
-            logger.debug(f"After date filter (from={date_from}, to={date_to}): {len(filtered)} calculations")
+        logger.info(f"Found {count} matching calculations")
 
         # Process results
-        count = len(filtered)
-
         if count == 0:
             # No matches
             logger.info("No calculations matched the search criteria")
@@ -258,27 +198,20 @@ def find_calculations(
 
         elif count == 1:
             # Single match - return detailed info
-            logger.info(f"Found single matching calculation: {filtered[0].get('id')}")
+            logger.info(f"Found single matching calculation: {calculations[0].get('id')}")
             return json.dumps({
                 "success": True,
                 "count": 1,
-                "calculation": filtered[0]
+                "calculation": calculations[0]
             }, ensure_ascii=False, indent=2)
 
         else:
             # Multiple matches - return list for user selection
             logger.info(f"Found {count} matching calculations")
 
-            # Sort by created_at (newest first)
-            sorted_calcs = sorted(
-                filtered,
-                key=lambda x: x.get('created_at', ''),
-                reverse=True
-            )
-
             # Prepare simplified list for presentation
             calc_list = []
-            for calc in sorted_calcs:
+            for calc in calculations:
                 calc_list.append({
                     "id": calc.get('id'),
                     "name": calc.get('name'),
@@ -296,12 +229,8 @@ def find_calculations(
                 "calculations": calc_list
             }, ensure_ascii=False, indent=2)
 
-    except json.JSONDecodeError as e:
-        logger.error(f"JSON parsing error in find_calculations: {e}", exc_info=True)
-        return json.dumps({
-            "success": False,
-            "error": f"計算データの解析中にエラーが発生しました: {str(e)}"
-        }, ensure_ascii=False, indent=2)
+    except ServiceError as e:
+        return _handle_service_error(e, "find_calculations")
 
     except Exception as e:
         logger.error(f"Unexpected error in find_calculations: {e}", exc_info=True)

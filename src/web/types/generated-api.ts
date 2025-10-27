@@ -112,8 +112,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List all calculations
-         * @description Get a list of all available calculation directories
+         * List calculations with optional filtering
+         * @description Get a list of calculation directories with optional filtering by name, status, method, basis set, and date range. Filtering is performed at the file system level for optimal performance.
          */
         get: operations["listCalculations"];
         put?: never;
@@ -1052,6 +1052,11 @@ export interface components {
              * @example null
              */
             tavily_api_key?: string | null;
+            /**
+             * @description Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
+             * @example pyscf-research-agent@example.com
+             */
+            research_email?: string | null;
         };
         SettingsResponse: {
             /** @example true */
@@ -1900,14 +1905,27 @@ export interface operations {
     };
     listCalculations: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Partial match search in calculation name (case-insensitive) */
+                name_query?: string;
+                /** @description Filter by calculation status */
+                status?: "completed" | "running" | "error" | "waiting" | "pending";
+                /** @description Filter by calculation method */
+                calculation_method?: "DFT" | "HF" | "MP2" | "CCSD" | "TDDFT" | "CASCI" | "CASSCF";
+                /** @description Filter by basis set (case-insensitive) */
+                basis_function?: string;
+                /** @description Start date for date range filtering (ISO format YYYY-MM-DD) */
+                date_from?: string;
+                /** @description End date for date range filtering (ISO format YYYY-MM-DD) */
+                date_to?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description List of calculations */
+            /** @description List of calculations matching filter criteria */
             200: {
                 headers: {
                     [name: string]: unknown;

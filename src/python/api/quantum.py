@@ -113,18 +113,43 @@ def quantum_calculate(body: QuantumCalculationRequest):
 
 @quantum_bp.route('/api/quantum/calculations', methods=['GET'])
 def list_calculations():
-    """List all available calculation directories."""
+    """
+    List calculation directories with optional filtering.
+
+    Query Parameters:
+        name_query (str, optional): Partial match search in calculation name (case-insensitive)
+        status (str, optional): Filter by status ("completed", "running", "error")
+        calculation_method (str, optional): Filter by calculation method ("DFT", "HF", "MP2", etc.)
+        basis_function (str, optional): Filter by basis set (case-insensitive)
+        date_from (str, optional): Start date for date range filtering (ISO format: YYYY-MM-DD)
+        date_to (str, optional): End date for date range filtering (ISO format: YYYY-MM-DD)
+    """
     try:
         quantum_service = get_quantum_service()
-        
-        # Call service layer
-        result = quantum_service.list_calculations()
-        
+
+        # Get query parameters for filtering
+        name_query = request.args.get('name_query', type=str)
+        status = request.args.get('status', type=str)
+        calculation_method = request.args.get('calculation_method', type=str)
+        basis_function = request.args.get('basis_function', type=str)
+        date_from = request.args.get('date_from', type=str)
+        date_to = request.args.get('date_to', type=str)
+
+        # Call service layer with filters
+        result = quantum_service.list_calculations(
+            name_query=name_query,
+            status=status,
+            calculation_method=calculation_method,
+            basis_function=basis_function,
+            date_from=date_from,
+            date_to=date_to
+        )
+
         return jsonify({
             'success': True,
             'data': result
         })
-        
+
     except ServiceError as e:
         logger.error(f"Service error listing calculations: {e}")
         return jsonify({'success': False, 'error': e.message}), e.status_code

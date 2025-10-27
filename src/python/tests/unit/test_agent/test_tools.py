@@ -9,7 +9,7 @@ import pytest
 import json
 from unittest.mock import MagicMock, patch
 
-from agent.quantum_calculator import tools
+from agent import common_tools as tools
 from services.exceptions import ServiceError, NotFoundError, ValidationError
 
 
@@ -55,7 +55,7 @@ def test_handle_service_error_helper():
 # list_all_calculations() Tests
 # ============================================================================
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_list_all_calculations_success(mock_get_service):
     """
     GIVEN quantum service returns calculations list
@@ -84,7 +84,7 @@ def test_list_all_calculations_success(mock_get_service):
     assert data['data']['count'] == 2
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_list_all_calculations_service_error(mock_get_service):
     """
     GIVEN quantum service raises ServiceError
@@ -109,7 +109,7 @@ def test_list_all_calculations_service_error(mock_get_service):
 # get_calculation_details() Tests
 # ============================================================================
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_get_calculation_details_success(mock_get_service):
     """
     GIVEN valid calculation ID and service returns details
@@ -136,7 +136,7 @@ def test_get_calculation_details_success(mock_get_service):
     assert data['data']['calculation']['id'] == 'calc123'
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_get_calculation_details_invalid_id(mock_get_service):
     """
     GIVEN invalid calculation ID (empty string)
@@ -152,7 +152,7 @@ def test_get_calculation_details_invalid_id(mock_get_service):
     assert "required" in data['error'].lower()
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_get_calculation_details_not_found(mock_get_service):
     """
     GIVEN calculation ID that doesn't exist
@@ -176,7 +176,7 @@ def test_get_calculation_details_not_found(mock_get_service):
 # search_pubchem_by_name() Tests
 # ============================================================================
 
-@patch('agent.tools.get_pubchem_service')
+@patch('agent.common_tools.execution_tools.get_pubchem_service')
 def test_search_pubchem_by_name_success(mock_get_service):
     """
     GIVEN valid compound name and service returns data
@@ -200,7 +200,7 @@ def test_search_pubchem_by_name_success(mock_get_service):
     assert data['data']['compound_info']['cid'] == 962
 
 
-@patch('agent.tools.get_pubchem_service')
+@patch('agent.common_tools.execution_tools.get_pubchem_service')
 def test_search_pubchem_by_name_empty_name(mock_get_service):
     """
     GIVEN empty compound name
@@ -216,7 +216,7 @@ def test_search_pubchem_by_name_empty_name(mock_get_service):
     assert "required" in data['error'].lower()
 
 
-@patch('agent.tools.get_pubchem_service')
+@patch('agent.common_tools.execution_tools.get_pubchem_service')
 def test_search_pubchem_by_name_invalid_search_type(mock_get_service):
     """
     GIVEN invalid search_type parameter
@@ -236,7 +236,7 @@ def test_search_pubchem_by_name_invalid_search_type(mock_get_service):
 # convert_smiles_to_xyz() Tests
 # ============================================================================
 
-@patch('agent.tools.get_smiles_service')
+@patch('agent.common_tools.execution_tools.get_smiles_service')
 def test_convert_smiles_to_xyz_success(mock_get_service):
     """
     GIVEN valid SMILES string and service returns XYZ
@@ -259,7 +259,7 @@ def test_convert_smiles_to_xyz_success(mock_get_service):
     assert 'xyz' in data['data']
 
 
-@patch('agent.tools.get_smiles_service')
+@patch('agent.common_tools.execution_tools.get_smiles_service')
 def test_convert_smiles_to_xyz_empty_smiles(mock_get_service):
     """
     GIVEN empty SMILES string
@@ -275,7 +275,7 @@ def test_convert_smiles_to_xyz_empty_smiles(mock_get_service):
     assert "required" in data['error'].lower()
 
 
-@patch('agent.tools.get_smiles_service')
+@patch('agent.common_tools.execution_tools.get_smiles_service')
 def test_convert_smiles_to_xyz_too_long(mock_get_service):
     """
     GIVEN SMILES string exceeding max length
@@ -296,7 +296,7 @@ def test_convert_smiles_to_xyz_too_long(mock_get_service):
 # start_quantum_calculation() Tests
 # ============================================================================
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.execution_tools.get_quantum_service')
 def test_start_quantum_calculation_valid_params(mock_get_service):
     """
     GIVEN valid calculation parameters
@@ -327,7 +327,7 @@ def test_start_quantum_calculation_valid_params(mock_get_service):
     assert data['data']['calculation']['id'] == 'calc123'
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.execution_tools.get_quantum_service')
 def test_start_quantum_calculation_empty_xyz(mock_get_service):
     """
     GIVEN empty XYZ string
@@ -349,7 +349,7 @@ def test_start_quantum_calculation_empty_xyz(mock_get_service):
     assert "xyz" in data['error'].lower()
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.execution_tools.get_quantum_service')
 def test_start_quantum_calculation_invalid_method(mock_get_service):
     """
     GIVEN invalid calculation_method
@@ -371,7 +371,7 @@ def test_start_quantum_calculation_invalid_method(mock_get_service):
     assert "calculation_method" in data['error'].lower()
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.execution_tools.get_quantum_service')
 def test_start_quantum_calculation_invalid_charges(mock_get_service):
     """
     GIVEN charges outside valid range
@@ -393,7 +393,7 @@ def test_start_quantum_calculation_invalid_charges(mock_get_service):
     assert "charges" in data['error'].lower()
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.execution_tools.get_quantum_service')
 def test_start_quantum_calculation_dft_requires_xc(mock_get_service):
     """
     GIVEN DFT method with exchange_correlation
@@ -432,7 +432,7 @@ def test_start_quantum_calculation_dft_requires_xc(mock_get_service):
 # get_supported_parameters() Tests
 # ============================================================================
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_get_supported_parameters_success(mock_get_service):
     """
     GIVEN quantum service returns supported parameters
@@ -460,7 +460,7 @@ def test_get_supported_parameters_success(mock_get_service):
 # delete_calculation() Tests
 # ============================================================================
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.execution_tools.get_quantum_service')
 def test_delete_calculation_returns_confirmation_request(mock_get_service):
     """
     GIVEN valid calculation ID
@@ -488,7 +488,7 @@ def test_delete_calculation_returns_confirmation_request(mock_get_service):
     assert data['calculation_id'] == 'calc123'
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.execution_tools.get_quantum_service')
 def test_delete_calculation_empty_id(mock_get_service):
     """
     GIVEN empty calculation ID
@@ -508,7 +508,7 @@ def test_delete_calculation_empty_id(mock_get_service):
 # validate_xyz_format() Tests
 # ============================================================================
 
-@patch('agent.tools.get_pubchem_service')
+@patch('agent.common_tools.execution_tools.get_pubchem_service')
 def test_validate_xyz_format_valid(mock_get_service):
     """
     GIVEN valid XYZ format string
@@ -532,7 +532,7 @@ def test_validate_xyz_format_valid(mock_get_service):
     assert data['data']['valid'] is True
 
 
-@patch('agent.tools.get_pubchem_service')
+@patch('agent.common_tools.execution_tools.get_pubchem_service')
 def test_validate_xyz_format_empty(mock_get_service):
     """
     GIVEN empty XYZ string
@@ -556,7 +556,7 @@ def test_validate_xyz_format_empty(mock_get_service):
     (tools.list_all_calculations, []),
     (tools.get_supported_parameters, []),
 ])
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_tools_return_valid_json(mock_get_service, tool_func, args):
     """
     GIVEN any tool function
@@ -579,7 +579,7 @@ def test_tools_return_valid_json(mock_get_service, tool_func, args):
     assert 'success' in data
 
 
-@patch('agent.tools.get_quantum_service')
+@patch('agent.common_tools.analysis_tools.get_quantum_service')
 def test_error_responses_have_consistent_format(mock_get_service):
     """
     GIVEN tool encounters an error

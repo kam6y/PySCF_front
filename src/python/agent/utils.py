@@ -84,6 +84,44 @@ def get_tavily_api_key() -> Optional[str]:
     return None
 
 
+def get_research_email() -> str:
+    """
+    Get research email address from environment variable or settings file.
+
+    Priority:
+        1. Environment variable: RESEARCH_EMAIL
+        2. Settings file: settings.research_email
+        3. Default fallback: "pyscf-research-agent@example.com"
+
+    Returns:
+        str: Email address (always returns a value, never None)
+    """
+    import os
+    from quantum_calc.settings_manager import get_current_settings
+
+    # Default fallback email
+    default_email = "pyscf-research-agent@example.com"
+
+    # Priority 1: Environment variable
+    email = os.environ.get("RESEARCH_EMAIL")
+    if email:
+        logger.debug("Using research email from environment variable")
+        return email
+
+    # Priority 2: Settings file
+    try:
+        settings = get_current_settings()
+        if settings.research_email:
+            logger.debug("Using research email from settings file")
+            return settings.research_email
+    except Exception as e:
+        logger.warning(f"Failed to load settings for research email: {e}")
+
+    # Priority 3: Default fallback
+    logger.debug(f"Using default research email: {default_email}")
+    return default_email
+
+
 def detect_language(text: str, llm: ChatGoogleGenerativeAI) -> str:
     """
     Detect the language of the given text using LLM.
