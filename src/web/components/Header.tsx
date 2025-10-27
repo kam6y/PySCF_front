@@ -57,7 +57,7 @@ export const Header: React.FC<HeaderProps> = ({
     fetchFullScreen();
 
     // Monitor fullscreen state changes
-    const cleanup = window.electronAPI.onFullScreenChange((fullScreen) => {
+    const cleanup = window.electronAPI.onFullScreenChange(fullScreen => {
       setIsFullScreen(fullScreen);
     });
 

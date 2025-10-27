@@ -66,7 +66,7 @@ export const App = () => {
     fetchFullScreen();
 
     // 全画面状態の変更を監視
-    const cleanup = window.electronAPI.onFullScreenChange((fullScreen) => {
+    const cleanup = window.electronAPI.onFullScreenChange(fullScreen => {
       setIsFullScreen(fullScreen);
     });
 
