@@ -756,20 +756,41 @@ class CalculationProcessManager:
                                     # Continue without resource registration
                             
                             # Start the calculation
+                            # Check if executor has been shut down before submitting
+                            if self._shutdown or self.executor._shutdown:
+                                logger.warning(f"Executor has been shut down. Cannot schedule calculation {next_calc.calculation_id}")
+                                self._update_calculation_status_from_queue(next_calc.calculation_id, 'error', 'Process manager has been shut down')
+                                started = True
+                                break
+
                             future = self.executor.submit(calculation_worker, next_calc.calculation_id, next_calc.parameters)
                             self.active_futures[next_calc.calculation_id] = future
-                            
+
                             # Add callback to clean up completed futures
                             future.add_done_callback(lambda f, calc_id=next_calc.calculation_id: self._cleanup_future(calc_id, f))
-                            
+
                             # Update calculation status from 'waiting' to 'running'
                             self._update_calculation_status_from_queue(next_calc.calculation_id, 'running')
-                            
+
                             started_count += 1
                             logger.info(f"Started queued calculation {next_calc.calculation_id} with {user_cpu_cores} CPU cores and {user_memory_mb} MB memory ({len(self.active_futures)}/{self.max_parallel_instances} slots used, {len(self.calculation_queue)} remaining in queue)")
                             started = True
                             break
-                            
+
+                        except RuntimeError as e:
+                            if 'cannot schedule new futures after shutdown' in str(e):
+                                logger.error(f"Cannot schedule calculation {next_calc.calculation_id}: executor has been shut down")
+                                self._update_calculation_status_from_queue(next_calc.calculation_id, 'error', 'Process manager has been shut down')
+                                # Unregister resources on failure (if resource manager is available)
+                                if self.resource_manager is not None:
+                                    try:
+                                        self.resource_manager.unregister_calculation(next_calc.calculation_id)
+                                    except Exception as cleanup_error:
+                                        logger.warning(f"Failed to unregister queued calculation resources on failure: {cleanup_error}")
+                                started = True
+                                break
+                            else:
+                                raise
                         except Exception as e:
                             logger.error(f"Failed to start queued calculation {next_calc.calculation_id}: {e}")
                             # Unregister resources on failure (if resource manager is available)

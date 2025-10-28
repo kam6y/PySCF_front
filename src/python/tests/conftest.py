@@ -59,6 +59,16 @@ def app():
     with _app.app_context():
         yield _app
 
+    # Cleanup: Shutdown process manager first to prevent "cannot schedule new futures after shutdown" errors
+    try:
+        from quantum_calc.process_manager import get_process_manager
+        process_manager = get_process_manager()
+        if process_manager:
+            process_manager.shutdown(wait=True)
+            logger.info("Process manager shut down successfully")
+    except Exception as e:
+        print(f"Warning: Failed to shutdown process manager: {e}")
+
     # Cleanup: Remove temporary directory
     import shutil
     try:
@@ -193,23 +203,29 @@ def dummy_executor():
 @pytest.fixture
 def sample_h2_xyz():
     """
-    Provide sample H2 molecule coordinates.
+    Provide sample H2 molecule coordinates in valid XYZ format.
 
     Returns:
-        str: XYZ coordinates for a hydrogen molecule.
+        str: XYZ coordinates for a hydrogen molecule with proper format:
+             Line 1: number of atoms
+             Line 2: comment line
+             Lines 3+: atom symbol and coordinates
     """
-    return "H 0 0 0\nH 0 0 0.74"
+    return "2\nHydrogen molecule\nH 0 0 0\nH 0 0 0.74"
 
 
 @pytest.fixture
 def sample_water_xyz():
     """
-    Provide sample water molecule coordinates.
+    Provide sample water molecule coordinates in valid XYZ format.
 
     Returns:
-        str: XYZ coordinates for a water molecule.
+        str: XYZ coordinates for a water molecule with proper format:
+             Line 1: number of atoms
+             Line 2: comment line
+             Lines 3+: atom symbol and coordinates
     """
-    return "O 0.0000 0.0000 0.1173\nH 0.0000 0.7572 -0.4692\nH 0.0000 -0.7572 -0.4692"
+    return "3\nWater molecule\nO 0.0000 0.0000 0.1173\nH 0.0000 0.7572 -0.4692\nH 0.0000 -0.7572 -0.4692"
 
 
 @pytest.fixture
