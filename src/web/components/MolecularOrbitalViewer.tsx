@@ -8,9 +8,8 @@ import {
 } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
 import styles from './MolecularOrbitalViewer.module.css';
-
-// 3Dmol.jsはCDNから読み込まれ、グローバル変数として利用可能
-declare const $3Dmol: any;
+import * as $3Dmol from '3dmol';
+import { GLViewer } from '../../types/3dmol';
 
 interface MolecularOrbitalViewerProps {
   calculationId: string;
@@ -30,7 +29,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
     const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
     // State declarations
-    const [viewer, setViewer] = useState<any>(null);
+    const [viewer, setViewer] = useState<GLViewer | null>(null);
     const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
       number | null
     >(null);
@@ -109,7 +108,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
           const newViewer = $3Dmol.createViewer(viewerRef.current, {
             backgroundColor: 'white',
             antialias: true,
-          });
+          }) as unknown as GLViewer;
 
           setViewer(newViewer);
           setRetryCount(0);

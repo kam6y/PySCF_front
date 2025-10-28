@@ -7,9 +7,8 @@ import {
 } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
 import styles from './InlineOrbitalViewer.module.css';
-
-// 3Dmol.jsはCDNから読み込まれ、グローバル変数として利用可能
-declare const $3Dmol: any;
+import * as $3Dmol from '3dmol';
+import { GLViewer } from '../../types/3dmol';
 
 interface InlineOrbitalViewerProps {
   calculation_id: string;
@@ -40,7 +39,7 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> =
       const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
       // State declarations
-      const [viewer, setViewer] = useState<any>(null);
+      const [viewer, setViewer] = useState<GLViewer | null>(null);
       const [viewerOptions, setViewerOptions] = useState<ViewerOptions>({
         gridSize: grid_size,
         isovaluePos: isovalue_pos,
@@ -109,7 +108,7 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> =
             const newViewer = $3Dmol.createViewer(viewerRef.current, {
               backgroundColor: 'white',
               antialias: true,
-            });
+            }) as unknown as GLViewer;
 
             setViewer(newViewer);
             setRetryCount(0);

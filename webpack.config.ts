@@ -121,10 +121,6 @@ const renderer: Configuration = {
     // React アプリのエントリーファイル
     app: "./src/web/index.tsx",
   },
-  // 3Dmol.jsはCDNから読み込むため、バンドルから除外
-  externals: {
-    "3dmol": "$3Dmol",
-  },
   resolve: {
     extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],
     fallback: {
