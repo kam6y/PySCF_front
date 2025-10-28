@@ -49,27 +49,47 @@ jobs:
     - name: Verify conda environment
       shell: bash -l {0}
       run: |
-        conda activate pyscf-env
-        npm run verify-env
+        python scripts/verify-environment.py
 
     - name: Generate code from OpenAPI spec
       shell: bash -l {0}
       run: |
-        conda activate pyscf-env
-        npm run codegen
+        npm run codegen:typescript
+        cd src/python
+        datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description
 
     - name: Run Python tests
       shell: bash -l {0}
       run: |
-        conda activate pyscf-env
         cd src/python
         python -m pytest tests/ -v
 
     - name: Build application (production)
       shell: bash -l {0}
       run: |
-        conda activate pyscf-env
-        npm run build
+        # Clean build artifacts
+        npm run clean:build-artifacts
+
+        # Build webpack
+        npm run build:webpack
+
+        # Build conda-pack (CI version - without conda.sh sourcing)
+        rimraf conda_env
+        conda-pack -o conda_env.tar.gz
+        mkdir -p conda_env
+        tar -xzf conda_env.tar.gz -C conda_env
+        rm conda_env.tar.gz
+        echo "Cleaning up development files from conda_env..."
+        find conda_env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+        find conda_env -type f \( -name "*.pyc" -o -name "*.pyo" -o -name "*.pyd" \) -delete
+        find conda_env/lib/python*/site-packages -maxdepth 2 -type d \( -name "tests" -o -name "test" \) -exec rm -rf {} + 2>/dev/null || true
+        rm -rf conda_env/etc/conda/test-files 2>/dev/null || true
+        find conda_env -type f -name ".coverage*" -delete 2>/dev/null || true
+        find conda_env -name "*.egg-info" -type d -exec rm -rf {} + 2>/dev/null || true
+        echo "✓ Cleanup completed"
+
+        # Validate build
+        python scripts/validate-build-completeness.py
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
