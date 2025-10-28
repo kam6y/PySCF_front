@@ -39,7 +39,8 @@
     "test:gunicorn-local": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && cd src/python && echo \"Testing Gunicorn locally...\" && gunicorn --bind 127.0.0.1:5000 --workers 1 --threads 4 --timeout 0 --log-level info --preload app:app'",
     "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\"",
     "test:python-standalone": "node scripts/test-python-standalone.js",
-    "test:conda-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && export PATH=\"$CONDA_BASE/envs/pyscf-env/bin:$PATH\" && cd dist/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin && echo \"Testing conda environment...\" && ./python --version && ./python -c \"import gunicorn; print('\"'\"'Gunicorn:'\"'\"', gunicorn.__version__)\" && ./python -c \"import flask; print('\"'\"'Flask: Available'\"'\"')\" && echo \"Conda environment test completed.\"'"
+    "test:conda-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && export PATH=\"$CONDA_BASE/envs/pyscf-env/bin:$PATH\" && cd dist/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin && echo \"Testing conda environment...\" && ./python --version && ./python -c \"import gunicorn; print('\"'\"'Gunicorn:'\"'\"', gunicorn.__version__)\" && ./python -c \"import flask; print('\"'\"'Flask: Available'\"'\"')\" && echo \"Conda environment test completed.\"'",
+    "release": "node scripts/bump-version.js"
   },
   "repository": {
     "type": "git",
@@ -112,6 +113,7 @@
     "zustand": "^5.0.7"
   },
   "build": {
+    "publish": "never",
     "appId": "com.kam6y.pyscf_front",
     "productName": "Pyscf_front",
     "files": [
