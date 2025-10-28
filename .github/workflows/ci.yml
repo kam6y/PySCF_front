@@ -91,7 +91,7 @@ jobs:
         npm run build:webpack
 
         # Build conda-pack (CI version - without conda.sh sourcing)
-        rimraf conda_env
+        rm -rf conda_env
         conda-pack -o conda_env.tar.gz
         mkdir -p conda_env
         tar -xzf conda_env.tar.gz -C conda_env
