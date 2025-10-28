@@ -590,18 +590,9 @@ export const CalculationSettingsPage = ({
     }
   };
 
+  // activeCalculationが存在しない場合は何も表示しない（通常は発生しないはず）
   if (!activeCalculation || !activeCalculation.parameters) {
-    return (
-      <div className={styles.calculationSettingsContainers}>
-        <div className={styles.loadingContainer}>
-          <h2>Welcome PySCF_front</h2>
-          <p>
-            Please start a new calculation or select a calculation from the
-            sidebar.
-          </p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   const { parameters: params, status: calculationStatus } = activeCalculation;

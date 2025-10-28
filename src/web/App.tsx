@@ -107,10 +107,29 @@ export const App = () => {
     console.log('[App] Initial setup completed, saved flag to localStorage');
 
     setShowInitialSetup(false);
+
+    // 初回セットアップ完了後、自動的に新規計算を作成
+    console.log('[App] Auto-creating new calculation after setup completion');
+    appState.calculation.createNewCalculation();
   };
 
   // チャットセッションのデータ取得
   const { data: chatSessionsData } = useGetChatSessions();
+
+  // アプリ起動時に自動的に新規計算を作成
+  useEffect(() => {
+    // 初回セットアップダイアログが閉じており、settingsがロードされ、
+    // まだ新規計算が作成されていない場合のみ実行
+    if (
+      !showInitialSetup &&
+      settings &&
+      !appState.calculation.stagedCalculation
+    ) {
+      console.log('[App] Auto-creating new calculation on app startup');
+      appState.calculation.createNewCalculation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showInitialSetup, settings]);
 
   // AIチャット画面を開いた時にサイドバーのタブを"chats"に自動切り替え
   // AI Agent ページがOFFの場合は"calculations"に戻す
