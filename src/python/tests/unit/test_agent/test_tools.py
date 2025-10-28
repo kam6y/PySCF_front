@@ -10,6 +10,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 from agent import common_tools as tools
+from agent.common_tools import analysis_tools
 from services.exceptions import ServiceError, NotFoundError, ValidationError
 
 
@@ -24,8 +25,8 @@ def test_validation_error_helper():
     THEN it should return formatted JSON error
     """
     # ACT
-    result = tools._validation_error("Test validation error")
-    
+    result = analysis_tools._validation_error("Test validation error")
+
     # ASSERT
     data = json.loads(result)
     assert data['success'] is False
@@ -40,10 +41,10 @@ def test_handle_service_error_helper():
     """
     # ARRANGE
     error = ServiceError("Test service error")
-    
+
     # ACT
-    result = tools._handle_service_error(error, "test_function")
-    
+    result = analysis_tools._handle_service_error(error, "test_function")
+
     # ASSERT
     data = json.loads(result)
     assert data['success'] is False

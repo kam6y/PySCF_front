@@ -20,24 +20,27 @@ class TestAgentChatAPI:
         THEN SSE stream is returned with chunks and done event
         """
         # ARRANGE
+        # Clear the compiled graph cache
+        import api.agent
+        api.agent._compiled_graph_cache = None
+
         # Mock the compiled graph
         mock_graph = mocker.MagicMock()
-        
-        # Mock the stream method to return state updates with AI response
-        def mock_stream(graph_input):
-            # Simulate graph execution returning final state with AI message
+
+        # Mock the stream method to return state updates with AI response in supervisor format
+        def mock_stream(graph_input, stream_mode="updates", subgraphs=True):
+            # Simulate supervisor returning final state with AI message
             user_msg = graph_input["messages"][-1]
             ai_response = AIMessage(content="This is a test response.")
             final_state = {
-                "molecular": {
-                    "messages": graph_input["messages"] + [ai_response],
-                    "next_node": "end"
+                "supervisor": {
+                    "messages": graph_input["messages"] + [ai_response]
                 }
             }
             yield final_state
-        
+
         mock_graph.stream.side_effect = mock_stream
-        
+
         # Patch get_compiled_graph to return our mock
         mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
@@ -69,26 +72,29 @@ class TestAgentChatAPI:
         THEN graph receives the history converted to LangChain format
         """
         # ARRANGE
+        # Clear the compiled graph cache
+        import api.agent
+        api.agent._compiled_graph_cache = None
+
         chat_history = [
             {'role': 'user', 'parts': [{'text': 'Hello'}]},
             {'role': 'model', 'parts': [{'text': 'Hi there!'}]}
         ]
-        
+
         # Mock the compiled graph
         mock_graph = mocker.MagicMock()
-        
-        def mock_stream(graph_input):
+
+        def mock_stream(graph_input, stream_mode="updates", subgraphs=True):
             # Verify history was converted properly (should have 2 history messages + 1 new user message)
             num_messages = len(graph_input["messages"])
             ai_response = AIMessage(content=f"Received {num_messages} total messages (including history)")
             final_state = {
-                "molecular": {
-                    "messages": graph_input["messages"] + [ai_response],
-                    "next_node": "end"
+                "supervisor": {
+                    "messages": graph_input["messages"] + [ai_response]
                 }
             }
             yield final_state
-        
+
         mock_graph.stream.side_effect = mock_stream
         mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
@@ -175,6 +181,10 @@ class TestAgentChatAPI:
         THEN error event is sent in SSE stream
         """
         # ARRANGE
+        # Clear the compiled graph cache
+        import api.agent
+        api.agent._compiled_graph_cache = None
+
         # Mock graph to raise an exception
         mock_graph = mocker.MagicMock()
         mock_graph.stream.side_effect = Exception("Graph execution error")
@@ -207,19 +217,22 @@ class TestAgentChatAPI:
         THEN graph routes to molecular agent and returns response
         """
         # ARRANGE
+        # Clear the compiled graph cache
+        import api.agent
+        api.agent._compiled_graph_cache = None
+
         mock_graph = mocker.MagicMock()
-        
-        def mock_stream(graph_input):
-            # Simulate routing to molecular agent
+
+        def mock_stream(graph_input, stream_mode="updates", subgraphs=True):
+            # Simulate routing to molecular agent via supervisor
             ai_response = AIMessage(content="HOMO energy calculation result: -0.5 Hartree")
             final_state = {
-                "molecular": {
-                    "messages": graph_input["messages"] + [ai_response],
-                    "next_node": "end"
+                "supervisor": {
+                    "messages": graph_input["messages"] + [ai_response]
                 }
             }
             yield final_state
-        
+
         mock_graph.stream.side_effect = mock_stream
         mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
@@ -249,19 +262,22 @@ class TestAgentChatAPI:
         THEN graph routes to research agent and returns response
         """
         # ARRANGE
+        # Clear the compiled graph cache
+        import api.agent
+        api.agent._compiled_graph_cache = None
+
         mock_graph = mocker.MagicMock()
-        
-        def mock_stream(graph_input):
-            # Simulate routing to research agent
+
+        def mock_stream(graph_input, stream_mode="updates", subgraphs=True):
+            # Simulate routing to research agent via supervisor
             ai_response = AIMessage(content="Found 3 papers on DFT:\n1. Paper Title 1\n2. Paper Title 2")
             final_state = {
-                "research": {
-                    "messages": graph_input["messages"] + [ai_response],
-                    "next_node": "end"
+                "supervisor": {
+                    "messages": graph_input["messages"] + [ai_response]
                 }
             }
             yield final_state
-        
+
         mock_graph.stream.side_effect = mock_stream
         mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
@@ -291,18 +307,21 @@ class TestAgentChatAPI:
         THEN graph receives only the current message
         """
         # ARRANGE
+        # Clear the compiled graph cache
+        import api.agent
+        api.agent._compiled_graph_cache = None
+
         mock_graph = mocker.MagicMock()
-        
-        def mock_stream(graph_input):
+
+        def mock_stream(graph_input, stream_mode="updates", subgraphs=True):
             ai_response = AIMessage(content="Response without history")
             final_state = {
-                "molecular": {
-                    "messages": graph_input["messages"] + [ai_response],
-                    "next_node": "end"
+                "supervisor": {
+                    "messages": graph_input["messages"] + [ai_response]
                 }
             }
             yield final_state
-        
+
         mock_graph.stream.side_effect = mock_stream
         mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
@@ -342,20 +361,23 @@ class TestAgentChatAPI:
         THEN chunks are received in correct order
         """
         # ARRANGE
+        # Clear the compiled graph cache
+        import api.agent
+        api.agent._compiled_graph_cache = None
+
         mock_graph = mocker.MagicMock()
-        
-        def mock_stream(graph_input):
+
+        def mock_stream(graph_input, stream_mode="updates", subgraphs=True):
             # Return a long response that will be chunked
             long_response = "First Second Third"
             ai_response = AIMessage(content=long_response)
             final_state = {
-                "molecular": {
-                    "messages": graph_input["messages"] + [ai_response],
-                    "next_node": "end"
+                "supervisor": {
+                    "messages": graph_input["messages"] + [ai_response]
                 }
             }
             yield final_state
-        
+
         mock_graph.stream.side_effect = mock_stream
         mocker.patch('api.agent.get_compiled_graph', return_value=mock_graph)
 
@@ -415,8 +437,13 @@ class TestAgentChatAPI:
         for line in lines:
             event = json.loads(line.replace('data: ', ''))
             assert 'type' in event
-            assert event['type'] in ['chunk', 'done', 'error']
-            
+            # agent_status is now also a valid event type
+            assert event['type'] in ['chunk', 'done', 'error', 'agent_status']
+
             if event['type'] == 'chunk':
                 assert 'payload' in event
                 assert 'text' in event['payload']
+            elif event['type'] == 'agent_status':
+                assert 'payload' in event
+                assert 'status' in event['payload']
+                assert 'agent' in event['payload']

@@ -47,16 +47,16 @@ def test_sample_data_fixtures(sample_h2_xyz, sample_water_xyz):
     WHEN the fixtures are accessed
     THEN they should contain valid XYZ coordinate data
     """
-    # H2 should have 2 atoms
+    # H2 should have 4 lines (atom count + comment + 2 atoms)
     assert 'H' in sample_h2_xyz
     h2_lines = [line for line in sample_h2_xyz.split('\n') if line.strip()]
-    assert len(h2_lines) == 2
+    assert len(h2_lines) == 4
 
-    # Water should have 3 atoms
+    # Water should have 5 lines (atom count + comment + 3 atoms)
     assert 'O' in sample_water_xyz
     assert 'H' in sample_water_xyz
     water_lines = [line for line in sample_water_xyz.split('\n') if line.strip()]
-    assert len(water_lines) == 3
+    assert len(water_lines) == 5
 
 
 def test_valid_params_fixtures(valid_dft_params, valid_hf_params):

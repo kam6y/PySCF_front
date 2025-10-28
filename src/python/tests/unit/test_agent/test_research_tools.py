@@ -43,8 +43,8 @@ class MockArxivResult:
 # search_arxiv() Success Tests
 # ============================================================================
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_success_single_result(mock_search_class, mock_client_class):
     """
     GIVEN arxiv API returns a single paper result
@@ -79,8 +79,8 @@ def test_search_arxiv_success_single_result(mock_search_class, mock_client_class
     assert "**PDF Link:** https://arxiv.org/pdf/2401.12345.pdf" in result
 
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_success_multiple_results(mock_search_class, mock_client_class):
     """
     GIVEN arxiv API returns multiple paper results
@@ -131,8 +131,8 @@ def test_search_arxiv_success_multiple_results(mock_search_class, mock_client_cl
     assert "Author B, Author C" in result
 
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_handles_newlines_in_summary(mock_search_class, mock_client_class):
     """
     GIVEN arxiv result contains newlines in summary
@@ -169,8 +169,8 @@ def test_search_arxiv_handles_newlines_in_summary(mock_search_class, mock_client
 # search_arxiv() Empty Results Tests
 # ============================================================================
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_no_results(mock_search_class, mock_client_class):
     """
     GIVEN arxiv API returns empty results
@@ -197,8 +197,8 @@ def test_search_arxiv_no_results(mock_search_class, mock_client_class):
 # search_arxiv() Error Handling Tests
 # ============================================================================
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_handles_api_error(mock_search_class, mock_client_class):
     """
     GIVEN arxiv API raises an exception
@@ -221,8 +221,8 @@ def test_search_arxiv_handles_api_error(mock_search_class, mock_client_class):
     assert "ArXiv API connection error" in result
 
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_handles_search_creation_error(mock_search_class, mock_client_class):
     """
     GIVEN arxiv.Search raises an exception during initialization
@@ -244,8 +244,8 @@ def test_search_arxiv_handles_search_creation_error(mock_search_class, mock_clie
 # search_arxiv() Parameter Tests
 # ============================================================================
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_respects_max_results_parameter(mock_search_class, mock_client_class):
     """
     GIVEN max_results parameter is specified
@@ -269,8 +269,8 @@ def test_search_arxiv_respects_max_results_parameter(mock_search_class, mock_cli
     assert call_kwargs['max_results'] == 10
 
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_uses_default_max_results(mock_search_class, mock_client_class):
     """
     GIVEN max_results parameter is not specified
@@ -294,8 +294,8 @@ def test_search_arxiv_uses_default_max_results(mock_search_class, mock_client_cl
     assert call_kwargs['max_results'] == 5
 
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_uses_relevance_sorting(mock_search_class, mock_client_class):
     """
     GIVEN search_arxiv is called
@@ -354,8 +354,8 @@ def test_search_arxiv_tool_has_proper_docstring():
 # Output Format Tests
 # ============================================================================
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_output_is_markdown_formatted(mock_search_class, mock_client_class):
     """
     GIVEN arxiv API returns results
@@ -390,8 +390,8 @@ def test_search_arxiv_output_is_markdown_formatted(mock_search_class, mock_clien
     assert "**PDF Link:**" in result
 
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_multiple_authors_formatted_correctly(mock_search_class, mock_client_class):
     """
     GIVEN arxiv result has multiple authors
@@ -425,8 +425,8 @@ def test_search_arxiv_multiple_authors_formatted_correctly(mock_search_class, mo
 # Edge Cases Tests
 # ============================================================================
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_handles_empty_query(mock_search_class, mock_client_class):
     """
     GIVEN empty query string
@@ -448,8 +448,8 @@ def test_search_arxiv_handles_empty_query(mock_search_class, mock_client_class):
     assert isinstance(result, str)
 
 
-@patch('agent.research.tools.arxiv.Client')
-@patch('agent.research.tools.arxiv.Search')
+@patch('agent.literature_surveyor.tools.arxiv.Client')
+@patch('agent.literature_surveyor.tools.arxiv.Search')
 def test_search_arxiv_handles_special_characters(mock_search_class, mock_client_class):
     """
     GIVEN query with special characters
