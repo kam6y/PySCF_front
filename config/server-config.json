@@ -74,8 +74,11 @@
       "ah_max_cycle": 30
     },
     "spectrum_settings": {
-      "ir_frequency_range": [400, 4000],
-      "frequency_threshold": 80.0
+      "ir_frequency_range": [
+        400,
+        4000
+      ],
+      "frequency_threshold": 80
     }
   },
   "app_info": {
@@ -94,8 +97,18 @@
   "ai_agent": {
     "model_name": "gemini-2.5-flash",
     "max_retries": 3,
-    "retry_delays": [1, 2, 4],
-    "retryable_status_codes": [429, 500, 502, 503, 504],
+    "retry_delays": [
+      1,
+      2,
+      4
+    ],
+    "retryable_status_codes": [
+      429,
+      500,
+      502,
+      503,
+      504
+    ],
     "deep_research": {
       "default_depth": 3,
       "min_depth": 1,
