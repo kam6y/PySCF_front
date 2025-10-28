@@ -49,15 +49,10 @@ fi
 log_success "conda が見つかりました: $(conda --version)"
 
 # conda の初期化確認
-if [[ -f "$HOME/miniforge3/etc/profile.d/conda.sh" ]]; then
-    source "$HOME/miniforge3/etc/profile.d/conda.sh"
-    log_info "Miniforge conda環境を読み込みました"
-elif [[ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]]; then
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-    log_info "Miniconda conda環境を読み込みました"
-elif [[ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]]; then
-    source "$HOME/anaconda3/etc/profile.d/conda.sh"
-    log_info "Anaconda conda環境を読み込みました"
+CONDA_BASE=$(conda info --base 2>/dev/null)
+if [[ -n "$CONDA_BASE" && -f "$CONDA_BASE/etc/profile.d/conda.sh" ]]; then
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+    log_info "conda環境を読み込みました: $CONDA_BASE"
 else
     log_warning "conda初期化スクリプトが見つかりません"
     log_info "手動でcondaを初期化してください: conda init"

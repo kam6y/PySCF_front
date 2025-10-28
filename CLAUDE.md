@@ -77,10 +77,13 @@ This project requires a conda environment for development. The application featu
     # Install Miniforge (if not already installed)
     # Example for macOS ARM:
     curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
-    bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
-    
+    bash Miniforge3-MacOSX-arm64.sh -b
+
+    # Initialize conda (or use: conda init)
+    CONDA_BASE=$(conda info --base)
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+
     # Create conda environment from environment.yml (includes all dependencies)
-    source $HOME/miniforge3/etc/profile.d/conda.sh
     conda env create -f .github/environment.yml
     
     # Activate the environment
@@ -161,10 +164,11 @@ wsl
 
 # Install Miniforge in WSL
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
-bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
+bash Miniforge3-Linux-x86_64.sh -b
 
 # Initialize conda
-source $HOME/miniforge3/etc/profile.d/conda.sh
+CONDA_BASE=$(conda info --base)
+source "$CONDA_BASE/etc/profile.d/conda.sh"
 
 # Navigate to your project directory (example)
 cd /mnt/c/Users/YOUR_USERNAME/Documents/PySCF_front

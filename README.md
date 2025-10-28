@@ -88,10 +88,13 @@ If you prefer to manage the conda environment manually:
     ```bash
     # Example for installing Miniforge on macOS ARM
     curl -L -O "[https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh](https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
-    bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
-    
+    bash Miniforge3-MacOSX-arm64.sh -b
+
+    # Initialize conda (or use: conda init)
+    CONDA_BASE=$(conda info --base)
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+
     # Create the conda environment from the environment.yml file
-    source $HOME/miniforge3/etc/profile.d/conda.sh
     conda env create -f .github/environment.yml
     
     # Activate the environment
@@ -187,10 +190,11 @@ wsl
 
 # Install Miniforge in WSL
 curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
-bash Miniforge3-Linux-x86_64.sh -b -p $HOME/miniforge3
+bash Miniforge3-Linux-x86_64.sh -b
 
 # Initialize conda
-source $HOME/miniforge3/etc/profile.d/conda.sh
+CONDA_BASE=$(conda info --base)
+source "$CONDA_BASE/etc/profile.d/conda.sh"
 
 # Navigate to your project directory (example)
 cd /mnt/c/Users/YOUR_USERNAME/Documents/PySCF_front
@@ -324,10 +328,13 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     ```bash
     # Miniforgeのインストール (例: Apple Silicon Mac)
     curl -L -O "[https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh](https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
-    bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
-    
+    bash Miniforge3-MacOSX-arm64.sh -b
+
+    # condaを初期化 (または: conda init)
+    CONDA_BASE=$(conda info --base)
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+
     # environment.ymlからconda環境を作成
-    source $HOME/miniforge3/etc/profile.d/conda.sh
     conda env create -f .github/environment.yml
     
     # 環境をアクティブ化
