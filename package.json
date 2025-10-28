@@ -131,7 +131,6 @@
           "!share/doc/**",
           "!share/info/**",
           "!share/gtk-doc/**",
-          "!include/**",
           "!**/*.a",
           "!**/*.la"
         ]
