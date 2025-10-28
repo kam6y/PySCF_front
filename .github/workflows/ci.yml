@@ -41,6 +41,7 @@ jobs:
         python-version: 3.12
         auto-activate-base: false
         use-only-tar-bz2: true
+        conda-remove-defaults: true
     
     - name: Install Node.js dependencies
       run: npm ci --legacy-peer-deps
