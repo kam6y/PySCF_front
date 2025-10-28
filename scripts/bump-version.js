@@ -6,12 +6,13 @@
  * This script updates version across all project files and creates a git tag.
  *
  * Usage:
- *   node scripts/bump-version.js <new-version> [--no-push]
- *   npm run release -- <new-version> [--no-push]
+ *   node scripts/bump-version.js <new-version> [--no-push] [--force]
+ *   npm run release -- <new-version> [--no-push] [--force]
  *
  * Examples:
  *   npm run release -- 0.0.2
  *   npm run release -- 0.1.0 --no-push
+ *   npm run release -- 0.0.1 --force  # Force recreate existing tag
  */
 
 const fs = require('fs');
@@ -52,10 +53,14 @@ function warning(message) {
 const args = process.argv.slice(2);
 const newVersion = args.find(arg => !arg.startsWith('--'));
 const noPush = args.includes('--no-push');
+const forceTag = args.includes('--force');
 
 if (!newVersion) {
-  error('Usage: npm run release -- <new-version> [--no-push]');
+  error('Usage: npm run release -- <new-version> [--no-push] [--force]');
   error('Example: npm run release -- 0.0.2');
+  error('Options:');
+  error('  --no-push  Create commit and tag locally without pushing');
+  error('  --force    Force recreate tag if it already exists');
   process.exit(1);
 }
 
@@ -200,6 +205,76 @@ function getCurrentBranch() {
   }
 }
 
+function checkExistingTag() {
+  log('\n🏷️  Checking for existing tag...', 'blue');
+
+  const tagName = `v${newVersion}`;
+  let localTagExists = false;
+  let remoteTagExists = false;
+
+  // Check local tag
+  try {
+    execSync(`git rev-parse ${tagName}`, { encoding: 'utf8', stdio: 'pipe' });
+    localTagExists = true;
+  } catch (err) {
+    // Tag doesn't exist locally
+  }
+
+  // Check remote tag
+  try {
+    execSync(`git ls-remote --tags origin ${tagName}`, { encoding: 'utf8', stdio: 'pipe' });
+    const output = execSync(`git ls-remote --tags origin ${tagName}`, { encoding: 'utf8' });
+    if (output.trim()) {
+      remoteTagExists = true;
+    }
+  } catch (err) {
+    // Remote check failed, probably no remote
+  }
+
+  if (localTagExists || remoteTagExists) {
+    warning(`Tag ${tagName} already exists!`);
+    if (localTagExists) {
+      warning(`  - Found in local repository`);
+    }
+    if (remoteTagExists) {
+      warning(`  - Found in remote repository`);
+    }
+
+    if (!forceTag) {
+      error('');
+      error('To recreate this tag, use the --force option:');
+      error(`  npm run release -- ${newVersion} --force`);
+      process.exit(1);
+    }
+
+    log('\n🔨 Force mode enabled - will recreate tag', 'yellow');
+
+    // Delete local tag if it exists
+    if (localTagExists) {
+      try {
+        execSync(`git tag -d ${tagName}`, { stdio: 'inherit' });
+        success(`Deleted local tag ${tagName}`);
+      } catch (err) {
+        error(`Failed to delete local tag: ${err.message}`);
+        process.exit(1);
+      }
+    }
+
+    // Delete remote tag if it exists
+    if (remoteTagExists && !noPush) {
+      try {
+        execSync(`git push origin :refs/tags/${tagName}`, { stdio: 'inherit' });
+        success(`Deleted remote tag ${tagName}`);
+      } catch (err) {
+        error(`Failed to delete remote tag: ${err.message}`);
+        process.exit(1);
+      }
+    }
+  } else {
+    success(`Tag ${tagName} does not exist - ready to create`);
+  }
+}
+
 function commitAndTag() {
   log('\n📦 Creating git commit and tag...', 'blue');
 
@@ -256,9 +331,11 @@ function main() {
   log('==========================================\n', 'cyan');
 
   info(`New version: ${newVersion}`);
-  info(`Push to remote: ${!noPush ? 'Yes' : 'No (--no-push flag)'}\n`);
+  info(`Push to remote: ${!noPush ? 'Yes' : 'No (--no-push flag)'}`);
+  info(`Force mode: ${forceTag ? 'Yes (--force flag)' : 'No'}\n`);
 
   checkGitStatus();
+  checkExistingTag();
   updateVersionFiles();
   commitAndTag();
 }
