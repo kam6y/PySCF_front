@@ -34,14 +34,16 @@ class TestCalculationWorkflowSync:
         )
         
         # Mock PySCF to avoid actual computation
+        # We need to mock at the module where it's imported, not where it's defined
         mock_mol = mocker.MagicMock()
         mock_scf = mocker.MagicMock()
         mock_scf.kernel.return_value = -1.06  # Mock energy
         mock_scf.mo_energy = [-0.5, 0.3]
         mock_scf.mo_occ = [2.0, 0.0]
-        
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        mocker.patch('pyscf.scf.RHF', return_value=mock_scf)
+
+        # Mock at the calculator module level where gto and scf are imported
+        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
 
         # ACT
         # Step 1: Submit calculation
@@ -66,8 +68,22 @@ class TestCalculationWorkflowSync:
         
         calc_details = details_data['data']['calculation']
         assert calc_details['id'] == calc_id
+
+        # Print detailed error information if calculation failed
+        if calc_details['status'] == 'error':
+            error_msg = f"Calculation failed with status 'error'.\n"
+            if 'results' in calc_details and calc_details['results']:
+                error_msg += f"Error details: {calc_details['results']}\n"
+            if 'error_message' in calc_details:
+                error_msg += f"Error message: {calc_details['error_message']}\n"
+            print(error_msg)
+            # In CI environment, provide more helpful assertion message
+            import os
+            if os.environ.get('CI'):
+                pytest.fail(f"Calculation ended in error status in CI environment.\n{error_msg}")
+
         assert calc_details['status'] in ['completed', 'running']  # May still be running in edge cases
-        
+
         # If completed, verify results
         if calc_details['status'] == 'completed':
             assert 'results' in calc_details
@@ -88,9 +104,9 @@ class TestCalculationWorkflowSync:
         mock_scf.kernel.return_value = -1.5
         mock_scf.mo_energy = [-0.5]
         mock_scf.mo_occ = [2.0]
-        
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        mocker.patch('pyscf.dft.RKS', return_value=mock_scf)
+
+        mocker.patch('quantum_calc.dft_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.dft_calculator.dft.RKS', return_value=mock_scf)
 
         # ACT
         # Submit multiple calculations
@@ -133,8 +149,8 @@ class TestCalculationWorkflowSync:
         mock_scf.mo_energy = [-0.5]
         mock_scf.mo_occ = [2.0]
         
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        mocker.patch('pyscf.scf.RHF', return_value=mock_scf)
+        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
 
         # Submit calculation
         response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
@@ -174,8 +190,8 @@ class TestCalculationWorkflowSync:
         mock_scf.mo_energy = [-0.5]
         mock_scf.mo_occ = [2.0]
         
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        mocker.patch('pyscf.scf.RHF', return_value=mock_scf)
+        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
 
         # Submit calculation
         response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
@@ -212,9 +228,9 @@ class TestCalculationWorkflowSync:
         mock_scf.kernel.return_value = -1.06
         mock_scf.mo_energy = [-0.5, 0.3]
         mock_scf.mo_occ = [2.0, 0.0]
-        
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        mocker.patch('pyscf.scf.RHF', return_value=mock_scf)
+
+        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
 
         # ACT
         # Step 1: Submit calculation
@@ -284,11 +300,11 @@ class TestCalculationWorkflowSync:
         mock_scf.mo_occ = [2.0, 0.0, 0.0]
         mock_scf.mo_coeff = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]  # Mock MO coefficients
         
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        mocker.patch('pyscf.scf.RHF', return_value=mock_scf)
+        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
         
         # Mock CUBE file generation
-        mocker.patch('pyscf.tools.cubegen.orbital')
+        mocker.patch('quantum_calc.orbital_generator.tools.cubegen.orbital')
 
         # Submit and complete calculation
         response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
@@ -413,29 +429,30 @@ class TestCalculationWorkflowMultipleCalculations:
         
         # Mock PySCF
         mock_mol = mocker.MagicMock()
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        
+        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.dft_calculator.gto.M', return_value=mock_mol)
+
         # Different energies for different calculations
         energies = [-1.06, -1.5, -2.0]
         call_count = [0]
-        
+
         def mock_kernel_side_effect():
             energy = energies[call_count[0] % len(energies)]
             call_count[0] += 1
             return energy
-        
+
         mock_scf_hf = mocker.MagicMock()
         mock_scf_hf.kernel.side_effect = mock_kernel_side_effect
         mock_scf_hf.mo_energy = [-0.5]
         mock_scf_hf.mo_occ = [2.0]
-        
+
         mock_scf_dft = mocker.MagicMock()
         mock_scf_dft.kernel.side_effect = mock_kernel_side_effect
         mock_scf_dft.mo_energy = [-0.5]
         mock_scf_dft.mo_occ = [2.0]
-        
-        mocker.patch('pyscf.scf.RHF', return_value=mock_scf_hf)
-        mocker.patch('pyscf.dft.RKS', return_value=mock_scf_dft)
+
+        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf_hf)
+        mocker.patch('quantum_calc.dft_calculator.dft.RKS', return_value=mock_scf_dft)
 
         # ACT
         # Submit HF calculation
