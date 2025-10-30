@@ -82,7 +82,7 @@
     }
   },
   "app_info": {
-    "version": "0.0.3"
+    "version": "0.0.4-alpha"
   },
   "external_services": {
     "pubchem_timeout": 30,
