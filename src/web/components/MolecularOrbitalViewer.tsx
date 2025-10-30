@@ -157,14 +157,13 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
           // 再試行ロジック（最大3回まで）
           if (retryCountRef.current < 3) {
             retryCountRef.current += 1;
-            timeoutId = setTimeout(
-              () => {
-                animationFrameId = requestAnimationFrame(initializeViewer);
-              },
-              500 * retryCountRef.current
-            ); // 指数バックオフ
+            timeoutId = setTimeout(() => {
+              animationFrameId = requestAnimationFrame(initializeViewer);
+            }, 500 * retryCountRef.current); // 指数バックオフ
           } else {
-            console.error('Failed to initialize molecular viewer after 3 attempts');
+            console.error(
+              'Failed to initialize molecular viewer after 3 attempts'
+            );
             onError?.(
               'Failed to initialize molecular viewer after multiple attempts'
             );
@@ -267,7 +266,12 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
     // CUBEデータが更新されたときに分子軌道を表示
     useEffect(() => {
       // ビューアーが完全に準備完了するまで待機
-      if (!viewer || !isViewerReady || !cubeData || !(cubeData as any).cube_data) {
+      if (
+        !viewer ||
+        !isViewerReady ||
+        !cubeData ||
+        !(cubeData as any).cube_data
+      ) {
         return;
       }
 
@@ -319,7 +323,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
             try {
               viewer.clear();
             } catch (clearError) {
-              console.error('Failed to clear viewer after model error:', clearError);
+              console.error(
+                'Failed to clear viewer after model error:',
+                clearError
+              );
             }
             throw new Error('Failed to add molecular structure from CUBE data');
           }
@@ -337,7 +344,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
             try {
               viewer.clear();
             } catch (clearError) {
-              console.error('Failed to clear viewer after positive isosurface error:', clearError);
+              console.error(
+                'Failed to clear viewer after positive isosurface error:',
+                clearError
+              );
             }
             throw new Error(
               `Failed to add positive isosurface: ${posError instanceof Error ? posError.message : String(posError)}`
@@ -357,7 +367,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
             try {
               viewer.clear();
             } catch (clearError) {
-              console.error('Failed to clear viewer after negative isosurface error:', clearError);
+              console.error(
+                'Failed to clear viewer after negative isosurface error:',
+                clearError
+              );
             }
             throw new Error(
               `Failed to add negative isosurface: ${negError instanceof Error ? negError.message : String(negError)}`
