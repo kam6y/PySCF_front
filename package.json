@@ -1,6 +1,6 @@
 {
   "name": "pyscf_front",
-  "version": "0.0.4-alpha",
+  "version": "0.0.4-alpha2",
   "description": "A quantum chemical calculation app using Electron, React, and Python.",
   "main": "dist/main.js",
   "scripts": {
