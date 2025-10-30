@@ -50,8 +50,6 @@ jobs:
       run: |
         conda activate pyscf-env
         npm run build
-        # Initialize conda environment (fix shebangs)
-        ./conda_env/bin/conda-unpack
 
     - name: Package application
       shell: bash -l {0}

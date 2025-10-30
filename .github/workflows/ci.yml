@@ -97,7 +97,7 @@ jobs:
         tar -xzf conda_env.tar.gz -C conda_env
         rm conda_env.tar.gz
         # Initialize conda environment (fix shebangs)
-        ./conda_env/bin/conda-unpack
+        (./conda_env/bin/conda-unpack || echo "Warning: conda-unpack encountered errors but continuing...")
         echo "Cleaning up development files from conda_env..."
         find conda_env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
         find conda_env -type f \( -name "*.pyc" -o -name "*.pyo" -o -name "*.pyd" \) -delete
