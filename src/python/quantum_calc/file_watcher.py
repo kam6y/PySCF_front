@@ -3,16 +3,26 @@
 """File system monitoring utilities for quantum chemistry calculations."""
 
 import os
+import sys
 import json
 import logging
 import threading
 from pathlib import Path
-from typing import Dict, Callable, Optional, Set
+from typing import Dict, Callable, Optional, Set, Any
 from datetime import datetime
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
 import queue
 import threading
+
+# Platform-specific observer selection
+# FSEventsObserver (macOS default) fails after fork in Gunicorn workers
+# Use PollingObserver on macOS for fork-safety, regular Observer elsewhere
+if sys.platform == 'darwin':
+    from watchdog.observers.polling import PollingObserver as Observer
+    logging.getLogger(__name__).info("Using PollingObserver for macOS fork-safety")
+else:
+    from watchdog.observers import Observer
+
+from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
 
 from .exceptions import FileManagerError, WebSocketError
 
@@ -108,7 +118,7 @@ class WebSocketCalculationWatcher:
         self.base_directory = Path(base_directory)
         self.observer = Observer()
         self.connections: Dict[str, Set[Callable]] = {}  # calculation_id -> set of callbacks
-        self.watched_dirs: Set[str] = set()
+        self.watched_dirs: Dict[str, Any] = {}  # calculation_id -> ObservedWatch object from schedule()
         self._lock = threading.Lock()
         self._started = False
         
@@ -173,8 +183,9 @@ class WebSocketCalculationWatcher:
             calc_dir_str = str(calc_dir)
             
             if calc_dir_str not in self.watched_dirs and calc_dir.exists():
-                self.observer.schedule(self.event_handler, calc_dir_str, recursive=False)
-                self.watched_dirs.add(calc_dir_str)
+                # Store the ObservedWatch object returned by schedule() for later unscheduling
+                watch = self.observer.schedule(self.event_handler, calc_dir_str, recursive=False)
+                self.watched_dirs[calc_dir_str] = watch
                 logger.debug(f"Started watching directory: {calc_dir_str}")
     
     def remove_connection(self, calculation_id: str, callback: Callable[[Dict], None]):
@@ -195,38 +206,27 @@ class WebSocketCalculationWatcher:
                     self._stop_watching_calculation(calculation_id)
     
     def _stop_watching_calculation(self, calculation_id: str):
-        """Stop watching a calculation directory when no connections remain."""
+        """
+        Stop watching a calculation directory when no connections remain.
+        
+        Uses the official watchdog API pattern: store the ObservedWatch object
+        returned by schedule() and pass it to unschedule() later.
+        This avoids relying on internal implementation details of the watchdog library.
+        """
         calc_dir = self.base_directory / calculation_id
         calc_dir_str = str(calc_dir)
         
         if calc_dir_str in self.watched_dirs:
-            # Safe handling of observer cleanup
             try:
-                # Try to access watches attribute safely
-                if hasattr(self.observer, 'watches') and self.observer.watches:
-                    # Find and remove the watch
-                    for watch in self.observer.watches:
-                        if hasattr(watch, 'path') and watch.path == calc_dir_str:
-                            self.observer.unschedule(watch)
-                            break
-                elif hasattr(self.observer, '_watches') and self.observer._watches:
-                    # Alternative access pattern for some watchdog versions
-                    for watch in self.observer._watches:
-                        if hasattr(watch, 'path') and watch.path == calc_dir_str:
-                            self.observer.unschedule(watch)
-                            break
-                else:
-                    # Fallback: unschedule_all for this event handler
-                    logger.debug(f"Cannot access observer watches, attempting unschedule_all for {calc_dir_str}")
-                    # Note: This is less precise but safer
-                    pass
-            except (AttributeError, RuntimeError) as e:
-                logger.warning(f"Error accessing observer watches for cleanup: {e}")
+                # Use the stored ObservedWatch object for clean unscheduling (official pattern)
+                watch = self.watched_dirs[calc_dir_str]
+                self.observer.unschedule(watch)
+                del self.watched_dirs[calc_dir_str]
+                logger.debug(f"Stopped watching directory: {calc_dir_str}")
             except Exception as e:
-                logger.error(f"Unexpected error during watch cleanup: {e}")
-            
-            self.watched_dirs.discard(calc_dir_str)
-            logger.debug(f"Stopped watching directory: {calc_dir_str}")
+                logger.error(f"Error unscheduling watch for {calc_dir_str}: {e}")
+                # Clean up the entry even if unscheduling failed
+                self.watched_dirs.pop(calc_dir_str, None)
     
     def _queue_file_change(self, calculation_id: str, file_data: Dict):
         """Queue file change events for processing in threading context."""

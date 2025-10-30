@@ -1,0 +1,252 @@
+/* src/web/components/ChatMessage.module.css */
+
+.chatMessage {
+  padding: 12px 16px;
+  border-radius: 18px;
+  max-width: 70%;
+  word-wrap: break-word;
+  line-height: 1.4;
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user {
+  background-color: #3b82f6;
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.model {
+  background-color: #e5e7eb;
+  color: #1f2937;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+}
+
+.messageContent {
+  /* Message content wrapper */
+}
+
+/* ストリーミング時のカーソル */
+.cursor {
+  color: #3b82f6;
+  opacity: 1;
+  animation: blink 1s linear infinite;
+  margin-left: 2px;
+  font-weight: bold;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* マークダウンスタイル */
+.markdown {
+  line-height: 1.6;
+  color: inherit;
+}
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  margin: 16px 0 8px 0;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.markdown h1 {
+  font-size: 1.5em;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 8px;
+}
+
+.markdown h2 {
+  font-size: 1.3em;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 4px;
+}
+
+.markdown h3 {
+  font-size: 1.15em;
+}
+
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-size: 1em;
+}
+
+.markdown p {
+  margin: 8px 0;
+}
+
+.markdown ul,
+.markdown ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.markdown li {
+  margin: 4px 0;
+}
+
+.markdown li > ul,
+.markdown li > ol {
+  margin: 4px 0;
+}
+
+.markdown code {
+  background-color: rgba(175, 184, 193, 0.2);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.markdown pre {
+  background-color: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+  overflow-x: auto;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-size: 0.85em;
+  line-height: 1.4;
+}
+
+.markdown pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.markdown blockquote {
+  border-left: 4px solid #d1d5db;
+  margin: 12px 0;
+  padding: 8px 16px;
+  background-color: rgba(209, 213, 219, 0.1);
+  border-radius: 0 8px 8px 0;
+  font-style: italic;
+}
+
+.markdown blockquote p {
+  margin: 4px 0;
+}
+
+.markdown hr {
+  border: none;
+  border-top: 2px solid #9ca3af;
+  margin: 20px 0;
+}
+
+.markdown a {
+  color: #3b82f6;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-bottom-color 0.2s ease;
+}
+
+.markdown a:hover {
+  border-bottom-color: #3b82f6;
+}
+
+.markdown strong {
+  font-weight: 600;
+}
+
+.markdown em {
+  font-style: italic;
+}
+
+.markdown table {
+  border-collapse: collapse;
+  margin: 12px 0;
+  width: 100%;
+}
+
+.markdown th,
+.markdown td {
+  border: 1px solid #e1e4e8;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown th {
+  background-color: #f6f8fa;
+  font-weight: 600;
+}
+
+.markdown tr:nth-child(even) {
+  background-color: rgba(246, 248, 250, 0.5);
+}
+
+/* シンタックスハイライト用スタイル */
+.markdown .hljs {
+  background-color: #f6f8fa !important;
+  color: #24292e;
+}
+
+.markdown .hljs-comment,
+.markdown .hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.markdown .hljs-keyword,
+.markdown .hljs-selector-tag,
+.markdown .hljs-type {
+  color: #d73a49;
+}
+
+.markdown .hljs-string,
+.markdown .hljs-doctag {
+  color: #032f62;
+}
+
+.markdown .hljs-title,
+.markdown .hljs-section {
+  color: #6f42c1;
+  font-weight: 600;
+}
+
+.markdown .hljs-number,
+.markdown .hljs-literal {
+  color: #005cc5;
+}
+
+.markdown .hljs-function,
+.markdown .hljs-params {
+  color: #6f42c1;
+}
+
+.markdown .hljs-variable,
+.markdown .hljs-template-variable {
+  color: #e36209;
+}
+
+.markdown .hljs-builtin-name,
+.markdown .hljs-built_in {
+  color: #005cc5;
+}
+
+/* Orbital viewer in chat - override max-width for messages containing visualizations */
+.model:has(.markdown > div) {
+  max-width: 85%;
+}

@@ -1,0 +1,313 @@
+.container {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+  background: white;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.header h3 {
+  margin: 0;
+  font-size: 1.0em;
+  color: #333;
+}
+
+.settingsButton {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fa;
+  color: #333;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.settingsButton:hover {
+  background: #e9ecef;
+}
+
+.settingsPanel {
+  padding: 15px;
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.settingsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 15px;
+}
+
+.settingItem {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.settingItem label {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.settingInput {
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.settingInput:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.rangeInputs {
+  display: flex;
+  gap: 8px;
+}
+
+.rangeInputs input {
+  flex: 1;
+}
+
+.settingItem input[type="checkbox"] {
+  margin-right: 8px;
+  width: 16px;
+  height: 16px;
+}
+
+.settingsActions {
+  display: flex;
+  gap: 8px;
+}
+
+.applyButton,
+.cancelButton {
+  padding: 6px 12px;
+  border: 1px solid;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.applyButton {
+  background: #007bff;
+  border-color: #007bff;
+  color: white;
+}
+
+.applyButton:hover {
+  background: #0056b3;
+  border-color: #0056b3;
+}
+
+.cancelButton {
+  background: #f8f9fa;
+  border-color: #ddd;
+  color: #333;
+}
+
+.cancelButton:hover {
+  background: #e9ecef;
+}
+
+.loadingContainer,
+.errorContainer,
+.noDataContainer {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.loadingText {
+  font-size: 14px;
+}
+
+.errorContainer {
+  color: #e74c3c;
+}
+
+.errorText {
+  margin-bottom: 15px;
+  font-size: 14px;
+}
+
+.retryButton {
+  padding: 6px 12px;
+  border: 1px solid #e74c3c;
+  border-radius: 4px;
+  background: #e74c3c;
+  color: white;
+  cursor: pointer;
+}
+
+.retryButton:hover {
+  background: #c0392b;
+  border-color: #c0392b;
+}
+
+.content {
+  margin-top: 0;
+}
+
+/* Chart section styles */
+.chartSection {
+  margin-bottom: 25px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+}
+
+/* Custom tooltip styles */
+.customTooltip {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-size: 13px;
+}
+
+.customTooltip p {
+  margin: 0 0 4px 0;
+  color: #333;
+}
+
+.peakInfo {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
+.peakInfo p {
+  margin: 2px 0;
+  color: #dc2626;
+  font-size: 12px;
+}
+
+/* Metadata section styles */
+.metadataSection {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+}
+
+.metadataSection h4 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.1em;
+  font-weight: 500;
+}
+
+.metadataGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.metadataItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: #333;
+}
+
+.metadataLabel {
+  font-weight: 500;
+}
+
+.metadataValue {
+  color: #0066cc;
+  font-family: monospace;
+}
+
+/* Peaks section styles */
+.peaksSection {
+  margin-bottom: 20px;
+}
+
+.peaksSection h4 {
+  margin: 0 0 15px 0;
+  color: #333;
+  font-size: 1.1em;
+  font-weight: 500;
+}
+
+.peaksTable {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 14px;
+  background: white;
+}
+
+.peaksHeader {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  background: #f8f9fa;
+  font-weight: 500;
+  color: #333;
+  border-bottom: 1px solid #ddd;
+}
+
+.peaksHeader span {
+  padding: 10px 12px;
+  text-align: center;
+  border-right: 1px solid #e9ecef;
+}
+
+.peaksHeader span:last-child {
+  border-right: none;
+}
+
+.peaksRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.peaksRow:hover {
+  background: #fafafa;
+}
+
+.peaksRow:last-child {
+  border-bottom: none;
+}
+
+.peaksRow span {
+  padding: 8px 12px;
+  text-align: center;
+  font-family: monospace;
+  border-right: 1px solid #f0f0f0;
+}
+
+.peaksRow span:first-child {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.peaksRow span:nth-child(2) {
+  color: #059669;
+}
+
+.peaksRow span:last-child {
+  border-right: none;
+  color: #6b7280;
+}
+

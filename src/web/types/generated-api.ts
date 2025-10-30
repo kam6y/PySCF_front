@@ -112,8 +112,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List all calculations
-         * @description Get a list of all available calculation directories
+         * List calculations with optional filtering
+         * @description Get a list of calculation directories with optional filtering by name, status, method, basis set, and date range. Filtering is performed at the file system level for optimal performance.
          */
         get: operations["listCalculations"];
         put?: never;
@@ -136,11 +136,7 @@ export interface paths {
          * @description Get detailed information about a specific calculation
          */
         get: operations["getCalculationDetails"];
-        /**
-         * Update calculation metadata
-         * @description Update calculation name and other metadata
-         */
-        put: operations["updateCalculation"];
+        put?: never;
         post?: never;
         /**
          * Delete calculation
@@ -149,7 +145,11 @@ export interface paths {
         delete: operations["deleteCalculation"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update calculation metadata
+         * @description Update calculation name and other metadata
+         */
+        patch: operations["patchCalculation"];
         trace?: never;
     };
     "/api/quantum/calculations/{calculationId}/orbitals": {
@@ -216,6 +216,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quantum/calculations/{calculationId}/ir-spectrum": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate IR spectrum for a calculation
+         * @description Generate theoretical IR spectrum from vibrational frequency data with scale factor corrections and Lorentzian broadening
+         */
+        get: operations["getIRSpectrum"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quantum/supported-parameters": {
         parameters: {
             query?: never;
@@ -230,6 +250,129 @@ export interface paths {
         get: operations["getSupportedParameters"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get application settings
+         * @description Retrieve current application settings including parallel processing limits
+         */
+        get: operations["getSettings"];
+        /**
+         * Update application settings
+         * @description Update application settings including parallel processing limits
+         */
+        put: operations["updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/resource-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get system resource status
+         * @description Get current system resource information, constraints, and allocation status
+         */
+        get: operations["getSystemResourceStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat-history/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get all chat sessions
+         * @description Retrieve a list of all chat history sessions, ordered by most recent update
+         */
+        get: operations["getChatSessions"];
+        put?: never;
+        /**
+         * Create a new chat session
+         * @description Create a new chat history session with an optional name
+         */
+        post: operations["createChatSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat-history/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get chat session details
+         * @description Retrieve a specific chat session with all messages
+         */
+        get: operations["getChatSession"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete chat session
+         * @description Delete a chat session and all its messages
+         */
+        delete: operations["deleteChatSession"];
+        options?: never;
+        head?: never;
+        /**
+         * Update chat session
+         * @description Update chat session metadata (e.g., name)
+         */
+        patch: operations["updateChatSession"];
+        trace?: never;
+    };
+    "/api/agent/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Chat with AI agent
+         * @description Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+         *
+         *     SSE Event Types:
+         *     - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
+         *     - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+         *     - `done`: Stream completion - `{"type": "done"}`
+         *     - `error`: Error occurred - `{"type": "error", "payload": {"message": "..."}}`
+         *
+         */
+        post: operations["streamChatWithAgent"];
         delete?: never;
         options?: never;
         head?: never;
@@ -254,17 +397,22 @@ export interface components {
          * @description Quantum calculation method
          * @enum {string}
          */
-        CalculationMethod: "DFT" | "HF" | "MP2" | "CCSD" | "CCSD_T" | "TDDFT";
+        CalculationMethod: "DFT" | "HF" | "MP2" | "CCSD" | "CCSD_T" | "TDDFT" | "CASCI" | "CASSCF";
         /**
          * @description Status of a calculation
          * @enum {string}
          */
-        CalculationStatus: "pending" | "running" | "completed" | "error";
+        CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting";
+        /**
+         * @description Type of agent action requiring confirmation
+         * @enum {string}
+         */
+        AgentActionType: "delete_calculation";
         PubChemSearchRequest: {
             /** @description Search query for PubChem */
             query: string;
             /** @default name */
-            search_type: components["schemas"]["SearchType"];
+            searchType: components["schemas"]["SearchType"];
         };
         SMILESConvertRequest: {
             /** @description SMILES string to convert to XYZ format */
@@ -285,20 +433,20 @@ export interface components {
              */
             basis_function: string;
             /**
-             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS)
+             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS). Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
              * @default B3LYP
              */
-            exchange_correlation: string;
+            exchange_correlation: string | null;
             /**
              * @description Molecular charge
              * @default 0
              */
             charges: number;
             /**
-             * @description Spin multiplicity (2S)
+             * @description Spin (2S), number of unpaired electrons
              * @default 0
              */
-            spin_multiplicity: number;
+            spin: number;
             /** @default none */
             solvent_method: components["schemas"]["SolventMethod"];
             /**
@@ -310,7 +458,7 @@ export interface components {
              */
             solvent: string;
             /**
-             * @description Name for the calculation
+             * @description Display name for the calculation instance (distinct from molecule_name which is the chemical name)
              * @default Unnamed Calculation
              */
             name: string;
@@ -334,6 +482,48 @@ export interface components {
              * @default false
              */
             tddft_analyze_nto: boolean;
+            /**
+             * @description Number of active space orbitals (CASCI/CASSCF only)
+             * @default 4
+             */
+            ncas: number;
+            /**
+             * @description Number of active space electrons (CASCI/CASSCF only)
+             * @default 4
+             */
+            nelecas: number;
+            /**
+             * @description Maximum CASSCF macro iterations (CASSCF only)
+             * @default 50
+             */
+            max_cycle_macro: number;
+            /**
+             * @description Maximum CI solver micro iterations (CASCI/CASSCF)
+             * @default 3
+             */
+            max_cycle_micro: number;
+            /**
+             * @description Transform to natural orbitals in active space (CASCI/CASSCF only)
+             * @default true
+             */
+            natorb: boolean;
+            /**
+             * Format: float
+             * @description Energy convergence tolerance (CASSCF only)
+             * @default 0.000001
+             */
+            conv_tol: number;
+            /**
+             * Format: float
+             * @description Gradient convergence tolerance (CASSCF only)
+             * @default 0.0001
+             */
+            conv_tol_grad: number;
+            /**
+             * @description Whether to perform geometry optimization before the main calculation
+             * @default true
+             */
+            optimize_geometry: boolean;
         };
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */
@@ -417,12 +607,14 @@ export interface components {
         CalculationParameters: {
             calculation_method: components["schemas"]["CalculationMethod"];
             basis_function: string;
-            exchange_correlation: string;
+            /** @description Exchange-correlation functional. Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals. */
+            exchange_correlation?: string | null;
             charges: number;
-            spin_multiplicity: number;
+            spin: number;
             solvent_method: components["schemas"]["SolventMethod"];
             solvent: string;
             xyz: string;
+            /** @description Chemical name of the molecule (distinct from calculation display name) */
             molecule_name?: string | null;
             cpu_cores?: number | null;
             memory_mb?: number | null;
@@ -434,6 +626,26 @@ export interface components {
             tddft_method?: string | null;
             /** @description Whether NTO analysis was performed */
             tddft_analyze_nto?: boolean | null;
+            /** @description Number of active space orbitals (CASCI/CASSCF) */
+            ncas?: number | null;
+            /** @description Number of active space electrons (CASCI/CASSCF) */
+            nelecas?: number | null;
+            /** @description Maximum CASSCF macro iterations */
+            max_cycle_macro?: number | null;
+            /** @description Maximum CI solver micro iterations */
+            max_cycle_micro?: number | null;
+            /** @description Whether natural orbital transformation was used */
+            natorb?: boolean | null;
+            /**
+             * Format: float
+             * @description Energy convergence tolerance used
+             */
+            conv_tol?: number | null;
+            /**
+             * Format: float
+             * @description Gradient convergence tolerance used
+             */
+            conv_tol_grad?: number | null;
         };
         CalculationResults: {
             /** @description SCF energy result */
@@ -462,8 +674,8 @@ export interface components {
             xc_functional?: string;
             /** @description Molecular charge */
             charge?: number;
-            /** @description Spin multiplicity */
-            spin_multiplicity?: number;
+            /** @description Spin (2S), number of unpaired electrons */
+            spin?: number;
             /** @description Maximum SCF cycles */
             max_cycle?: number;
             /** @description Number of atoms */
@@ -544,6 +756,37 @@ export interface components {
             gibbs_free_energy_298K?: number | null;
             /** @description Heat capacity at 298.15 K in Hartree/K */
             heat_capacity_298K?: number | null;
+            /** @description CASCI energy in Hartree (CASCI only) */
+            casci_energy?: number | null;
+            /** @description CASSCF energy in Hartree (CASSCF only) */
+            casscf_energy?: number | null;
+            /** @description Correlation energy (CASCI/CASSCF - SCF) in Hartree */
+            correlation_energy?: number | null;
+            /** @description Number of CASSCF macro iterations performed */
+            macro_iterations?: number | null;
+            /** @description Natural orbital analysis results (CASCI/CASSCF) */
+            natural_orbital_analysis?: components["schemas"]["NaturalOrbitalAnalysis"];
+            /** @description CI coefficient analysis results (CASCI/CASSCF) */
+            ci_coefficient_analysis?: components["schemas"]["CICoefficientAnalysis"];
+            /** @description Mulliken atomic spin density analysis (CASCI/CASSCF open-shell) */
+            mulliken_spin_analysis?: components["schemas"]["MullikenSpinAnalysis"];
+            /** @description Orbital overlap analysis between SCF and CASCI/CASSCF orbitals */
+            orbital_overlap_analysis?: components["schemas"]["OrbitalOverlapAnalysis"];
+            /** @description Orbital rotation analysis during CASSCF optimization (CASSCF only) */
+            orbital_rotation_analysis?: components["schemas"]["OrbitalRotationAnalysis"];
+            /** @description Information about kernel() return value structure */
+            kernel_return_info?: ({
+                /** @description Number of elements in kernel() return tuple */
+                tuple_length?: number;
+                /** @description Shape of CI coefficients array */
+                ci_coefficients_shape?: string;
+            } & {
+                [key: string]: unknown;
+            }) | null;
+            /** @description Whether CI coefficients are available from kernel() return */
+            ci_coefficients_available?: boolean | null;
+            /** @description Enhanced CI coefficient analysis from kernel() return */
+            enhanced_ci_analysis?: components["schemas"]["EnhancedCIAnalysis"];
         };
         CalculationInstance: {
             /** @description Unique calculation ID */
@@ -566,7 +809,9 @@ export interface components {
             /** @description Path to calculation files */
             workingDirectory?: string | null;
             /** @description Error details if status is error */
-            errorMessage?: string | null;
+            error?: string | null;
+            /** @description Reason why calculation is waiting (if status is waiting) */
+            waitingReason?: string | null;
         };
         CalculationSummary: {
             /** @description Unique calculation ID */
@@ -766,11 +1011,700 @@ export interface components {
             success: boolean;
             data: components["schemas"]["SupportedParametersData"];
         };
+        AppSettings: {
+            /**
+             * @description Maximum number of parallel calculation instances
+             * @example 4
+             */
+            max_parallel_instances: number;
+            /**
+             * @description Maximum CPU utilization percentage for the system
+             * @example 95
+             */
+            max_cpu_utilization_percent: number;
+            /**
+             * @description Maximum memory utilization percentage for the system
+             * @example 95
+             */
+            max_memory_utilization_percent: number;
+            /**
+             * @description Total number of CPU cores in the system (auto-detected)
+             * @example 8
+             */
+            system_total_cores: number;
+            /**
+             * @description Total system memory in MB (auto-detected)
+             * @example 16384
+             */
+            system_total_memory_mb: number;
+            /**
+             * @description Directory path where calculation data is stored
+             * @example /Users/username/PySCF_calculations
+             */
+            calculations_directory: string;
+            /**
+             * @description Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
+             * @example null
+             */
+            gemini_api_key?: string | null;
+            /**
+             * @description Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
+             * @example null
+             */
+            tavily_api_key?: string | null;
+            /**
+             * @description Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
+             * @example pyscf-research-agent@example.com
+             */
+            research_email?: string | null;
+        };
+        SettingsResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                settings: components["schemas"]["AppSettings"];
+            };
+        };
+        SettingsUpdateRequest: components["schemas"]["AppSettings"];
         ErrorResponse: {
             /** @example false */
             success: boolean;
             /** @description Error message */
             error: string;
+        };
+        SystemResourceInfo: {
+            /**
+             * @description Total number of CPU cores
+             * @example 8
+             */
+            total_cpu_cores: number;
+            /**
+             * @description Total system memory in MB
+             * @example 16384
+             */
+            total_memory_mb: number;
+            /**
+             * @description Available system memory in MB
+             * @example 8192
+             */
+            available_memory_mb: number;
+            /**
+             * @description Current CPU usage percentage
+             * @example 25.5
+             */
+            cpu_usage_percent: number;
+            /**
+             * @description Current memory usage percentage
+             * @example 50.2
+             */
+            memory_usage_percent: number;
+            /**
+             * Format: date-time
+             * @description Timestamp when the resource info was collected
+             */
+            timestamp: string;
+        };
+        ResourceConstraints: {
+            /**
+             * @description Maximum CPU utilization percentage
+             * @example 95
+             */
+            max_cpu_utilization_percent: number;
+            /**
+             * @description Maximum memory utilization percentage
+             * @example 95
+             */
+            max_memory_utilization_percent: number;
+            /**
+             * @description Maximum allowed CPU cores for calculations
+             * @example 6
+             */
+            max_allowed_cpu_cores: number;
+            /**
+             * @description Maximum allowed memory in MB for calculations
+             * @example 13107
+             */
+            max_allowed_memory_mb: number;
+        };
+        AllocatedResources: {
+            /**
+             * @description Total CPU cores currently allocated to calculations
+             * @example 4
+             */
+            total_allocated_cpu_cores: number;
+            /**
+             * @description Total memory in MB currently allocated to calculations
+             * @example 8192
+             */
+            total_allocated_memory_mb: number;
+            /**
+             * @description Available CPU cores for new calculations
+             * @example 2
+             */
+            available_cpu_cores: number;
+            /**
+             * @description Available memory in MB for new calculations
+             * @example 4915
+             */
+            available_memory_mb: number;
+            /**
+             * @description Number of active calculations
+             * @example 2
+             */
+            active_calculations_count: number;
+        };
+        SystemResourceSummary: {
+            system_info: components["schemas"]["SystemResourceInfo"];
+            resource_constraints: components["schemas"]["ResourceConstraints"];
+            allocated_resources: components["schemas"]["AllocatedResources"];
+        };
+        SystemResourceResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["SystemResourceSummary"];
+        };
+        IRSpectrumResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["IRSpectrumData"];
+        };
+        IRSpectrumData: {
+            /**
+             * @description Unique calculation ID
+             * @example calc_20240101_120000_abcd1234
+             */
+            calculation_id: string;
+            spectrum: components["schemas"]["IRSpectrumDetails"];
+            generation_info: components["schemas"]["IRGenerationInfo"];
+        };
+        IRSpectrumDetails: {
+            /**
+             * @description Wavenumber values (cm⁻¹) for the x-axis
+             * @example [
+             *       400,
+             *       401,
+             *       402
+             *     ]
+             */
+            x_axis: number[];
+            /**
+             * @description Intensity values for the y-axis (arbitrary units)
+             * @example [
+             *       0,
+             *       0.1,
+             *       0.05
+             *     ]
+             */
+            y_axis: number[];
+            /** @description Individual peaks in the spectrum */
+            peaks: components["schemas"]["IRPeak"][];
+            metadata: components["schemas"]["IRSpectrumMetadata"];
+        };
+        IRPeak: {
+            /**
+             * Format: float
+             * @description Peak frequency after scale factor correction (cm⁻¹)
+             * @example 1654.2
+             */
+            frequency_cm: number;
+            /**
+             * Format: float
+             * @description Peak intensity (arbitrary units)
+             * @example 120.5
+             */
+            intensity: number;
+            /**
+             * Format: float
+             * @description Original calculated frequency before scale factor correction (cm⁻¹)
+             * @example 1723.1
+             */
+            original_frequency_cm: number;
+        };
+        IRSpectrumMetadata: {
+            /**
+             * @description Computational method used
+             * @example B3LYP
+             */
+            method: string;
+            /**
+             * @description Basis set used
+             * @example 6-31G*
+             */
+            basis_set: string;
+            /**
+             * Format: float
+             * @description Scale factor applied to frequencies
+             * @example 0.96
+             */
+            scale_factor: number;
+            /**
+             * @description Information about the scale factor source
+             * @example Exact match found
+             */
+            scale_message: string;
+            /**
+             * Format: float
+             * @description Full width at half maximum for Lorentzian broadening (cm⁻¹)
+             * @example 100
+             */
+            broadening_fwhm_cm: number;
+            /**
+             * @description Frequency range for the spectrum [min, max] (cm⁻¹)
+             * @example [
+             *       400,
+             *       4000
+             *     ]
+             */
+            frequency_range_cm: number[];
+            /**
+             * @description Total number of calculated frequencies
+             * @example 24
+             */
+            num_peaks_total: number;
+            /**
+             * @description Number of peaks within the specified range
+             * @example 18
+             */
+            num_peaks_in_range: number;
+            /**
+             * @description Number of points in the spectrum
+             * @example 3000
+             */
+            num_points: number;
+        };
+        IRGenerationInfo: {
+            /**
+             * Format: float
+             * @description Full width at half maximum used for broadening (cm⁻¹)
+             * @example 100
+             */
+            broadening_fwhm_cm: number;
+            /**
+             * @description Frequency range used [min, max] (cm⁻¹)
+             * @example [
+             *       400,
+             *       4000
+             *     ]
+             */
+            frequency_range_cm: number[];
+            /**
+             * @description Whether individual peaks were marked in the plot
+             * @example true
+             */
+            peaks_marked: boolean;
+            /**
+             * Format: date-time
+             * @description ISO timestamp when the spectrum was generated
+             * @example 2024-01-01T12:00:00.000Z
+             */
+            generated_at: string;
+        };
+        NaturalOrbitalAnalysis: {
+            /** @description Whether natural orbital analysis was performed */
+            enabled?: boolean;
+            /** @description Natural orbital occupation numbers */
+            occupation_numbers?: number[] | null;
+            /** @description Number of strongly occupied orbitals (occupation > 1.5) */
+            strongly_occupied_count?: number;
+            /** @description Number of weakly occupied orbitals (0.1 < occupation <= 1.5) */
+            weakly_occupied_count?: number;
+            /** @description Number of virtual orbitals (occupation <= 0.1) */
+            virtual_count?: number;
+            /** @description Total number of active space orbitals analyzed */
+            total_orbitals?: number;
+            /**
+             * Format: float
+             * @description Total number of electrons in active space
+             */
+            total_active_electrons?: number;
+            /**
+             * Format: float
+             * @description Effective number of electron pairs
+             */
+            effective_electron_pairs?: number;
+            /**
+             * Format: float
+             * @description Effective number of unpaired electrons
+             */
+            effective_unpaired_electrons?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        CICoefficientAnalysis: {
+            /** @description Whether CI coefficient analysis is available */
+            available?: boolean;
+            /** @description Total number of configurations */
+            total_configurations?: number;
+            /** @description Major configurations with significant contributions */
+            major_configurations?: {
+                /** @description Index of the configuration */
+                configuration_index?: number;
+                /**
+                 * Format: float
+                 * @description CI coefficient value
+                 */
+                coefficient?: number;
+                /**
+                 * Format: float
+                 * @description Percentage contribution to the wavefunction
+                 */
+                contribution_percent?: number;
+                /**
+                 * Format: float
+                 * @description Cumulative percentage contribution
+                 */
+                cumulative_percent?: number;
+            }[];
+            /**
+             * Format: float
+             * @description Leading CI coefficient (largest magnitude)
+             */
+            leading_coefficient?: number;
+            /**
+             * Format: float
+             * @description Percentage contribution of the leading configuration
+             */
+            leading_contribution_percent?: number;
+            /**
+             * Format: float
+             * @description Percentage multiconfigurational character (100 - leading contribution)
+             */
+            multiconfigurational_character?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        MullikenSpinAnalysis: {
+            /** @description Whether Mulliken spin analysis is available */
+            available?: boolean;
+            /** @description Spin density for each atom */
+            atomic_spin_densities?: {
+                /** @description 0-based index of the atom */
+                atom_index?: number;
+                /** @description Element symbol */
+                element?: string;
+                /**
+                 * Format: float
+                 * @description Atomic spin density (alpha - beta electrons)
+                 */
+                spin_density?: number;
+                /**
+                 * Format: float
+                 * @description Absolute value of atomic spin density
+                 */
+                abs_spin_density?: number;
+            }[];
+            /**
+             * Format: float
+             * @description Total spin density of the molecule
+             */
+            total_spin_density?: number;
+            /**
+             * Format: float
+             * @description Sum of absolute atomic spin densities
+             */
+            total_absolute_spin_density?: number;
+            /**
+             * Format: float
+             * @description Expected spin (2S) from molecular parameters
+             */
+            expected_spin?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        OrbitalOverlapAnalysis: {
+            /** @description Whether orbital overlap analysis is available */
+            available?: boolean;
+            /** @description Number of active space orbitals analyzed */
+            active_space_orbitals?: number;
+            /** @description Analysis of each active space orbital */
+            active_orbital_analysis?: {
+                /** @description Index of active space orbital */
+                active_orbital_index?: number;
+                /** @description Index of dominant SCF orbital */
+                dominant_scf_orbital?: number;
+                /**
+                 * Format: float
+                 * @description Maximum overlap with SCF orbitals
+                 */
+                max_overlap?: number;
+                /**
+                 * @description Type of dominant SCF orbital
+                 * @enum {string}
+                 */
+                scf_orbital_type?: "occupied" | "partially_occupied" | "virtual" | "unknown";
+            }[];
+            /**
+             * Format: float
+             * @description Average maximum overlap across active orbitals
+             */
+            average_max_overlap?: number;
+            /**
+             * @description Character of orbital transformation
+             * @enum {string}
+             */
+            orbital_transformation_character?: "minimal" | "significant";
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        OrbitalRotationAnalysis: {
+            /** @description Whether orbital rotation analysis is available */
+            available?: boolean;
+            /**
+             * Format: float
+             * @description Maximum rotation magnitude for core orbitals
+             */
+            core_orbital_rotation_magnitude?: number;
+            /**
+             * Format: float
+             * @description Maximum rotation magnitude for active orbitals
+             */
+            active_orbital_rotation_magnitude?: number;
+            /**
+             * Format: float
+             * @description Maximum rotation magnitude for virtual orbitals
+             */
+            virtual_orbital_rotation_magnitude?: number;
+            /**
+             * Format: float
+             * @description Overall maximum rotation magnitude
+             */
+            overall_rotation_magnitude?: number;
+            /**
+             * @description Extent of orbital rotation during CASSCF optimization
+             * @enum {string}
+             */
+            rotation_extent?: "minimal" | "moderate" | "significant";
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        EnhancedCIAnalysis: {
+            /**
+             * @description Source of CI analysis (from kernel return value)
+             * @enum {string}
+             */
+            source?: "kernel_return";
+            /** @description Whether enhanced CI analysis is available */
+            available?: boolean;
+            /** @description Total number of CI coefficients */
+            total_coefficients?: number;
+            /** @description Shape of the CI coefficient vector/matrix */
+            ci_vector_shape?: string;
+            /** @description Major configurations with >0.5% contribution */
+            major_configurations?: {
+                /** @description Index of the configuration */
+                configuration_index?: number;
+                /**
+                 * Format: float
+                 * @description CI coefficient value
+                 */
+                coefficient?: number;
+                /**
+                 * Format: float
+                 * @description Percentage contribution to the wavefunction
+                 */
+                contribution_percent?: number;
+                /**
+                 * Format: float
+                 * @description Cumulative percentage contribution
+                 */
+                cumulative_percent?: number;
+            }[];
+            /**
+             * Format: float
+             * @description Leading CI coefficient (largest magnitude)
+             */
+            leading_coefficient?: number;
+            /**
+             * Format: float
+             * @description Percentage contribution of the leading configuration
+             */
+            leading_contribution_percent?: number;
+            /**
+             * Format: float
+             * @description Multiconfigurational character (100 - leading contribution %)
+             */
+            multiconfigurational_character?: number;
+            /** @description Number of configurations with significant contribution */
+            effective_configurations?: number;
+            /**
+             * Format: float
+             * @description Entropy measure of wavefunction multiconfigurational character
+             */
+            wavefunction_entropy?: number;
+            /**
+             * @description Overall character of the wavefunction
+             * @enum {string}
+             */
+            wavefunction_character?: "single_configuration" | "few_configuration" | "multiconfigurational";
+            /**
+             * Format: float
+             * @description Normalization of the CI vector
+             */
+            normalization?: number;
+            /** @description Reason if analysis was not performed */
+            reason?: string | null;
+            /** @description Error message if analysis failed */
+            error?: string | null;
+        };
+        AgentChatRequest: {
+            /** @description New message from the user */
+            message: string;
+            /** @description Previous conversation history */
+            history: {
+                /** @enum {string} */
+                role?: "user" | "model";
+                parts?: {
+                    text?: string;
+                }[];
+            }[];
+            /** @description Optional chat session ID for persisting conversation history */
+            session_id?: string | null;
+        };
+        AgentChatResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description Response message from the AI agent */
+                reply: string;
+            };
+        };
+        ExecuteConfirmedActionRequest: {
+            action_type: components["schemas"]["AgentActionType"];
+            /** @description ID of the calculation to perform the action on */
+            calculation_id: string;
+        };
+        ExecuteConfirmedActionResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description Result message */
+                message: string;
+                action_type?: components["schemas"]["AgentActionType"];
+                /** @description ID of the affected calculation */
+                calculation_id?: string;
+            };
+        };
+        ChatMessage: {
+            /**
+             * @description Unique message ID (UUID)
+             * @example msg_550e8400-e29b-41d4-a716-446655440000
+             */
+            id: string;
+            /**
+             * @description Associated chat session ID
+             * @example session_550e8400-e29b-41d4-a716-446655440000
+             */
+            session_id: string;
+            /**
+             * @description Message sender role
+             * @enum {string}
+             */
+            role: "user" | "model";
+            /** @description Message content */
+            content: string;
+            /**
+             * Format: date-time
+             * @description Message creation timestamp
+             */
+            created_at: string;
+        };
+        ChatSession: {
+            /**
+             * @description Unique session ID (UUID)
+             * @example session_550e8400-e29b-41d4-a716-446655440000
+             */
+            id: string;
+            /**
+             * @description Session name/title
+             * @example 水分子のDFT計算
+             */
+            name: string;
+            /**
+             * Format: date-time
+             * @description Session creation timestamp
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description Last update timestamp
+             */
+            updated_at: string;
+        };
+        ChatSessionSummary: {
+            /** @description Unique session ID */
+            id: string;
+            /** @description Session name/title */
+            name: string;
+            /** @description Number of messages in this session */
+            message_count: number;
+            /**
+             * Format: date-time
+             * @description Session creation timestamp
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description Last update timestamp
+             */
+            updated_at: string;
+        };
+        ChatSessionDetail: {
+            session: components["schemas"]["ChatSession"];
+            /** @description All messages in this session, ordered by creation time */
+            messages: components["schemas"]["ChatMessage"][];
+        };
+        CreateChatSessionRequest: {
+            /**
+             * @description Session name/title
+             * @default 新しいチャット
+             */
+            name: string;
+        };
+        UpdateChatSessionRequest: {
+            /** @description Updated session name */
+            name: string;
+        };
+        ChatHistoryListResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description List of chat sessions */
+                sessions: components["schemas"]["ChatSessionSummary"][];
+                /** @description Total number of sessions */
+                total_count: number;
+            };
+        };
+        ChatSessionResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                session: components["schemas"]["ChatSession"];
+            };
+        };
+        ChatSessionDetailResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["ChatSessionDetail"];
+        };
+        ChatSessionDeleteResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /** @description Deletion confirmation message */
+                message: string;
+                /** @description ID of the deleted session */
+                deleted_id: string;
+            };
         };
     };
     responses: never;
@@ -971,14 +1905,27 @@ export interface operations {
     };
     listCalculations: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Partial match search in calculation name (case-insensitive) */
+                name_query?: string;
+                /** @description Filter by calculation status */
+                status?: "completed" | "running" | "error" | "waiting" | "pending";
+                /** @description Filter by calculation method */
+                calculation_method?: "DFT" | "HF" | "MP2" | "CCSD" | "TDDFT" | "CASCI" | "CASSCF";
+                /** @description Filter by basis set (case-insensitive) */
+                basis_function?: string;
+                /** @description Start date for date range filtering (ISO format YYYY-MM-DD) */
+                date_from?: string;
+                /** @description End date for date range filtering (ISO format YYYY-MM-DD) */
+                date_to?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description List of calculations */
+            /** @description List of calculations matching filter criteria */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1039,7 +1986,48 @@ export interface operations {
             };
         };
     };
-    updateCalculation: {
+    deleteCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculation deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationDeleteResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patchCalculation: {
         parameters: {
             query?: never;
             header?: never;
@@ -1083,47 +2071,6 @@ export interface operations {
                 };
             };
             /** @description Failed to update calculation */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    deleteCalculation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Unique calculation ID */
-                calculationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Calculation deleted successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalculationDeleteResponse"];
-                };
-            };
-            /** @description Calculation not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to delete calculation */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -1270,7 +2217,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Specific orbital index to delete (if not provided, deletes all) */
-                orbital_index?: number;
+                orbitalIndex?: number;
             };
             header?: never;
             path: {
@@ -1310,6 +2257,65 @@ export interface operations {
             };
         };
     };
+    getIRSpectrum: {
+        parameters: {
+            query?: {
+                /** @description Full width at half maximum for Lorentzian broadening in cm⁻¹ */
+                broadeningFwhm?: number;
+                /** @description Minimum wavenumber for spectrum range in cm⁻¹ */
+                xMin?: number;
+                /** @description Maximum wavenumber for spectrum range in cm⁻¹ */
+                xMax?: number;
+                /** @description Whether to mark individual peaks in the plot */
+                showPeaks?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description IR spectrum generated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IRSpectrumResponse"];
+                };
+            };
+            /** @description Invalid parameters or calculation not completed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Calculation not found or no frequency data available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to generate IR spectrum */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getSupportedParameters: {
         parameters: {
             query?: never;
@@ -1329,6 +2335,347 @@ export interface operations {
                 };
             };
             /** @description Failed to retrieve supported parameters */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Failed to retrieve settings */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Settings updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Invalid settings data */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to update settings */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getSystemResourceStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description System resource status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemResourceResponse"];
+                };
+            };
+            /** @description Failed to retrieve system resource status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getChatSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat sessions retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatHistoryListResponse"];
+                };
+            };
+            /** @description Failed to retrieve chat sessions */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    createChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateChatSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Chat session created successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionResponse"];
+                };
+            };
+            /** @description Invalid request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to create chat session */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chat session ID */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat session retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionDetailResponse"];
+                };
+            };
+            /** @description Chat session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to retrieve chat session */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chat session ID */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chat session deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionDeleteResponse"];
+                };
+            };
+            /** @description Chat session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete chat session */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    updateChatSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Chat session ID */
+                sessionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateChatSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Chat session updated successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatSessionResponse"];
+                };
+            };
+            /** @description Chat session not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to update chat session */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    streamChatWithAgent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentChatRequest"];
+            };
+        };
+        responses: {
+            /** @description Successfully initiated a streaming connection. The response is a Server-Sent Event (SSE) stream with a `text/event-stream` content type. Each event is a JSON object containing either a text chunk, error message, or stream completion signal.
+             *      */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Invalid request (empty message, message too long, etc.) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Server error during agent processing */
             500: {
                 headers: {
                     [name: string]: unknown;

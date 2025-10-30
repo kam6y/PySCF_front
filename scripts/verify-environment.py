@@ -59,12 +59,12 @@ def check_required_packages() -> bool:
         ('geometric', 'geometric - 分子幾何最適化'),
         ('flask', 'Flask - ウェブフレームワーク'),
         ('flask_cors', 'Flask-CORS - CORS対応'),
+        ('flask_sock', 'Flask-Sock - WebSocket対応'),
         ('pydantic', 'Pydantic - データバリデーション'),
         ('gevent', 'Gevent - 非同期処理'),
         ('requests', 'Requests - HTTP クライアント'),
         ('conda_pack', 'conda-pack - 環境パッケージ化'),
         ('datamodel_code_generator', 'datamodel-code-generator - コード生成'),
-        ('PyInstaller', 'PyInstaller - Python実行ファイル作成'),
     ]
     
     log_info("必須パッケージをチェック中...")
@@ -172,46 +172,18 @@ def check_flask_functionality() -> bool:
 def check_conda_environment() -> bool:
     """conda 環境の確認"""
     log_info("conda 環境をチェック中...")
+
+    # 現在のPython実行可能ファイルのパスを取得
+    python_executable = sys.executable
     
-    try:
-        import os
-        # 環境変数からconda環境名を確認
-        conda_default_env = os.environ.get('CONDA_DEFAULT_ENV')
-        conda_prefix = os.environ.get('CONDA_PREFIX', '')
-        
-        if conda_default_env == 'pyscf-env':
-            log_success(f"適切なconda環境がアクティブです: {conda_default_env} ✓")
-            return True
-        elif 'pyscf-env' in conda_prefix:
-            log_success(f"pyscf-env環境が検出されました: {conda_prefix} ✓")
-            return True
-        else:
-            # condaコマンドを試行（パスが利用可能な場合）
-            try:
-                conda_env = subprocess.run(
-                    ['conda', 'info', '--json'],
-                    capture_output=True,
-                    text=True,
-                    check=True
-                )
-                
-                import json
-                env_info = json.loads(conda_env.stdout)
-                active_env = env_info.get('active_prefix_name', 'base')
-                
-                if active_env == 'pyscf-env':
-                    log_success(f"適切なconda環境がアクティブです: {active_env} ✓")
-                    return True
-                else:
-                    log_warning(f"現在のconda環境: {active_env} (pyscf-env が推奨)")
-                    return False
-                    
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                log_warning(f"conda環境: {conda_default_env or 'unknown'} (環境変数から取得)")
-                return False
-            
-    except Exception as e:
-        log_error(f"conda 環境チェック失敗: {e}")
+    # パスに "pyscf-env" が含まれているかで判定するのが最も確実
+    if "pyscf-env" in python_executable:
+        log_success(f"適切なconda環境がアクティブです: {python_executable} ✓")
+        return True
+    else:
+        log_error("pyscf-env 環境がアクティブではありません ✗")
+        log_info(f"現在のPython: {python_executable}")
+        log_info("解決策: 'conda activate pyscf-env' を実行してください。")
         return False
 
 def check_project_structure() -> bool:

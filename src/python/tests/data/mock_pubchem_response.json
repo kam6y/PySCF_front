@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "data": {
+    "xyz": "3\nWater\nO 0.0000 0.0000 0.1173\nH 0.0000 0.7572 -0.4692\nH 0.0000 -0.7572 -0.4692",
+    "name": "Water",
+    "formula": "H2O",
+    "molecular_weight": 18.015
+  }
+}

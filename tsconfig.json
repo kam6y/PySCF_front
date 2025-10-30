@@ -6,8 +6,9 @@
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
     "strict": true,
+    "skipLibCheck": true,
     "typeRoots": ["./node_modules/@types", "./src/types"],
-    "types": []
+    "types": ["node"]
   },
   "include": [
     "src/**/*"

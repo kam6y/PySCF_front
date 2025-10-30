@@ -43,7 +43,7 @@ export const useCalculationOperations = (
     } else if (error instanceof Error) {
       showErrorNotification(defaultMessage, error.message);
     } else {
-      showErrorNotification(defaultMessage, '不明なエラーが発生しました。');
+      showErrorNotification(defaultMessage, 'An unknown error occurred.');
     }
   };
 
@@ -59,7 +59,7 @@ export const useCalculationOperations = (
 
       return runningCalculation;
     } catch (error) {
-      handleApiError(error, '計算の開始に失敗しました');
+      handleApiError(error, 'Failed to start calculation');
       throw error;
     }
   };
@@ -74,7 +74,7 @@ export const useCalculationOperations = (
         newName,
       });
     } catch (error) {
-      handleApiError(error, '計算名の変更に失敗しました');
+      handleApiError(error, 'Failed to change calculation name');
     }
   };
 
@@ -89,7 +89,7 @@ export const useCalculationOperations = (
         setCurrentPage('calculation-settings');
       }
     } catch (error) {
-      handleApiError(error, '計算の削除に失敗しました');
+      handleApiError(error, 'Failed to delete calculation');
     }
   };
 

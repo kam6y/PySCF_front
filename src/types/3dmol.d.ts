@@ -9,6 +9,10 @@ export interface AtomSpec {
   x?: number;
   y?: number;
   z?: number;
+  properties?: {
+    [key: string]: any;
+    charge?: number;
+  };
 }
 
 export interface StyleSpec {
@@ -45,10 +49,11 @@ export interface ViewerSpec {
 }
 
 export interface LabelSpec {
-  position?: { x: number; y: number; z: number };
+  position?: { x: number; y: number; z: number } | { serial: number };
   fontColor?: string;
   backgroundColor?: string;
   backgroundOpacity?: number;
+  showBackground?: boolean;
   fontSize?: number;
   inFront?: boolean;
   bold?: boolean;
@@ -91,11 +96,24 @@ export interface GLViewer {
   addSurface(
     type: string,
     style: any,
-    sel?: AtomSpec,
+    sel?: AtomSpec & { charges?: number[] },
     allsel?: AtomSpec
   ): number;
   removeSurface(surfid: number): GLViewer;
   removeAllSurfaces(): GLViewer;
+
+  addVolumetricData(
+    data: string,
+    format: string,
+    spec: {
+      isoval?: number;
+      color?: string;
+      opacity?: number;
+      voldata?: any;
+      volscheme?: any;
+    }
+  ): any;
+  addIsosurface(volumedata: any, spec: any): any;
 
   spin(axis?: string, speed?: number): GLViewer;
   stopAnimate(): GLViewer;
@@ -123,7 +141,7 @@ export interface GLModel {
   addSurface(
     type: string,
     style: any,
-    sel?: AtomSpec,
+    sel?: AtomSpec & { charges?: number[] },
     allsel?: AtomSpec
   ): number;
   removeSurface(surf: number): GLModel;
@@ -155,4 +173,23 @@ declare module '3dmol' {
   ): void;
 
   export const ElementColors: { [element: string]: number };
+
+  export enum SurfaceType {
+    VDW = 1,
+    MS = 2,
+    SAS = 3,
+    SES = 4,
+  }
+
+  export namespace Gradient {
+    class RWB {
+      constructor(min: number, max: number);
+    }
+    class ROYGB {
+      constructor(min: number, max: number);
+    }
+    class Sinebow {
+      constructor(min: number, max: number);
+    }
+  }
 }

@@ -11,6 +11,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +19,12 @@ logger = logging.getLogger(__name__)
 class CCSDCalculator(BaseCalculator):
     """CCSD/CCSD(T) calculator using PySCF for structure optimization and CCSD calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir)
+        super().__init__(working_dir, optimize_geometry)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None
         self.ccsd: Optional[cc.CCSD] = None
@@ -33,82 +34,38 @@ class CCSDCalculator(BaseCalculator):
         self.calculate_ccsd_t = False  # Flag to indicate if CCSD(T) should be calculated
         
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup CCSD calculation with molecular geometry and parameters."""
-        try:
-            # Extract calculation parameters
-            basis = kwargs.get('basis', 'cc-pVDZ')  # CCSD typically uses correlation-consistent basis sets
-            charge = kwargs.get('charge', 0)
-            spin = kwargs.get('spin', 0)
-            max_cycle = kwargs.get('max_cycle', 150)
-            solvent_method = kwargs.get('solvent_method', 'none')
-            solvent = kwargs.get('solvent', '-')
-            memory_mb = kwargs.get('memory_mb', 4000)  # CCSD needs more memory than HF/DFT
-            frozen_core = kwargs.get('frozen_core', True)  # Enable frozen core by default for CCSD
-            ccsd_t = kwargs.get('ccsd_t', False)  # Whether to calculate CCSD(T) correction
-
-            # Store CCSD(T) flag
-            self.calculate_ccsd_t = ccsd_t
-
-            # Convert atoms list to PySCF format
-            atom_string = self._atoms_to_string(atoms)
-            
-            # Create molecular object
-            self.mol = gto.M(
-                atom=atom_string,
-                basis=basis,
-                charge=charge,
-                spin=spin,
-                verbose=0
-            )
-            
-            # 安全なメモリ設定を適用
-            if memory_mb and memory_mb > 0:
-                self.mol.max_memory = memory_mb
-            else:
-                self.mol.max_memory = 4000  # CCSDはより多くのメモリが必要
-            
-            # Setup HF calculation first (CCSD requires HF reference)
-            # For closed-shell systems (spin=0), use RHF
-            # For open-shell systems (spin>0), use UHF
-            if spin == 0:
-                self.mf = scf.RHF(self.mol)
-                logger.info("Using Restricted Hartree-Fock (RHF) reference for RCCSD")
-            else:
-                self.mf = scf.UHF(self.mol)
-                logger.info("Using Unrestricted Hartree-Fock (UHF) reference for UCCSD")
-            
-            # Apply solvent effects if requested
-            self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
-            
-            self.mf.chkfile = self.get_checkpoint_path()
-            self.mf.max_cycle = max_cycle
-            
-            # Store parameters for template method
-            self.max_cycle = max_cycle
-            self.solvent_method = solvent_method
-            self.solvent = solvent
-            self.frozen_core = frozen_core
-            
-            # Store parameters
-            method_name = 'UCCSD' if spin > 0 else 'RCCSD'
-            if ccsd_t:
-                method_name += '(T)'
-            
-            self.results.update({
-                'basis': basis,
-                'charge': charge,
-                'spin_multiplicity': spin,
-                'max_cycle': max_cycle,
-                'solvent_method': solvent_method,
-                'solvent': solvent,
-                'atom_count': len(atoms),
-                'method': method_name,
-                'frozen_core': frozen_core,
-                'ccsd_t_correction': ccsd_t
-            })
-            
-        except Exception as e:
-            raise InputError(f"Failed to setup CCSD calculation: {str(e)}")
+        """Setup CCSD calculation using the base template method."""
+        # Call the base template method which handles common setup
+        super().setup_calculation(atoms, **kwargs)
+    
+    def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
+        """Validate CCSD-specific parameters."""
+        # CCSD-specific parameters
+        frozen_core = kwargs.get('frozen_core', True)  # Enable frozen core by default for CCSD
+        ccsd_t = kwargs.get('ccsd_t', False)  # Whether to calculate CCSD(T) correction
+        
+        # Store CCSD(T) flag for later use
+        self.calculate_ccsd_t = ccsd_t
+        self.frozen_core = frozen_core
+        
+        # Set method name based on spin and CCSD(T) flag
+        method_name = 'UCCSD' if kwargs.get('spin', 0) > 0 else 'RCCSD'
+        if ccsd_t:
+            method_name += '(T)'
+        
+        return {
+            'method': method_name,
+            'frozen_core': frozen_core,
+            'ccsd_t_correction': ccsd_t
+        }
+    
+    def _get_default_memory_mb(self) -> int:
+        """Get default memory setting for CCSD calculations from config."""
+        return get_memory_for_method('CCSD')
+    
+    def _get_calculation_method_name(self) -> str:
+        """Get the name of the calculation method for logging."""
+        return 'CCSD(T)' if self.calculate_ccsd_t else 'CCSD'
     
     # ===== Template Method Pattern Implementation =====
     
@@ -181,7 +138,7 @@ class CCSDCalculator(BaseCalculator):
         results = {
             'hf_energy': hf_energy_float,
             'ccsd_correlation_energy': ccsd_corr_energy_float,
-            'scf_energy': ccsd_total_energy_float,  # For consistency with other calculators
+            'scf_energy': ccsd_t_total_energy_float if self.calculate_ccsd_t else ccsd_total_energy_float,  # Use CCSD(T) energy if calculated
             'ccsd_total_energy': ccsd_total_energy_float
         }
         
@@ -196,7 +153,7 @@ class CCSDCalculator(BaseCalculator):
     
     def _create_scf_method(self, mol):
         """Create HF method object for CCSD reference (RHF/UHF)."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin', 0)
         
         if spin == 0:
             mf = scf.RHF(mol)
@@ -213,5 +170,5 @@ class CCSDCalculator(BaseCalculator):
     
     def _get_base_method_description(self) -> str:
         """Get description of base method for logging."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin', 0)
         return f"{'UHF' if spin > 0 else 'RHF'} (CCSD reference)"

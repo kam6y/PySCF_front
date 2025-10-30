@@ -190,7 +190,16 @@ export const MoleculeViewer = forwardRef<
         try {
           viewer.removeAllModels();
           viewer.addModel(xyzData, 'xyz');
-          // Don't set default style here - it will be set by setStyle method
+
+          // Apply default ball-and-stick style
+          viewer.setStyle(
+            {},
+            {
+              stick: { radius: 0.15, colorscheme: 'default' },
+              sphere: { radius: 0.3, colorscheme: 'default' },
+            }
+          );
+
           updateOverlays(viewer);
           viewer.zoomTo();
         } catch (error) {
@@ -310,10 +319,7 @@ export const MoleculeViewer = forwardRef<
           height,
         }}
       >
-        <div
-          ref={containerRef}
-          className={styles.moleculeViewerContainer}
-        />
+        <div ref={containerRef} className={styles.moleculeViewerContainer} />
       </div>
     );
   }

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def get_supported_calculation_methods() -> List[str]:
     """Get list of supported quantum calculation methods."""
-    return ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT']
+    return ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT', 'CASCI', 'CASSCF']
 
 
 def get_supported_basis_functions() -> Dict[str, List[str]]:

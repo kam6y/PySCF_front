@@ -250,6 +250,16 @@
   box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
 }
 
+.waiting {
+  background: #f39c12;
+}
+
+.waiting:hover {
+  background: #e67e22;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+}
+
 /* Calculation Column - Calculation Settings */
 .calculationColumn {
   display: flex;

@@ -109,6 +109,30 @@
   transform: translateY(-1px) translateX(0);
 }
 
+/* Clickable toast styles */
+.toastClickable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toastClickable:hover {
+  transform: translateY(-2px) translateX(0);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.toastClickable:active {
+  transform: translateY(-1px) translateX(0);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Add subtle pointer indication */
+
+.toastClickable:hover::after {
+  opacity: 0.6;
+}
+
 /* Animation for progress bar (if we want to add auto-close indicator) */
 @keyframes shrink {
   from {

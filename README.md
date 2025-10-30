@@ -15,6 +15,10 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
     -   Perform **geometry optimization** and **vibrational frequency analysis**.
     -   Analyze results, including SCF energy, molecular orbitals (HOMO/LUMO), and more.
 -   **Calculation History**: View, rename, and delete past calculation results.
+-   **AI-Powered Multi-Agent System**:
+    -   **Molecular Agent**: Assists with quantum chemistry calculations and molecular analysis using natural language.
+    -   **Research Agent**: Searches arXiv for relevant academic papers and provides summaries with PDF links.
+    -   **Intelligent Routing**: Automatically routes queries to the appropriate specialist agent based on user intent.
 -   **Automated Environment Setup**: Set up the complete development environment with a single command (`npm run setup-env`).
 -   **Environment Validation**: Automatically verify Python dependencies and environment health (`npm run verify-env`).
 -   **Unified Execution Environment**: Uses a Gunicorn-based server for both development and production to eliminate environment-specific issues.
@@ -84,10 +88,13 @@ If you prefer to manage the conda environment manually:
     ```bash
     # Example for installing Miniforge on macOS ARM
     curl -L -O "[https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh](https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
-    bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
-    
+    bash Miniforge3-MacOSX-arm64.sh -b
+
+    # Initialize conda (or use: conda init)
+    CONDA_BASE=$(conda info --base)
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+
     # Create the conda environment from the environment.yml file
-    source $HOME/miniforge3/etc/profile.d/conda.sh
     conda env create -f .github/environment.yml
     
     # Activate the environment
@@ -135,6 +142,89 @@ The packaging process creates platform-specific installers in the `dist/` direct
 -   `PySCF_front-win32-x64.exe` (For Windows)
 -   `PySCF_front-linux-x86_64.AppImage` (For Linux)
 
+### Building for Linux on Windows
+
+There are two methods for building Linux applications on Windows:
+
+#### Method 1: Using Docker (Recommended)
+
+This is the simplest method, requiring only Docker Desktop with WSL2 backend.
+
+**Prerequisites:**
+- Docker Desktop installed and running
+- WSL2 enabled
+
+**Build Command:**
+```bash
+# Build Docker image and create Linux package (one command)
+npm run package:linux:docker
+```
+
+This command automatically:
+1. Builds a Docker image with all necessary dependencies
+2. Runs the build inside a Linux container
+3. Outputs the AppImage to the `dist/` directory on your host machine
+
+**Advanced Usage:**
+```bash
+# Build Docker image only
+npm run docker:build
+
+# Run build with existing image (faster for subsequent builds)
+npm run docker:package
+```
+
+#### Method 2: Using WSL Directly
+
+For more control, you can build directly in WSL (Windows Subsystem for Linux):
+
+**Prerequisites:**
+1. **WSL2** installed with a Linux distribution (Ubuntu recommended)
+2. **Miniforge** installed in WSL environment
+3. **Node.js** installed in WSL environment
+
+**Setup in WSL**
+```bash
+# Access WSL
+wsl
+
+# Install Miniforge in WSL
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+bash Miniforge3-Linux-x86_64.sh -b
+
+# Initialize conda
+CONDA_BASE=$(conda info --base)
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+
+# Navigate to your project directory (example)
+cd /mnt/c/Users/YOUR_USERNAME/Documents/PySCF_front
+
+# Install Node.js dependencies
+npm install
+
+# Create conda environment from environment.yml
+conda env create -f .github/environment.yml
+
+# Activate the environment
+conda activate pyscf-env
+
+# Verify the setup
+npm run verify-env
+```
+
+#### Building Linux Application
+```bash
+# In WSL, with pyscf-env activated
+conda activate pyscf-env
+
+# Build and package for Linux
+npm run package:linux
+```
+
+The built AppImage will be available in the `dist/` directory.
+
+**Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, PyInstaller, and electron-builder) in the Linux environment.
+
 ---
 
 ## Troubleshooting
@@ -176,6 +266,10 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     -   **構造最適化**と**振動数解析**をサポート。
     -   計算結果（SCFエネルギー、分子軌道、NTO解析など）を表示します。
 -   **計算履歴の管理:** 過去の計算結果を一覧表示し、名前の変更や削除が可能です。
+-   **AIマルチエージェントシステム:**
+    -   **分子エージェント:** 自然言語を使用して量子化学計算と分子解析をサポート。
+    -   **リサーチエージェント:** arXivから関連論文を検索し、PDFリンク付きの要約を提供。
+    -   **知的ルーティング:** ユーザーの質問内容に基づいて、適切な専門エージェントに自動的にルーティング。
 -   **自動環境構築:** ワンコマンドで開発環境をセットアップできます（`npm run setup-env`）。
 -   **環境検証機能:** Python依存関係と環境の健全性を自動チェックします（`npm run verify-env`）。
 -   **統一実行環境:** 開発・本番環境で同一のGunicornベースサーバーを使用し、環境差異問題を解決。
@@ -234,10 +328,13 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     ```bash
     # Miniforgeのインストール (例: Apple Silicon Mac)
     curl -L -O "[https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh](https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh)"
-    bash Miniforge3-MacOSX-arm64.sh -b -p $HOME/miniforge3
-    
+    bash Miniforge3-MacOSX-arm64.sh -b
+
+    # condaを初期化 (または: conda init)
+    CONDA_BASE=$(conda info --base)
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+
     # environment.ymlからconda環境を作成
-    source $HOME/miniforge3/etc/profile.d/conda.sh
     conda env create -f .github/environment.yml
     
     # 環境をアクティブ化

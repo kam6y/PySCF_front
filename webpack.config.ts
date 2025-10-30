@@ -1,5 +1,6 @@
 /** エディタで補完を効かせるために型定義をインポート */
 import type { Configuration } from "webpack";
+import webpack from "webpack";
 
 import HtmlWebpackPlugin from "html-webpack-plugin";
 import MiniCssExtractPlugin from "mini-css-extract-plugin";
@@ -25,6 +26,12 @@ const common: Configuration = {
     // 画像などのアセット類は "dist/assets" フォルダへ配置する
     assetModuleFilename: "assets/[name][ext]",
   },
+  plugins: [
+    // 環境変数をバンドルに注入
+    new webpack.DefinePlugin({
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+    }),
+  ],
   module: {
     // ファイル種別ごとのコンパイル & バンドルのルール
     rules: [
@@ -114,7 +121,40 @@ const renderer: Configuration = {
     // React アプリのエントリーファイル
     app: "./src/web/index.tsx",
   },
+  resolve: {
+    extensions: [".js", ".ts", ".jsx", ".tsx", ".json"],
+    fallback: {
+      // Node.jsモジュールのブラウザ用ポリフィルを設定
+      process: "process/browser",
+      util: "util/",
+      assert: "assert/",
+      stream: "stream-browserify",
+      buffer: "buffer/",
+    },
+  },
+  module: {
+    ...common.module,
+    rules: [
+      ...(common.module?.rules || []),
+      // ESMモジュール（.mjs）での拡張子なしインポートを許可
+      {
+        test: /\.m?js$/,
+        resolve: {
+          fullySpecified: false,
+        },
+      },
+    ],
+  },
   plugins: [
+    // 環境変数をバンドルに注入（common からコピー）
+    new webpack.DefinePlugin({
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+    }),
+    // processとBufferをグローバルに提供
+    new webpack.ProvidePlugin({
+      process: "process/browser",
+      Buffer: ["buffer", "Buffer"],
+    }),
     // CSS を JS へバンドルせず別ファイルとして出力するプラグイン
     new MiniCssExtractPlugin(),
     /**

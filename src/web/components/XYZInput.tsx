@@ -92,7 +92,9 @@ H   0.000000  -0.763239  -0.477047
       {/* Validation Status */}
       <div className={styles.xyzValidationStatus}>
         {isValidating && (
-          <div className={`${styles.validationMessage} ${styles.validating}`}>⏳ Validating...</div>
+          <div className={`${styles.validationMessage} ${styles.validating}`}>
+            ⏳ Validating...
+          </div>
         )}
 
         {validationResult && !isValidating && (

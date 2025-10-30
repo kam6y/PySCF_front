@@ -2,7 +2,7 @@ openapi: 3.1.1
 info:
   title: PySCF Native App API
   description: API for quantum chemistry calculations using PySCF with PubChem and SMILES integration
-  version: 0.3.0
+  version: 0.1.4-beta
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
@@ -151,12 +151,53 @@ paths:
 
   /api/quantum/calculations:
     get:
-      summary: List all calculations
-      description: Get a list of all available calculation directories
+      summary: List calculations with optional filtering
+      description: Get a list of calculation directories with optional filtering by name, status, method, basis set, and date range. Filtering is performed at the file system level for optimal performance.
       operationId: listCalculations
+      parameters:
+        - name: name_query
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Partial match search in calculation name (case-insensitive)
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [completed, running, error, waiting, pending]
+          description: Filter by calculation status
+        - name: calculation_method
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF]
+          description: Filter by calculation method
+        - name: basis_function
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by basis set (case-insensitive)
+        - name: date_from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Start date for date range filtering (ISO format YYYY-MM-DD)
+        - name: date_to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: End date for date range filtering (ISO format YYYY-MM-DD)
       responses:
         '200':
-          description: List of calculations
+          description: List of calculations matching filter criteria
           content:
             application/json:
               schema:
@@ -200,10 +241,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    put:
+    patch:
       summary: Update calculation metadata
       description: Update calculation name and other metadata
-      operationId: updateCalculation
+      operationId: patchCalculation
       parameters:
         - name: calculationId
           in: path
@@ -415,7 +456,7 @@ paths:
           description: Unique calculation ID
           schema:
             type: string
-        - name: orbital_index
+        - name: orbitalIndex
           in: query
           required: false
           description: Specific orbital index to delete (if not provided, deletes all)
@@ -441,6 +482,79 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/quantum/calculations/{calculationId}/ir-spectrum:
+    get:
+      summary: Generate IR spectrum for a calculation
+      description: Generate theoretical IR spectrum from vibrational frequency data with scale factor corrections and Lorentzian broadening
+      operationId: getIRSpectrum
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+        - name: broadeningFwhm
+          in: query
+          required: false
+          description: Full width at half maximum for Lorentzian broadening in cm⁻¹
+          schema:
+            type: number
+            format: float
+            default: 100.0
+            minimum: 0.1
+            maximum: 1000.0
+        - name: xMin
+          in: query
+          required: false
+          description: Minimum wavenumber for spectrum range in cm⁻¹
+          schema:
+            type: number
+            format: float
+            default: 400.0
+            minimum: 0.0
+        - name: xMax
+          in: query
+          required: false
+          description: Maximum wavenumber for spectrum range in cm⁻¹
+          schema:
+            type: number
+            format: float
+            default: 4000.0
+            maximum: 10000.0
+        - name: showPeaks
+          in: query
+          required: false
+          description: Whether to mark individual peaks in the plot
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: IR spectrum generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IRSpectrumResponse'
+        '400':
+          description: Invalid parameters or calculation not completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calculation not found or no frequency data available
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to generate IR spectrum
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/quantum/supported-parameters:
     get:
       summary: Get supported quantum chemistry parameters
@@ -460,6 +574,286 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/settings:
+    get:
+      summary: Get application settings
+      description: Retrieve current application settings including parallel processing limits
+      operationId: getSettings
+      responses:
+        '200':
+          description: Settings retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsResponse'
+        '500':
+          description: Failed to retrieve settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      summary: Update application settings
+      description: Update application settings including parallel processing limits
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SettingsUpdateRequest'
+      responses:
+        '200':
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SettingsResponse'
+        '400':
+          description: Invalid settings data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to update settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/system/resource-status:
+    get:
+      summary: Get system resource status
+      description: Get current system resource information, constraints, and allocation status
+      operationId: getSystemResourceStatus
+      responses:
+        '200':
+          description: System resource status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemResourceResponse'
+        '500':
+          description: Failed to retrieve system resource status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/chat-history/sessions:
+    get:
+      summary: Get all chat sessions
+      description: Retrieve a list of all chat history sessions, ordered by most recent update
+      operationId: getChatSessions
+      responses:
+        '200':
+          description: Chat sessions retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatHistoryListResponse'
+        '500':
+          description: Failed to retrieve chat sessions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      summary: Create a new chat session
+      description: Create a new chat history session with an optional name
+      operationId: createChatSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatSessionRequest'
+      responses:
+        '201':
+          description: Chat session created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to create chat session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/chat-history/sessions/{sessionId}:
+    get:
+      summary: Get chat session details
+      description: Retrieve a specific chat session with all messages
+      operationId: getChatSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Chat session ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chat session retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionDetailResponse'
+        '404':
+          description: Chat session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to retrieve chat session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    patch:
+      summary: Update chat session
+      description: Update chat session metadata (e.g., name)
+      operationId: updateChatSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Chat session ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChatSessionRequest'
+      responses:
+        '200':
+          description: Chat session updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionResponse'
+        '404':
+          description: Chat session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to update chat session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      summary: Delete chat session
+      description: Delete a chat session and all its messages
+      operationId: deleteChatSession
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Chat session ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Chat session deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionDeleteResponse'
+        '404':
+          description: Chat session not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to delete chat session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/agent/chat:
+    post:
+      summary: Chat with AI agent
+      description: >
+        Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE).
+        The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+
+
+        SSE Event Types:
+
+        - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
+
+        - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+
+        - `done`: Stream completion - `{"type": "done"}`
+
+        - `error`: Error occurred - `{"type": "error", "payload": {"message": "..."}}`
+      operationId: streamChatWithAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentChatRequest'
+      responses:
+        '200':
+          description: >
+            Successfully initiated a streaming connection.
+            The response is a Server-Sent Event (SSE) stream with a `text/event-stream` content type.
+            Each event is a JSON object containing either a text chunk, error message, or stream completion signal.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: >
+                  Server-Sent Events stream where each event contains JSON data.
+                  Event types include 'chunk' (text data), 'agent_status' (agent execution status), 'error' (error message), and 'done' (stream completion).
+                example: |
+                  data: {"type": "agent_status", "payload": {"status": "running", "agent": "research_expert"}}
+
+                  data: {"type": "agent_status", "payload": {"status": "completed", "agent": "research_expert"}}
+
+                  data: {"type": "agent_status", "payload": {"status": "responding", "agent": "supervisor"}}
+
+                  data: {"type": "chunk", "payload": {"text": "Hello, "}}
+
+                  data: {"type": "chunk", "payload": {"text": "how can I "}}
+
+                  data: {"type": "chunk", "payload": {"text": "help you?"}}
+
+                  data: {"type": "done"}
+        '400':
+          description: Invalid request (empty message, message too long, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error during agent processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   schemas:
@@ -476,13 +870,18 @@ components:
 
     CalculationMethod:
       type: string
-      enum: [DFT, HF, MP2, CCSD, CCSD_T, TDDFT]
+      enum: [DFT, HF, MP2, CCSD, CCSD_T, TDDFT, CASCI, CASSCF]
       description: Quantum calculation method
 
     CalculationStatus:
       type: string
-      enum: [pending, running, completed, error]
+      enum: [pending, running, completed, error, waiting]
       description: Status of a calculation
+
+    AgentActionType:
+      type: string
+      enum: [delete_calculation]
+      description: Type of agent action requiring confirmation
 
     # Request Models
     PubChemSearchRequest:
@@ -493,7 +892,7 @@ components:
           type: string
           minLength: 1
           description: Search query for PubChem
-        search_type:
+        searchType:
           $ref: '#/components/schemas/SearchType'
           default: name
 
@@ -533,19 +932,20 @@ components:
         exchange_correlation:
           type: string
           default: "B3LYP"
-          description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS)
+          nullable: true
+          description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS). Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
         charges:
           type: integer
           minimum: -10
           maximum: 10
           default: 0
           description: Molecular charge
-        spin_multiplicity:
+        spin:
           type: integer
           minimum: 0
           maximum: 10
           default: 0
-          description: Spin multiplicity (2S)
+          description: Spin (2S), number of unpaired electrons
         solvent_method:
           $ref: '#/components/schemas/SolventMethod'
           default: none
@@ -561,7 +961,7 @@ components:
           minLength: 1
           maxLength: 100
           default: "Unnamed Calculation"
-          description: Name for the calculation
+          description: Display name for the calculation instance (distinct from molecule_name which is the chemical name)
         cpu_cores:
           type: integer
           minimum: 1
@@ -589,6 +989,52 @@ components:
           type: boolean
           default: false
           description: Perform Natural Transition Orbital analysis (TDDFT only)
+        ncas:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 4
+          description: Number of active space orbitals (CASCI/CASSCF only)
+        nelecas:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 4
+          description: Number of active space electrons (CASCI/CASSCF only)
+        max_cycle_macro:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 50
+          description: Maximum CASSCF macro iterations (CASSCF only)
+        max_cycle_micro:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 3
+          description: Maximum CI solver micro iterations (CASCI/CASSCF)
+        natorb:
+          type: boolean
+          default: true
+          description: Transform to natural orbitals in active space (CASCI/CASSCF only)
+        conv_tol:
+          type: number
+          format: float
+          minimum: 1e-12
+          maximum: 1e-3
+          default: 0.000001
+          description: Energy convergence tolerance (CASSCF only)
+        conv_tol_grad:
+          type: number
+          format: float
+          minimum: 1e-8
+          maximum: 1e-2
+          default: 0.0001
+          description: Gradient convergence tolerance (CASSCF only)
+        optimize_geometry:
+          type: boolean
+          default: true
+          description: Whether to perform geometry optimization before the main calculation
 
     CalculationUpdateRequest:
       type: object
@@ -722,7 +1168,7 @@ components:
 
     CalculationParameters:
       type: object
-      required: [calculation_method, basis_function, exchange_correlation, charges, spin_multiplicity, solvent_method, solvent, xyz]
+      required: [calculation_method, basis_function, charges, spin, solvent_method, solvent, xyz]
       properties:
         calculation_method:
           $ref: '#/components/schemas/CalculationMethod'
@@ -730,9 +1176,11 @@ components:
           type: string
         exchange_correlation:
           type: string
+          nullable: true
+          description: Exchange-correlation functional. Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
         charges:
           type: integer
-        spin_multiplicity:
+        spin:
           type: integer
         solvent_method:
           $ref: '#/components/schemas/SolventMethod'
@@ -743,6 +1191,7 @@ components:
         molecule_name:
           type: string
           nullable: true
+          description: Chemical name of the molecule (distinct from calculation display name)
         cpu_cores:
           type: integer
           nullable: true
@@ -765,6 +1214,36 @@ components:
           type: boolean
           nullable: true
           description: Whether NTO analysis was performed
+        ncas:
+          type: integer
+          nullable: true
+          description: Number of active space orbitals (CASCI/CASSCF)
+        nelecas:
+          type: integer
+          nullable: true
+          description: Number of active space electrons (CASCI/CASSCF)
+        max_cycle_macro:
+          type: integer
+          nullable: true
+          description: Maximum CASSCF macro iterations
+        max_cycle_micro:
+          type: integer
+          nullable: true
+          description: Maximum CI solver micro iterations
+        natorb:
+          type: boolean
+          nullable: true
+          description: Whether natural orbital transformation was used
+        conv_tol:
+          type: number
+          format: float
+          nullable: true
+          description: Energy convergence tolerance used
+        conv_tol_grad:
+          type: number
+          format: float
+          nullable: true
+          description: Gradient convergence tolerance used
 
     CalculationResults:
       type: object
@@ -808,9 +1287,9 @@ components:
         charge:
           type: number
           description: Molecular charge
-        spin_multiplicity:
+        spin:
           type: integer
-          description: Spin multiplicity
+          description: Spin (2S), number of unpaired electrons
         max_cycle:
           type: integer
           description: Maximum SCF cycles
@@ -964,6 +1443,62 @@ components:
           type: number
           nullable: true
           description: Heat capacity at 298.15 K in Hartree/K
+        casci_energy:
+          type: number
+          nullable: true
+          description: CASCI energy in Hartree (CASCI only)
+        casscf_energy:
+          type: number
+          nullable: true
+          description: CASSCF energy in Hartree (CASSCF only)
+        correlation_energy:
+          type: number
+          nullable: true
+          description: Correlation energy (CASCI/CASSCF - SCF) in Hartree
+        macro_iterations:
+          type: integer
+          nullable: true
+          description: Number of CASSCF macro iterations performed
+        natural_orbital_analysis:
+          $ref: '#/components/schemas/NaturalOrbitalAnalysis'
+          nullable: true
+          description: Natural orbital analysis results (CASCI/CASSCF)
+        ci_coefficient_analysis:
+          $ref: '#/components/schemas/CICoefficientAnalysis'
+          nullable: true
+          description: CI coefficient analysis results (CASCI/CASSCF)
+        mulliken_spin_analysis:
+          $ref: '#/components/schemas/MullikenSpinAnalysis'
+          nullable: true
+          description: Mulliken atomic spin density analysis (CASCI/CASSCF open-shell)
+        orbital_overlap_analysis:
+          $ref: '#/components/schemas/OrbitalOverlapAnalysis'
+          nullable: true
+          description: Orbital overlap analysis between SCF and CASCI/CASSCF orbitals
+        orbital_rotation_analysis:
+          $ref: '#/components/schemas/OrbitalRotationAnalysis'
+          nullable: true
+          description: Orbital rotation analysis during CASSCF optimization (CASSCF only)
+        kernel_return_info:
+          type: object
+          nullable: true
+          description: Information about kernel() return value structure
+          properties:
+            tuple_length:
+              type: integer
+              description: Number of elements in kernel() return tuple
+            ci_coefficients_shape:
+              type: string
+              description: Shape of CI coefficients array
+          additionalProperties: true
+        ci_coefficients_available:
+          type: boolean
+          nullable: true
+          description: Whether CI coefficients are available from kernel() return
+        enhanced_ci_analysis:
+          $ref: '#/components/schemas/EnhancedCIAnalysis'
+          nullable: true
+          description: Enhanced CI coefficient analysis from kernel() return
 
     CalculationInstance:
       type: object
@@ -994,10 +1529,14 @@ components:
           type: string
           nullable: true
           description: Path to calculation files
-        errorMessage:
+        error:
           type: string
           nullable: true
           description: Error details if status is error
+        waitingReason:
+          type: string
+          nullable: true
+          description: Reason why calculation is waiting (if status is waiting)
 
     CalculationSummary:
       type: object
@@ -1350,6 +1889,76 @@ components:
         data:
           $ref: '#/components/schemas/SupportedParametersData'
 
+    # Settings-related schemas
+    AppSettings:
+      type: object
+      required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb, calculations_directory]
+      properties:
+        max_parallel_instances:
+          type: integer
+          minimum: 1
+          maximum: 32
+          description: Maximum number of parallel calculation instances
+          example: 4
+        max_cpu_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum CPU utilization percentage for the system
+          example: 95.0
+        max_memory_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum memory utilization percentage for the system
+          example: 95.0
+        system_total_cores:
+          type: integer
+          minimum: 1
+          description: Total number of CPU cores in the system (auto-detected)
+          example: 8
+        system_total_memory_mb:
+          type: integer
+          minimum: 1
+          description: Total system memory in MB (auto-detected)
+          example: 16384
+        calculations_directory:
+          type: string
+          description: Directory path where calculation data is stored
+          example: "/Users/username/PySCF_calculations"
+        gemini_api_key:
+          type: string
+          nullable: true
+          description: Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
+          example: null
+        tavily_api_key:
+          type: string
+          nullable: true
+          description: Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
+          example: null
+        research_email:
+          type: string
+          nullable: true
+          description: Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
+          example: "pyscf-research-agent@example.com"
+
+    SettingsResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [settings]
+          properties:
+            settings:
+              $ref: '#/components/schemas/AppSettings'
+
+    SettingsUpdateRequest:
+      $ref: '#/components/schemas/AppSettings'
+
     ErrorResponse:
       type: object
       required: [success, error]
@@ -1360,3 +1969,795 @@ components:
         error:
           type: string
           description: Error message
+
+    # System resource-related schemas
+    SystemResourceInfo:
+      type: object
+      required: [total_cpu_cores, total_memory_mb, available_memory_mb, cpu_usage_percent, memory_usage_percent, timestamp]
+      properties:
+        total_cpu_cores:
+          type: integer
+          minimum: 1
+          description: Total number of CPU cores
+          example: 8
+        total_memory_mb:
+          type: integer
+          minimum: 1
+          description: Total system memory in MB
+          example: 16384
+        available_memory_mb:
+          type: integer
+          minimum: 0
+          description: Available system memory in MB
+          example: 8192
+        cpu_usage_percent:
+          type: number
+          minimum: 0.0
+          maximum: 100.0
+          description: Current CPU usage percentage
+          example: 25.5
+        memory_usage_percent:
+          type: number
+          minimum: 0.0
+          maximum: 100.0
+          description: Current memory usage percentage
+          example: 50.2
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp when the resource info was collected
+
+    ResourceConstraints:
+      type: object
+      required: [max_cpu_utilization_percent, max_memory_utilization_percent, max_allowed_cpu_cores, max_allowed_memory_mb]
+      properties:
+        max_cpu_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum CPU utilization percentage
+          example: 95.0
+        max_memory_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum memory utilization percentage
+          example: 95.0
+        max_allowed_cpu_cores:
+          type: integer
+          minimum: 1
+          description: Maximum allowed CPU cores for calculations
+          example: 6
+        max_allowed_memory_mb:
+          type: integer
+          minimum: 1
+          description: Maximum allowed memory in MB for calculations
+          example: 13107
+
+    AllocatedResources:
+      type: object
+      required: [total_allocated_cpu_cores, total_allocated_memory_mb, available_cpu_cores, available_memory_mb, active_calculations_count]
+      properties:
+        total_allocated_cpu_cores:
+          type: integer
+          minimum: 0
+          description: Total CPU cores currently allocated to calculations
+          example: 4
+        total_allocated_memory_mb:
+          type: integer
+          minimum: 0
+          description: Total memory in MB currently allocated to calculations
+          example: 8192
+        available_cpu_cores:
+          type: integer
+          minimum: 0
+          description: Available CPU cores for new calculations
+          example: 2
+        available_memory_mb:
+          type: integer
+          minimum: 0
+          description: Available memory in MB for new calculations
+          example: 4915
+        active_calculations_count:
+          type: integer
+          minimum: 0
+          description: Number of active calculations
+          example: 2
+
+    SystemResourceSummary:
+      type: object
+      required: [system_info, resource_constraints, allocated_resources]
+      properties:
+        system_info:
+          $ref: '#/components/schemas/SystemResourceInfo'
+        resource_constraints:
+          $ref: '#/components/schemas/ResourceConstraints'
+        allocated_resources:
+          $ref: '#/components/schemas/AllocatedResources'
+
+    SystemResourceResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/SystemResourceSummary'
+
+    IRSpectrumResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/IRSpectrumData'
+
+    IRSpectrumData:
+      type: object
+      required: [calculation_id, spectrum, generation_info]
+      properties:
+        calculation_id:
+          type: string
+          description: Unique calculation ID
+          example: "calc_20240101_120000_abcd1234"
+        spectrum:
+          $ref: '#/components/schemas/IRSpectrumDetails'
+        generation_info:
+          $ref: '#/components/schemas/IRGenerationInfo'
+
+    IRSpectrumDetails:
+      type: object
+      required: [x_axis, y_axis, peaks, metadata]
+      properties:
+        x_axis:
+          type: array
+          items:
+            type: number
+          description: Wavenumber values (cm⁻¹) for the x-axis
+          example: [400.0, 401.0, 402.0]
+        y_axis:
+          type: array
+          items:
+            type: number
+          description: Intensity values for the y-axis (arbitrary units)
+          example: [0.0, 0.1, 0.05]
+        peaks:
+          type: array
+          items:
+            $ref: '#/components/schemas/IRPeak'
+          description: Individual peaks in the spectrum
+        metadata:
+          $ref: '#/components/schemas/IRSpectrumMetadata'
+
+    IRPeak:
+      type: object
+      required: [frequency_cm, intensity, original_frequency_cm]
+      properties:
+        frequency_cm:
+          type: number
+          format: float
+          description: Peak frequency after scale factor correction (cm⁻¹)
+          example: 1654.2
+        intensity:
+          type: number
+          format: float
+          description: Peak intensity (arbitrary units)
+          example: 120.5
+        original_frequency_cm:
+          type: number
+          format: float
+          description: Original calculated frequency before scale factor correction (cm⁻¹)
+          example: 1723.1
+
+    IRSpectrumMetadata:
+      type: object
+      required: [method, basis_set, scale_factor, scale_message, broadening_fwhm_cm, frequency_range_cm, num_peaks_total, num_peaks_in_range, num_points]
+      properties:
+        method:
+          type: string
+          description: Computational method used
+          example: "B3LYP"
+        basis_set:
+          type: string
+          description: Basis set used
+          example: "6-31G*"
+        scale_factor:
+          type: number
+          format: float
+          description: Scale factor applied to frequencies
+          example: 0.960
+        scale_message:
+          type: string
+          description: Information about the scale factor source
+          example: "Exact match found"
+        broadening_fwhm_cm:
+          type: number
+          format: float
+          description: Full width at half maximum for Lorentzian broadening (cm⁻¹)
+          example: 100.0
+        frequency_range_cm:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: Frequency range for the spectrum [min, max] (cm⁻¹)
+          example: [400.0, 4000.0]
+        num_peaks_total:
+          type: integer
+          description: Total number of calculated frequencies
+          example: 24
+        num_peaks_in_range:
+          type: integer
+          description: Number of peaks within the specified range
+          example: 18
+        num_points:
+          type: integer
+          description: Number of points in the spectrum
+          example: 3000
+
+    IRGenerationInfo:
+      type: object
+      required: [broadening_fwhm_cm, frequency_range_cm, peaks_marked, generated_at]
+      properties:
+        broadening_fwhm_cm:
+          type: number
+          format: float
+          description: Full width at half maximum used for broadening (cm⁻¹)
+          example: 100.0
+        frequency_range_cm:
+          type: array
+          items:
+            type: number
+          minItems: 2
+          maxItems: 2
+          description: Frequency range used [min, max] (cm⁻¹)
+          example: [400.0, 4000.0]
+        peaks_marked:
+          type: boolean
+          description: Whether individual peaks were marked in the plot
+          example: true
+        generated_at:
+          type: string
+          format: date-time
+          description: ISO timestamp when the spectrum was generated
+          example: "2024-01-01T12:00:00.000Z"
+
+    # CASCI/CASSCF Analysis Schemas
+    NaturalOrbitalAnalysis:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          description: Whether natural orbital analysis was performed
+        occupation_numbers:
+          type: array
+          items:
+            type: number
+            format: float
+          nullable: true
+          description: Natural orbital occupation numbers
+        strongly_occupied_count:
+          type: integer
+          description: Number of strongly occupied orbitals (occupation > 1.5)
+        weakly_occupied_count:
+          type: integer
+          description: Number of weakly occupied orbitals (0.1 < occupation <= 1.5)
+        virtual_count:
+          type: integer
+          description: Number of virtual orbitals (occupation <= 0.1)
+        total_orbitals:
+          type: integer
+          description: Total number of active space orbitals analyzed
+        total_active_electrons:
+          type: number
+          format: float
+          description: Total number of electrons in active space
+        effective_electron_pairs:
+          type: number
+          format: float
+          description: Effective number of electron pairs
+        effective_unpaired_electrons:
+          type: number
+          format: float
+          description: Effective number of unpaired electrons
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    CICoefficientAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether CI coefficient analysis is available
+        total_configurations:
+          type: integer
+          description: Total number of configurations
+        major_configurations:
+          type: array
+          items:
+            type: object
+            properties:
+              configuration_index:
+                type: integer
+                description: Index of the configuration
+              coefficient:
+                type: number
+                format: float
+                description: CI coefficient value
+              contribution_percent:
+                type: number
+                format: float
+                description: Percentage contribution to the wavefunction
+              cumulative_percent:
+                type: number
+                format: float
+                description: Cumulative percentage contribution
+          description: Major configurations with significant contributions
+        leading_coefficient:
+          type: number
+          format: float
+          description: Leading CI coefficient (largest magnitude)
+        leading_contribution_percent:
+          type: number
+          format: float
+          description: Percentage contribution of the leading configuration
+        multiconfigurational_character:
+          type: number
+          format: float
+          description: Percentage multiconfigurational character (100 - leading contribution)
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    MullikenSpinAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether Mulliken spin analysis is available
+        atomic_spin_densities:
+          type: array
+          items:
+            type: object
+            properties:
+              atom_index:
+                type: integer
+                description: 0-based index of the atom
+              element:
+                type: string
+                description: Element symbol
+              spin_density:
+                type: number
+                format: float
+                description: Atomic spin density (alpha - beta electrons)
+              abs_spin_density:
+                type: number
+                format: float
+                description: Absolute value of atomic spin density
+          description: Spin density for each atom
+        total_spin_density:
+          type: number
+          format: float
+          description: Total spin density of the molecule
+        total_absolute_spin_density:
+          type: number
+          format: float
+          description: Sum of absolute atomic spin densities
+        expected_spin:
+          type: number
+          format: float
+          description: Expected spin (2S) from molecular parameters
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    OrbitalOverlapAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether orbital overlap analysis is available
+        active_space_orbitals:
+          type: integer
+          description: Number of active space orbitals analyzed
+        active_orbital_analysis:
+          type: array
+          items:
+            type: object
+            properties:
+              active_orbital_index:
+                type: integer
+                description: Index of active space orbital
+              dominant_scf_orbital:
+                type: integer
+                description: Index of dominant SCF orbital
+              max_overlap:
+                type: number
+                format: float
+                description: Maximum overlap with SCF orbitals
+              scf_orbital_type:
+                type: string
+                enum: [occupied, partially_occupied, virtual, unknown]
+                description: Type of dominant SCF orbital
+          description: Analysis of each active space orbital
+        average_max_overlap:
+          type: number
+          format: float
+          description: Average maximum overlap across active orbitals
+        orbital_transformation_character:
+          type: string
+          enum: [minimal, significant]
+          description: Character of orbital transformation
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    OrbitalRotationAnalysis:
+      type: object
+      properties:
+        available:
+          type: boolean
+          description: Whether orbital rotation analysis is available
+        core_orbital_rotation_magnitude:
+          type: number
+          format: float
+          description: Maximum rotation magnitude for core orbitals
+        active_orbital_rotation_magnitude:
+          type: number
+          format: float
+          description: Maximum rotation magnitude for active orbitals
+        virtual_orbital_rotation_magnitude:
+          type: number
+          format: float
+          description: Maximum rotation magnitude for virtual orbitals
+        overall_rotation_magnitude:
+          type: number
+          format: float
+          description: Overall maximum rotation magnitude
+        rotation_extent:
+          type: string
+          enum: [minimal, moderate, significant]
+          description: Extent of orbital rotation during CASSCF optimization
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    EnhancedCIAnalysis:
+      type: object
+      properties:
+        source:
+          type: string
+          enum: [kernel_return]
+          description: Source of CI analysis (from kernel return value)
+        available:
+          type: boolean
+          description: Whether enhanced CI analysis is available
+        total_coefficients:
+          type: integer
+          description: Total number of CI coefficients
+        ci_vector_shape:
+          type: string
+          description: Shape of the CI coefficient vector/matrix
+        major_configurations:
+          type: array
+          items:
+            type: object
+            properties:
+              configuration_index:
+                type: integer
+                description: Index of the configuration
+              coefficient:
+                type: number
+                format: float
+                description: CI coefficient value
+              contribution_percent:
+                type: number
+                format: float
+                description: Percentage contribution to the wavefunction
+              cumulative_percent:
+                type: number
+                format: float
+                description: Cumulative percentage contribution
+          description: Major configurations with >0.5% contribution
+        leading_coefficient:
+          type: number
+          format: float
+          description: Leading CI coefficient (largest magnitude)
+        leading_contribution_percent:
+          type: number
+          format: float
+          description: Percentage contribution of the leading configuration
+        multiconfigurational_character:
+          type: number
+          format: float
+          description: Multiconfigurational character (100 - leading contribution %)
+        effective_configurations:
+          type: integer
+          description: Number of configurations with significant contribution
+        wavefunction_entropy:
+          type: number
+          format: float
+          description: Entropy measure of wavefunction multiconfigurational character
+        wavefunction_character:
+          type: string
+          enum: [single_configuration, few_configuration, multiconfigurational]
+          description: Overall character of the wavefunction
+        normalization:
+          type: number
+          format: float
+          description: Normalization of the CI vector
+        reason:
+          type: string
+          nullable: true
+          description: Reason if analysis was not performed
+        error:
+          type: string
+          nullable: true
+          description: Error message if analysis failed
+
+    AgentChatRequest:
+      type: object
+      required: [message, history]
+      properties:
+        message:
+          type: string
+          description: New message from the user
+        history:
+          type: array
+          description: Previous conversation history
+          items:
+            type: object
+            properties:
+              role:
+                type: string
+                enum: [user, model]
+              parts:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    text:
+                      type: string
+        session_id:
+          type: string
+          nullable: true
+          description: Optional chat session ID for persisting conversation history
+
+    AgentChatResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [reply]
+          properties:
+            reply:
+              type: string
+              description: Response message from the AI agent
+
+    ExecuteConfirmedActionRequest:
+      type: object
+      required: [action_type, calculation_id]
+      properties:
+        action_type:
+          $ref: '#/components/schemas/AgentActionType'
+        calculation_id:
+          type: string
+          description: ID of the calculation to perform the action on
+
+    ExecuteConfirmedActionResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message]
+          properties:
+            message:
+              type: string
+              description: Result message
+            action_type:
+              $ref: '#/components/schemas/AgentActionType'
+            calculation_id:
+              type: string
+              description: ID of the affected calculation
+
+    # Chat History Schemas
+    ChatMessage:
+      type: object
+      required: [id, session_id, role, content, created_at]
+      properties:
+        id:
+          type: string
+          description: Unique message ID (UUID)
+          example: "msg_550e8400-e29b-41d4-a716-446655440000"
+        session_id:
+          type: string
+          description: Associated chat session ID
+          example: "session_550e8400-e29b-41d4-a716-446655440000"
+        role:
+          type: string
+          enum: [user, model]
+          description: Message sender role
+        content:
+          type: string
+          description: Message content
+        created_at:
+          type: string
+          format: date-time
+          description: Message creation timestamp
+
+    ChatSession:
+      type: object
+      required: [id, name, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          description: Unique session ID (UUID)
+          example: "session_550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: Session name/title
+          example: "水分子のDFT計算"
+        created_at:
+          type: string
+          format: date-time
+          description: Session creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    ChatSessionSummary:
+      type: object
+      required: [id, name, message_count, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          description: Unique session ID
+        name:
+          type: string
+          description: Session name/title
+        message_count:
+          type: integer
+          description: Number of messages in this session
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+          description: Session creation timestamp
+        updated_at:
+          type: string
+          format: date-time
+          description: Last update timestamp
+
+    ChatSessionDetail:
+      type: object
+      required: [session, messages]
+      properties:
+        session:
+          $ref: '#/components/schemas/ChatSession'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+          description: All messages in this session, ordered by creation time
+
+    CreateChatSessionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          default: "新しいチャット"
+          description: Session name/title
+
+    UpdateChatSessionRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Updated session name
+
+    ChatHistoryListResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [sessions, total_count]
+          properties:
+            sessions:
+              type: array
+              items:
+                $ref: '#/components/schemas/ChatSessionSummary'
+              description: List of chat sessions
+            total_count:
+              type: integer
+              description: Total number of sessions
+              minimum: 0
+
+    ChatSessionResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [session]
+          properties:
+            session:
+              $ref: '#/components/schemas/ChatSession'
+
+    ChatSessionDetailResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/ChatSessionDetail'
+
+    ChatSessionDeleteResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message, deleted_id]
+          properties:
+            message:
+              type: string
+              description: Deletion confirmation message
+            deleted_id:
+              type: string
+              description: ID of the deleted session

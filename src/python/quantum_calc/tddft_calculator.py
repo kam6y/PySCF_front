@@ -10,6 +10,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,12 @@ logger = logging.getLogger(__name__)
 class TDDFTCalculator(BaseCalculator):
     """TDDFT calculator using PySCF for excited state calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir)
+        super().__init__(working_dir, optimize_geometry)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[dft.RKS] = None  # Can be either RKS or UKS
         self.mytd: Optional[tddft.TDDFT] = None
@@ -30,83 +31,41 @@ class TDDFTCalculator(BaseCalculator):
         self.molecule_name = molecule_name
         
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup TDDFT calculation with molecular geometry and parameters."""
-        try:
-            # Extract calculation parameters
-            basis = kwargs.get('basis', '6-31G(d)')
-            xc = kwargs.get('xc', 'B3LYP')
-            charge = kwargs.get('charge', 0)
-            spin = kwargs.get('spin', 0)
-            max_cycle = kwargs.get('max_cycle', 150)
-            solvent_method = kwargs.get('solvent_method', 'none')
-            solvent = kwargs.get('solvent', '-')
-            memory_mb = kwargs.get('memory_mb', 4000)  # Default 4GB
-            
-            # TDDFT-specific parameters
-            nstates = kwargs.get('nstates', 10)
-            tddft_method = kwargs.get('tddft_method', 'TDDFT')
-            analyze_nto = kwargs.get('analyze_nto', False)
-            
-            # Convert atoms list to PySCF format
-            atom_string = self._atoms_to_string(atoms)
-            
-            # Create molecular object
-            self.mol = gto.M(
-                atom=atom_string,
-                basis=basis,
-                charge=charge,
-                spin=spin,
-                verbose=0
-            )
-            # 安全なメモリ設定を適用
-            if memory_mb and memory_mb > 0:
-                self.mol.max_memory = memory_mb
-            else:
-                self.mol.max_memory = 4000  # TDDFTはより多くのメモリが必要
-            
-            # Setup DFT calculation (ground state) first
-            # For closed-shell systems (spin=0), use RKS
-            # For open-shell systems (spin>0), use UKS
-            if spin == 0:
-                self.mf = dft.RKS(self.mol)
-                logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell TDDFT ground state")
-            else:
-                self.mf = dft.UKS(self.mol)
-                logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell TDDFT ground state")
-            
-            self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
-            
-            self.mf.chkfile = self.get_checkpoint_path()
-            self.mf.xc = xc
-            self.mf.max_cycle = max_cycle
-            
-            # Store parameters for template method
-            self.max_cycle = max_cycle
-            self.xc_functional = xc
-            self.solvent_method = solvent_method
-            self.solvent = solvent
-            self.tddft_nstates = nstates
-            self.tddft_method = tddft_method
-            self.analyze_nto = analyze_nto
-            
-            # Store parameters
-            self.results.update({
-                'basis': basis,
-                'xc_functional': xc,
-                'charge': charge,
-                'spin_multiplicity': spin,
-                'max_cycle': max_cycle,
-                'solvent_method': solvent_method,
-                'solvent': solvent,
-                'atom_count': len(atoms),
-                'tddft_nstates': nstates,
-                'tddft_method': tddft_method,
-                'tddft_analyze_nto': analyze_nto,
-                'method': 'UKS' if spin > 0 else 'RKS'
-            })
-            
-        except Exception as e:
-            raise InputError(f"Failed to setup TDDFT calculation: {str(e)}")
+        """Setup TDDFT calculation using the base template method."""
+        # Call the base template method which handles common setup
+        super().setup_calculation(atoms, **kwargs)
+    
+    def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
+        """Validate TDDFT-specific parameters."""
+        # DFT-related parameters
+        xc = kwargs.get('xc', 'B3LYP')  # Exchange-correlation functional
+        
+        # TDDFT-specific parameters
+        nstates = kwargs.get('nstates', 10)
+        tddft_method = kwargs.get('tddft_method', 'TDDFT')
+        analyze_nto = kwargs.get('analyze_nto', False)
+        
+        # Store parameters for template method access
+        self.xc_functional = xc
+        self.tddft_nstates = nstates
+        self.tddft_method = tddft_method
+        self.analyze_nto = analyze_nto
+        
+        return {
+            'xc_functional': xc,
+            'method': 'UKS' if kwargs.get('spin', 0) > 0 else 'RKS',
+            'tddft_nstates': nstates,
+            'tddft_method': tddft_method,
+            'tddft_analyze_nto': analyze_nto
+        }
+    
+    def _get_default_memory_mb(self) -> int:
+        """Get default memory setting for TDDFT calculations from config."""
+        return get_memory_for_method('TDDFT')
+    
+    def _get_calculation_method_name(self) -> str:
+        """Get the name of the calculation method for logging."""
+        return 'TDDFT'
     
     # ===== Template Method Pattern Implementation =====
     
@@ -204,7 +163,7 @@ class TDDFTCalculator(BaseCalculator):
     
     def _create_scf_method(self, mol):
         """Create DFT method object for TDDFT ground state (RKS/UKS)."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin', 0)
         
         if spin == 0:
             mf = dft.RKS(mol)
@@ -224,7 +183,7 @@ class TDDFTCalculator(BaseCalculator):
     
     def _get_base_method_description(self) -> str:
         """Get description of base method for logging."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin', 0)
         return f"{'UKS' if spin > 0 else 'RKS'} (TDDFT ground state)"
     
     def _requires_geometry_optimization(self) -> bool:

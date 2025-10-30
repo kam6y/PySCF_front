@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { DropdownMenu, DropdownOption } from './DropdownMenu';
+import { AIAgentSwitch } from './AIAgentSwitch';
 import styles from './Header.module.css';
 
 interface HeaderProps {
@@ -11,6 +12,8 @@ interface HeaderProps {
   currentPage: DropdownOption;
   onDropdownOptionSelect: (option: DropdownOption) => void;
   onDropdownClose: () => void;
+  isAIAgentEnabled: boolean;
+  onAIAgentToggle: (enabled: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,7 +25,45 @@ export const Header: React.FC<HeaderProps> = ({
   currentPage,
   onDropdownOptionSelect,
   onDropdownClose,
+  isAIAgentEnabled,
+  onAIAgentToggle,
 }) => {
+  const [platform, setPlatform] = useState<string>('');
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+
+  // Get platform information on mount
+  useEffect(() => {
+    const fetchPlatform = async () => {
+      try {
+        const platformName = await window.electronAPI.getPlatform();
+        setPlatform(platformName);
+      } catch (error) {
+        console.error('Failed to get platform:', error);
+      }
+    };
+    fetchPlatform();
+  }, []);
+
+  // Get and monitor fullscreen state
+  useEffect(() => {
+    const fetchFullScreen = async () => {
+      try {
+        const fullScreen = await window.electronAPI.isFullScreen();
+        setIsFullScreen(fullScreen);
+      } catch (error) {
+        console.error('Failed to get fullscreen state:', error);
+      }
+    };
+    fetchFullScreen();
+
+    // Monitor fullscreen state changes
+    const cleanup = window.electronAPI.onFullScreenChange(fullScreen => {
+      setIsFullScreen(fullScreen);
+    });
+
+    return cleanup;
+  }, []);
+
   // Get page icon based on current page
   const getPageIcon = (page: DropdownOption) => {
     switch (page) {
@@ -84,10 +125,20 @@ export const Header: React.FC<HeaderProps> = ({
         );
       case 'draw-molecule':
         return (
-          <path
-            d="M12.854 1.854a.5.5 0 0 0-.708-.708L10.5 2.793 8.354.646a.5.5 0 1 0-.708.708L9.293 3 1.146 11.146a.5.5 0 0 0-.146.354V14a.5.5 0 0 0 .5.5h2.5a.5.5 0 0 0 .354-.146L12.5 6.207l1.647 1.647a.5.5 0 0 0 .708-.708L12.707 5l1.647-1.647a.5.5 0 0 0 0-.708L12.854 1.854zM11.207 4L4 11.207V13h1.793L13 5.793 11.207 4z"
-            fill="currentColor"
-          />
+          <>
+            {/* Pen/pencil icon for drawing molecules */}
+            <path
+              d="M11.5 1.5L14.5 4.5L5.5 13.5L2 14.5L3 11L12 2L11.5 1.5Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+            <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+            <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+            <circle cx="12" cy="4" r="1.5" fill="currentColor" />
+          </>
         );
       default:
         return getPageIcon('calculation-settings');
@@ -97,14 +148,22 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className={styles.appHeader}>
       <div
-        className={`${styles.headerContainer} ${isSidebarOpen ? styles.sidebarOpen : ''}`}
+        className={`${styles.headerContainer} ${isSidebarOpen ? styles.sidebarOpen : ''} ${
+          platform === 'linux'
+            ? styles.platformLinux
+            : platform === 'darwin' && isFullScreen
+              ? styles.platformMacFullScreen
+              : styles.platformMac
+        }`}
       >
         {/* Left Section */}
         <div className={styles.headerLeft}>
           <h1 className={styles.appTitle}>PySCF_front</h1>
         </div>
         {/* Right Section */}
-        <div className={styles.headerRight}>
+        <div
+          className={`${styles.headerRight} ${platform === 'linux' ? styles.headerRightLinux : ''}`}
+        >
           <button
             className={`${styles.dropdownButton} ${isDropdownOpen ? styles.active : ''}`}
             onClick={onDropdownToggle}
@@ -136,6 +195,12 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </svg>
           </button>
+
+          <AIAgentSwitch
+            isEnabled={isAIAgentEnabled}
+            onChange={onAIAgentToggle}
+          />
+
           <button
             className={styles.plusButton}
             onClick={onPlusClick}

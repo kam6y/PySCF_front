@@ -123,9 +123,16 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
             className={styles.dropdownIcon}
           >
             <path
-              d="M12.854 1.854a.5.5 0 0 0-.708-.708L10.5 2.793 8.354.646a.5.5 0 1 0-.708.708L9.293 3 1.146 11.146a.5.5 0 0 0-.146.354V14a.5.5 0 0 0 .5.5h2.5a.5.5 0 0 0 .354-.146L12.5 6.207l1.647 1.647a.5.5 0 0 0 .708-.708L12.707 5l1.647-1.647a.5.5 0 0 0 0-.708L12.854 1.854zM11.207 4L4 11.207V13h1.793L13 5.793 11.207 4z"
-              fill="currentColor"
+              d="M11.5 1.5L14.5 4.5L5.5 13.5L2 14.5L3 11L12 2L11.5 1.5Z"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
             />
+            <circle cx="4" cy="12" r="1.5" fill="currentColor" />
+            <circle cx="8" cy="8" r="1.5" fill="currentColor" />
+            <circle cx="12" cy="4" r="1.5" fill="currentColor" />
           </svg>
           <span>Draw molecule</span>
         </div>

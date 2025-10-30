@@ -11,6 +11,7 @@ from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
 from .file_manager import CalculationFileManager
 from .solvent_effects import setup_solvent_effects
+from .config_manager import get_memory_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +19,12 @@ logger = logging.getLogger(__name__)
 class MP2Calculator(BaseCalculator):
     """MP2 calculator using PySCF for structure optimization and MP2 energy calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir)
+        super().__init__(working_dir, optimize_geometry)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None
         self.mp2: Optional[mp.MP2] = None
@@ -32,69 +33,25 @@ class MP2Calculator(BaseCalculator):
         self.molecule_name = molecule_name
         
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup MP2 calculation with molecular geometry and parameters."""
-        try:
-            # Extract calculation parameters
-            basis = kwargs.get('basis', '6-31G(d)')
-            charge = kwargs.get('charge', 0)
-            spin = kwargs.get('spin', 0)
-            max_cycle = kwargs.get('max_cycle', 150)
-            solvent_method = kwargs.get('solvent_method', 'none')
-            solvent = kwargs.get('solvent', '-')
-            memory_mb = kwargs.get('memory_mb', 2000)  # Default 2GB
-
-            # Convert atoms list to PySCF format
-            atom_string = self._atoms_to_string(atoms)
-            
-            # Create molecular object
-            self.mol = gto.M(
-                atom=atom_string,
-                basis=basis,
-                charge=charge,
-                spin=spin,
-                verbose=0
-            )
-            # 安全なメモリ設定を適用
-            if memory_mb and memory_mb > 0:
-                self.mol.max_memory = memory_mb
-            else:
-                self.mol.max_memory = 3000  # MP2はより多くのメモリが必要
-            
-            # Setup HF calculation first (MP2 requires HF reference)
-            # For closed-shell systems (spin=0), use RHF
-            # For open-shell systems (spin>0), use UHF
-            if spin == 0:
-                self.mf = scf.RHF(self.mol)
-                logger.info("Using Restricted Hartree-Fock (RHF) reference for RMP2")
-            else:
-                self.mf = scf.UHF(self.mol)
-                logger.info("Using Unrestricted Hartree-Fock (UHF) reference for UMP2")
-            
-            # Apply solvent effects if requested
-            self.mf = setup_solvent_effects(self.mf, solvent_method, solvent)
-            
-            self.mf.chkfile = self.get_checkpoint_path()
-            self.mf.max_cycle = max_cycle
-            
-            # Store parameters for template method
-            self.max_cycle = max_cycle
-            self.solvent_method = solvent_method
-            self.solvent = solvent
-            
-            # Store parameters
-            self.results.update({
-                'basis': basis,
-                'charge': charge,
-                'spin_multiplicity': spin,
-                'max_cycle': max_cycle,
-                'solvent_method': solvent_method,
-                'solvent': solvent,
-                'atom_count': len(atoms),
-                'method': 'UMP2' if spin > 0 else 'RMP2'
-            })
-            
-        except Exception as e:
-            raise InputError(f"Failed to setup MP2 calculation: {str(e)}")
+        """Setup MP2 calculation using the base template method."""
+        # Call the base template method which handles common setup
+        super().setup_calculation(atoms, **kwargs)
+    
+    def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
+        """Validate MP2-specific parameters."""
+        # MP2-specific parameters (MP2 has no method-specific parameters beyond common ones)
+        # MP2 uses HF as reference, so method is based on spin
+        return {
+            'method': 'UMP2' if kwargs.get('spin', 0) > 0 else 'RMP2'
+        }
+    
+    def _get_default_memory_mb(self) -> int:
+        """Get default memory setting for MP2 calculations from config."""
+        return get_memory_for_method('MP2')
+    
+    def _get_calculation_method_name(self) -> str:
+        """Get the name of the calculation method for logging."""
+        return 'MP2'
     
     # ===== Template Method Pattern Implementation =====
     
@@ -151,7 +108,7 @@ class MP2Calculator(BaseCalculator):
     
     def _create_scf_method(self, mol):
         """Create HF method object for MP2 reference (RHF/UHF)."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin', 0)
         
         if spin == 0:
             mf = scf.RHF(mol)
@@ -168,6 +125,39 @@ class MP2Calculator(BaseCalculator):
     
     def _get_base_method_description(self) -> str:
         """Get description of base method for logging."""
-        spin = self.results.get('spin_multiplicity', 0) // 2
+        spin = self.results.get('spin', 0)
         return f"{'UHF' if spin > 0 else 'RHF'} (MP2 reference)"
+    
+    def _perform_geometry_optimization(self) -> None:
+        """Perform geometry optimization using MP2 level of theory."""
+        from pyscf.geomopt import geometric_solver
+        from pyscf import mp
+        
+        logger.info("Starting MP2 geometry optimization...")
+        
+        # First, run initial HF calculation to get reference
+        logger.info("Running initial HF calculation for MP2 reference...")
+        hf_energy = self.mf.kernel()
+        
+        if not self.mf.converged:
+            from .exceptions import ConvergenceError
+            raise ConvergenceError("Initial HF calculation failed to converge for MP2 geometry optimization")
+        
+        logger.info(f"Initial HF energy: {hf_energy} Hartree")
+        
+        # Create MP2 object for geometry optimization
+        logger.info("Creating MP2 object for geometry optimization...")
+        mp2_obj = mp.MP2(self.mf)
+        
+        # Perform MP2 geometry optimization
+        logger.info("Performing geometry optimization at MP2 level...")
+        optimized_mol = geometric_solver.optimize(mp2_obj)
+        self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
+        logger.info("MP2 geometry optimization completed")
+        
+        # Apply coordinate alignment after optimization
+        self._align_optimized_geometry()
+        
+        # Store the MP2 object for later use if needed
+        self.mp2 = mp2_obj
     

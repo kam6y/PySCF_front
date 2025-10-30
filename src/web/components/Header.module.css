@@ -34,12 +34,26 @@
 }
 
 .appTitle {
-  margin-left: 56px;
   font-size: 24px;
   font-family: 'ADLaM', sans-serif;
   font-weight: 600;
   color: white;
   transition: margin-left 0.3s ease-out;
+}
+
+/* macOS: Add margin for window control buttons */
+.platformMac .appTitle {
+  margin-left: 48px;
+}
+
+/* macOS fullscreen: No margin needed (window controls hidden) */
+.platformMacFullScreen .appTitle {
+  margin-left: 48px;
+}
+
+/* Linux: No margin needed (no window control buttons on the left) */
+.platformLinux .appTitle {
+  margin-left: 64px;
 }
 
 /* Reduce title margin when sidebar is open */
@@ -53,6 +67,11 @@
   align-items: center;
   gap: 8px;
   -webkit-app-region: no-drag;
+}
+
+/* Linux specific styles - add padding to avoid window controls overlap */
+.headerRightLinux {
+  padding-right: 100px;
 }
 
 .dropdownButton {

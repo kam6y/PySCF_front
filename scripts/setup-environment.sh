@@ -49,15 +49,10 @@ fi
 log_success "conda が見つかりました: $(conda --version)"
 
 # conda の初期化確認
-if [[ -f "$HOME/miniforge3/etc/profile.d/conda.sh" ]]; then
-    source "$HOME/miniforge3/etc/profile.d/conda.sh"
-    log_info "Miniforge conda環境を読み込みました"
-elif [[ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]]; then
-    source "$HOME/miniconda3/etc/profile.d/conda.sh"
-    log_info "Miniconda conda環境を読み込みました"
-elif [[ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]]; then
-    source "$HOME/anaconda3/etc/profile.d/conda.sh"
-    log_info "Anaconda conda環境を読み込みました"
+CONDA_BASE=$(conda info --base 2>/dev/null)
+if [[ -n "$CONDA_BASE" && -f "$CONDA_BASE/etc/profile.d/conda.sh" ]]; then
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+    log_info "conda環境を読み込みました: $CONDA_BASE"
 else
     log_warning "conda初期化スクリプトが見つかりません"
     log_info "手動でcondaを初期化してください: conda init"
@@ -105,41 +100,8 @@ conda activate "$ENV_NAME"
 
 # 環境の検証
 log_info "環境の検証を実行中..."
-# conda環境のPythonを直接使用してpyenvの干渉を回避
-$(conda info --base)/envs/$ENV_NAME/bin/python -c "
-import sys
-print(f'Python version: {sys.version}')
-
-try:
-    import pyscf
-    print(f'PySCF version: {pyscf.__version__}')
-except ImportError as e:
-    print(f'PySCF import failed: {e}')
-    sys.exit(1)
-
-try:
-    import rdkit
-    print(f'RDKit version: {rdkit.__version__}')
-except ImportError as e:
-    print(f'RDKit import failed: {e}')
-    sys.exit(1)
-
-try:
-    import flask
-    print(f'Flask version: {flask.__version__}')
-except ImportError as e:
-    print(f'Flask import failed: {e}')
-    sys.exit(1)
-
-try:
-    import conda_pack
-    print(f'conda-pack version: {conda_pack.__version__}')
-except ImportError as e:
-    print(f'conda-pack import failed: {e}')
-    sys.exit(1)
-
-print('All critical dependencies are available!')
-"
+# conda環境のPythonを直接使用して、新しく作成した環境を検証
+"$(conda info --base)/envs/$ENV_NAME/bin/python" "$PROJECT_ROOT/scripts/verify-environment.py"
 
 if [[ $? -eq 0 ]]; then
     log_success "環境の検証が成功しました"

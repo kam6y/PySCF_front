@@ -49,6 +49,7 @@ export type CubeFilesDeleteResponse =
   components['schemas']['CubeFilesDeleteResponse'];
 export type SupportedParametersResponse =
   components['schemas']['SupportedParametersResponse'];
+export type IRSpectrumResponse = components['schemas']['IRSpectrumResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 
 // Data models
@@ -58,6 +59,14 @@ export type CalculationResults = components['schemas']['CalculationResults'];
 export type CalculationInstance = components['schemas']['CalculationInstance'];
 export type CalculationSummary = components['schemas']['CalculationSummary'];
 export type OrbitalInfo = components['schemas']['OrbitalInfo'];
+export type IRSpectrumData = components['schemas']['IRSpectrumData'];
+export type IRSpectrumDetails = components['schemas']['IRSpectrumDetails'];
+export type IRSpectrumMetadata = components['schemas']['IRSpectrumMetadata'];
+
+// Chat history data models
+export type ChatSession = components['schemas']['ChatSession'];
+export type ChatSessionSummary = components['schemas']['ChatSessionSummary'];
+export type ChatSessionDetail = components['schemas']['ChatSessionDetail'];
 
 // Operation types for reference
 export type Operations = {
@@ -68,13 +77,14 @@ export type Operations = {
   startCalculation: operations['startCalculation'];
   listCalculations: operations['listCalculations'];
   getCalculationDetails: operations['getCalculationDetails'];
-  updateCalculation: operations['updateCalculation'];
+  updateCalculation: operations['patchCalculation'];
   deleteCalculation: operations['deleteCalculation'];
   getOrbitals: operations['getOrbitals'];
   getOrbitalCube: operations['getOrbitalCube'];
   listCubeFiles: operations['listCubeFiles'];
   deleteCubeFiles: operations['deleteCubeFiles'];
   getSupportedParameters: operations['getSupportedParameters'];
+  getIRSpectrum: operations['getIRSpectrum'];
 };
 
 // Response wrapper for API responses
@@ -96,7 +106,9 @@ export type OrbitalsResponseData = OrbitalsResponse['data'];
 export type OrbitalCubeResponseData = OrbitalCubeResponse['data'];
 export type CubeFilesListResponseData = CubeFilesListResponse['data'];
 export type CubeFilesDeleteResponseData = CubeFilesDeleteResponse['data'];
-export type SupportedParametersResponseData = SupportedParametersResponse['data'];
+export type SupportedParametersResponseData =
+  SupportedParametersResponse['data'];
+export type IRSpectrumResponseData = IRSpectrumResponse['data'];
 
 // Error handling
 export { ApiError };
