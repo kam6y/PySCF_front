@@ -39,16 +39,17 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       isovalueNeg: -0.02,
     });
     const [isLoading, setIsLoading] = useState(false);
-    const [retryCount, setRetryCount] = useState(0);
+    const retryCountRef = useRef(0);
     const [isDomReady, setIsDomReady] = useState(false);
+    const [isViewerReady, setIsViewerReady] = useState(false);
 
-    // Callback ref to properly track when DOM element becomes available
+    const previousCalculationIdRef = useRef<string | null>(null);
+
+    // Callback ref to track when DOM element becomes available
     const setViewerRef = useCallback(
       (node: HTMLDivElement | null) => {
         if (viewerRef.current !== node) {
           viewerRef.current = node;
-
-          // Update DOM ready state when ref changes
           const isReady = !!node;
           if (isReady !== isDomReady) {
             setIsDomReady(isReady);
@@ -57,7 +58,6 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       },
       [isDomReady]
     );
-    const previousCalculationIdRef = useRef<string | null>(null);
 
     // 軌道情報を取得
     const {
@@ -98,6 +98,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
 
       let animationFrameId: number;
       let timeoutId: NodeJS.Timeout;
+      let viewerInstance: GLViewer | null = null;
 
       const initializeViewer = () => {
         if (!viewerRef.current) {
@@ -110,36 +111,60 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
             antialias: true,
           }) as unknown as GLViewer;
 
-          setViewer(newViewer);
-          setRetryCount(0);
+          viewerInstance = newViewer;
 
-          // 初期化後にリサイズを実行
-          timeoutId = setTimeout(() => {
-            if (newViewer && viewerRef.current) {
-              try {
-                newViewer.resize();
-                newViewer.render();
-              } catch (error) {
-                console.error(
-                  'Failed to resize viewer after initialization:',
-                  error
-                );
-              }
-            }
-          }, 100);
+          // WebGLコンテキストの準備完了を確実に待機（2フレーム待機）
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              // ビューアーをすぐにセット（InlineOrbitalViewerと同じパターン）
+              setViewer(newViewer);
+              retryCountRef.current = 0;
+
+              // パッケージ環境でのGPU初期化を考慮して待機時間を延長
+              timeoutId = setTimeout(() => {
+                if (newViewer && viewerRef.current) {
+                  try {
+                    // ビューアーの基本的な初期化を実行
+                    newViewer.resize();
+                    newViewer.render();
+
+                    // ビューアーの準備完了を明示的にマーク
+                    setIsViewerReady(true);
+                  } catch (error) {
+                    console.error(
+                      '[MolecularOrbitalViewer] Failed to finalize viewer initialization:',
+                      error
+                    );
+                    // 初期化失敗時はビューアーをクリア
+                    setViewer(null);
+                    setIsViewerReady(false);
+
+                    if (retryCountRef.current < 3) {
+                      retryCountRef.current += 1;
+                    } else {
+                      onError?.(
+                        'Failed to initialize molecular viewer after multiple attempts'
+                      );
+                    }
+                  }
+                }
+              }, 200); // パッケージ環境対応のため200ms
+            });
+          });
         } catch (error) {
           console.error('Failed to initialize 3Dmol viewer:', error);
 
           // 再試行ロジック（最大3回まで）
-          if (retryCount < 3) {
-            setRetryCount(prev => prev + 1);
+          if (retryCountRef.current < 3) {
+            retryCountRef.current += 1;
             timeoutId = setTimeout(
               () => {
                 animationFrameId = requestAnimationFrame(initializeViewer);
               },
-              500 * (retryCount + 1)
+              500 * retryCountRef.current
             ); // 指数バックオフ
           } else {
+            console.error('Failed to initialize molecular viewer after 3 attempts');
             onError?.(
               'Failed to initialize molecular viewer after multiple attempts'
             );
@@ -157,11 +182,11 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
-        if (viewer) {
-          viewer.clear();
+        if (viewerInstance) {
+          viewerInstance.clear();
         }
       };
-    }, [onError, retryCount, isDomReady, viewer]);
+    }, [onError, isDomReady]);
 
     // ResizeObserverのセットアップ
     useEffect(() => {
@@ -199,7 +224,8 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
         // 状態をリセット
         setSelectedOrbitalIndex(null);
         setIsLoading(false);
-        setIsDomReady(false);
+        setIsViewerReady(false);
+        retryCountRef.current = 0;
 
         // 3Dmol.jsビューアーをクリア
         if (viewer) {
@@ -240,148 +266,143 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
 
     // CUBEデータが更新されたときに分子軌道を表示
     useEffect(() => {
-      if (!viewer || !cubeData || !(cubeData as any).cube_data) {
+      // ビューアーが完全に準備完了するまで待機
+      if (!viewer || !isViewerReady || !cubeData || !(cubeData as any).cube_data) {
         return;
       }
 
       setIsLoading(true);
 
-      try {
-        // ビューアーをクリア
-        viewer.clear();
-
-        // CUBEファイルデータを追加
-        const cubeContent = (cubeData as any).cube_data;
-
-        // デバッグ情報: CUBEデータの内容確認
-        console.log('CUBE data validation:', {
-          hasContent: !!cubeContent,
-          contentType: typeof cubeContent,
-          contentLength: cubeContent?.length || 0,
-          firstChars: cubeContent?.substring?.(0, 100) || 'N/A',
-          isovaluePos: viewerOptions.isovaluePos,
-          isovalueNeg: viewerOptions.isovalueNeg,
-        });
-
-        // CUBEデータの詳細検証
-        if (!cubeContent || typeof cubeContent !== 'string') {
-          throw new Error(
-            'Invalid CUBE data: content is empty or not a string'
-          );
-        }
-
-        if (cubeContent.length < 100) {
-          throw new Error('Invalid CUBE data: content too short');
-        }
-
-        // CUBE形式の基本的な検証（ヘッダー行の存在確認）
-        const lines = cubeContent.split('\n');
-        if (lines.length < 6) {
-          throw new Error('Invalid CUBE data: insufficient header lines');
-        }
-
-        // 等値面設定の範囲チェック
-        if (
-          Math.abs(viewerOptions.isovaluePos) < 0.001 ||
-          Math.abs(viewerOptions.isovaluePos) > 1.0
-        ) {
-          console.warn(
-            'Positive isovalue may be out of optimal range:',
-            viewerOptions.isovaluePos
-          );
-        }
-        if (
-          Math.abs(viewerOptions.isovalueNeg) < 0.001 ||
-          Math.abs(viewerOptions.isovalueNeg) > 1.0
-        ) {
-          console.warn(
-            'Negative isovalue may be out of optimal range:',
-            viewerOptions.isovalueNeg
-          );
-        }
-
-        // 分子構造を先に追加（等値面の前に）
+      // 非同期でレンダリング処理を実行
+      const renderOrbital = async () => {
         try {
-          viewer.addModel(cubeContent, 'cube');
-          viewer.setStyle(
-            {},
-            { stick: { radius: 0.1 }, sphere: { radius: 0.3 } }
-          );
-          console.log('Successfully added molecular structure');
-        } catch (modelError) {
-          console.error('Failed to add molecular model:', modelError);
-          throw new Error('Failed to add molecular structure from CUBE data');
-        }
+          // ビューアーが有効であることを再確認
+          if (!viewer || !isViewerReady) {
+            setIsLoading(false);
+            return;
+          }
 
-        // 正の等値面（赤色）- 保護された呼び出し
-        try {
-          console.log(
-            'Adding positive isosurface with value:',
-            viewerOptions.isovaluePos
-          );
-          viewer.addVolumetricData(cubeContent, 'cube', {
-            isoval: viewerOptions.isovaluePos,
-            color: 'red',
-            opacity: 0.75,
-          });
-          console.log('Successfully added positive isosurface');
-        } catch (posError) {
-          console.error('Error adding positive isosurface:', posError);
-          throw new Error(
-            `Failed to add positive isosurface: ${posError instanceof Error ? posError.message : String(posError)}`
-          );
-        }
+          // ビューアーをクリアして、WebGLリソースの解放を待機
+          viewer.clear();
+          await new Promise(resolve => setTimeout(resolve, 50));
 
-        // 負の等値面（青色）- 保護された呼び出し
-        try {
-          console.log(
-            'Adding negative isosurface with value:',
-            viewerOptions.isovalueNeg
-          );
-          viewer.addVolumetricData(cubeContent, 'cube', {
-            isoval: viewerOptions.isovalueNeg,
-            color: 'blue',
-            opacity: 0.75,
-          });
-          console.log('Successfully added negative isosurface');
-        } catch (negError) {
-          console.error('Error adding negative isosurface:', negError);
-          throw new Error(
-            `Failed to add negative isosurface: ${negError instanceof Error ? negError.message : String(negError)}`
-          );
-        }
+          // CUBEファイルデータを追加
+          const cubeContent = (cubeData as any).cube_data;
 
-        // ビューを最適化（即座に実行）
-        viewer.zoomTo();
-        viewer.render();
+          // CUBEデータの詳細検証
+          if (!cubeContent || typeof cubeContent !== 'string') {
+            throw new Error(
+              'Invalid CUBE data: content is empty or not a string'
+            );
+          }
 
-        // レンダリング完了後の遅延再描画（レイアウトが確定してから）
-        setTimeout(() => {
+          if (cubeContent.length < 100) {
+            throw new Error('Invalid CUBE data: content too short');
+          }
+
+          // CUBE形式の基本的な検証（ヘッダー行の存在確認）
+          const lines = cubeContent.split('\n');
+          if (lines.length < 6) {
+            throw new Error('Invalid CUBE data: insufficient header lines');
+          }
+
+          // 分子構造を先に追加（等値面の前に）
           try {
-            if (viewer && viewerRef.current) {
+            viewer.addModel(cubeContent, 'cube');
+            viewer.setStyle(
+              {},
+              { stick: { radius: 0.1 }, sphere: { radius: 0.3 } }
+            );
+          } catch (modelError) {
+            console.error('Failed to add molecular model:', modelError);
+            // ビューアーをクリーンアップ
+            try {
+              viewer.clear();
+            } catch (clearError) {
+              console.error('Failed to clear viewer after model error:', clearError);
+            }
+            throw new Error('Failed to add molecular structure from CUBE data');
+          }
+
+          // 正の等値面（赤色）- 保護された呼び出し
+          try {
+            viewer.addVolumetricData(cubeContent, 'cube', {
+              isoval: viewerOptions.isovaluePos,
+              color: 'red',
+              opacity: 0.75,
+            });
+          } catch (posError) {
+            console.error('Error adding positive isosurface:', posError);
+            // ビューアーをクリーンアップ
+            try {
+              viewer.clear();
+            } catch (clearError) {
+              console.error('Failed to clear viewer after positive isosurface error:', clearError);
+            }
+            throw new Error(
+              `Failed to add positive isosurface: ${posError instanceof Error ? posError.message : String(posError)}`
+            );
+          }
+
+          // 負の等値面（青色）- 保護された呼び出し
+          try {
+            viewer.addVolumetricData(cubeContent, 'cube', {
+              isoval: viewerOptions.isovalueNeg,
+              color: 'blue',
+              opacity: 0.75,
+            });
+          } catch (negError) {
+            console.error('Error adding negative isosurface:', negError);
+            // ビューアーをクリーンアップ
+            try {
+              viewer.clear();
+            } catch (clearError) {
+              console.error('Failed to clear viewer after negative isosurface error:', clearError);
+            }
+            throw new Error(
+              `Failed to add negative isosurface: ${negError instanceof Error ? negError.message : String(negError)}`
+            );
+          }
+
+          // ビューを最適化（即座に実行）
+          try {
+            viewer.zoomTo();
+            viewer.render();
+          } catch (renderError) {
+            console.error('Failed to perform initial render:', renderError);
+            throw new Error('Failed to render orbital visualization');
+          }
+
+          // レンダリング完了を待ってから再度リサイズ
+          await new Promise(resolve => setTimeout(resolve, 200));
+
+          // 最終的な調整とレンダリング
+          try {
+            if (viewer && viewerRef.current && isViewerReady) {
               viewer.resize();
               viewer.zoomTo();
               viewer.render();
-              console.log('Completed delayed re-render');
             }
           } catch (delayedRenderError) {
             console.error(
               'Failed to perform delayed re-render:',
               delayedRenderError
             );
+            // 最終レンダリングの失敗は致命的ではない（警告のみ）
           }
-        }, 200);
 
-        setIsLoading(false);
-        console.log('Molecular orbital rendering completed successfully');
-      } catch (error) {
-        console.error('Failed to render molecular orbital:', error);
-        onError?.(
-          `Failed to render molecular orbital visualization: ${error instanceof Error ? error.message : String(error)}`
-        );
-        setIsLoading(false);
-      }
-    }, [viewer, cubeData, viewerOptions, onError]);
+          setIsLoading(false);
+        } catch (error) {
+          console.error('Failed to render molecular orbital:', error);
+          onError?.(
+            `Failed to render molecular orbital visualization: ${error instanceof Error ? error.message : String(error)}`
+          );
+          setIsLoading(false);
+        }
+      };
+
+      renderOrbital();
+    }, [viewer, isViewerReady, cubeData, viewerOptions, onError]);
 
     // エラーハンドリング
     useEffect(() => {
@@ -416,7 +437,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
     if (orbitalsLoading) {
       return (
         <div className={styles.loadingContainer}>
-          <div>⚛️ Loading orbital information...</div>
+          <div>Loading orbital information...</div>
         </div>
       );
     }
@@ -428,7 +449,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
     ) {
       return (
         <div className={styles.noDataContainer}>
-          <div>📊 No orbital data available for this calculation.</div>
+          <div>No orbital data available for this calculation.</div>
         </div>
       );
     }
@@ -568,7 +589,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
           {/* ローディングオーバーレイ */}
           {(isLoading || cubeLoading) && (
             <div className={styles.loadingOverlay}>
-              ⚛️ Generating orbital data...
+              Generating orbital data...
             </div>
           )}
         </div>

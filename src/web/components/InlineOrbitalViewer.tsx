@@ -98,6 +98,7 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> =
 
         let animationFrameId: number;
         let timeoutId: NodeJS.Timeout;
+        let viewerInstance: GLViewer | null = null;
 
         const initializeViewer = () => {
           if (!viewerRef.current) {
@@ -110,22 +111,30 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> =
               antialias: true,
             }) as unknown as GLViewer;
 
-            setViewer(newViewer);
-            setRetryCount(0);
+            viewerInstance = newViewer;
 
-            timeoutId = setTimeout(() => {
-              if (newViewer && viewerRef.current) {
-                try {
-                  newViewer.resize();
-                  newViewer.render();
-                } catch (error) {
-                  console.error(
-                    'Failed to resize viewer after initialization:',
-                    error
-                  );
-                }
-              }
-            }, 100);
+            // WebGLコンテキストの準備完了を確実に待機（2フレーム待機）
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                setViewer(newViewer);
+                setRetryCount(0);
+
+                // ビューアーのリサイズとレンダリングを実行
+                timeoutId = setTimeout(() => {
+                  if (newViewer && viewerRef.current) {
+                    try {
+                      newViewer.resize();
+                      newViewer.render();
+                    } catch (error) {
+                      console.error(
+                        'Failed to resize viewer after initialization:',
+                        error
+                      );
+                    }
+                  }
+                }, 100);
+              });
+            });
           } catch (error) {
             console.error('Failed to initialize 3Dmol viewer:', error);
 
@@ -154,11 +163,11 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> =
           if (timeoutId) {
             clearTimeout(timeoutId);
           }
-          if (viewer) {
-            viewer.clear();
+          if (viewerInstance) {
+            viewerInstance.clear();
           }
         };
-      }, [onError, retryCount, isDomReady, viewer]);
+      }, [onError, retryCount, isDomReady]);
 
       // ResizeObserverのセットアップ
       useEffect(() => {
@@ -193,50 +202,56 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> =
 
         setIsLoading(true);
 
-        try {
-          viewer.clear();
+        // 非同期でレンダリング処理を実行
+        const renderOrbital = async () => {
+          try {
+            // ビューアーをクリアして、WebGLリソースの解放を待機
+            viewer.clear();
+            await new Promise(resolve => setTimeout(resolve, 50));
 
-          const cubeContent = (cubeData as any).cube_data;
+            const cubeContent = (cubeData as any).cube_data;
 
-          console.log('Rendering orbital visualization:', {
-            calculation_id,
-            orbital_index,
-            hasContent: !!cubeContent,
-          });
+            console.log('Rendering orbital visualization:', {
+              calculation_id,
+              orbital_index,
+              hasContent: !!cubeContent,
+            });
 
-          if (
-            !cubeContent ||
-            typeof cubeContent !== 'string' ||
-            cubeContent.length < 100
-          ) {
-            throw new Error('Invalid CUBE data');
-          }
+            if (
+              !cubeContent ||
+              typeof cubeContent !== 'string' ||
+              cubeContent.length < 100
+            ) {
+              throw new Error('Invalid CUBE data');
+            }
 
-          // 分子構造を追加
-          viewer.addModel(cubeContent, 'cube');
-          viewer.setStyle(
-            {},
-            { stick: { radius: 0.1 }, sphere: { radius: 0.3 } }
-          );
+            // 分子構造を追加
+            viewer.addModel(cubeContent, 'cube');
+            viewer.setStyle(
+              {},
+              { stick: { radius: 0.1 }, sphere: { radius: 0.3 } }
+            );
 
-          // 正の等値面（赤色）
-          viewer.addVolumetricData(cubeContent, 'cube', {
-            isoval: viewerOptions.isovaluePos,
-            color: 'red',
-            opacity: 0.75,
-          });
+            // 正の等値面（赤色）
+            viewer.addVolumetricData(cubeContent, 'cube', {
+              isoval: viewerOptions.isovaluePos,
+              color: 'red',
+              opacity: 0.75,
+            });
 
-          // 負の等値面（青色）
-          viewer.addVolumetricData(cubeContent, 'cube', {
-            isoval: viewerOptions.isovalueNeg,
-            color: 'blue',
-            opacity: 0.75,
-          });
+            // 負の等値面（青色）
+            viewer.addVolumetricData(cubeContent, 'cube', {
+              isoval: viewerOptions.isovalueNeg,
+              color: 'blue',
+              opacity: 0.75,
+            });
 
-          viewer.zoomTo();
-          viewer.render();
+            viewer.zoomTo();
+            viewer.render();
 
-          setTimeout(() => {
+            // レンダリング完了を待ってから再度リサイズ
+            await new Promise(resolve => setTimeout(resolve, 200));
+
             try {
               if (viewer && viewerRef.current) {
                 viewer.resize();
@@ -249,16 +264,18 @@ export const InlineOrbitalViewer: React.FC<InlineOrbitalViewerProps> =
                 delayedRenderError
               );
             }
-          }, 200);
 
-          setIsLoading(false);
-        } catch (error) {
-          console.error('Failed to render molecular orbital:', error);
-          onError?.(
-            `Failed to render molecular orbital: ${error instanceof Error ? error.message : String(error)}`
-          );
-          setIsLoading(false);
-        }
+            setIsLoading(false);
+          } catch (error) {
+            console.error('Failed to render molecular orbital:', error);
+            onError?.(
+              `Failed to render molecular orbital: ${error instanceof Error ? error.message : String(error)}`
+            );
+            setIsLoading(false);
+          }
+        };
+
+        renderOrbital();
       }, [
         viewer,
         cubeData,
