@@ -51,6 +51,25 @@
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
+  position: relative;
+}
+
+/* Read-only mode */
+.editorContainer.readOnly {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.editorContainer.readOnly::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(200, 200, 200, 0.1);
+  pointer-events: none;
+  z-index: 1000;
 }
 
 /* Actions Container */
@@ -85,12 +104,14 @@
 }
 
 .convertButton {
-  background: var(--primary-color, #007bff);
+  background: var(--primary-color, #50D4F5);
   color: white;
 }
 
 .convertButton:hover:not(:disabled) {
-  background: var(--primary-hover, #0056b3);
+  background: var(--primary-color, #22b9e7);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
 }
 
 .clearButton:disabled,
@@ -121,5 +142,50 @@
 .errorText {
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* Status Banner */
+.statusBanner {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  box-sizing: border-box;
+}
+
+.statusBanner.running {
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+}
+
+.statusBanner.waiting {
+  background: #d1ecf1;
+  border: 1px solid #bee5eb;
+  color: #0c5460;
+}
+
+.statusBanner.completed {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+
+.statusBanner.error {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+}
+
+.statusIcon {
+  flex-shrink: 0;
+}
+
+.statusText {
+  flex: 1;
 }
 

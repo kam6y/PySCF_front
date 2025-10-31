@@ -1035,6 +1035,10 @@ components:
           type: boolean
           default: true
           description: Whether to perform geometry optimization before the main calculation
+        ketcher_data:
+          type: string
+          nullable: true
+          description: Ketcher molecule format (JSON) for preserving the original drawn structure
 
     CalculationUpdateRequest:
       type: object
@@ -1244,6 +1248,10 @@ components:
           format: float
           nullable: true
           description: Gradient convergence tolerance used
+        ketcher_data:
+          type: string
+          nullable: true
+          description: Ketcher molecule format (JSON) for preserving the original drawn structure
 
     CalculationResults:
       type: object

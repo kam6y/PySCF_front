@@ -524,6 +524,8 @@ export interface components {
              * @default true
              */
             optimize_geometry: boolean;
+            /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
+            ketcher_data?: string | null;
         };
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */
@@ -646,6 +648,8 @@ export interface components {
              * @description Gradient convergence tolerance used
              */
             conv_tol_grad?: number | null;
+            /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
+            ketcher_data?: string | null;
         };
         CalculationResults: {
             /** @description SCF energy result */

@@ -24,6 +24,7 @@ declare module 'ketcher-core' {
     getSmiles(isExtended?: boolean): Promise<string>;
     getMolfile(molfileFormat?: 'v2000' | 'v3000' | 'auto'): Promise<string>;
     getRxn(molfileFormat?: 'v2000' | 'v3000'): Promise<string>;
+    getKet(): Promise<string>;
     setMolecule(molecule: string | object): Promise<void>;
     editor: {
       subscribe: (event: string, callback: (operations: any) => void) => void;
