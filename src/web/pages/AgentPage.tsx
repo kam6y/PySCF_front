@@ -683,6 +683,66 @@ export const AgentPage = React.memo(() => {
     }
   }, [history]);
 
+  // サンプルプロンプトの定義
+  const samplePrompts = [
+    {
+      text: 'Run a DFT calculation for a water molecule',
+      icon: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+        />
+      ),
+    },
+    {
+      text: 'Research the structure of photocatalysts',
+      icon: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+        />
+      ),
+    },
+    {
+      text: 'Extend absorption wavelength based on benzene ring',
+      icon: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M13 10V3L4 14h7v7l9-11h-7z"
+        />
+      ),
+    },
+    {
+      text: 'Analyze the latest completed calculation',
+      icon: (
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+        />
+      ),
+    },
+  ];
+
+  // サンプルプロンプトクリック時のハンドラー
+  const handlePromptClick = useCallback(
+    (promptText: string) => {
+      setCurrentMessage(promptText);
+      // テキストエリアにフォーカスを移動
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+      }
+    },
+    [setCurrentMessage]
+  );
+
   // 空の状態表示
   const renderEmptyState = () => (
     <div className={styles.emptyState}>
@@ -706,6 +766,27 @@ export const AgentPage = React.memo(() => {
         design, quantum chemistry calculations, and analysis. Ask questions
         about your molecules or request assistance with quantum computational
         chemistry tasks.
+      </div>
+
+      {/* Sample prompts */}
+      <div className={styles.promptSuggestions}>
+        {samplePrompts.map((prompt, index) => (
+          <button
+            key={index}
+            className={styles.promptCard}
+            onClick={() => handlePromptClick(prompt.text)}
+          >
+            <svg
+              className={styles.promptIcon}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              {prompt.icon}
+            </svg>
+            <span className={styles.promptText}>{prompt.text}</span>
+          </button>
+        ))}
       </div>
     </div>
   );
