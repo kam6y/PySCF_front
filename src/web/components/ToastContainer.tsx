@@ -9,11 +9,11 @@ export const ToastContainer: React.FC = () => {
   const appState = useAppState();
 
   const handleNavigate = (calculationId: string) => {
-    // 該当する計算を選択
+    // Select the corresponding calculation
     appState.calculation.selectCalculation(calculationId);
 
-    // 適切なページに遷移
-    // 成功通知の場合は結果ページ、エラー通知の場合は設定ページに遷移
+    // Navigate to appropriate page
+    // For success notifications, go to results page; for error notifications, go to settings page
     const notification = notifications.find(
       n => n.calculationId === calculationId
     );

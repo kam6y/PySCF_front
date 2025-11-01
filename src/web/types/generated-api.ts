@@ -1047,6 +1047,13 @@ export interface components {
              */
             calculations_directory: string;
             /**
+             * @description Display timezone for timestamps in chat history and calculation history
+             * @default UTC
+             * @example UTC
+             * @enum {string}
+             */
+            timezone: "UTC" | "Asia/Tokyo" | "Asia/Shanghai" | "Asia/Seoul" | "Asia/Singapore" | "Asia/Kolkata" | "Australia/Sydney" | "Europe/London" | "Europe/Paris" | "Europe/Berlin" | "America/New_York" | "America/Chicago" | "America/Denver" | "America/Los_Angeles";
+            /**
              * @description Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
              * @example null
              */
