@@ -344,6 +344,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   type="range"
                   min="1"
                   max="16"
+                  step="1"
                   value={maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES}
                   onChange={e => {
                     const newValue = Number(e.target.value);
@@ -362,6 +363,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   <span>1</span>
                   <span>4</span>
                   <span>8</span>
+                  <span>12</span>
                   <span>16</span>
                 </div>
               </div>
