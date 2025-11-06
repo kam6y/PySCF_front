@@ -24,7 +24,7 @@ class TestJoinCalculationWebSocket:
         """
         # ARRANGE
         # Mock get_current_settings to return test configuration
-        from generated_models import AppSettings
+        from generated_models import AppSettings, Timezone
         mock_settings = AppSettings(
             max_parallel_instances=3,
             max_cpu_utilization_percent=95.0,
@@ -32,6 +32,7 @@ class TestJoinCalculationWebSocket:
             system_total_cores=8,
             system_total_memory_mb=16384,
             calculations_directory=app.config['CALCULATIONS_DIR'],  # Use test directory
+            timezone=Timezone.UTC,
             gemini_api_key=None,
             tavily_api_key=None,
             research_email=None
