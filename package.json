@@ -1,13 +1,13 @@
 {
   "name": "pyscf_front",
-  "version": "0.1.4-beta",
+  "version": "0.1.5-beta",
   "description": "A quantum chemical calculation app using Electron, React, and Python.",
   "main": "dist/main.js",
   "scripts": {
     "dev": "rimraf dist && npm run codegen && run-p dev:webpack dev:electron",
     "dev:clean": "rimraf dist node_modules/.cache && npm run codegen && run-p dev:webpack dev:electron",
     "dev:webpack": "cross-env NODE_ENV=\"development\" webpack --progress",
-    "dev:electron": "wait-on --delay 1000 --interval 100 --timeout 30000 ./dist/index.html ./dist/main.js && electronmon .",
+    "dev:electron": "wait-on --delay 1000 --interval 100 --timeout 90000 ./dist/index.html ./dist/main.js && electronmon .",
     "build": "npm run verify-env && npm run clean:build-artifacts && npm run codegen && npm run build:webpack && npm run build:conda-pack && npm run validate-build",
     "build:webpack": "cross-env NODE_ENV=\"production\" webpack --progress",
     "build:conda-pack": "npm run verify-build-env && rimraf conda_env && bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && conda-pack -o conda_env.tar.gz && mkdir -p conda_env && tar -xzf conda_env.tar.gz -C conda_env && rm conda_env.tar.gz && (./conda_env/bin/conda-unpack || echo \"Warning: conda-unpack encountered errors but continuing...\") && echo \"Cleaning up development files from conda_env...\" && find conda_env -type d -name \"__pycache__\" -exec rm -rf {} + 2>/dev/null || true && find conda_env -type f \\( -name \"*.pyc\" -o -name \"*.pyo\" -o -name \"*.pyd\" \\) -delete && find conda_env/lib/python*/site-packages -maxdepth 2 -type d \\( -name \"tests\" -o -name \"test\" \\) -exec rm -rf {} + 2>/dev/null || true && rm -rf conda_env/etc/conda/test-files 2>/dev/null || true && find conda_env -type f -name \".coverage*\" -delete 2>/dev/null || true && find conda_env -name \"*.egg-info\" -type d -exec rm -rf {} + 2>/dev/null || true && echo \"✓ Cleanup completed\"'",

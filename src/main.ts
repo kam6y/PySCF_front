@@ -470,15 +470,17 @@ const startPythonServer = async (): Promise<void> => {
       });
 
       // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
-      // パッケージ環境では初期化に時間がかかるため、遅延とタイムアウトを延長
-      const initialDelay = app.isPackaged ? 5000 : 2000;
-      const healthCheckRetries = app.isPackaged ? 60 : 20; // パッケージ環境: 30秒, 開発環境: 10秒
+      // パッケージ環境では初回起動時の初期化（大規模ライブラリロード、バイトコードコンパイル等）に時間がかかるため、
+      // 遅延とタイムアウトを大幅に延長。2回目以降はキャッシュにより高速化されるため、実際の待機時間は短くなる
+      const initialDelay = app.isPackaged ? 10000 : 2000;
+      const healthCheckRetries = app.isPackaged ? 120 : 20; // パッケージ環境: 初回最大130秒, 開発環境: 10秒
+      const healthCheckInterval = app.isPackaged ? 1000 : 500; // パッケージ環境: 1秒間隔, 開発環境: 0.5秒間隔
 
       setTimeout(() => {
         console.log(
           `Starting health check for Gunicorn server on port ${flaskPort}`
         );
-        checkServerHealth(flaskPort!, healthCheckRetries)
+        checkServerHealth(flaskPort!, healthCheckRetries, healthCheckInterval)
           .then(resolve)
           .catch(reject);
       }, initialDelay);

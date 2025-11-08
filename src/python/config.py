@@ -388,7 +388,7 @@ def get_fallback_config() -> Dict[str, Any]:
             }
         },
         "app_info": {
-            "version": "0.1.4-beta"
+            "version": "0.1.5-beta"
         },
         "external_services": {
             "pubchem_timeout": 30,

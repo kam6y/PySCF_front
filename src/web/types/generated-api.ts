@@ -524,6 +524,8 @@ export interface components {
              * @default true
              */
             optimize_geometry: boolean;
+            /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
+            ketcher_data?: string | null;
         };
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */
@@ -646,6 +648,8 @@ export interface components {
              * @description Gradient convergence tolerance used
              */
             conv_tol_grad?: number | null;
+            /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
+            ketcher_data?: string | null;
         };
         CalculationResults: {
             /** @description SCF energy result */
@@ -1042,6 +1046,13 @@ export interface components {
              * @example /Users/username/PySCF_calculations
              */
             calculations_directory: string;
+            /**
+             * @description Display timezone for timestamps in chat history and calculation history
+             * @default UTC
+             * @example UTC
+             * @enum {string}
+             */
+            timezone: "UTC" | "Asia/Tokyo" | "Asia/Shanghai" | "Asia/Seoul" | "Asia/Singapore" | "Asia/Kolkata" | "Australia/Sydney" | "Europe/London" | "Europe/Paris" | "Europe/Berlin" | "America/New_York" | "America/Chicago" | "America/Denver" | "America/Los_Angeles";
             /**
              * @description Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
              * @example null

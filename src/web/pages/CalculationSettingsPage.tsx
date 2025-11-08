@@ -316,6 +316,7 @@ export const CalculationSettingsPage = ({
             adjustedParams.calculation_method === 'CCSD_T'
           )
         ),
+        ketcher_data: (adjustedParams as any).ketcher_data || undefined,
       };
 
       if (isCompleted && isParamChange) {
@@ -421,6 +422,7 @@ export const CalculationSettingsPage = ({
               currentParams.calculation_method === 'CCSD_T'
             )
           ),
+          ketcher_data: (currentParams as any).ketcher_data || undefined,
         };
 
         if (isCompleted) {
@@ -513,6 +515,7 @@ export const CalculationSettingsPage = ({
     setCalculationError(null);
 
     const currentParams = activeCalculation.parameters;
+
     const finalParams: QuantumCalculationRequest & {
       frozen_core?: boolean;
     } = {
@@ -575,6 +578,7 @@ export const CalculationSettingsPage = ({
           currentParams.calculation_method === 'CCSD_T'
         )
       ),
+      ketcher_data: (currentParams as any).ketcher_data || undefined,
     };
 
     try {
@@ -682,6 +686,7 @@ export const CalculationSettingsPage = ({
             params.calculation_method === 'CCSD_T'
           )
         ),
+        ketcher_data: (params as any).ketcher_data || undefined,
       };
 
       if (isCompleted) {

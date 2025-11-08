@@ -4,6 +4,8 @@ import { useGetCalculationDetails } from '../hooks/useCalculationQueries';
 import { useDeleteChatSession } from '../hooks/useChatHistoryQueries';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
 import { useAgentStore } from '../store/agentStore';
+import { useAppSettings } from '../hooks';
+import { formatDateTimeWithSeconds } from '../utils/dateFormatter';
 import { ChatHistoryList } from './ChatHistoryList';
 import { ConfirmationModal } from './ConfirmationModal';
 import { SidebarView } from '../store/uiStore';
@@ -202,6 +204,7 @@ const CalculationCard: React.FC<CalculationCardProps> = ({
 }) => {
   const { data: detailsData, isLoading: detailsLoading } =
     useGetCalculationDetails(calculation.id);
+  const { settings } = useAppSettings();
 
   const handleCardClick = () => {
     onSelect(calculation.id);
@@ -220,14 +223,10 @@ const CalculationCard: React.FC<CalculationCardProps> = ({
         <div className={styles.calculationName}>{calculation.name}</div>
         <div className={styles.calculationMeta}>
           <div className={styles.calculationDate}>
-            {new Date(calculation.date).toLocaleString('en-US', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              second: '2-digit',
-            })}
+            {formatDateTimeWithSeconds(
+              calculation.date,
+              settings?.timezone || 'UTC'
+            )}
           </div>
         </div>
 

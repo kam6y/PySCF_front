@@ -2,7 +2,7 @@ openapi: 3.1.1
 info:
   title: PySCF Native App API
   description: API for quantum chemistry calculations using PySCF with PubChem and SMILES integration
-  version: 0.1.4-beta
+  version: 0.1.5-beta
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
@@ -1035,6 +1035,10 @@ components:
           type: boolean
           default: true
           description: Whether to perform geometry optimization before the main calculation
+        ketcher_data:
+          type: string
+          nullable: true
+          description: Ketcher molecule format (JSON) for preserving the original drawn structure
 
     CalculationUpdateRequest:
       type: object
@@ -1244,6 +1248,10 @@ components:
           format: float
           nullable: true
           description: Gradient convergence tolerance used
+        ketcher_data:
+          type: string
+          nullable: true
+          description: Ketcher molecule format (JSON) for preserving the original drawn structure
 
     CalculationResults:
       type: object
@@ -1892,7 +1900,7 @@ components:
     # Settings-related schemas
     AppSettings:
       type: object
-      required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb, calculations_directory]
+      required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb, calculations_directory, timezone]
       properties:
         max_parallel_instances:
           type: integer
@@ -1926,6 +1934,26 @@ components:
           type: string
           description: Directory path where calculation data is stored
           example: "/Users/username/PySCF_calculations"
+        timezone:
+          type: string
+          enum:
+            - UTC
+            - Asia/Tokyo
+            - Asia/Shanghai
+            - Asia/Seoul
+            - Asia/Singapore
+            - Asia/Kolkata
+            - Australia/Sydney
+            - Europe/London
+            - Europe/Paris
+            - Europe/Berlin
+            - America/New_York
+            - America/Chicago
+            - America/Denver
+            - America/Los_Angeles
+          default: "UTC"
+          description: Display timezone for timestamps in chat history and calculation history
+          example: "UTC"
         gemini_api_key:
           type: string
           nullable: true

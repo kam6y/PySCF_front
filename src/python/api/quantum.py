@@ -89,9 +89,10 @@ def quantum_calculate(body: QuantumCalculationRequest):
             'max_cycle_micro': body.max_cycle_micro,
             'natorb': body.natorb,
             'conv_tol': body.conv_tol,
-            'conv_tol_grad': body.conv_tol_grad
+            'conv_tol_grad': body.conv_tol_grad,
+            'ketcher_data': body.ketcher_data
         }
-        
+
         # Add exchange_correlation only for DFT methods
         if calculation_method != 'HF':
             parameters['exchange_correlation'] = body.exchange_correlation

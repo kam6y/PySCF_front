@@ -54,6 +54,7 @@ class SettingsManager:
             system_total_cores=total_cores,
             system_total_memory_mb=total_memory_mb,
             calculations_directory=default_calc_dir,
+            timezone="UTC",
             gemini_api_key=None,
             tavily_api_key=None,
             research_email="pyscf-research-agent@example.com"
@@ -142,16 +143,17 @@ class SettingsManager:
     def save_settings(self, settings: AppSettings) -> bool:
         """
         Save settings to file.
-        
+
         Args:
             settings: Settings to save.
-            
+
         Returns:
             bool: True if save was successful, False otherwise.
         """
         try:
             # Convert Pydantic model to dict for JSON serialization
-            settings_dict = settings.model_dump()
+            # mode='json' ensures enums are serialized as their values
+            settings_dict = settings.model_dump(mode='json')
             
             # Write to temporary file first, then rename for atomic operation
             temp_file = self.settings_file.with_suffix('.json.tmp')

@@ -35,7 +35,7 @@ class SettingsService:
             settings = get_current_settings()
             
             logger.info(f"Successfully retrieved settings")
-            return settings.model_dump()
+            return settings.model_dump(mode='json')
             
         except Exception as e:
             logger.error(f"Failed to retrieve settings: {e}", exc_info=True)
@@ -116,7 +116,7 @@ class SettingsService:
                 except Exception as qs_error:
                     logger.warning(f"Failed to update quantum service settings: {qs_error}")
 
-            result = updated_settings.model_dump()
+            result = updated_settings.model_dump(mode='json')
 
             # Add move result to response if directory was moved
             if move_result:

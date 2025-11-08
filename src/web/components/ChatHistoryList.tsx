@@ -2,6 +2,8 @@ import React from 'react';
 import { ChatSessionSummary } from '../types/api-types';
 import { useGetChatSessions } from '../hooks/useChatHistoryQueries';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
+import { useAppSettings } from '../hooks';
+import { formatDateTime } from '../utils/dateFormatter';
 import styles from './ChatHistoryList.module.css';
 
 interface ChatHistoryListProps {
@@ -19,6 +21,7 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
 }) => {
   const { isLoading, error, refetch } = useGetChatSessions();
   const activeSessionId = useChatHistoryStore(state => state.activeSessionId);
+  const { settings } = useAppSettings();
 
   const handleSessionClick = (sessionId: string) => {
     onSessionSelect(sessionId);
@@ -89,13 +92,10 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
             <div className={styles.chatName}>{session.name}</div>
             <div className={styles.chatMeta}>
               <div className={styles.chatDate}>
-                {new Date(session.updated_at).toLocaleString('en-US', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {formatDateTime(
+                  session.updated_at,
+                  settings?.timezone || 'UTC'
+                )}
               </div>
               <div className={styles.chatMessageCount}>
                 {session.message_count}{' '}

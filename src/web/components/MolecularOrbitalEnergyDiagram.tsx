@@ -43,7 +43,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       const [viewerSize, setViewerSize] = useState({ width: 800, height: 600 });
       const containerRef = useRef<HTMLDivElement>(null);
 
-      // 軌道情報を取得
+      // Get orbital information
       const {
         data: orbitalsData,
         isLoading: orbitalsLoading,
@@ -63,7 +63,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
               height: 600,
             });
 
-            // 初期値が未設定の場合、デフォルト値を設定
+            // Set default value if initial value is not set
             if (value === null) {
               setValue({
                 version: 2,
@@ -90,10 +90,10 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
           }
         };
 
-        // 初回のサイズ設定
+        // Initial size setup
         updateSize();
 
-        // ResizeObserverでコンテナのサイズ変更を監視
+        // Monitor container size changes with ResizeObserver
         const resizeObserver = new ResizeObserver(() => {
           updateSize();
         });
@@ -115,20 +115,20 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         }
       }, [orbitalsError, onError]);
 
-      // 軌道データの処理とソート
+      // Process and sort orbital data
       const processedOrbitals: ProcessedOrbital[] = useMemo(() => {
         if (!orbitalsData?.orbitals) return [];
 
-        // エネルギー順にソート
+        // Sort by energy
         const sortedOrbitals = [...orbitalsData.orbitals].sort(
           (a, b) => a.energy_ev - b.energy_ev
         );
 
-        // Y軸位置を計算
+        // Calculate Y-axis position
         const energyRange = Math.max(
           sortedOrbitals[sortedOrbitals.length - 1].energy_ev -
             sortedOrbitals[0].energy_ev,
-          10 // 最小範囲を設定
+          10 // Set minimum range
         );
         const minEnergy = sortedOrbitals[0].energy_ev;
         const drawableHeight =
@@ -146,7 +146,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         }));
       }, [orbitalsData]);
 
-      // HOMO-LUMO情報の計算
+      // Calculate HOMO-LUMO information
       const orbitalSummary = useMemo(() => {
         const homoOrbital = processedOrbitals.find(
           o => o.orbital_type === 'homo'
@@ -165,7 +165,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         };
       }, [processedOrbitals]);
 
-      // ズームスケールの計算とスマートスケーリング
+      // Calculate zoom scale and smart scaling
       const scalingFactors = useMemo(() => {
         const scale = value?.a || 1;
 

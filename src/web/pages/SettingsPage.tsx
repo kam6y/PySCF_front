@@ -1,6 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppSettings } from '../hooks';
+import {
+  TIMEZONE_LABELS,
+  TIMEZONE_GROUPS,
+  getTimezoneLabel,
+} from '../utils/dateFormatter';
+import type { components } from '../types/generated-api';
 import styles from './SettingsPage.module.css';
+
+// Type for timezone from generated API types
+type Timezone = components['schemas']['AppSettings']['timezone'];
 
 // Default values constants
 const DEFAULT_MAX_PARALLEL_INSTANCES = 4;
@@ -25,6 +34,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [tavilyApiKey, setTavilyApiKey] = useState<string>('');
   const [calculationsDirectory, setCalculationsDirectory] =
     useState<string>('');
+  const [timezone, setTimezone] = useState<Timezone>('UTC');
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
@@ -33,6 +43,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     geminiApiKey?: string;
     tavilyApiKey?: string;
     calculationsDirectory?: string;
+    timezone?: Timezone;
   }>({});
 
   const { settings, isLoading, isUpdating, error, updateSettings } =
@@ -63,6 +74,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         geminiApiKey: settings.gemini_api_key || '',
         tavilyApiKey: settings.tavily_api_key || '',
         calculationsDirectory: settings.calculations_directory || '',
+        timezone: settings.timezone || 'UTC',
       };
 
       if (process.env.NODE_ENV === 'development') {
@@ -75,6 +87,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setGeminiApiKey(newValues.geminiApiKey);
       setTavilyApiKey(newValues.tavilyApiKey);
       setCalculationsDirectory(newValues.calculationsDirectory);
+      setTimezone(newValues.timezone);
       setOriginalValues(newValues);
 
       if (process.env.NODE_ENV === 'development') {
@@ -97,6 +110,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
         calculations_directory: calculationsDirectory,
+        timezone: timezone,
         gemini_api_key: geminiApiKey || null,
         tavily_api_key: tavilyApiKey || null,
       });
@@ -108,6 +122,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         geminiApiKey,
         tavilyApiKey,
         calculationsDirectory,
+        timezone,
       };
       setOriginalValues(newValues);
     } catch (error) {
@@ -119,6 +134,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setGeminiApiKey(originalValues.geminiApiKey || '');
       setTavilyApiKey(originalValues.tavilyApiKey || '');
       setCalculationsDirectory(originalValues.calculationsDirectory || '');
+      setTimezone(originalValues.timezone || 'UTC');
     }
   };
 
@@ -129,6 +145,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setGeminiApiKey(originalValues.geminiApiKey || '');
     setTavilyApiKey(originalValues.tavilyApiKey || '');
     setCalculationsDirectory(originalValues.calculationsDirectory || '');
+    setTimezone(originalValues.timezone || 'UTC');
   };
 
   const handleSelectFolder = async () => {
@@ -162,6 +179,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const currentGeminiApiKey = geminiApiKey;
     const currentTavilyApiKey = tavilyApiKey;
     const currentCalculationsDirectory = calculationsDirectory;
+    const currentTimezone = timezone;
 
     const originalParallel =
       originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
@@ -173,6 +191,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const originalTavilyApiKey = originalValues.tavilyApiKey || '';
     const originalCalculationsDirectory =
       originalValues.calculationsDirectory || '';
+    const originalTimezone = originalValues.timezone || 'UTC';
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
@@ -181,6 +200,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const tavilyApiKeyChanged = currentTavilyApiKey !== originalTavilyApiKey;
     const calculationsDirectoryChanged =
       currentCalculationsDirectory !== originalCalculationsDirectory;
+    const timezoneChanged = currentTimezone !== originalTimezone;
 
     const hasChanges =
       parallelChanged ||
@@ -188,7 +208,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       memoryChanged ||
       geminiApiKeyChanged ||
       tavilyApiKeyChanged ||
-      calculationsDirectoryChanged;
+      calculationsDirectoryChanged ||
+      timezoneChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
@@ -226,12 +247,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     geminiApiKey,
     tavilyApiKey,
     calculationsDirectory,
+    timezone,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
     originalValues?.maxMemoryUtilization,
     originalValues?.geminiApiKey,
     originalValues?.tavilyApiKey,
     originalValues?.calculationsDirectory,
+    originalValues?.timezone,
   ]);
 
   if (isLoading) {
@@ -321,6 +344,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   type="range"
                   min="1"
                   max="16"
+                  step="1"
                   value={maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES}
                   onChange={e => {
                     const newValue = Number(e.target.value);
@@ -339,6 +363,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   <span>1</span>
                   <span>4</span>
                   <span>8</span>
+                  <span>12</span>
                   <span>16</span>
                 </div>
               </div>
@@ -565,6 +590,74 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                       ⚠ API Key Not Set (Web search disabled)
                     </span>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.settingsSection}>
+          <h3>Display</h3>
+
+          <div className={styles.settingItem}>
+            <div className={styles.settingLabel}>
+              <label htmlFor="timezone">Timezone for Date & Time Display</label>
+              <p className={styles.settingHelp}>
+                Timezone used for displaying timestamps in chat history and
+                calculation history. Changes apply immediately to all displayed
+                dates.
+              </p>
+            </div>
+
+            <div className={styles.settingControl}>
+              <div className={styles.selectContainer}>
+                <select
+                  id="timezone"
+                  value={timezone}
+                  onChange={e => {
+                    const newValue = e.target.value as Timezone;
+                    if (process.env.NODE_ENV === 'development') {
+                      console.log('SettingsPage: timezone changed', newValue);
+                    }
+                    setTimezone(newValue);
+                  }}
+                  className={styles.selectInput}
+                  disabled={isUpdating}
+                >
+                  <optgroup label="Standard">
+                    {TIMEZONE_GROUPS.standard.map(tz => (
+                      <option key={tz} value={tz}>
+                        {getTimezoneLabel(tz)}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Asia / Pacific">
+                    {TIMEZONE_GROUPS.asiaPacific.map(tz => (
+                      <option key={tz} value={tz}>
+                        {getTimezoneLabel(tz)}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Europe">
+                    {TIMEZONE_GROUPS.europe.map(tz => (
+                      <option key={tz} value={tz}>
+                        {getTimezoneLabel(tz)}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Americas">
+                    {TIMEZONE_GROUPS.americas.map(tz => (
+                      <option key={tz} value={tz}>
+                        {getTimezoneLabel(tz)}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+                <div className={styles.selectedTimezone}>
+                  <span className={styles.timezoneLabel}>Selected:</span>
+                  <span className={styles.timezoneValue}>
+                    {getTimezoneLabel(timezone)}
+                  </span>
                 </div>
               </div>
             </div>
