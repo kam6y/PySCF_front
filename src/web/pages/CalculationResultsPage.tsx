@@ -1023,6 +1023,230 @@ export const CalculationResultsPage = ({
         )}
 
         {/* ========================================
+            4.5️⃣ ENERGETICS AND ELECTRONIC STRUCTURE DETAILS
+            ======================================== */}
+        {processedData.shouldShowEnergeticsSection && (
+          <section
+            className={`${styles.calculationSection} ${styles.energeticsSection}`}
+          >
+            <h2 className={styles.primaryHeader}>
+              Energetics and Electronic Structure Details
+            </h2>
+
+            {/* Energy Components */}
+            {(results.nuclear_repulsion_energy != null ||
+              results.electronic_energy != null) && (
+              <div className={styles.propertySubsection}>
+                <h3>Energy Components</h3>
+                <div className={styles.energyComponentsGrid}>
+                  {results.scf_energy != null && (
+                    <div>
+                      <strong>Total SCF Energy:</strong>
+                      <code>{results.scf_energy.toFixed(8)} hartree</code>
+                    </div>
+                  )}
+                  {results.nuclear_repulsion_energy != null && (
+                    <div>
+                      <strong>Nuclear Repulsion Energy:</strong>
+                      <code>
+                        {results.nuclear_repulsion_energy.toFixed(8)} hartree
+                      </code>
+                    </div>
+                  )}
+                  {results.electronic_energy != null && (
+                    <div>
+                      <strong>Electronic Energy:</strong>
+                      <code>
+                        {results.electronic_energy.toFixed(8)} hartree
+                      </code>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Frontier Orbital Analysis */}
+            {(results.homo_energy_ev != null ||
+              results.lumo_energy_ev != null ||
+              results.homo_lumo_gap_ev != null) && (
+              <div className={styles.propertySubsection}>
+                <h3>Frontier Orbital Analysis</h3>
+                <div className={styles.frontierOrbitalsGrid}>
+                  {results.homo_energy_ev != null && (
+                    <div className={styles.orbitalEnergyBox}>
+                      <strong>HOMO Energy:</strong>
+                      <div className={styles.energyValue}>
+                        <code className={styles.primaryValue}>
+                          {results.homo_energy_ev.toFixed(4)} eV
+                        </code>
+                        <code className={styles.secondaryUnit}>
+                          ({results.homo_energy_hartree?.toFixed(6)} hartree)
+                        </code>
+                      </div>
+                    </div>
+                  )}
+                  {results.lumo_energy_ev != null && (
+                    <div className={styles.orbitalEnergyBox}>
+                      <strong>LUMO Energy:</strong>
+                      <div className={styles.energyValue}>
+                        <code className={styles.primaryValue}>
+                          {results.lumo_energy_ev.toFixed(4)} eV
+                        </code>
+                        <code className={styles.secondaryUnit}>
+                          ({results.lumo_energy_hartree?.toFixed(6)} hartree)
+                        </code>
+                      </div>
+                    </div>
+                  )}
+                  {results.homo_lumo_gap_ev != null && (
+                    <div className={styles.gapBox}>
+                      <strong>HOMO-LUMO Gap:</strong>
+                      <div className={styles.gapValue}>
+                        <code className={styles.primaryGap}>
+                          {results.homo_lumo_gap_ev.toFixed(4)} eV
+                        </code>
+                        <code className={styles.secondaryUnit}>
+                          ({results.homo_lumo_gap_hartree?.toFixed(6)} hartree)
+                        </code>
+                      </div>
+                      <div className={styles.gapInterpretation}>
+                        {results.homo_lumo_gap_ev > 5.0 &&
+                          '→ Large gap - chemically stable'}
+                        {results.homo_lumo_gap_ev > 2.0 &&
+                          results.homo_lumo_gap_ev <= 5.0 &&
+                          '→ Moderate gap'}
+                        {results.homo_lumo_gap_ev <= 2.0 &&
+                          '→ Small gap - reactive'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Dipole Moment */}
+            {results.dipole_moment_total_debye != null && (
+              <div className={styles.propertySubsection}>
+                <h3>Dipole Moment</h3>
+                <div className={styles.dipoleMomentContainer}>
+                  <div className={styles.dipoleComponents}>
+                    <table className={styles.dipoleTable}>
+                      <thead>
+                        <tr>
+                          <th>Component</th>
+                          <th className={styles.rightAlign}>Value (Debye)</th>
+                          <th className={styles.rightAlign}>Value (a.u.)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <strong>μx</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_x_debye?.toFixed(4)}
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_x_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <strong>μy</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_y_debye?.toFixed(4)}
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_y_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <strong>μz</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_z_debye?.toFixed(4)}
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_z_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                        <tr className={styles.totalRow}>
+                          <td>
+                            <strong>|μ| (Total)</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              <strong>
+                                {results.dipole_moment_total_debye.toFixed(4)}
+                              </strong>
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_total_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className={styles.dipolePolarityInfo}>
+                    <strong>Polarity:</strong>{' '}
+                    {results.dipole_moment_total_debye > 1.0 && 'High polarity'}
+                    {results.dipole_moment_total_debye > 0.5 &&
+                      results.dipole_moment_total_debye <= 1.0 &&
+                      'Moderate polarity'}
+                    {results.dipole_moment_total_debye <= 0.5 &&
+                      'Low polarity (nearly nonpolar)'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Basis Set Information */}
+            {(results.num_basis_functions != null ||
+              results.num_primitive_gaussians != null) && (
+              <div className={styles.propertySubsection}>
+                <h3>Basis Set Information</h3>
+                <div className={styles.basisInfoGrid}>
+                  {results.basis && (
+                    <div>
+                      <strong>Basis Set:</strong> <code>{results.basis}</code>
+                    </div>
+                  )}
+                  {results.num_basis_functions != null && (
+                    <div>
+                      <strong>Number of Basis Functions:</strong>{' '}
+                      <code>{results.num_basis_functions}</code>
+                    </div>
+                  )}
+                  {results.num_primitive_gaussians != null && (
+                    <div>
+                      <strong>Number of Primitive Gaussians:</strong>{' '}
+                      <code>{results.num_primitive_gaussians}</code>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ========================================
             5️⃣ VIBRATIONAL ANALYSIS SECTION - Unified
             ======================================== */}
         {results.frequency_analysis_performed && (
@@ -1643,9 +1867,121 @@ export const CalculationResultsPage = ({
                   </>
                 )}
             </div>
+            {/* CCSD Diagnostic Indicators */}
+            {(results.ccsd_t1_diagnostic != null ||
+              results.ccsd_d1_diagnostic != null ||
+              results.ccsd_d2_diagnostic != null) && (
+              <div className={styles.diagnosticsSection}>
+                <h3 className={styles.subsectionHeader}>
+                  Diagnostic Indicators
+                </h3>
+                <div className={styles.diagnosticsGrid}>
+                  {results.ccsd_t1_diagnostic != null && (
+                    <div
+                      className={`${styles.diagnosticBox} ${
+                        results.ccsd_t1_diagnostic > 0.02
+                          ? styles.diagnosticWarning
+                          : styles.diagnosticOk
+                      }`}
+                    >
+                      <strong>T1 Diagnostic:</strong>
+                      <code className={styles.diagnosticValue}>
+                        {results.ccsd_t1_diagnostic.toFixed(6)}
+                      </code>
+                      <span className={styles.diagnosticInterpretation}>
+                        {results.ccsd_t1_diagnostic > 0.02
+                          ? '⚠️ Multi-reference character detected - single-reference CCSD may be unreliable'
+                          : '✓ Single-reference CCSD is appropriate'}
+                      </span>
+                    </div>
+                  )}
+                  {results.ccsd_d1_diagnostic != null && (
+                    <div className={styles.diagnosticBox}>
+                      <strong>D1 Diagnostic:</strong>
+                      <code className={styles.diagnosticValue}>
+                        {results.ccsd_d1_diagnostic.toFixed(6)}
+                      </code>
+                    </div>
+                  )}
+                  {results.ccsd_d2_diagnostic != null && (
+                    <div className={styles.diagnosticBox}>
+                      <strong>D2 Diagnostic:</strong>
+                      <code className={styles.diagnosticValue}>
+                        {results.ccsd_d2_diagnostic.toFixed(6)}
+                      </code>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {(results as any).frozen_core && (
               <div className={styles.sectionDescription}>
                 ℹ️ Frozen core approximation was used in this calculation
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* MP2 Results Section */}
+        {parameters.calculation_method === 'MP2' && (
+          <section
+            className={`${styles.calculationSection} ${styles.mp2Section}`}
+          >
+            <h2 className={styles.secondaryHeader}>MP2 Advanced Results</h2>
+            <div className={styles.thermochemicalGrid}>
+              <div>
+                <strong>HF Energy:</strong>{' '}
+                <code>
+                  {((results as any).hf_energy || results.scf_energy)?.toFixed(
+                    6
+                  )}{' '}
+                  Hartree
+                </code>
+              </div>
+              <div>
+                <strong>MP2 Correlation Energy:</strong>{' '}
+                <code>
+                  {(results as any).mp2_correlation_energy?.toFixed(6)} Hartree
+                </code>
+              </div>
+              <div>
+                <strong>MP2 Total Energy:</strong>{' '}
+                <code>
+                  {(results as any).mp2_total_energy?.toFixed(6)} Hartree
+                </code>
+              </div>
+            </div>
+
+            {/* MP2 Correlation Components */}
+            {(results.mp2_same_spin_correlation != null ||
+              results.mp2_opposite_spin_correlation != null) && (
+              <div className={styles.correlationComponents}>
+                <h3 className={styles.subsectionHeader}>
+                  Correlation Energy Components
+                </h3>
+                <div className={styles.thermochemicalGrid}>
+                  {results.mp2_same_spin_correlation != null && (
+                    <div>
+                      <strong>Same-Spin Correlation:</strong>{' '}
+                      <code>
+                        {results.mp2_same_spin_correlation.toFixed(6)} Hartree
+                      </code>
+                    </div>
+                  )}
+                  {results.mp2_opposite_spin_correlation != null && (
+                    <div>
+                      <strong>Opposite-Spin Correlation:</strong>{' '}
+                      <code>
+                        {results.mp2_opposite_spin_correlation.toFixed(6)}{' '}
+                        Hartree
+                      </code>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.sectionDescription}>
+                  ℹ️ These components provide insight into the nature of
+                  electron correlation
+                </div>
               </div>
             )}
           </section>

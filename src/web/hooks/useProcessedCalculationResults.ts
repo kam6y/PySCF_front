@@ -75,6 +75,13 @@ export const useProcessedCalculationResults = (
 
     const shouldShowVibrationalSection = results.frequency_analysis_performed;
 
+    const shouldShowEnergeticsSection =
+      results.dipole_moment_total_debye != null ||
+      results.homo_lumo_gap_ev != null ||
+      results.nuclear_repulsion_energy != null ||
+      results.electronic_energy != null ||
+      results.num_basis_functions != null;
+
     return {
       results,
       parameters,
@@ -85,6 +92,7 @@ export const useProcessedCalculationResults = (
       shouldShowTDDFTSection,
       shouldShowCCSDSection,
       shouldShowVibrationalSection,
+      shouldShowEnergeticsSection,
     };
   }, [activeCalculation]);
 };

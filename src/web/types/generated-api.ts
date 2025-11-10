@@ -686,6 +686,58 @@ export interface components {
             atom_count?: number;
             /** @description Error message if calculation failed */
             error?: string | null;
+            /** @description Dipole moment X component in Debye */
+            dipole_moment_x_debye?: number | null;
+            /** @description Dipole moment Y component in Debye */
+            dipole_moment_y_debye?: number | null;
+            /** @description Dipole moment Z component in Debye */
+            dipole_moment_z_debye?: number | null;
+            /** @description Total dipole moment magnitude in Debye */
+            dipole_moment_total_debye?: number | null;
+            /** @description Dipole moment X component in atomic units */
+            dipole_moment_x_au?: number | null;
+            /** @description Dipole moment Y component in atomic units */
+            dipole_moment_y_au?: number | null;
+            /** @description Dipole moment Z component in atomic units */
+            dipole_moment_z_au?: number | null;
+            /** @description Total dipole moment magnitude in atomic units */
+            dipole_moment_total_au?: number | null;
+            /** @description HOMO orbital energy in hartree */
+            homo_energy_hartree?: number | null;
+            /** @description HOMO orbital energy in eV */
+            homo_energy_ev?: number | null;
+            /** @description LUMO orbital energy in hartree */
+            lumo_energy_hartree?: number | null;
+            /** @description LUMO orbital energy in eV */
+            lumo_energy_ev?: number | null;
+            /** @description HOMO-LUMO energy gap in hartree */
+            homo_lumo_gap_hartree?: number | null;
+            /** @description HOMO-LUMO energy gap in eV */
+            homo_lumo_gap_ev?: number | null;
+            /** @description Nuclear repulsion energy in hartree */
+            nuclear_repulsion_energy?: number | null;
+            /** @description Electronic energy in hartree */
+            electronic_energy?: number | null;
+            /** @description Total number of basis functions */
+            num_basis_functions?: number | null;
+            /** @description Total number of primitive Gaussian functions */
+            num_primitive_gaussians?: number | null;
+            /** @description MP2 same-spin correlation energy in hartree */
+            mp2_same_spin_correlation?: number | null;
+            /** @description MP2 opposite-spin correlation energy in hartree */
+            mp2_opposite_spin_correlation?: number | null;
+            /** @description CCSD T1 diagnostic (>0.02 suggests multi-reference character) */
+            ccsd_t1_diagnostic?: number | null;
+            /** @description CCSD D1 diagnostic (alternative diagnostic based on density matrix) */
+            ccsd_d1_diagnostic?: number | null;
+            /** @description CCSD D2 diagnostic (diagnostic based on T2 amplitudes) */
+            ccsd_d2_diagnostic?: number | null;
+            /** @description Number of SCF iterations performed */
+            scf_iterations?: number | null;
+            /** @description Final energy change in SCF convergence */
+            final_energy_change?: number | null;
+            /** @description Final density matrix change in SCF convergence */
+            final_density_change?: number | null;
             /** @description Excitation energies in eV (TDDFT only) */
             excitation_energies?: number[] | null;
             /** @description Excitation wavelengths in nm (TDDFT only) */

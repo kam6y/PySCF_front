@@ -216,7 +216,11 @@ class CASSCFCalculator(BaseCalculator):
             'enhanced_ci_analysis': enhanced_ci_analysis
         }
         results.update(casscf_results)
-        
+
+        # Add common additional properties (from base calculator)
+        common_props = self._extract_common_additional_properties()
+        results.update(common_props)
+
         logger.info(f"CASSCF calculation completed with enhanced analysis. Energy: {casscf_energy_float:.6f} hartree, Converged: {converged}")
         return results
     

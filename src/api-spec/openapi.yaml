@@ -1308,6 +1308,110 @@ components:
           type: string
           nullable: true
           description: Error message if calculation failed
+        dipole_moment_x_debye:
+          type: number
+          nullable: true
+          description: Dipole moment X component in Debye
+        dipole_moment_y_debye:
+          type: number
+          nullable: true
+          description: Dipole moment Y component in Debye
+        dipole_moment_z_debye:
+          type: number
+          nullable: true
+          description: Dipole moment Z component in Debye
+        dipole_moment_total_debye:
+          type: number
+          nullable: true
+          description: Total dipole moment magnitude in Debye
+        dipole_moment_x_au:
+          type: number
+          nullable: true
+          description: Dipole moment X component in atomic units
+        dipole_moment_y_au:
+          type: number
+          nullable: true
+          description: Dipole moment Y component in atomic units
+        dipole_moment_z_au:
+          type: number
+          nullable: true
+          description: Dipole moment Z component in atomic units
+        dipole_moment_total_au:
+          type: number
+          nullable: true
+          description: Total dipole moment magnitude in atomic units
+        homo_energy_hartree:
+          type: number
+          nullable: true
+          description: HOMO orbital energy in hartree
+        homo_energy_ev:
+          type: number
+          nullable: true
+          description: HOMO orbital energy in eV
+        lumo_energy_hartree:
+          type: number
+          nullable: true
+          description: LUMO orbital energy in hartree
+        lumo_energy_ev:
+          type: number
+          nullable: true
+          description: LUMO orbital energy in eV
+        homo_lumo_gap_hartree:
+          type: number
+          nullable: true
+          description: HOMO-LUMO energy gap in hartree
+        homo_lumo_gap_ev:
+          type: number
+          nullable: true
+          description: HOMO-LUMO energy gap in eV
+        nuclear_repulsion_energy:
+          type: number
+          nullable: true
+          description: Nuclear repulsion energy in hartree
+        electronic_energy:
+          type: number
+          nullable: true
+          description: Electronic energy in hartree
+        num_basis_functions:
+          type: integer
+          nullable: true
+          description: Total number of basis functions
+        num_primitive_gaussians:
+          type: integer
+          nullable: true
+          description: Total number of primitive Gaussian functions
+        mp2_same_spin_correlation:
+          type: number
+          nullable: true
+          description: MP2 same-spin correlation energy in hartree
+        mp2_opposite_spin_correlation:
+          type: number
+          nullable: true
+          description: MP2 opposite-spin correlation energy in hartree
+        ccsd_t1_diagnostic:
+          type: number
+          nullable: true
+          description: CCSD T1 diagnostic (>0.02 suggests multi-reference character)
+        ccsd_d1_diagnostic:
+          type: number
+          nullable: true
+          description: CCSD D1 diagnostic (alternative diagnostic based on density matrix)
+        ccsd_d2_diagnostic:
+          type: number
+          nullable: true
+          description: CCSD D2 diagnostic (diagnostic based on T2 amplitudes)
+        scf_iterations:
+          type: integer
+          nullable: true
+          description: Number of SCF iterations performed
+        final_energy_change:
+          type: number
+          nullable: true
+          description: Final energy change in SCF convergence
+        final_density_change:
+          type: number
+          nullable: true
+          description: Final density matrix change in SCF convergence
         excitation_energies:
           type: array
           items:

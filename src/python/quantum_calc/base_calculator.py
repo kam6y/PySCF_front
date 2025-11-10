@@ -1503,5 +1503,111 @@ class BaseCalculator(ABC):
         except Exception as e:
             logger.error(f"Error in enhanced CI coefficient analysis: {e}")
             ci_analysis['error'] = str(e)
-        
+
         return ci_analysis
+
+    # ===== Common Additional Properties Extraction =====
+
+    def _extract_common_additional_properties(self) -> Dict[str, Any]:
+        """
+        Extract common additional properties available for all calculation methods.
+
+        This method provides comprehensive electronic structure information including:
+        - Dipole moment (x, y, z components and total, in Debye and a.u.)
+        - HOMO-LUMO energies and gap (in hartree and eV)
+        - Energy components (nuclear repulsion, electronic energy)
+        - Basis set information (number of basis functions, primitive Gaussians)
+
+        Returns:
+            Dictionary containing all available common properties
+        """
+        properties = {}
+
+        if self.mf is None or self.mol is None:
+            logger.warning("Mean field or molecular object not available for additional properties extraction")
+            return properties
+
+        try:
+            # 1. Dipole Moment (双極子モーメント)
+            try:
+                logger.info("Calculating dipole moment...")
+                # Get dipole moment in both Debye and atomic units
+                dip_debye = self.mf.dip_moment(unit='Debye')  # Returns [x, y, z]
+                dip_au = self.mf.dip_moment(unit='A.U.')
+
+                properties['dipole_moment_x_debye'] = float(dip_debye[0])
+                properties['dipole_moment_y_debye'] = float(dip_debye[1])
+                properties['dipole_moment_z_debye'] = float(dip_debye[2])
+                properties['dipole_moment_total_debye'] = float(np.linalg.norm(dip_debye))
+                properties['dipole_moment_x_au'] = float(dip_au[0])
+                properties['dipole_moment_y_au'] = float(dip_au[1])
+                properties['dipole_moment_z_au'] = float(dip_au[2])
+                properties['dipole_moment_total_au'] = float(np.linalg.norm(dip_au))
+
+                logger.info(f"Dipole moment: {properties['dipole_moment_total_debye']:.4f} Debye")
+            except Exception as e:
+                logger.warning(f"Failed to calculate dipole moment: {e}")
+
+            # 2. HOMO-LUMO Gap and Individual Energies (HOMO-LUMOギャップと個別エネルギー)
+            try:
+                logger.info("Calculating HOMO-LUMO energies and gap...")
+                mo_energy = self.mf.mo_energy
+
+                # Handle both RKS/RHF (1D array) and UKS/UHF (2D array) cases
+                if hasattr(mo_energy, 'ndim') and mo_energy.ndim == 2:
+                    # UKS/UHF case: use alpha orbitals
+                    mo_energy = mo_energy[0]
+
+                homo_idx = self.results.get('homo_index')
+                lumo_idx = self.results.get('lumo_index')
+
+                if homo_idx is not None and lumo_idx is not None:
+                    homo_energy_hartree = float(mo_energy[homo_idx])
+                    lumo_energy_hartree = float(mo_energy[lumo_idx])
+                    gap_hartree = lumo_energy_hartree - homo_energy_hartree
+
+                    # Convert to eV (1 hartree = 27.2114 eV)
+                    HARTREE_TO_EV = 27.2114
+                    properties['homo_energy_hartree'] = homo_energy_hartree
+                    properties['homo_energy_ev'] = homo_energy_hartree * HARTREE_TO_EV
+                    properties['lumo_energy_hartree'] = lumo_energy_hartree
+                    properties['lumo_energy_ev'] = lumo_energy_hartree * HARTREE_TO_EV
+                    properties['homo_lumo_gap_hartree'] = gap_hartree
+                    properties['homo_lumo_gap_ev'] = gap_hartree * HARTREE_TO_EV
+
+                    logger.info(f"HOMO energy: {properties['homo_energy_ev']:.4f} eV")
+                    logger.info(f"LUMO energy: {properties['lumo_energy_ev']:.4f} eV")
+                    logger.info(f"HOMO-LUMO gap: {properties['homo_lumo_gap_ev']:.4f} eV")
+            except Exception as e:
+                logger.warning(f"Failed to calculate HOMO-LUMO energies: {e}")
+
+            # 3. Energy Components (エネルギー成分)
+            try:
+                logger.info("Calculating energy components...")
+                properties['nuclear_repulsion_energy'] = float(self.mf.energy_nuc())
+                e_tot = self.mf.e_tot
+                e_nuc = properties['nuclear_repulsion_energy']
+                properties['electronic_energy'] = float(e_tot - e_nuc)
+
+                logger.info(f"Nuclear repulsion energy: {properties['nuclear_repulsion_energy']:.6f} hartree")
+                logger.info(f"Electronic energy: {properties['electronic_energy']:.6f} hartree")
+            except Exception as e:
+                logger.warning(f"Failed to calculate energy components: {e}")
+
+            # 4. Basis Set Information (基底関数情報)
+            try:
+                logger.info("Extracting basis set information...")
+                properties['num_basis_functions'] = int(self.mol.nao)
+                properties['num_primitive_gaussians'] = int(self.mol.npgto_nr())
+
+                logger.info(f"Number of basis functions: {properties['num_basis_functions']}")
+                logger.info(f"Number of primitive Gaussians: {properties['num_primitive_gaussians']}")
+            except Exception as e:
+                logger.warning(f"Failed to extract basis set information: {e}")
+
+            logger.info("Common additional properties extraction completed")
+
+        except Exception as e:
+            logger.error(f"Failed to extract common additional properties: {e}")
+
+        return properties
