@@ -14,6 +14,8 @@ from queue import Queue
 from dataclasses import dataclass
 from .config_manager import get_memory_for_method
 from .resource_manager import AllocationStatus
+from .pause_manager import pause_manager
+from .exceptions import PauseRequestedException
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +118,7 @@ def _import_calculator_classes(process_logger):
     Returns (calculators_dict, exception_classes_tuple).
     """
     from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator
-    from quantum_calc import CalculationError, ConvergenceError, InputError
+    from quantum_calc import CalculationError, ConvergenceError, InputError, PauseRequestedException
     
     calculators = {
         'DFT': DFTCalculator,
@@ -141,8 +143,8 @@ def _import_calculator_classes(process_logger):
     except Exception as e:
         process_logger.error(f"Unexpected error importing CASCI/CASSCF calculators: {e}")
         process_logger.error("CASCI and CASSCF calculations will not be available")
-    
-    return calculators, (CalculationError, ConvergenceError, InputError)
+
+    return calculators, (CalculationError, ConvergenceError, InputError, PauseRequestedException)
 
 
 def _create_calculator_instance(calculation_method: str, parameters: dict, 
@@ -344,7 +346,15 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         calculator = _create_calculator_instance(
             calculation_method, parameters, calc_dir, calculator_classes, process_logger
         )
-        
+
+        # Resume from checkpoint if this is a resumed calculation
+        if parameters.get('resume_from_pause', False):
+            pause_state = parameters.get('pause_state')
+            process_logger.info(f"Resuming calculation {calculation_id} from checkpoint")
+            if pause_state:
+                process_logger.info(f"Pause state: {pause_state}")
+            calculator.resume_from_checkpoint(pause_state)
+
         # Parse XYZ and setup calculation
         atoms = calculator.parse_xyz(parameters['xyz'])
         setup_params = _prepare_setup_parameters(parameters, memory_mb)
@@ -358,23 +368,67 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         # Save results and update status to completed
         file_manager.save_calculation_results(calc_dir, results)
         file_manager.save_calculation_status(calc_dir, 'completed')
-        
+
+        # Clean up pause state file if it exists (from previous pause/resume cycle)
+        file_manager.delete_pause_state(calc_dir)
+        process_logger.debug(f"Cleaned up pause state file for calculation {calculation_id}")
+
         process_logger.info(f"Calculation {calculation_id} completed successfully in process {os.getpid()}")
         return True, None
-    
-    except exception_types as e:
-        # Handle known calculation errors
-        return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
-    
-    except ImportError as e:
-        # Handle import errors
-        return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
-    
+
     except Exception as e:
-        # Handle unexpected errors
+        # Check if this is a pause request - handle it specially
+        from quantum_calc.exceptions import PauseRequestedException
+        if isinstance(e, PauseRequestedException):
+            process_logger.info(f"Calculation {calculation_id} was paused by user request")
+
+            # Save pause state information
+            pause_state = {
+                'calculation_phase': 'scf_calculation',  # Default to SCF phase
+                'checkpoint_exists': os.path.exists(os.path.join(calc_dir, 'calculation.chk')),
+            }
+
+            # Check if there's a geometry trajectory file to determine optimization step
+            trajectory_file = os.path.join(calc_dir, 'geom_opt_trajectory.xyz')
+            if os.path.exists(trajectory_file):
+                try:
+                    with open(trajectory_file, 'r') as f:
+                        content = f.read()
+                        # Count the number of geometry steps
+                        step_count = content.count('Optimization step')
+                        if step_count > 0:
+                            pause_state['optimization_step'] = step_count
+                            pause_state['calculation_phase'] = 'geometry_optimization'
+                except Exception as read_error:
+                    process_logger.warning(f"Failed to read geometry trajectory: {read_error}")
+
+            # Save pause state to file
+            file_manager.save_pause_state(calc_dir, pause_state)
+
+            # Update status to 'paused'
+            file_manager.save_calculation_status(calc_dir, 'paused')
+
+            # Remove pause flag file
+            from quantum_calc.pause_manager import pause_manager
+            pause_manager.remove_pause_flag_file(calc_dir)
+
+            process_logger.info(f"Calculation {calculation_id} paused successfully, state saved")
+
+            # Return success - the 'paused' status is saved in the file
+            return True, None
+
+        # For all other exceptions, handle as errors
         return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
     
     finally:
+        # Clean up pause flag file if it exists
+        # (This is idempotent - safe to call even if already removed)
+        try:
+            pause_manager.remove_pause_flag_file(calc_dir)
+            process_logger.debug(f"Cleaned up pause flag file for calculation {calculation_id}")
+        except Exception as cleanup_error:
+            process_logger.warning(f"Failed to clean up pause flag file: {cleanup_error}")
+
         # Restore original PySCF thread count
         if original_threads is not None:
             try:
@@ -653,10 +707,31 @@ class CalculationProcessManager:
             
             # Determine result and log
             if future.exception():
-                error_message = str(future.exception())
-                logger.error(f"Calculation {calculation_id} failed with exception: {error_message}")
-                # Send WebSocket notification for exception error
-                self._send_websocket_notification(calculation_id, 'error', error_message)
+                exception = future.exception()
+                # Check if calculation was paused
+                if isinstance(exception, PauseRequestedException):
+                    logger.info(f"Calculation {calculation_id} was paused by user request")
+                    # Get file manager to update status
+                    from quantum_calc.file_manager import CalculationFileManager
+                    from quantum_calc import get_current_settings
+                    settings = get_current_settings()
+                    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+                    calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+
+                    # Update status to 'paused'
+                    file_manager.save_calculation_status(calc_dir, 'paused')
+
+                    # Clear pause request and remove flag file
+                    pause_manager.clear_pause_request(calculation_id)
+                    pause_manager.remove_pause_flag_file(calc_dir)
+
+                    # Send WebSocket notification
+                    self._send_websocket_notification(calculation_id, 'paused', None)
+                else:
+                    error_message = str(exception)
+                    logger.error(f"Calculation {calculation_id} failed with exception: {error_message}")
+                    # Send WebSocket notification for exception error
+                    self._send_websocket_notification(calculation_id, 'error', error_message)
             else:
                 success, calc_error = future.result()
                 if success:
@@ -883,55 +958,106 @@ class CalculationProcessManager:
             'max_workers': self.max_workers
         }
     
-    def cancel_calculation(self, calculation_id: str) -> bool:
+    def pause_calculation(self, calculation_id: str) -> bool:
         """
-        Attempt to cancel a calculation (either running or queued).
-        
+        Request pause for a running calculation.
+
         Args:
-            calculation_id: ID of the calculation to cancel
-            
+            calculation_id: ID of the calculation to pause
+
         Returns:
-            True if successfully cancelled, False otherwise
+            True if pause request was accepted, False otherwise
+
+        Raises:
+            ValueError: If calculation is not found or not in a pausable state
         """
+        logger.info(f"Pause requested for calculation: {calculation_id}")
+
+        # Get file manager instance
+        from quantum_calc.file_manager import CalculationFileManager
+        from quantum_calc import get_current_settings
+        settings = get_current_settings()
+        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+
+        # Check if calculation directory exists
+        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+        if not os.path.exists(calc_dir):
+            raise ValueError(f"Calculation not found: {calculation_id}")
+
         # Check if calculation is running
-        future = self.active_futures.get(calculation_id)
-        if future and not future.done():
-            cancelled = future.cancel()
-            if cancelled:
-                logger.info(f"Successfully cancelled running calculation {calculation_id}")
-                # Update status to cancelled on the file system
-                try:
-                    from quantum_calc.file_manager import CalculationFileManager
-                    from quantum_calc import get_current_settings
-                    settings = get_current_settings()
-                    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
-                    calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
-                    file_manager.save_calculation_status(calc_dir, 'cancelled')
-                except Exception as e:
-                    logger.error(f"Failed to update status for cancelled calculation {calculation_id}: {e}")
-            return cancelled
-        
-        # Check if calculation is queued
-        for i, calc in enumerate(self.calculation_queue):
-            if calc.calculation_id == calculation_id:
-                # Remove from queue
-                removed_calc = self.calculation_queue.pop(i)
-                logger.info(f"Successfully cancelled queued calculation {calculation_id} (was at position {i+1} in queue)")
-                
-                # Update status to cancelled on the file system
-                try:
-                    from quantum_calc.file_manager import CalculationFileManager
-                    from quantum_calc import get_current_settings
-                    settings = get_current_settings()
-                    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
-                    calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
-                    file_manager.save_calculation_status(calc_dir, 'cancelled')
-                except Exception as e:
-                    logger.error(f"Failed to update status for cancelled calculation {calculation_id}: {e}")
-                
-                return True
-        
-        return False
+        status, _ = file_manager.read_calculation_status_details(calc_dir)
+        if status != 'running':
+            raise ValueError(f"Calculation is not running (status: {status})")
+
+        # Create pause flag file for worker process
+        pause_manager.create_pause_flag_file(calc_dir)
+        pause_manager.request_pause(calculation_id)
+
+        # Update status to 'pausing' (intermediate state)
+        file_manager.save_calculation_status(calc_dir, 'pausing')
+
+        # Send WebSocket notification
+        self._send_websocket_notification(calculation_id, 'pausing', None)
+
+        logger.info(f"Pause request accepted for calculation: {calculation_id}")
+        return True
+
+    def resume_calculation(self, calculation_id: str) -> Dict[str, Any]:
+        """
+        Resume a paused calculation from checkpoint.
+
+        Args:
+            calculation_id: ID of the calculation to resume
+
+        Returns:
+            Calculation instance dictionary
+
+        Raises:
+            ValueError: If calculation cannot be resumed
+        """
+        logger.info(f"Resuming calculation: {calculation_id}")
+
+        # Get file manager instance
+        from quantum_calc.file_manager import CalculationFileManager
+        from quantum_calc import get_current_settings
+        settings = get_current_settings()
+        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+
+        # Check if calculation directory exists
+        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+        if not os.path.exists(calc_dir):
+            raise ValueError(f"Calculation not found: {calculation_id}")
+
+        # Check if calculation is paused
+        status, _ = file_manager.read_calculation_status_details(calc_dir)
+        if status != 'paused':
+            raise ValueError(f"Calculation is not paused (status: {status})")
+
+        # Load pause state (optional - for future checkpoint resume)
+        pause_state = file_manager.load_pause_state(calc_dir)
+
+        # Load original parameters
+        params = file_manager.read_calculation_parameters(calc_dir)
+        if not params:
+            raise ValueError("No calculation parameters found")
+
+        # Add resume flag for future use
+        params['resume_from_pause'] = True
+        if pause_state:
+            params['pause_state'] = pause_state
+
+        # Resubmit calculation
+        success, message, waiting_reason = self.submit_calculation(calculation_id, params)
+
+        if not success:
+            raise ValueError(f"Failed to resume calculation: {message}")
+
+        logger.info(f"Calculation resumed: {calculation_id}")
+
+        # Return simple confirmation - actual calculation instance
+        # will be retrieved by service layer after this method returns
+        return {'calculation_id': calculation_id, 'status': message}
+
     
     def shutdown(self, wait: bool = True, timeout: Optional[float] = None):
         """

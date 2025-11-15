@@ -45,6 +45,32 @@ export const useDeleteCalculation = () => {
   });
 };
 
+// 計算を一時停止するMutation
+export const usePauseCalculation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.pauseCalculation(id),
+    onSuccess: (data, id) => {
+      // 成功したら関連するキャッシュを更新
+      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+      queryClient.invalidateQueries({ queryKey: ['calculation', id] });
+    },
+  });
+};
+
+// 計算を再開するMutation
+export const useResumeCalculation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.resumeCalculation(id),
+    onSuccess: (data, id) => {
+      // 成功したら関連するキャッシュを更新
+      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+      queryClient.invalidateQueries({ queryKey: ['calculation', id] });
+    },
+  });
+};
+
 // 計算名を更新するMutation
 export const useUpdateCalculationName = () => {
   const queryClient = useQueryClient();

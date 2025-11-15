@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_pydantic import validate
 
-from services import get_quantum_service, ServiceError
+from services import get_quantum_service, ServiceError, ValidationError
 from generated_models import QuantumCalculationRequest, CalculationUpdateRequest
 
 # Set up logging
@@ -226,25 +226,53 @@ def update_calculation(calculation_id, body: CalculationUpdateRequest):
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/cancel', methods=['POST'])
-def cancel_calculation(calculation_id):
-    """Cancel a running calculation."""
+@quantum_bp.route('/api/quantum/calculations/<calculation_id>/pause', methods=['POST'])
+def pause_calculation(calculation_id):
+    """Pause a running calculation."""
     try:
         quantum_service = get_quantum_service()
-        
+
         # Call service layer
-        result = quantum_service.cancel_calculation(calculation_id)
-        
+        result = quantum_service.pause_calculation(calculation_id)
+
         return jsonify({
             'success': True,
             'data': result
-        })
-            
+        }), 202
+
+    except ValidationError as e:
+        logger.error(f"Validation error pausing calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': e.message}), 400
     except ServiceError as e:
-        logger.error(f"Service error cancelling calculation {calculation_id}: {e}")
+        logger.error(f"Service error pausing calculation {calculation_id}: {e}")
         return jsonify({'success': False, 'error': e.message}), e.status_code
     except Exception as e:
-        logger.error(f"Unexpected error cancelling calculation {calculation_id}: {e}", exc_info=True)
+        logger.error(f"Unexpected error pausing calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@quantum_bp.route('/api/quantum/calculations/<calculation_id>/resume', methods=['POST'])
+def resume_calculation(calculation_id):
+    """Resume a paused calculation."""
+    try:
+        quantum_service = get_quantum_service()
+
+        # Call service layer
+        result = quantum_service.resume_calculation(calculation_id)
+
+        return jsonify({
+            'success': True,
+            'data': result
+        }), 202
+
+    except ValidationError as e:
+        logger.error(f"Validation error resuming calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': e.message}), 400
+    except ServiceError as e:
+        logger.error(f"Service error resuming calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': e.message}), e.status_code
+    except Exception as e:
+        logger.error(f"Unexpected error resuming calculation {calculation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 

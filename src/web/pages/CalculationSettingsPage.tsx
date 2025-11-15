@@ -23,6 +23,8 @@ interface CalculationSettingsPageProps {
     params: QuantumCalculationRequest
   ) => Promise<CalculationInstance>;
   onCalculationRename: (id: string, newName: string) => Promise<void>;
+  onCalculationPause: (id: string) => Promise<void>;
+  onCalculationResume: (id: string) => Promise<void>;
   createNewCalculationFromExisting: (
     originalCalc: CalculationInstance,
     newParams: QuantumCalculationRequest
@@ -34,6 +36,8 @@ export const CalculationSettingsPage = ({
   onCalculationUpdate,
   onStartCalculation,
   onCalculationRename,
+  onCalculationPause,
+  onCalculationResume,
   createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
   // Helper functions for safely getting parameters with defaults
@@ -870,28 +874,47 @@ export const CalculationSettingsPage = ({
                   <span className={styles.memoryUnit}>MB</span>
                 </div>
               </div>
-              <button
-                className={`${styles.startCalculationBtn} ${
-                  calculationStatus === 'completed'
-                    ? styles.completed
-                    : calculationStatus === 'running'
-                      ? styles.running
-                      : calculationStatus === 'waiting'
-                        ? styles.waiting
-                        : calculationStatus === 'error'
-                          ? styles.error
-                          : styles.pending
-                }`}
-                onClick={handleStartCalculation}
-                disabled={
-                  !hasValidMolecule ||
-                  calculationStatus === 'running' ||
-                  calculationStatus === 'waiting' ||
-                  calculationStatus === 'completed'
-                }
-              >
-                {getCalculationButtonText()}
-              </button>
+              {calculationStatus === 'running' || calculationStatus === 'pausing' ? (
+                <button
+                  className={`${styles.pauseBtn} ${
+                    calculationStatus === 'pausing' ? styles.pausing : ''
+                  }`}
+                  onClick={() => onCalculationPause(activeCalculation!.id)}
+                  disabled={calculationStatus === 'pausing'}
+                >
+                  <span className={styles.pauseIcon}>⏸</span>
+                  {calculationStatus === 'pausing' ? 'Pausing...' : 'Pause'}
+                </button>
+              ) : calculationStatus === 'paused' ? (
+                <button
+                  className={styles.resumeBtn}
+                  onClick={() => onCalculationResume(activeCalculation!.id)}
+                >
+                  <span className={styles.resumeIcon}>▶</span>
+                  Resume
+                </button>
+              ) : calculationStatus === 'waiting' ? (
+                <button
+                  className={`${styles.startCalculationBtn} ${styles.waiting}`}
+                  disabled
+                >
+                  Waiting...
+                </button>
+              ) : (
+                <button
+                  className={`${styles.startCalculationBtn} ${
+                    calculationStatus === 'completed'
+                      ? styles.completed
+                      : calculationStatus === 'error'
+                        ? styles.error
+                        : styles.pending
+                  }`}
+                  onClick={handleStartCalculation}
+                  disabled={!hasValidMolecule || calculationStatus === 'completed'}
+                >
+                  {getCalculationButtonText()}
+                </button>
+              )}
             </div>
           </div>
           <div className={styles.calculationColumn}>

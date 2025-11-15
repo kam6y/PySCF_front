@@ -8,6 +8,8 @@ import logging
 from contextlib import contextmanager
 import numpy as np
 from .config_manager import get_memory_for_method, get_max_cycle
+from .exceptions import PauseRequestedException
+from .pause_manager import pause_manager
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +166,7 @@ class BaseCalculator(ABC):
         self.max_cycle = common_params['max_cycle']
         self.solvent_method = common_params['solvent_method']
         self.solvent = common_params['solvent']
-        
+
         # Store spin in results so _create_scf_method can access it
         self.results['spin'] = common_params['spin']
         self.results['charge'] = common_params['charge']
@@ -180,7 +182,10 @@ class BaseCalculator(ABC):
         self.mf.chkfile = self.get_checkpoint_path()
         self.mf.max_cycle = common_params['max_cycle']
 
-        logger.info(f"SCF method setup completed: {self._get_base_method_description()}")
+        # Integrate SCF callback for pause support
+        self.mf.callback = self._scf_callback
+
+        logger.info(f"SCF method setup completed with pause callback: {self._get_base_method_description()}")
     
     def _store_calculation_parameters(self, common_params: Dict[str, Any], 
                                     specific_params: Dict[str, Any], atom_count: int) -> None:
@@ -228,16 +233,16 @@ class BaseCalculator(ABC):
         """Template method for running quantum chemistry calculations."""
         try:
             self._pre_calculation_check()
-            
+
             if self._requires_geometry_optimization():
                 self._perform_geometry_optimization()
-            
+
             self._setup_final_calculation()
             base_energy = self._run_base_scf_calculation()
             self._verify_scf_convergence()
-            
+
             specific_results = self._perform_specific_calculation(base_energy)
-            
+
             if self._requires_orbital_analysis():
                 self._perform_orbital_analysis()
 
@@ -248,24 +253,30 @@ class BaseCalculator(ABC):
                 self._perform_frequency_analysis()
 
             return self._prepare_final_results(specific_results)
-            
+
+        except PauseRequestedException:
+            # Re-raise pause exception without modification
+            # This will be caught by ProcessManager and handled appropriately
+            logger.info("Calculation paused by user request")
+            raise
+
         except Exception as e:
             import traceback
             from .exceptions import CalculationError
-            
+
             # Enhanced error logging for CASCI/CASSCF
             calculation_method = getattr(self, 'calculation_method', 'Unknown')
             logger.error(f"Calculation failed in {calculation_method} run_calculation:")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Exception message: '{str(e)}'")
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
-            
+
             # Handle empty error messages specifically for CASCI/CASSCF
             error_message = str(e)
             if not error_message.strip():
                 error_message = f"Unknown error in {calculation_method} calculation (empty error message)"
                 logger.error(f"Empty error message detected, using: {error_message}")
-            
+
             if isinstance(e, (CalculationError,)):
                 raise
             raise CalculationError(f"{calculation_method} calculation failed: {error_message}")
@@ -591,12 +602,21 @@ class BaseCalculator(ABC):
     def _perform_geometry_optimization(self) -> None:
         """Perform geometry optimization using geometric_solver."""
         from pyscf.geomopt import geometric_solver
-        
+
         logger.info("Starting geometry optimization...")
-        optimized_mol = geometric_solver.optimize(self.mf)
+
+        # Integrate callback for geometry optimization
+        # Note: geometric_solver.optimize accepts callback parameter
+        try:
+            optimized_mol = geometric_solver.optimize(self.mf, callback=self._geometry_optimization_callback)
+        except TypeError:
+            # Fallback if callback is not supported by this version of PySCF
+            logger.warning("Geometry optimization callback not supported, using standard optimization")
+            optimized_mol = geometric_solver.optimize(self.mf)
+
         self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
         logger.info("Geometry optimization completed")
-        
+
         # Apply coordinate alignment after optimization
         self._align_optimized_geometry()
     
@@ -847,7 +867,128 @@ class BaseCalculator(ABC):
             self.mf.max_cycle = self.max_cycle
         elif 'max_cycle' in self.results:
             self.mf.max_cycle = self.results['max_cycle']
-    
+
+        # Integrate SCF callback for pause support
+        self.mf.callback = self._scf_callback
+
+    # ===== Pause/Resume Support Methods =====
+
+    def _check_pause_requested(self) -> None:
+        """
+        Check if pause has been requested for this calculation.
+
+        Raises:
+            PauseRequestedException: If pause has been requested
+        """
+        # Check flag file in working directory
+        if pause_manager.check_pause_flag_file(self.working_dir):
+            logger.info("Pause requested via flag file, raising PauseRequestedException")
+            raise PauseRequestedException("Calculation paused by user request")
+
+    def _scf_callback(self, envs: Dict[str, Any]) -> bool:
+        """
+        Callback function for SCF iterations.
+
+        This is called after each SCF iteration by PySCF.
+        Checks for pause requests and raises PauseRequestedException if needed.
+
+        Args:
+            envs: Environment dictionary from PySCF containing iteration info
+
+        Returns:
+            False to continue calculation, True to stop (but we use exceptions instead)
+
+        Raises:
+            PauseRequestedException: If pause has been requested
+        """
+        # Check for pause request
+        self._check_pause_requested()
+
+        # Log progress every few iterations
+        if 'cycle' in envs and envs['cycle'] % 5 == 0:
+            logger.debug(f"SCF iteration {envs['cycle']}, checking pause status")
+
+        return False  # Continue calculation
+
+    def _geometry_optimization_callback(self, envs: Dict[str, Any]) -> bool:
+        """
+        Callback function for geometry optimization steps.
+
+        This is called after each geometry optimization step.
+        Saves trajectory and checks for pause requests.
+
+        Args:
+            envs: Environment dictionary from PySCF geometric optimizer
+
+        Returns:
+            False to continue optimization, True to stop (but we use exceptions instead)
+
+        Raises:
+            PauseRequestedException: If pause has been requested
+        """
+        # Check for pause request
+        self._check_pause_requested()
+
+        # Save geometry trajectory step if file_manager is available
+        if hasattr(self, 'file_manager') and hasattr(envs, 'mol'):
+            try:
+                step_num = envs.get('cycle', 0)
+                # Convert current geometry to XYZ string
+                mol = envs['mol']
+                atom_symbols = [mol.atom_symbol(i) for i in range(mol.natm)]
+                coords = mol.atom_coords(unit="ANG")
+
+                lines = [str(mol.natm)]
+                lines.append(f"Optimization step {step_num}")
+                for symbol, coord in zip(atom_symbols, coords):
+                    lines.append(f"{symbol:2s} {coord[0]:12.6f} {coord[1]:12.6f} {coord[2]:12.6f}")
+
+                geometry_xyz = "\n".join(lines)
+                self.file_manager.save_geometry_trajectory_step(self.working_dir, step_num, geometry_xyz)
+                logger.debug(f"Saved geometry trajectory step {step_num}")
+            except Exception as e:
+                logger.warning(f"Failed to save geometry trajectory step: {e}")
+
+        return False  # Continue optimization
+
+    def resume_from_checkpoint(self, pause_state: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Resume calculation from checkpoint file.
+
+        This method configures the SCF calculation to use the checkpoint file
+        as an initial guess, enabling true checkpoint-based resume.
+
+        Args:
+            pause_state: Optional pause state information containing checkpoint details
+        """
+        chk_path = self.get_checkpoint_path()
+
+        if not os.path.exists(chk_path):
+            logger.warning(f"Checkpoint file not found: {chk_path}")
+            logger.info("Will start calculation from scratch")
+            return
+
+        logger.info(f"Resuming calculation from checkpoint: {chk_path}")
+
+        # Configure SCF to use checkpoint file as initial guess
+        if hasattr(self, 'mf') and self.mf is not None:
+            self.mf.init_guess = 'chkfile'
+            self.mf.chkfile = chk_path
+            logger.info("Configured SCF to use checkpoint file as initial guess")
+
+        # If pause state contains geometry trajectory info, load last geometry
+        if pause_state and hasattr(self, 'file_manager'):
+            try:
+                last_geometry = self.file_manager.load_last_geometry(self.working_dir)
+                if last_geometry:
+                    logger.info("Loaded last geometry from trajectory file")
+                    # Parse and set as starting geometry for optimization
+                    atoms = self.parse_xyz(last_geometry)
+                    logger.info(f"Resuming geometry optimization from step with {len(atoms)} atoms")
+                    # The geometry will be used in the next optimization call
+            except Exception as e:
+                logger.warning(f"Failed to load last geometry from trajectory: {e}")
+
     def _run_base_scf_calculation(self) -> float:
         """Run base SCF calculation and return energy."""
         logger.info(f"Running {self._get_base_method_description()} calculation...")

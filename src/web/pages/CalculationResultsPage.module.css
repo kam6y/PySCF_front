@@ -1052,6 +1052,7 @@
 
 .energeticsSection {
   /* Inherits from .calculationSection */
+  width: auto;
 }
 
 .energyComponentsGrid {

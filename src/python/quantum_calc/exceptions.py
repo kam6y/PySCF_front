@@ -39,3 +39,8 @@ class WebSocketError(Exception):
 class XYZValidationError(Exception):
     """Exception raised for XYZ format validation errors."""
     pass
+
+
+class PauseRequestedException(Exception):
+    """Exception raised when a calculation is paused by user request."""
+    pass

@@ -363,48 +363,7 @@ class QuantumService:
         except OSError as e:
             logger.error(f"System error updating calculation {calculation_id}: {e}")
             raise ServiceError('System error updating calculation.')
-    
-    def cancel_calculation(self, calculation_id: str) -> Dict[str, Any]:
-        """
-        Cancel a running calculation.
-        
-        Args:
-            calculation_id: Unique ID of the calculation
-            
-        Returns:
-            Dict containing success message
-            
-        Raises:
-            ValidationError: If calculation is not running
-            ResourceUnavailableError: If process manager is unavailable
-            ServiceError: For other errors
-        """
-        try:
-            process_manager = get_process_manager()
-            
-            # Check if calculation is running
-            if not process_manager.is_running(calculation_id):
-                raise ValidationError(f'Calculation "{calculation_id}" is not currently running.')
-            
-            # Attempt to cancel
-            cancelled = process_manager.cancel_calculation(calculation_id)
-            
-            if cancelled:
-                logger.info(f"Successfully cancelled calculation {calculation_id}")
-                return {
-                    'message': f'Calculation "{calculation_id}" has been cancelled successfully',
-                    'calculation_id': calculation_id
-                }
-            else:
-                raise ValidationError(f'Failed to cancel calculation "{calculation_id}". It may have already completed.')
-                
-        except ProcessManagerError as e:
-            logger.error(f"Process manager error cancelling calculation {calculation_id}: {e}")
-            raise ResourceUnavailableError('Process manager unavailable.')
-        except ValueError as e:
-            logger.warning(f"Invalid calculation ID for cancellation {calculation_id}: {e}")
-            raise ValidationError('Invalid calculation ID.')
-    
+
     def delete_calculation(self, calculation_id: str) -> Dict[str, Any]:
         """
         Delete a calculation and its files.
@@ -422,13 +381,15 @@ class QuantumService:
         """
         try:
             process_manager = get_process_manager()
-            
-            # Try to cancel if running
+
+            # Prevent deletion of running calculations
             if process_manager.is_running(calculation_id):
-                logger.info(f"Cancelling running calculation {calculation_id} before deletion")
-                process_manager.cancel_calculation(calculation_id)
-                time.sleep(0.5)  # Wait for cancellation
-            
+                logger.warning(f"Cannot delete running calculation {calculation_id}")
+                raise ValidationError(
+                    f'Cannot delete calculation "{calculation_id}" while it is running. '
+                    'Please pause or wait for the calculation to complete first.'
+                )
+
             calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
@@ -789,7 +750,89 @@ class QuantumService:
         except ValueError as e:
             logger.error(f"Invalid parameters for IR spectrum generation ({calculation_id}): {e}")
             raise ValidationError(f'Invalid parameters: {str(e)}')
-    
+
+    def pause_calculation(self, calculation_id: str) -> Dict[str, Any]:
+        """
+        Pause a running calculation.
+
+        Args:
+            calculation_id: ID of the calculation to pause
+
+        Returns:
+            Dict containing success message and calculation ID
+
+        Raises:
+            NotFoundError: If calculation not found
+            ValidationError: If calculation is not in a pausable state
+            ServiceError: If pause fails
+        """
+        try:
+            logger.info(f"Pausing calculation: {calculation_id}")
+
+            # Get process manager
+            process_manager = get_process_manager()
+
+            # Request pause
+            success = process_manager.pause_calculation(calculation_id)
+
+            if not success:
+                raise ServiceError("Failed to pause calculation")
+
+            logger.info(f"Calculation pause requested successfully: {calculation_id}")
+
+            return {
+                'message': 'Pause request accepted. Calculation will pause after current iteration.',
+                'calculation_id': calculation_id
+            }
+
+        except ValueError as e:
+            logger.error(f"Cannot pause calculation {calculation_id}: {e}")
+            raise ValidationError(str(e))
+        except Exception as e:
+            logger.error(f"Error pausing calculation {calculation_id}: {e}", exc_info=True)
+            raise ServiceError(f'Failed to pause calculation: {str(e)}')
+
+    def resume_calculation(self, calculation_id: str) -> Dict[str, Any]:
+        """
+        Resume a paused calculation.
+
+        Args:
+            calculation_id: ID of the calculation to resume
+
+        Returns:
+            Dict containing success message and calculation instance
+
+        Raises:
+            NotFoundError: If calculation not found
+            ValidationError: If calculation is not paused or cannot be resumed
+            ServiceError: If resume fails
+        """
+        try:
+            logger.info(f"Resuming calculation: {calculation_id}")
+
+            # Get process manager
+            process_manager = get_process_manager()
+
+            # Resume calculation (returns simple confirmation dict)
+            resume_result = process_manager.resume_calculation(calculation_id)
+
+            logger.info(f"Calculation resumed successfully: {calculation_id}")
+
+            # Get full calculation instance details
+            calculation_details = self.get_calculation_details(calculation_id)
+
+            return {
+                'message': 'Calculation resumed from checkpoint',
+                'calculation': calculation_details['calculation']
+            }
+
+        except ValueError as e:
+            logger.error(f"Cannot resume calculation {calculation_id}: {e}")
+            raise ValidationError(str(e))
+        except Exception as e:
+            logger.error(f"Error resuming calculation {calculation_id}: {e}", exc_info=True)
+            raise ServiceError(f'Failed to resume calculation: {str(e)}')
+
     def _build_calculation_instance(
         self,
         calculation_id: str,

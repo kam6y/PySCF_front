@@ -224,6 +224,8 @@ export const App = () => {
             }
             onStartCalculation={calculationActions.handleStartCalculation}
             onCalculationRename={calculationActions.handleCalculationRename}
+            onCalculationPause={calculationActions.handleCalculationPause}
+            onCalculationResume={calculationActions.handleCalculationResume}
             createNewCalculationFromExisting={
               appState.calculation.createNewFromExisting
             }
@@ -251,6 +253,8 @@ export const App = () => {
             }
             onStartCalculation={calculationActions.handleStartCalculation}
             onCalculationRename={calculationActions.handleCalculationRename}
+            onCalculationPause={calculationActions.handleCalculationPause}
+            onCalculationResume={calculationActions.handleCalculationResume}
             createNewCalculationFromExisting={
               appState.calculation.createNewFromExisting
             }

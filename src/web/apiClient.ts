@@ -16,6 +16,8 @@ import {
   CubeFilesDeleteResponseData,
   SupportedParametersResponseData,
   IRSpectrumResponseData,
+  PauseCalculationResponseData,
+  ResumeCalculationResponseData,
 } from './types/api-types';
 import { components } from './types/generated-api';
 
@@ -268,6 +270,30 @@ export const deleteCalculation = (
     `/api/quantum/calculations/${id}`,
     {
       method: 'DELETE',
+    }
+  );
+};
+
+export const pauseCalculation = (
+  id: string
+): Promise<PauseCalculationResponseData> => {
+  validateCalculationId(id, `/api/quantum/calculations/${id}/pause`);
+  return request<PauseCalculationResponseData>(
+    `/api/quantum/calculations/${id}/pause`,
+    {
+      method: 'POST',
+    }
+  );
+};
+
+export const resumeCalculation = (
+  id: string
+): Promise<ResumeCalculationResponseData> => {
+  validateCalculationId(id, `/api/quantum/calculations/${id}/resume`);
+  return request<ResumeCalculationResponseData>(
+    `/api/quantum/calculations/${id}/resume`,
+    {
+      method: 'POST',
     }
   );
 };

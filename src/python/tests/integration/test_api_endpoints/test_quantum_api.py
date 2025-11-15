@@ -356,50 +356,6 @@ class TestCalculationDeletionAPI:
         assert response.status_code == 404
 
 
-class TestCalculationCancellationAPI:
-    """Integration tests for POST /api/quantum/calculations/<id>/cancel endpoint."""
-
-    def test_cancel_calculation_success(self, client, mocker):
-        """
-        GIVEN calculation is running
-        WHEN POST /api/quantum/calculations/<id>/cancel is called
-        THEN 200 OK is returned with cancellation confirmation
-        """
-        # ARRANGE
-        calc_id = 'calc-123'
-        mock_result = {
-            'calculation_id': calc_id,
-            'message': f'Calculation "{calc_id}" has been cancelled successfully'
-        }
-        mock_service = mocker.patch('api.quantum.get_quantum_service')
-        mock_service.return_value.cancel_calculation.return_value = mock_result
-
-        # ACT
-        response = client.post(f'/api/quantum/calculations/{calc_id}/cancel')
-
-        # ASSERT
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['success'] is True
-
-    def test_cancel_calculation_not_found(self, client, mocker):
-        """
-        GIVEN calculation does not exist
-        WHEN POST /api/quantum/calculations/<id>/cancel is called
-        THEN 404 Not Found is returned
-        """
-        # ARRANGE
-        calc_id = 'nonexistent-calc'
-        mock_service = mocker.patch('api.quantum.get_quantum_service')
-        mock_service.return_value.cancel_calculation.side_effect = NotFoundError(f"Calculation {calc_id} not found")
-
-        # ACT
-        response = client.post(f'/api/quantum/calculations/{calc_id}/cancel')
-
-        # ASSERT
-        assert response.status_code == 404
-
-
 class TestMolecularOrbitalsAPI:
     """Integration tests for orbital-related endpoints."""
 

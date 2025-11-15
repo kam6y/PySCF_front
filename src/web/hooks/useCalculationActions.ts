@@ -3,6 +3,8 @@ import {
   useStartCalculation,
   useUpdateCalculationName,
   useDeleteCalculation,
+  usePauseCalculation,
+  useResumeCalculation,
 } from './useCalculationQueries';
 import {
   CalculationInstance,
@@ -21,6 +23,8 @@ export const useCalculationActions = () => {
   const startCalculationMutation = useStartCalculation();
   const updateCalculationNameMutation = useUpdateCalculationName();
   const deleteCalculationMutation = useDeleteCalculation();
+  const pauseCalculationMutation = usePauseCalculation();
+  const resumeCalculationMutation = useResumeCalculation();
   const { clearStagedCalculation, setActiveCalculationId } =
     useCalculationStore();
 
@@ -134,6 +138,32 @@ export const useCalculationActions = () => {
     }
   };
 
+  const handleCalculationPause = async (calculationId: string) => {
+    try {
+      await pauseCalculationMutation.mutateAsync(calculationId);
+      showInfoNotification(
+        'Calculation pausing',
+        'The calculation will pause after the current iteration completes.'
+      );
+    } catch (error) {
+      handleApiError(error, 'Failed to pause calculation');
+      throw error;
+    }
+  };
+
+  const handleCalculationResume = async (calculationId: string) => {
+    try {
+      await resumeCalculationMutation.mutateAsync(calculationId);
+      showInfoNotification(
+        'Calculation resuming',
+        'The calculation is resuming from where it was paused.'
+      );
+    } catch (error) {
+      handleApiError(error, 'Failed to resume calculation');
+      throw error;
+    }
+  };
+
   const handleCalculationUpdate = (updatedCalculation: CalculationInstance) => {
     // React Queryキャッシュを直接更新
     queryClient.setQueryData(['calculation', updatedCalculation.id], {
@@ -146,11 +176,15 @@ export const useCalculationActions = () => {
     handleStartCalculation,
     handleCalculationRename,
     handleCalculationDelete,
+    handleCalculationPause,
+    handleCalculationResume,
     handleCalculationUpdate,
 
     // Loading states
     isStarting: startCalculationMutation.isPending,
     isRenaming: updateCalculationNameMutation.isPending,
     isDeleting: deleteCalculationMutation.isPending,
+    isPausing: pauseCalculationMutation.isPending,
+    isResuming: resumeCalculationMutation.isPending,
   };
 };

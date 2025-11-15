@@ -315,6 +315,82 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/quantum/calculations/{calculationId}/pause:
+    post:
+      summary: Pause a running calculation
+      description: Safely pause a running calculation after the current SCF iteration completes. The calculation can be resumed later from the checkpoint.
+      operationId: pauseCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Pause request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PauseCalculationResponse'
+        '400':
+          description: Calculation is not in a pausable state (not running)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to pause calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculations/{calculationId}/resume:
+    post:
+      summary: Resume a paused calculation
+      description: Resume a paused calculation from its checkpoint file. The calculation will continue from where it was paused.
+      operationId: resumeCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Resume request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeCalculationResponse'
+        '400':
+          description: Calculation cannot be resumed (not paused, no checkpoint available, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to resume calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/quantum/calculations/{calculationId}/orbitals:
     get:
       summary: Get molecular orbital information
@@ -875,7 +951,7 @@ components:
 
     CalculationStatus:
       type: string
-      enum: [pending, running, completed, error, waiting]
+      enum: [pending, running, completed, error, waiting, pausing, paused]
       description: Status of a calculation
 
     AgentActionType:
@@ -1649,6 +1725,30 @@ components:
           type: string
           nullable: true
           description: Reason why calculation is waiting (if status is waiting)
+        canResume:
+          type: boolean
+          nullable: true
+          description: Whether this calculation can be resumed from a paused state
+        pausedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when calculation was paused
+        resumeInfo:
+          type: object
+          nullable: true
+          description: Information about the paused state for resuming
+          properties:
+            optimization_step:
+              type: integer
+              description: Geometry optimization step number when paused
+            checkpoint_exists:
+              type: boolean
+              description: Whether checkpoint file is available for resume
+            calculation_phase:
+              type: string
+              enum: [geometry_optimization, scf_calculation, post_scf]
+              description: Which phase the calculation was in when paused
 
     CalculationSummary:
       type: object
@@ -2893,3 +2993,40 @@ components:
             deleted_id:
               type: string
               description: ID of the deleted session
+
+    PauseCalculationResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message, calculation_id]
+          properties:
+            message:
+              type: string
+              description: Confirmation message
+              example: "Pause request accepted. Calculation will pause after current iteration."
+            calculation_id:
+              type: string
+              description: ID of the calculation being paused
+
+    ResumeCalculationResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message, calculation]
+          properties:
+            message:
+              type: string
+              description: Confirmation message
+              example: "Calculation resumed from checkpoint"
+            calculation:
+              $ref: '#/components/schemas/CalculationInstance'

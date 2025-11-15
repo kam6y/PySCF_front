@@ -152,6 +152,46 @@ export interface paths {
         patch: operations["patchCalculation"];
         trace?: never;
     };
+    "/api/quantum/calculations/{calculationId}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause a running calculation
+         * @description Safely pause a running calculation after the current SCF iteration completes. The calculation can be resumed later from the checkpoint.
+         */
+        post: operations["pauseCalculation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/calculations/{calculationId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume a paused calculation
+         * @description Resume a paused calculation from its checkpoint file. The calculation will continue from where it was paused.
+         */
+        post: operations["resumeCalculation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quantum/calculations/{calculationId}/orbitals": {
         parameters: {
             query?: never;
@@ -402,7 +442,7 @@ export interface components {
          * @description Status of a calculation
          * @enum {string}
          */
-        CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting";
+        CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting" | "pausing" | "paused";
         /**
          * @description Type of agent action requiring confirmation
          * @enum {string}
@@ -868,6 +908,25 @@ export interface components {
             error?: string | null;
             /** @description Reason why calculation is waiting (if status is waiting) */
             waitingReason?: string | null;
+            /** @description Whether this calculation can be resumed from a paused state */
+            canResume?: boolean | null;
+            /**
+             * Format: date-time
+             * @description Timestamp when calculation was paused
+             */
+            pausedAt?: string | null;
+            /** @description Information about the paused state for resuming */
+            resumeInfo?: {
+                /** @description Geometry optimization step number when paused */
+                optimization_step?: number;
+                /** @description Whether checkpoint file is available for resume */
+                checkpoint_exists?: boolean;
+                /**
+                 * @description Which phase the calculation was in when paused
+                 * @enum {string}
+                 */
+                calculation_phase?: "geometry_optimization" | "scf_calculation" | "post_scf";
+            } | null;
         };
         CalculationSummary: {
             /** @description Unique calculation ID */
@@ -1769,6 +1828,31 @@ export interface components {
                 deleted_id: string;
             };
         };
+        PauseCalculationResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /**
+                 * @description Confirmation message
+                 * @example Pause request accepted. Calculation will pause after current iteration.
+                 */
+                message: string;
+                /** @description ID of the calculation being paused */
+                calculation_id: string;
+            };
+        };
+        ResumeCalculationResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /**
+                 * @description Confirmation message
+                 * @example Calculation resumed from checkpoint
+                 */
+                message: string;
+                calculation: components["schemas"]["CalculationInstance"];
+            };
+        };
     };
     responses: never;
     parameters: never;
@@ -2134,6 +2218,106 @@ export interface operations {
                 };
             };
             /** @description Failed to update calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    pauseCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pause request accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PauseCalculationResponse"];
+                };
+            };
+            /** @description Calculation is not in a pausable state (not running) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to pause calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resumeCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resume request accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeCalculationResponse"];
+                };
+            };
+            /** @description Calculation cannot be resumed (not paused, no checkpoint available, etc.) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to resume calculation */
             500: {
                 headers: {
                     [name: string]: unknown;

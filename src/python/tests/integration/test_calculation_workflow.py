@@ -8,6 +8,7 @@ to results retrieval, using DummyExecutor for synchronous testing.
 import pytest
 import os
 import json
+import time
 from pathlib import Path
 from tests.conftest import DummyExecutor
 
@@ -200,6 +201,17 @@ class TestCalculationWorkflowSync:
         # Verify it exists
         response_before = client.get(f'/api/quantum/calculations/{calc_id}')
         assert response_before.status_code == 200
+
+        # Wait for calculation to complete before attempting deletion
+        # (Cannot delete running calculations)
+        max_wait = 5  # seconds
+        start_time = time.time()
+        while time.time() - start_time < max_wait:
+            response = client.get(f'/api/quantum/calculations/{calc_id}')
+            calc_status = response.get_json()['data']['calculation']['status']
+            if calc_status in ['completed', 'error']:
+                break
+            time.sleep(0.1)
 
         # ACT
         response_delete = client.delete(f'/api/quantum/calculations/{calc_id}')
