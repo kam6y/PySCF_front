@@ -874,7 +874,8 @@ export const CalculationSettingsPage = ({
                   <span className={styles.memoryUnit}>MB</span>
                 </div>
               </div>
-              {calculationStatus === 'running' || calculationStatus === 'pausing' ? (
+              {calculationStatus === 'running' ||
+              calculationStatus === 'pausing' ? (
                 <button
                   className={`${styles.pauseBtn} ${
                     calculationStatus === 'pausing' ? styles.pausing : ''
@@ -910,7 +911,9 @@ export const CalculationSettingsPage = ({
                         : styles.pending
                   }`}
                   onClick={handleStartCalculation}
-                  disabled={!hasValidMolecule || calculationStatus === 'completed'}
+                  disabled={
+                    !hasValidMolecule || calculationStatus === 'completed'
+                  }
                 >
                   {getCalculationButtonText()}
                 </button>
