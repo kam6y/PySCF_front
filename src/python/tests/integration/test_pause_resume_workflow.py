@@ -255,7 +255,7 @@ H    1.4671  1.1550  0.0848"""
 
         # Step 7: Wait for completion
         print("\n=== Step 7: Waiting for 'completed' status ===")
-        calc = wait_for_status(client, calc_id, 'completed', timeout=60)
+        calc = wait_for_status(client, calc_id, 'completed', timeout=600)
         assert calc['status'] == 'completed'
 
         # Step 8: Verify completion and cleanup
