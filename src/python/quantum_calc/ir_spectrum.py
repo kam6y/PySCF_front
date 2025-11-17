@@ -37,22 +37,26 @@ class IRSpectrumCalculator:
         logger.info(f"IR spectrum calculator initialized for {method}/{basis_set}")
         logger.info(f"Scale factor: {self.scale_factor} ({self.scale_message})")
     
-    def calculate_ir_spectrum(self, 
+    def calculate_ir_spectrum(self,
                             frequencies: List[float],
                             intensities: Optional[List[float]] = None,
+                            normal_modes: Optional[List[List[List[float]]]] = None,
+                            molecule_structure: Optional[Dict[str, Any]] = None,
                             broadening_fwhm: float = 100.0,
                             x_range: Optional[Tuple[float, float]] = None,
                             num_points: int = 3000) -> Dict[str, Any]:
         """
         Calculate IR spectrum from vibrational frequencies and intensities.
-        
+
         Args:
             frequencies: Vibrational frequencies in cm⁻¹ (unscaled)
             intensities: IR intensities (if None, uniform intensities are used)
+            normal_modes: List of vibrational mode displacement vectors, shape (n_modes, n_atoms, 3)
+            molecule_structure: Dict with 'symbols' (list of element symbols) and 'coordinates' (list of [x,y,z])
             broadening_fwhm: Full width at half maximum for Lorentzian broadening (cm⁻¹)
             x_range: Frequency range for spectrum (min_freq, max_freq) in cm⁻¹
             num_points: Number of points in the spectrum
-            
+
         Returns:
             Dictionary containing spectrum data and metadata
         """
@@ -85,26 +89,67 @@ class IRSpectrumCalculator:
             freq_mask = (scaled_frequencies >= x_range[0]) & (scaled_frequencies <= x_range[1])
             active_frequencies = scaled_frequencies[freq_mask]
             active_intensities = intensities[freq_mask]
-            
+
+            # Get indices of active frequencies for mode mapping
+            active_indices = np.where(freq_mask)[0]
+
             logger.info(f"Processing {len(active_frequencies)} frequencies in range {x_range}")
-            
+
             # Generate x-axis (wavenumber grid)
             x_axis = np.linspace(x_range[0], x_range[1], num_points)
-            
+
             # Calculate spectrum using Lorentzian broadening
             spectrum = self._calculate_lorentzian_spectrum(
                 x_axis, active_frequencies, active_intensities, broadening_fwhm
             )
-            
+
             # Prepare peak information
             peaks = []
-            for freq, intensity in zip(active_frequencies, active_intensities):
-                peaks.append({
+            has_mode_data = (normal_modes is not None and
+                           molecule_structure is not None and
+                           len(normal_modes) == len(frequencies))
+
+            if not has_mode_data and normal_modes is not None:
+                logger.warning("Normal modes provided but data is incomplete or inconsistent. Skipping mode visualization.")
+
+            for i, (freq, intensity) in enumerate(zip(active_frequencies, active_intensities)):
+                original_idx = active_indices[i]  # Get original index before filtering
+                peak_data = {
                     'frequency_cm': float(freq),
                     'intensity': float(intensity),
-                    'original_frequency_cm': float(freq / self.scale_factor)
-                })
-            
+                    'original_frequency_cm': float(freq / self.scale_factor),
+                    'mode_displacements': None
+                }
+
+                # Add mode displacement data if available
+                if has_mode_data:
+                    try:
+                        mode_vector = normal_modes[original_idx]  # Shape: (n_atoms, 3)
+                        atom_symbols = molecule_structure['symbols']
+                        atom_coords = molecule_structure['coordinates']
+
+                        # Create mode displacements array
+                        mode_displacements = []
+                        for atom_idx, (symbol, coord, displacement) in enumerate(
+                            zip(atom_symbols, atom_coords, mode_vector)
+                        ):
+                            mode_displacements.append({
+                                'atom_index': atom_idx,
+                                'element': symbol,
+                                'x': float(coord[0]),
+                                'y': float(coord[1]),
+                                'z': float(coord[2]),
+                                'dx': float(displacement[0]),
+                                'dy': float(displacement[1]),
+                                'dz': float(displacement[2])
+                            })
+
+                        peak_data['mode_displacements'] = mode_displacements
+                    except Exception as e:
+                        logger.error(f"Failed to generate mode displacements for frequency {freq:.1f}: {str(e)}")
+
+                peaks.append(peak_data)
+
             # Sort peaks by frequency
             peaks.sort(key=lambda p: p['frequency_cm'])
             
@@ -166,11 +211,11 @@ def create_ir_spectrum_from_calculation_results(calculation_results: Dict[str, A
                                               **kwargs) -> Dict[str, Any]:
     """
     Create IR spectrum from PySCF calculation results.
-    
+
     Args:
         calculation_results: Results dictionary from quantum calculation
         **kwargs: Additional arguments for spectrum generation
-        
+
     Returns:
         Dictionary containing spectrum data only
     """
@@ -179,32 +224,55 @@ def create_ir_spectrum_from_calculation_results(calculation_results: Dict[str, A
         frequencies = calculation_results.get('vibrational_frequencies')
         if not frequencies:
             raise ValueError("No vibrational frequencies found in calculation results")
-        
+
+        # Extract IR intensities (may be None if not calculated)
+        ir_intensities = calculation_results.get('ir_intensities')
+
+        # Extract vibrational mode data
+        normal_modes = calculation_results.get('normal_modes')
+        molecule_structure = calculation_results.get('molecule_structure')
+
         # Extract method and basis set
         parameters = calculation_results.get('parameters', {})
         method = parameters.get('calculation_method', 'B3LYP')
         basis_set = parameters.get('basis_function', '6-31G*')
-        
+
         # Handle different method name formats
         if method.upper() == 'DFT':
             # For DFT calculations, use the exchange-correlation functional
             xc_functional = parameters.get('exchange_correlation', 'B3LYP')
             method = xc_functional
-        
+
         logger.info(f"Creating IR spectrum from calculation results: {method}/{basis_set}")
         logger.info(f"Found {len(frequencies)} vibrational frequencies")
-        
+
+        if ir_intensities is not None:
+            logger.info(f"Found {len(ir_intensities)} IR intensities")
+        else:
+            logger.warning("No IR intensities found - uniform intensities will be used")
+
+        if normal_modes is not None and molecule_structure is not None:
+            logger.info(f"Normal modes and molecular structure available for visualization")
+        else:
+            logger.warning("Normal modes or molecular structure not available - peak visualization will be limited")
+
         # Initialize calculator
         calculator = IRSpectrumCalculator(method=method, basis_set=basis_set)
-        
-        # Generate spectrum data only
-        spectrum_data = calculator.calculate_ir_spectrum(frequencies, **kwargs)
-        
+
+        # Generate spectrum data with mode information
+        spectrum_data = calculator.calculate_ir_spectrum(
+            frequencies,
+            intensities=ir_intensities,
+            normal_modes=normal_modes,
+            molecule_structure=molecule_structure,
+            **kwargs
+        )
+
         return {
             'spectrum_data': spectrum_data,
             'success': True
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to create IR spectrum from calculation results: {str(e)}")
         return {

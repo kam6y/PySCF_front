@@ -1322,6 +1322,54 @@ export interface components {
             peaks: components["schemas"]["IRPeak"][];
             metadata: components["schemas"]["IRSpectrumMetadata"];
         };
+        AtomDisplacement: {
+            /**
+             * @description Zero-based index of the atom
+             * @example 0
+             */
+            atom_index: number;
+            /**
+             * @description Element symbol
+             * @example C
+             */
+            element: string;
+            /**
+             * Format: float
+             * @description X coordinate of the atom (Angstrom)
+             * @example 0
+             */
+            x: number;
+            /**
+             * Format: float
+             * @description Y coordinate of the atom (Angstrom)
+             * @example 0
+             */
+            y: number;
+            /**
+             * Format: float
+             * @description Z coordinate of the atom (Angstrom)
+             * @example 0
+             */
+            z: number;
+            /**
+             * Format: float
+             * @description X component of displacement vector
+             * @example 0.123
+             */
+            dx: number;
+            /**
+             * Format: float
+             * @description Y component of displacement vector
+             * @example -0.045
+             */
+            dy: number;
+            /**
+             * Format: float
+             * @description Z component of displacement vector
+             * @example 0.078
+             */
+            dz: number;
+        };
         IRPeak: {
             /**
              * Format: float
@@ -1341,6 +1389,8 @@ export interface components {
              * @example 1723.1
              */
             original_frequency_cm: number;
+            /** @description Vibrational mode displacement vectors for 3D visualization */
+            mode_displacements?: components["schemas"]["AtomDisplacement"][] | null;
         };
         IRSpectrumMetadata: {
             /**

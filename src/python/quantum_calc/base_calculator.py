@@ -359,11 +359,13 @@ class BaseCalculator(ABC):
         """Convert optimized geometry to XYZ format string."""
         if not hasattr(self, 'optimized_geometry') or self.optimized_geometry is None:
             return ""
-        if not hasattr(self, 'mol') or self.mol is None:
+        if not hasattr(self, 'mf') or self.mf is None or self.mf.mol is None:
             return ""
-        
-        atom_symbols = [self.mol.atom_symbol(i) for i in range(self.mol.natm)]
-        lines = [str(self.mol.natm)]
+
+        # Use self.mf.mol to ensure consistency with optimized geometry
+        mol = self.mf.mol
+        atom_symbols = [mol.atom_symbol(i) for i in range(mol.natm)]
+        lines = [str(mol.natm)]
         lines.append("Optimized geometry from PySCF calculation")
         
         for i, (symbol, coords) in enumerate(zip(atom_symbols, self.optimized_geometry)):
@@ -373,32 +375,33 @@ class BaseCalculator(ABC):
     
     def _calculate_mulliken_charges(self) -> Optional[List[Dict[str, Any]]]:
         """Calculate Mulliken population analysis charges for each atom."""
-        if not hasattr(self, 'mf') or self.mf is None:
+        if not hasattr(self, 'mf') or self.mf is None or self.mf.mol is None:
             return None
-        if not hasattr(self, 'mol') or self.mol is None:
-            return None
-        
+
+        # Use self.mf.mol to ensure consistency with the converged calculation
+        mol = self.mf.mol
+
         try:
             # Perform Mulliken population analysis
             # This returns (pop, charges) where pop are populations and charges are atomic charges
             pop, charges = self.mf.mulliken_pop()
-            
+
             # Extract charges for each atom
             mulliken_charges = []
-            for i in range(self.mol.natm):
-                atom_symbol = self.mol.atom_symbol(i)
+            for i in range(mol.natm):
+                atom_symbol = mol.atom_symbol(i)
                 # Convert numpy float to Python float for JSON serialization
                 charge = float(charges[i])
-                
+
                 mulliken_charges.append({
                     'atom_index': i,
                     'element': atom_symbol,
                     'charge': charge
                 })
-            
+
             # Verify total charge conservation (should equal molecular charge)
             total_charge = sum(item['charge'] for item in mulliken_charges)
-            expected_charge = float(self.mol.charge)
+            expected_charge = float(mol.charge)
             logger.info(f"Mulliken analysis: calculated total charge = {total_charge:.6f}, expected = {expected_charge:.6f}")
             
             if abs(total_charge - expected_charge) > 0.01:
@@ -466,7 +469,9 @@ class BaseCalculator(ABC):
             'thermal_energy_298K': None,
             'entropy_298K': None,
             'gibbs_free_energy_298K': None,
-            'heat_capacity_298K': None
+            'heat_capacity_298K': None,
+            'normal_modes': None,  # Vibrational mode displacement vectors
+            'molecule_structure': None  # Molecular geometry for mode visualization
         }
         
         try:
@@ -488,35 +493,69 @@ class BaseCalculator(ABC):
             # Step 2: Perform harmonic analysis
             try:
                 logger.info("Performing harmonic analysis...")
-                freq_info = thermo.harmonic_analysis(self.mol, hessian)
+                # Use self.mf.mol to ensure harmonic analysis uses the same geometry as Hessian calculation
+                freq_info = thermo.harmonic_analysis(self.mf.mol, hessian)
                 
                 # Extract frequencies in cm^-1
                 frequencies_au = freq_info['freq_au']
                 frequencies_cm = freq_info['freq_wavenumber']
-                
+                normal_modes = freq_info['norm_mode']  # Shape: (3*natom, nmodes)
+
+                # Get molecular structure for mode visualization
+                # Use self.mf.mol to ensure we get optimized geometry if optimization was performed
+                mol_for_structure = self.mf.mol
+                atom_coords = mol_for_structure.atom_coords()  # Shape: (natom, 3)
+                atom_symbols = [mol_for_structure.atom_symbol(i) for i in range(mol_for_structure.natm)]
+
                 # Filter out low frequencies (below 80 cm^-1 threshold)
                 # and count imaginary frequencies
                 imaginary_count = 0
                 positive_frequencies = []
-                
-                for freq_cm in frequencies_cm:
+                positive_mode_indices = []  # Track which modes correspond to positive frequencies
+
+                for mode_idx, freq_cm in enumerate(frequencies_cm):
                     if freq_cm < 0:
                         # Imaginary frequency (negative eigenvalue)
                         imaginary_count += 1
                     elif freq_cm >= 80.0:  # PySCF default threshold
                         # Real, significant frequency
                         positive_frequencies.append(float(freq_cm))
-                
+                        positive_mode_indices.append(mode_idx)
+
                 logger.info(f"Found {len(positive_frequencies)} positive frequencies (≥80 cm⁻¹)")
                 logger.info(f"Found {imaginary_count} imaginary frequencies")
-                
+
+                # Extract normal modes for positive frequencies
+                # normal_modes shape: (nmodes, 3*natom) - each row is a mode
+                # We need to reshape to (natom, 3) for each mode
+                natom = mol_for_structure.natm
+                formatted_normal_modes = []
+
+                # Debug: Log array shape for troubleshooting
+                logger.debug(f"normal_modes shape: {normal_modes.shape}")
+                logger.debug(f"natom: {natom}, expected mode vector size: {3*natom}")
+
+                for mode_idx in positive_mode_indices:
+                    mode_vector = normal_modes[mode_idx]  # Shape: (3*natom,)
+                    # Reshape to (natom, 3) where each row is [dx, dy, dz] for an atom
+                    mode_vector_reshaped = mode_vector.reshape(natom, 3)
+                    formatted_normal_modes.append(mode_vector_reshaped.tolist())
+
+                # Format molecular structure
+                molecule_structure = {
+                    'symbols': atom_symbols,
+                    'coordinates': atom_coords.tolist()  # Shape: (natom, 3)
+                }
+
                 # Update results with frequency information
                 frequency_results.update({
                     'frequency_analysis_performed': True,
                     'vibrational_frequencies': positive_frequencies,
-                    'imaginary_frequencies_count': imaginary_count
+                    'imaginary_frequencies_count': imaginary_count,
+                    'normal_modes': formatted_normal_modes,  # List of (natom, 3) arrays
+                    'molecule_structure': molecule_structure
                 })
-                
+
                 # Log optimization quality assessment
                 if imaginary_count == 0:
                     logger.info("Geometry optimization successful: no imaginary frequencies detected")
@@ -524,10 +563,72 @@ class BaseCalculator(ABC):
                     logger.warning("One imaginary frequency detected: possible transition state")
                 else:
                     logger.warning(f"Multiple imaginary frequencies ({imaginary_count}) detected: poor optimization")
-                    
+
             except Exception as e:
                 logger.error(f"Harmonic analysis failed: {str(e)}")
                 return frequency_results
+
+            # Step 2.5: Calculate IR intensities
+            try:
+                logger.info("Calculating IR intensities...")
+
+                # Import the appropriate Infrared class based on the method type
+                from pyscf.prop import infrared
+
+                # Determine which Infrared class to use based on mean field type
+                # Check if UHF/UKS (unrestricted) or RHF/RKS (restricted)
+                if hasattr(self.mf, 'mo_occ'):
+                    # Check if mo_occ is a tuple/list (UHF/UKS) or array (RHF/RKS)
+                    is_unrestricted = isinstance(self.mf.mo_occ, (tuple, list))
+                else:
+                    # Fallback: assume restricted
+                    is_unrestricted = False
+
+                # Check if DFT (has xc attribute) or HF
+                is_dft = hasattr(self.mf, 'xc') and self.mf.xc is not None
+
+                # Select the appropriate Infrared class
+                if is_unrestricted:
+                    if is_dft:
+                        logger.info("Using UKS Infrared calculator")
+                        ir_calculator = infrared.uks.Infrared(self.mf)
+                    else:
+                        logger.info("Using UHF Infrared calculator")
+                        ir_calculator = infrared.uhf.Infrared(self.mf)
+                else:
+                    if is_dft:
+                        logger.info("Using RKS Infrared calculator")
+                        ir_calculator = infrared.rks.Infrared(self.mf)
+                    else:
+                        logger.info("Using RHF Infrared calculator")
+                        ir_calculator = infrared.rhf.Infrared(self.mf)
+
+                # Run IR intensity calculation
+                ir_result = ir_calculator.run()
+
+                # Extract IR intensities (units: km/mol)
+                # ir_inten is a 1D array with length equal to number of vibrational modes
+                ir_intensities_all = ir_result.ir_inten
+
+                logger.info(f"IR intensities calculated: {len(ir_intensities_all)} modes total")
+
+                # Extract only the IR intensities corresponding to positive frequencies
+                # positive_mode_indices contains the indices of modes with freq >= 80 cm^-1
+                ir_intensities_filtered = [float(ir_intensities_all[idx]) for idx in positive_mode_indices]
+
+                # Store IR intensities in results
+                frequency_results['ir_intensities'] = ir_intensities_filtered
+
+                logger.info(f"IR intensities extracted for {len(ir_intensities_filtered)} positive frequency modes")
+
+            except ImportError as e:
+                logger.warning(f"IR intensity calculation skipped: pyscf.prop.infrared module not available ({str(e)})")
+                logger.warning("To enable IR intensities, install: pip install git+https://github.com/pyscf/properties")
+                frequency_results['ir_intensities'] = None
+            except Exception as e:
+                logger.warning(f"IR intensity calculation failed: {str(e)}")
+                logger.warning("Continuing without IR intensities - uniform intensities will be used for IR spectrum")
+                frequency_results['ir_intensities'] = None
             
             # Step 3: Calculate thermochemical properties (optional, non-critical)
             try:
@@ -1413,49 +1514,52 @@ class BaseCalculator(ABC):
             
             # Calculate spin density matrix (alpha - beta)
             spin_dm = dm1a - dm1b
-            
+
+            # Use self.mf.mol to ensure consistency with the converged calculation
+            mol = self.mf.mol if hasattr(self, 'mf') and self.mf is not None else self.mol
+
             # Perform Mulliken population analysis on spin density
-            if hasattr(self.mol, 'get_ovlp'):
-                ovlp = self.mol.get_ovlp()
+            if hasattr(mol, 'get_ovlp'):
+                ovlp = mol.get_ovlp()
             else:
                 ovlp = self.mycas._scf.get_ovlp()
-            
+
             # Mulliken spin populations
             spin_pop = np.einsum('ij,ji->i', spin_dm, ovlp)
-            
+
             # Group by atoms
             atomic_spin_densities = []
             ao_offset = 0
-            
-            for iatom in range(self.mol.natm):
-                atom_symbol = self.mol.atom_symbol(iatom)
-                nao = self.mol.aoslice_by_atom()[iatom][3] - self.mol.aoslice_by_atom()[iatom][2]
-                
+
+            for iatom in range(mol.natm):
+                atom_symbol = mol.atom_symbol(iatom)
+                nao = mol.aoslice_by_atom()[iatom][3] - mol.aoslice_by_atom()[iatom][2]
+
                 # Sum spin populations for this atom
                 atom_spin = float(np.sum(spin_pop[ao_offset:ao_offset + nao]))
-                
+
                 atomic_spin_densities.append({
                     'atom_index': iatom,
                     'element': atom_symbol,
                     'spin_density': atom_spin,
                     'abs_spin_density': abs(atom_spin)
                 })
-                
+
                 ao_offset += nao
-            
+
             # Calculate total spin
             total_spin_density = sum([atom['spin_density'] for atom in atomic_spin_densities])
             total_abs_spin = sum([atom['abs_spin_density'] for atom in atomic_spin_densities])
-            
+
             spin_analysis.update({
                 'atomic_spin_densities': atomic_spin_densities,
                 'total_spin_density': float(total_spin_density),
                 'total_absolute_spin_density': float(total_abs_spin),
-                'expected_spin': float(self.mol.spin)
+                'expected_spin': float(mol.spin)
             })
-            
+
             logger.info(f"Spin density analysis: total = {total_spin_density:.3f}, "
-                       f"expected = {self.mol.spin}, atoms analyzed = {len(atomic_spin_densities)}")
+                       f"expected = {mol.spin}, atoms analyzed = {len(atomic_spin_densities)}")
             
         except Exception as e:
             logger.error(f"Error in Mulliken spin density calculation: {e}")
@@ -1483,11 +1587,14 @@ class BaseCalculator(ABC):
             return {'available': False, 'reason': 'SCF reference orbitals not found'}
         
         overlap_analysis['available'] = True
-        
+
+        # Use self.mf.mol to ensure consistency with the converged calculation
+        mol = self.mf.mol if hasattr(self, 'mf') and self.mf is not None else self.mol
+
         try:
             # Get overlap matrix
-            if hasattr(self.mol, 'get_ovlp'):
-                S = self.mol.get_ovlp()
+            if hasattr(mol, 'get_ovlp'):
+                S = mol.get_ovlp()
             else:
                 S = self.mf.get_ovlp()
             
@@ -1664,9 +1771,12 @@ class BaseCalculator(ABC):
         """
         properties = {}
 
-        if self.mf is None or self.mol is None:
+        if self.mf is None or self.mf.mol is None:
             logger.warning("Mean field or molecular object not available for additional properties extraction")
             return properties
+
+        # Use self.mf.mol to ensure consistency with the converged calculation
+        mol = self.mf.mol
 
         try:
             # 1. Dipole Moment (双極子モーメント)
@@ -1738,8 +1848,8 @@ class BaseCalculator(ABC):
             # 4. Basis Set Information (基底関数情報)
             try:
                 logger.info("Extracting basis set information...")
-                properties['num_basis_functions'] = int(self.mol.nao)
-                properties['num_primitive_gaussians'] = int(self.mol.npgto_nr())
+                properties['num_basis_functions'] = int(mol.nao)
+                properties['num_primitive_gaussians'] = int(mol.npgto_nr())
 
                 logger.info(f"Number of basis functions: {properties['num_basis_functions']}")
                 logger.info(f"Number of primitive Gaussians: {properties['num_primitive_gaussians']}")

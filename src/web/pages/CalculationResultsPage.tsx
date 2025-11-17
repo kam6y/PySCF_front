@@ -1357,6 +1357,9 @@ export const CalculationResultsPage = ({
                     <IRSpectrumViewer
                       calculationId={activeCalculation.id}
                       onError={handleSetError}
+                      optimizedGeometry={
+                        activeCalculation.results?.optimized_geometry
+                      }
                     />
                   </LazyViewer>
                 </div>

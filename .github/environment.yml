@@ -29,6 +29,8 @@ dependencies:
   # Environment packaging for distribution
   - conda-pack=0.8.1
   - pip:
+    # PySCF extensions
+    - git+https://github.com/pyscf/properties  # IR/Raman intensity calculations
     # Flask extensions
     - flask-pydantic==0.13.2
     - flask-socketio==5.5.1

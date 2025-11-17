@@ -2364,6 +2364,49 @@ components:
         metadata:
           $ref: '#/components/schemas/IRSpectrumMetadata'
 
+    AtomDisplacement:
+      type: object
+      required: [atom_index, element, x, y, z, dx, dy, dz]
+      properties:
+        atom_index:
+          type: integer
+          description: Zero-based index of the atom
+          example: 0
+        element:
+          type: string
+          description: Element symbol
+          example: "C"
+        x:
+          type: number
+          format: float
+          description: X coordinate of the atom (Angstrom)
+          example: 0.0
+        y:
+          type: number
+          format: float
+          description: Y coordinate of the atom (Angstrom)
+          example: 0.0
+        z:
+          type: number
+          format: float
+          description: Z coordinate of the atom (Angstrom)
+          example: 0.0
+        dx:
+          type: number
+          format: float
+          description: X component of displacement vector
+          example: 0.123
+        dy:
+          type: number
+          format: float
+          description: Y component of displacement vector
+          example: -0.045
+        dz:
+          type: number
+          format: float
+          description: Z component of displacement vector
+          example: 0.078
+
     IRPeak:
       type: object
       required: [frequency_cm, intensity, original_frequency_cm]
@@ -2383,6 +2426,12 @@ components:
           format: float
           description: Original calculated frequency before scale factor correction (cm⁻¹)
           example: 1723.1
+        mode_displacements:
+          type: array
+          nullable: true
+          description: Vibrational mode displacement vectors for 3D visualization
+          items:
+            $ref: '#/components/schemas/AtomDisplacement'
 
     IRSpectrumMetadata:
       type: object

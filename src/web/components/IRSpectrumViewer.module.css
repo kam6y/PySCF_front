@@ -159,6 +159,23 @@
   border-color: #c0392b;
 }
 
+/* Vertical stacked layout */
+.contentWrapper {
+  display: block;
+  margin-top: 0;
+}
+
+/* Viewer section - above Peak Information */
+.viewerSection {
+  margin-top: 25px;
+  margin-bottom: 25px;
+}
+
+/* Spectrum section - below the viewer */
+.spectrumSection {
+  /* No special styling needed */
+}
+
 .content {
   margin-top: 0;
 }
@@ -309,5 +326,97 @@
 .peaksRow span:last-child {
   border-right: none;
   color: #6b7280;
+}
+
+/* Clickable and selected row styles */
+.clickableRow {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clickableRow:hover {
+  background-color: #e3f2fd !important;
+}
+
+.selectedRow {
+  background-color: #bbdefb !important;
+  border-left: 3px solid #2196f3;
+}
+
+/* Right panel - Viewer section */
+.viewerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.viewerHeader h4 {
+  margin: 0;
+  color: #333;
+  font-size: 1.1em;
+  font-weight: 500;
+}
+
+.clearButton {
+  padding: 4px 8px;
+  border: 1px solid #dc2626;
+  border-radius: 4px;
+  background: #dc2626;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: background-color 0.2s ease;
+}
+
+.clearButton:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.moleculeViewerContainer {
+  position: relative;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #f8f9fa;
+  /* Explicitly set height to ensure MoleculeViewer renders */
+  height: 500px;
+  width: 100%;
+}
+
+/* Custom styling for MoleculeViewer in IR Spectrum */
+.irSpectrumMoleculeViewer {
+  position: relative;
+  z-index: 1;
+  /* Ensure MoleculeViewer takes full height of parent */
+  width: 100% !important;
+  height: 100% !important;
+  /* Remove border since container already has one */
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.viewerPlaceholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 10;
+  /* Ensure it's above the viewer */
+}
+
+.viewerPlaceholder p {
+  margin: 0;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  border: 1px dashed #ddd;
 }
 
