@@ -42,6 +42,8 @@ dependencies:
     - watchdog==6.0.0
     # Testing framework for Flask
     - pytest-flask==1.3.0
+    # YAML parsing for OpenAPI spec
+    - pyyaml==6.0.1
     # AI/ML API integration
     - google-genai==1.39.1
     # LangChain ecosystem for multi-agent architecture

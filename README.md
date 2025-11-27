@@ -227,6 +227,31 @@ The built AppImage will be available in the `dist/` directory.
 
 ---
 
+## Development Tools
+
+### API Documentation (Swagger UI)
+
+The application provides interactive API documentation via Swagger UI, available **in development mode only**.
+
+**Access URL:**
+```
+http://127.0.0.1:5000/api-docs/
+```
+
+**Features:**
+- Browse all API endpoints with detailed request/response schemas
+- Test endpoints directly in the browser with "Try it out" functionality
+- View comprehensive documentation generated from the OpenAPI specification
+- Search and filter endpoints
+
+**Availability:**
+- ✅ **Development mode** (`npm run dev`): Swagger UI is accessible
+- ❌ **Packaged builds**: Swagger UI is not included (development tool only)
+
+**Note:** Swagger UI is automatically enabled when running the development server and uses the OpenAPI specification from [src/api-spec/openapi.yaml](src/api-spec/openapi.yaml).
+
+---
+
 ## Troubleshooting
 
 Always start by running the verification commands to identify the problem:
@@ -378,6 +403,31 @@ npm run package
 -   `PySCF_front-darwin-arm64.dmg` (macOS)
 -   `PySCF_front-win32-x64.exe` (Windows)
 -   `PySCF_front-linux-x86_64.AppImage` (Linux)
+
+## 開発ツール
+
+### API仕様書 (Swagger UI)
+
+開発環境限定で、Swagger UIによるインタラクティブなAPI仕様書を提供しています。
+
+**アクセスURL:**
+```
+http://127.0.0.1:5000/api-docs/
+```
+
+**機能:**
+- すべてのAPIエンドポイントの詳細なリクエスト/レスポンススキーマの表示
+- 「Try it out」機能でブラウザから直接エンドポイントをテスト可能
+- OpenAPI仕様書から自動生成された包括的なドキュメント
+- エンドポイントの検索・フィルタリング
+
+**利用可能環境:**
+- ✅ **開発モード** (`npm run dev`): Swagger UIにアクセス可能
+- ❌ **パッケージ版**: Swagger UIは含まれません（開発ツールのみ）
+
+**注記:** Swagger UIは開発サーバー起動時に自動的に有効化され、[src/api-spec/openapi.yaml](src/api-spec/openapi.yaml)のOpenAPI仕様を使用します。
+
+---
 
 ## トラブルシューティング
 
