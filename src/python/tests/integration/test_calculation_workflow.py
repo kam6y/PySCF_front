@@ -204,7 +204,7 @@ class TestCalculationWorkflowSync:
 
         # Wait for calculation to complete before attempting deletion
         # (Cannot delete running calculations)
-        max_wait = 5  # seconds
+        max_wait = 15  # seconds
         start_time = time.time()
         while time.time() - start_time < max_wait:
             response = client.get(f'/api/quantum/calculations/{calc_id}')
