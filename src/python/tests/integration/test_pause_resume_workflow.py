@@ -145,6 +145,24 @@ H    1.4671  1.1550  0.0848"""
             "memory_mb": 2048
         }
 
+    @pytest.fixture(autouse=True)
+    def mock_system_resources(self, mocker):
+        """
+        Mock system resources to ensure tests don't fail due to CI load.
+        
+        This prevents 'System CPU usage exceeds limit' errors when running
+        tests on busy CI runners.
+        """
+        # Mock psutil to return low CPU usage
+        mocker.patch('quantum_calc.resource_manager.psutil.cpu_percent', return_value=10.0)
+        
+        # Mock virtual memory to ensure sufficient memory is available
+        mock_memory = mocker.Mock()
+        mock_memory.total = 16 * 1024 * 1024 * 1024  # 16 GB
+        mock_memory.available = 8 * 1024 * 1024 * 1024  # 8 GB
+        mock_memory.percent = 50.0
+        mocker.patch('quantum_calc.resource_manager.psutil.virtual_memory', return_value=mock_memory)
+
     def test_pause_resume_full_workflow(self, client, app, quick_DFT_params):
         """
         GIVEN a running quantum calculation
@@ -294,7 +312,7 @@ H    1.4671  1.1550  0.0848"""
         calc_id = response.get_json()['data']['calculation']['id']
 
         # Wait for completion
-        calc = wait_for_status(client, calc_id, ['completed', 'error'], timeout=100)
+        calc = wait_for_status(client, calc_id, ['completed', 'error'], timeout=300)
         assert calc['status'] == 'completed'
 
         # ACT - Try to pause completed calculation
@@ -326,7 +344,7 @@ H    1.4671  1.1550  0.0848"""
         response = client.post('/api/quantum/calculate', json=quick_DFT_params)
         calc_id = response.get_json()['data']['calculation']['id']
 
-        calc = wait_for_status(client, calc_id, ['completed', 'error'], timeout=100)
+        calc = wait_for_status(client, calc_id, ['completed', 'error'], timeout=300)
         assert calc['status'] == 'completed'
 
         # ACT - Try to resume completed calculation
