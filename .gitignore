@@ -109,3 +109,7 @@ Desktop.ini
 # Chat history database
 # チャット履歴データベース
 data/chat_history.db
+
+# Codebase visualization output
+# コードベース可視化スクリプトの出力
+code.txt
