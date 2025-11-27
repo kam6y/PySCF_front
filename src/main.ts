@@ -863,11 +863,6 @@ const createWindow = async () => {
     });
   }
 
-  // レンダラープロセスにFlaskサーバーのポートを通知
-  mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow?.webContents.send('set-flask-port', flaskPort);
-  });
-
   // 全画面状態の変更をレンダラープロセスに通知
   mainWindow.on('enter-full-screen', () => {
     mainWindow?.webContents.send('fullscreen-changed', true);
@@ -883,7 +878,13 @@ const createWindow = async () => {
     mainWindow = null;
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
+  // ポート番号をURLパラメータとして渡す（IPC不要の堅牢な方式）
+  const htmlPath = path.join(__dirname, 'index.html');
+  mainWindow.loadFile(htmlPath, {
+    query: { flask_port: String(flaskPort) },
+  });
+
+  console.log(`[Main] Loading window with Flask port: ${flaskPort}`);
 };
 
 // シングルインスタンスロックを取得
@@ -934,9 +935,6 @@ app.on('before-quit', () => {
   isQuitting = true;
   stopPythonServer();
 });
-
-// IPC handler for renderer to get port (fallback)
-ipcMain.handle('get-flask-port', () => flaskPort);
 
 // IPC handler for getting platform information
 ipcMain.handle('get-platform', () => process.platform);

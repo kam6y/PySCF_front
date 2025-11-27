@@ -21,11 +21,21 @@ import {
 } from './types/api-types';
 import { components } from './types/generated-api';
 
-let API_BASE_URL = 'http://127.0.0.1:5000'; // Default, will be updated
+// preloadで設定されたポート番号を使用（URLパラメータ経由で取得済み）
+const initialPort = window.electronAPI?.flaskPort;
+
+if (!initialPort) {
+  console.error('[API Client] Flask port not available. Using fallback: 5000');
+  console.error('[API Client] This indicates an initialization failure.');
+}
+
+let API_BASE_URL = `http://127.0.0.1:${initialPort || 5000}`;
+
+console.log(`[API Client] Initialized with port: ${initialPort || 5000}`);
 
 export const setApiBaseUrl = (port: number) => {
   API_BASE_URL = `http://127.0.0.1:${port}`;
-  console.log(`API base URL set to: ${API_BASE_URL}`);
+  console.log(`[API Client] API base URL updated to: ${API_BASE_URL}`);
 };
 
 // Re-export the generated type for backward compatibility
