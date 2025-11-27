@@ -139,7 +139,7 @@ npm run package
 
 The packaging process creates platform-specific installers in the `dist/` directory:
 -   `PySCF_front-darwin-arm64.dmg` (For macOS)
--   `PySCF_front-win32-x64.exe` (For Windows)
+
 -   `PySCF_front-linux-x86_64.AppImage` (For Linux)
 
 ### Building for Linux on Windows
@@ -433,7 +433,7 @@ npm run package
 
 `dist/`ディレクトリに各OS用のインストーラーが生成されます。
 -   `PySCF_front-darwin-arm64.dmg` (macOS)
--   `PySCF_front-win32-x64.exe` (Windows)
+
 -   `PySCF_front-linux-x86_64.AppImage` (Linux)
 
 ## 開発ツール

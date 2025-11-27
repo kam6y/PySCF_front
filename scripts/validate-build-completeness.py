@@ -51,9 +51,9 @@ def check_conda_environment(project_root: Path) -> bool:
     
     # 重要なファイルの存在確認 (Windows対応)
     # Windowsの場合、実行ファイルは Scripts ディレクトリ配下にあり、.exe が付く
-    is_windows = os.name == 'nt'
-    bin_dir = "Scripts" if is_windows else "bin"
-    exe_suffix = ".exe" if is_windows else ""
+    # Windows support removed
+    bin_dir = "bin"
+    exe_suffix = ""
 
     required_files = [
         Path(bin_dir) / f"python{exe_suffix}",

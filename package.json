@@ -169,10 +169,6 @@
         ]
       }
     ],
-    "win": {
-      "target": "nsis",
-      "icon": "src/assets/icon/win/icon.ico"
-    },
     "mac": {
       "target": "dmg",
       "icon": "src/assets/icon/mac/Pyscf_front.icns"
