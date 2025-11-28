@@ -161,11 +161,18 @@ const request = async <T>(
   const url = `${API_BASE_URL}${endpoint}`;
 
   try {
+    const authToken = window.electronAPI?.authToken;
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (authToken) {
+      (headers as any)['X-Auth-Token'] = authToken;
+    }
+
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     });
 

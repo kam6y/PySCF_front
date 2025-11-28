@@ -1,6 +1,7 @@
 export interface ElectronAPI {
   // URLパラメータから取得したFlaskポート番号（preloadで設定）
   flaskPort: number | null;
+  authToken: string | null;
   openExternalUrl: (
     url: string
   ) => Promise<{ success: boolean; error?: string }>;

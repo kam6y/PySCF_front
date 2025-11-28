@@ -7,6 +7,8 @@ const urlParams = new URLSearchParams(window.location.search);
 const flaskPortParam = urlParams.get('flask_port');
 const flaskPort = flaskPortParam ? parseInt(flaskPortParam, 10) : null;
 
+const authToken = urlParams.get('auth_token');
+
 console.log(`[Preload] Flask port from URL: ${flaskPort}`);
 
 // 検証: ポート番号が有効な範囲かチェック
@@ -20,6 +22,7 @@ if (!isValidPort) {
 contextBridge.exposeInMainWorld('electronAPI', {
   // URLパラメータから取得したポート番号を公開
   flaskPort: isValidPort ? flaskPort : null,
+  authToken: authToken || null,
 
   // Electron API methods
   openExternalUrl: (url: string) =>

@@ -7,6 +7,7 @@ import http from 'node:http';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
+import crypto from 'crypto';
 
 let mainWindow: BrowserWindow | null = null;
 let pythonProcess: ChildProcess | null = null;
@@ -14,6 +15,7 @@ let flaskPort: number | null = null;
 let isQuitting = false;
 let isCreatingWindow = false;
 let serverConfig: any = null;
+let authToken: string = '';
 
 const execFilePromise = promisify(execFile);
 
@@ -160,9 +162,14 @@ const checkServerHealth = (
   return new Promise((resolve, reject) => {
     let attempts = 0;
     const url = `http://127.0.0.1:${port}/health`;
+    const options = {
+      headers: {
+        'X-Auth-Token': authToken,
+      },
+    };
     const interval = setInterval(() => {
       http
-        .get(url, res => {
+        .get(url, options, res => {
           if (res.statusCode === 200) {
             clearInterval(interval);
             console.log('Python server is healthy.');
@@ -257,6 +264,9 @@ const createCleanEnvironment = (
     'XAUTHORITY',
     // MacOS specific
     '__CF_USER_TEXT_ENCODING',
+    // Dynamic Linker
+    'LD_LIBRARY_PATH',
+    'DYLD_LIBRARY_PATH',
   ];
 
   const cleanEnv: Record<string, string> = {};
@@ -273,9 +283,11 @@ const createCleanEnvironment = (
   const originalPath = process.env.PATH || '';
   const pathEntries = originalPath.split(':').filter(p => {
     // Exclude common Python environment paths
-    if (p.includes('/.pyenv/')) return false;
-    if (p.includes('/anaconda')) return false;
-    if (p.includes('/miniconda')) return false;
+    // We want to avoid using the user's local python environments
+    // but we should be careful not to exclude system paths that might be needed
+    if (p.includes('/.pyenv/versions/')) return false;
+    if (p.includes('/anaconda') && p.includes('/bin')) return false;
+    if (p.includes('/miniconda') && p.includes('/bin')) return false;
     if (p.includes('virtualenvs')) return false;
     return true;
   });
@@ -286,6 +298,8 @@ const createCleanEnvironment = (
   // 3. Set application-specific variables
   cleanEnv.CONDA_DEFAULT_ENV = 'pyscf-env';
   cleanEnv.PYSCF_SERVER_PORT = String(serverPort);
+  cleanEnv.PYSCF_PARENT_PID = String(process.pid);
+  cleanEnv.PYSCF_AUTH_TOKEN = authToken;
 
   // Explicitly unset potentially conflicting Python variables
   // (They are already not in the whitelist, but this documents intent)
@@ -798,6 +812,12 @@ const createWindow = async () => {
   }
 
   isCreatingWindow = true;
+
+  // Generate a random authentication token if not already generated
+  if (!authToken) {
+    authToken = crypto.randomBytes(32).toString('hex');
+    console.log('Generated authentication token for Python backend');
+  }
   console.log('Starting window creation...');
 
   try {
@@ -882,7 +902,10 @@ const createWindow = async () => {
   // ポート番号をURLパラメータとして渡す（IPC不要の堅牢な方式）
   const htmlPath = path.join(__dirname, 'index.html');
   mainWindow.loadFile(htmlPath, {
-    query: { flask_port: String(flaskPort) },
+    query: {
+      flask_port: String(flaskPort),
+      auth_token: authToken,
+    },
   });
 
   console.log(`[Main] Loading window with Flask port: ${flaskPort}`);

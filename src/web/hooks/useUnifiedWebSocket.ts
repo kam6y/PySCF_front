@@ -313,7 +313,8 @@ export const useUnifiedWebSocket = ({
 
       // 30秒以内の重複通知を防止
       const now = Date.now();
-      const timeSinceLastNotification = now - lastErrorNotificationTimeRef.current;
+      const timeSinceLastNotification =
+        now - lastErrorNotificationTimeRef.current;
 
       if (timeSinceLastNotification > 30000) {
         showErrorNotification('Real-time monitoring error', error);
@@ -449,7 +450,9 @@ export const useUnifiedWebSocket = ({
           error.message.includes('503');
 
         if (isTransientError) {
-          console.log('[UnifiedWebSocket] Transient error, auto-reconnecting...');
+          console.log(
+            '[UnifiedWebSocket] Transient error, auto-reconnecting...'
+          );
           return;
         }
 

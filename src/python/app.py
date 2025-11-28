@@ -72,6 +72,34 @@ def create_app(server_port: int = None, test_config: dict = None):
     # This establishes app.config as the single source of truth for configuration
     configure_flask_app(app, server_config, server_port)
 
+    # Security: Authentication Middleware
+    # Verify X-Auth-Token header against the token provided by Electron
+    auth_token = os.getenv('PYSCF_AUTH_TOKEN')
+    
+    @app.before_request
+    def verify_auth_token():
+        """
+        Verify authentication token for all requests.
+        Skips verification for OPTIONS requests (CORS preflight).
+        """
+        # Skip auth for OPTIONS requests to allow CORS preflight
+        if request.method == 'OPTIONS':
+            return None
+            
+        # If no auth token is configured (e.g. during dev without Electron), 
+        # we might want to skip auth or warn. 
+        # For security, we enforce it if the env var is present.
+        if auth_token:
+            client_token = request.headers.get('X-Auth-Token')
+            if not client_token or client_token != auth_token:
+                logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        else:
+            # In production, this should be an error. 
+            # In standalone dev, we might allow it but log a warning.
+            if not app.debug and not os.getenv('PYSCF_ENV') == 'development':
+                 logger.warning("Running without authentication token in non-debug mode!")
+
     # Apply test configuration if provided
     if test_config is not None:
         app.config.update(test_config)
