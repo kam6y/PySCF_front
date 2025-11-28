@@ -3,7 +3,7 @@ import os
 import sys
 import signal
 import atexit
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from pydantic import ValidationError
@@ -135,70 +135,25 @@ def create_app(server_port: int = None, test_config: dict = None):
         KNOWN ISSUE & WORKAROUND:
         When WebSocket connections close, the close frame (binary data) is sometimes
         misinterpreted as an HTTP request by Werkzeug/Flask-SocketIO, resulting in
-        400 Bad Request errors with messages like "Invalid HTTP method" or garbled
-        binary data in the error description.
+        400 Bad Request errors.
         
         This is a known issue in the Flask-SocketIO/Werkzeug stack when using
-        threading async_mode. The issue has been observed across multiple versions
-        and environments (see Flask-SocketIO issues #287, #466, #1417, #1811).
-        
-        ROOT CAUSE:
-        - WebSocket close frames contain binary protocol data
-        - When connection teardown occurs, these frames may be read by HTTP handlers
-        - The binary data fails to parse as valid HTTP, triggering 400 errors
+        threading async_mode.
         
         CURRENT WORKAROUND:
-        This handler detects WebSocket-related errors by examining the error message
-        for known patterns (protocol keywords, binary data indicators) and silently
-        logs them as debug messages rather than warnings to avoid log pollution.
-        
-        FUTURE MONITORING:
-        - Monitor Flask-SocketIO and Werkzeug changelogs for protocol handling fixes
-        - Consider upgrading to newer async modes (eventlet/gevent) if issues persist
-        - Review this workaround when upgrading major versions of dependencies
-        
-        VALIDATION:
-        This approach has been validated as the recommended workaround by the
-        Flask-SocketIO community and is safe as it only affects cosmetic logging,
-        not functionality.
+        We detect if the error occurred on the Socket.IO endpoint path ('/socket.io/').
+        If so, we treat it as a known WebSocket teardown issue and log it at DEBUG level.
         """
-        error_description = str(error).lower()
-        
-        # Comprehensive list of WebSocket protocol error indicators
-        # Based on observed patterns from Flask-SocketIO issues and WebSocket RFC 6455
-        websocket_indicators = [
-            # HTTP method errors (most common)
-            'invalid http method', 'expected get method', 'invalid method',
-            # WebSocket protocol keywords
-            'websocket', 'connection upgrade', 'upgrade required',
-            # Request parsing errors
-            'bad request line', 'malformed request', 'protocol error',
-            # Connection state errors
-            'connection reset', 'connection closed', 'connection aborted',
-            # Encoding errors (binary data misinterpreted as text)
-            'invalid utf-8', 'decode error', 'unicode error'
-        ]
-        
-        # Primary detection: Check for known error message patterns
-        is_websocket_related = any(indicator in error_description for indicator in websocket_indicators)
-        
-        # Secondary detection: Binary data heuristic
-        # WebSocket close frames contain non-printable bytes that appear in error messages
-        if not is_websocket_related:
-            error_str = str(error)
-            non_printable_count = sum(1 for c in error_str if ord(c) < 32 and c not in '\n\r\t')
-            # If error message contains significant binary data, likely a WebSocket frame
-            if non_printable_count > 3:  # Empirically determined threshold
-                is_websocket_related = True
-        
-        if is_websocket_related:
+        # Robust detection: Check if the request is for the Socket.IO endpoint
+        # WebSocket traffic always goes to /socket.io/ (unless configured otherwise)
+        if request.path.startswith('/socket.io/'):
             # WebSocket protocol frame misinterpreted as HTTP - expected behavior
             # Log at debug level to avoid polluting logs with normal connection teardown
-            logger.debug(f"WebSocket close frame detected (expected): {error}")
+            logger.debug(f"WebSocket close frame detected on {request.path} (expected): {error}")
             return '', 400  # Return minimal response
         
         # Genuine HTTP 400 error - log and return proper error response
-        logger.warning(f"Genuine bad HTTP request: {error}")
+        logger.warning(f"Genuine bad HTTP request on {request.path}: {error}")
         return jsonify({'success': False, 'error': 'Bad request.'}), 400
 
     @app.errorhandler(404)
