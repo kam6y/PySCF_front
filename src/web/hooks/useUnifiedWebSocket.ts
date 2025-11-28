@@ -33,6 +33,8 @@ export const useUnifiedWebSocket = ({
   const disconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectingRef = useRef<boolean>(false);
   const isMountedRef = useRef<boolean>(false);
+  const syncFailureCountRef = useRef<number>(0);
+  const lastErrorNotificationTimeRef = useRef<number>(0);
 
   // 重複更新防止チェック
   const isDuplicateUpdate = useCallback((calculationId: string): boolean => {
@@ -303,12 +305,24 @@ export const useUnifiedWebSocket = ({
     ]
   );
 
-  // エラーハンドリング
+  // エラーハンドリング（30秒以内の重複通知を防止）
   const handleWebSocketError = useCallback(
     (error: string) => {
       console.error('[UnifiedWebSocket] Error:', error);
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
-      showErrorNotification('Real-time monitoring error', error);
+
+      // 30秒以内の重複通知を防止
+      const now = Date.now();
+      const timeSinceLastNotification = now - lastErrorNotificationTimeRef.current;
+
+      if (timeSinceLastNotification > 30000) {
+        showErrorNotification('Real-time monitoring error', error);
+        lastErrorNotificationTimeRef.current = now;
+      } else {
+        console.log(
+          `[UnifiedWebSocket] Skipping duplicate error notification (${Math.floor(timeSinceLastNotification / 1000)}s since last)`
+        );
+      }
     },
     [queryClient]
   );
@@ -428,32 +442,33 @@ export const useUnifiedWebSocket = ({
         console.error('[UnifiedWebSocket] Connection error:', error);
         isConnectingRef.current = false;
 
+        // ネットワーク切断やサーバー一時停止など、自動再接続されるエラーは通知しない
+        const isTransientError =
+          error.message.includes('websocket error') ||
+          error.message.includes('502') ||
+          error.message.includes('503');
+
+        if (isTransientError) {
+          console.log('[UnifiedWebSocket] Transient error, auto-reconnecting...');
+          return;
+        }
+
+        // その他のエラーのみ通知
         let errorMessage = 'Failed to connect to monitoring server.';
 
         if (error.message.includes('timeout')) {
           errorMessage = 'Connection timed out. The server may not be running.';
         } else if (error.message.includes('xhr poll error')) {
           errorMessage = 'Server communication was interrupted.';
-        } else if (error.message.includes('websocket error')) {
-          errorMessage =
-            'WebSocket connection failed. Falling back to polling mode.';
         } else if (error.message.includes('400')) {
           errorMessage =
             'Server rejected connection (HTTP 400). Check CORS settings.';
         } else if (error.message.includes('403')) {
           errorMessage =
             'Connection forbidden (HTTP 403). Check server authentication.';
-        } else if (
-          error.message.includes('502') ||
-          error.message.includes('503')
-        ) {
-          errorMessage =
-            'Server is temporarily unavailable. Retrying connection...';
         }
 
-        if (!error.message.includes('502') && !error.message.includes('503')) {
-          handleWebSocketError(errorMessage);
-        }
+        handleWebSocketError(errorMessage);
       });
 
       socket.on('disconnect', (reason: string) => {
@@ -463,8 +478,47 @@ export const useUnifiedWebSocket = ({
         }
       });
 
-      socket.on('reconnect', () => {
-        console.log('[UnifiedWebSocket] Reconnected successfully');
+      socket.on('reconnect', async attemptNumber => {
+        console.log(
+          `[UnifiedWebSocket] Reconnected after ${attemptNumber} attempts`
+        );
+        console.log('[UnifiedWebSocket] Syncing data after reconnection...');
+
+        const activeId = currentActiveCalculationId.current;
+
+        try {
+          // 並行実行で効率化（合計時間を約50%短縮）
+          await Promise.all([
+            queryClient.invalidateQueries({
+              queryKey: ['calculations'],
+              refetchType: 'active',
+            }),
+            activeId && !activeId.startsWith('new-calculation-')
+              ? queryClient.invalidateQueries({
+                  queryKey: ['calculation', activeId],
+                  refetchType: 'active',
+                })
+              : Promise.resolve(),
+          ]);
+
+          syncFailureCountRef.current = 0;
+          console.log('[UnifiedWebSocket] Data sync completed successfully');
+        } catch (error) {
+          syncFailureCountRef.current++;
+          console.error(
+            `[UnifiedWebSocket] Data sync failed (attempt ${syncFailureCountRef.current}/2):`,
+            error
+          );
+
+          if (syncFailureCountRef.current >= 2) {
+            showErrorNotification(
+              'Connection synchronization failed',
+              'Unable to sync calculation data after reconnection. Please refresh the page if calculations appear outdated.'
+            );
+            syncFailureCountRef.current = 0;
+          }
+          // エラーでもアプリケーションは継続（次のWebSocket更新で回復可能）
+        }
       });
 
       socket.on('reconnect_error', (error: Error) => {
