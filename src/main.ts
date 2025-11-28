@@ -40,37 +40,19 @@ const loadServerConfig = (): any => {
       console.log(`Loaded server configuration from: ${configPath}`);
       return config;
     } else {
-      console.log(
-        `Configuration file not found at: ${configPath}. Using defaults.`
-      );
+      const msg = `Configuration file not found at: ${configPath}`;
+      console.error(msg);
+      throw new Error(msg);
     }
   } catch (error) {
-    console.log(
-      `Failed to load server configuration: ${error}. Using defaults.`
+    console.error(`Failed to load server configuration: ${error}`);
+    dialog.showErrorBox(
+      'Configuration Error',
+      `Failed to load server configuration.\n\nThe application cannot start without a valid 'server-config.json' file.\n\nError details: ${error}`
     );
+    app.quit();
+    process.exit(1);
   }
-
-  // デフォルト設定を返す
-  return {
-    server: {
-      host: '127.0.0.1',
-      port: {
-        default: 5000,
-        auto_detect: true,
-        range: { start: 5000, end: 5100 },
-      },
-    },
-    gunicorn: {
-      workers: 1,
-      threads: 4,
-      timeout: 0,
-      worker_class: 'sync',
-      keep_alive: 30,
-      log_level: 'info',
-    },
-    production: { use_gunicorn: true },
-    development: { debug: false },
-  };
 };
 
 // グローバル設定を読み込み
