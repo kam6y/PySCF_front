@@ -184,31 +184,6 @@ class ServerConfig:
         return self._config.copy()
 
 
-def find_available_port(host: str, start_port: int, end_port: int) -> int:
-    """
-    Find an available port within the specified range.
-
-    Args:
-        host: Host address to bind to.
-        start_port: Starting port number.
-        end_port: Ending port number (inclusive).
-
-    Returns:
-        int: Available port number.
-
-    Raises:
-        RuntimeError: If no available port is found in the range.
-    """
-    for port in range(start_port, end_port + 1):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((host, port))
-                return port
-        except OSError:
-            continue
-    raise RuntimeError(f"No available port found in range {start_port}-{end_port}")
-
-
 def determine_server_port(config: ServerConfig, port_arg: Optional[int] = None,
                          port_env: Optional[str] = None) -> int:
     """
@@ -217,8 +192,10 @@ def determine_server_port(config: ServerConfig, port_arg: Optional[int] = None,
     Priority order:
     1. Command line argument (port_arg)
     2. Environment variable (port_env)
-    3. Auto-detected port (if enabled)
-    4. Default port from configuration
+    3. Default port from configuration
+
+    Note: Auto-detection has been removed to prevent race conditions.
+    The port must be assigned by the parent process (Electron).
 
     Args:
         config: ServerConfig instance.
@@ -242,18 +219,7 @@ def determine_server_port(config: ServerConfig, port_arg: Optional[int] = None,
         except (ValueError, TypeError):
             logger.warning(f"Invalid port in environment variable: {port_env}")
 
-    # Priority 3: Auto-detection
-    if config.is_port_auto_detect_enabled():
-        start_port, end_port = config.get_port_range()
-        default_port = config.get_default_port()
-        host = config.get_server_host()
-
-        # Start searching from the default port
-        port = find_available_port(host, default_port, end_port)
-        logger.info(f"Auto-detected available port: {port}")
-        return port
-
-    # Priority 4: Default port
+    # Priority 3: Default port
     default_port = config.get_default_port()
     logger.info(f"Using default port: {default_port}")
     return default_port

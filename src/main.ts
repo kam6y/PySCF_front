@@ -249,60 +249,80 @@ const findAvailablePort = async (
 };
 
 /**
- * pyenv関連の環境変数を除外し、conda環境専用の環境変数を作成
- * pyenvとcondaの競合を防ぐために、pyenv関連の環境変数を明示的に除外する
+ * Create a clean environment for the Python process using a whitelist approach.
+ * This prevents user's local Python environment (pyenv, conda, venv) from interfering.
  *
- * @param condaBinDir - conda環境のbinディレクトリパス
- * @param serverPort - Flaskサーバーのポート番号
- * @returns クリーニングされた環境変数のマップ
+ * @param condaBinDir - The bin directory of the conda environment to use
+ * @param serverPort - The port number for the Flask server
+ * @returns A clean environment object
  */
 const createCleanEnvironment = (
   condaBinDir: string,
   serverPort: number
 ): Record<string, string> => {
+  // Whitelist of environment variables to pass through
+  const ALLOWED_ENV_VARS = [
+    // System basics
+    'HOME',
+    'USER',
+    'TMPDIR',
+    'SHELL',
+    'TERM',
+    'LANG',
+    'LC_ALL',
+    // Display / GUI
+    'DISPLAY',
+    'XAUTHORITY',
+    // MacOS specific
+    '__CF_USER_TEXT_ENCODING',
+  ];
+
   const cleanEnv: Record<string, string> = {};
 
-  // pyenv関連の環境変数を除外してコピー
-  const excludeKeys = [
-    'PYENV_ROOT',
-    'PYENV_SHELL',
-    'PYENV_VERSION',
-    'PYENV_DIR',
-  ];
-  for (const [key, value] of Object.entries(process.env)) {
-    if (value !== undefined && !excludeKeys.includes(key)) {
-      cleanEnv[key] = value;
+  // 1. Pass through whitelisted variables
+  for (const key of ALLOWED_ENV_VARS) {
+    if (process.env[key] !== undefined) {
+      cleanEnv[key] = process.env[key]!;
     }
   }
 
-  // PATHからpyenv関連ディレクトリを除外
+  // 2. Construct a clean PATH
+  // We want to keep system paths but exclude any user-land Python paths
   const originalPath = process.env.PATH || '';
-  const pathEntries = originalPath
-    .split(':')
-    .filter(p => !p.includes('/.pyenv/shims') && !p.includes('/.pyenv/bin'));
+  const pathEntries = originalPath.split(':').filter(p => {
+    // Exclude common Python environment paths
+    if (p.includes('/.pyenv/')) return false;
+    if (p.includes('/anaconda')) return false;
+    if (p.includes('/miniconda')) return false;
+    if (p.includes('virtualenvs')) return false;
+    return true;
+  });
 
-  // conda binディレクトリを最優先に配置
+  // Prepend our conda bin directory to ensure it takes precedence
   cleanEnv.PATH = `${condaBinDir}:${pathEntries.join(':')}`;
+
+  // 3. Set application-specific variables
   cleanEnv.CONDA_DEFAULT_ENV = 'pyscf-env';
   cleanEnv.PYSCF_SERVER_PORT = String(serverPort);
 
-  // パッケージ環境用の設定ファイルパスを環境変数で渡す
-  // config.pyがprocess.resourcesPathを認識できるようにする
+  // Explicitly unset potentially conflicting Python variables
+  // (They are already not in the whitelist, but this documents intent)
+  // PYTHONPATH, PYTHONHOME, VIRTUAL_ENV are NOT copied.
+
+  // 4. Set environment-specific variables
   if (app.isPackaged) {
     cleanEnv.PYSCF_RESOURCES_PATH = process.resourcesPath;
     cleanEnv.PYSCF_ENV = 'production';
     console.log(`Setting PYSCF_RESOURCES_PATH=${process.resourcesPath}`);
   } else {
-    // 開発環境では明示的にPYSCF_ENVを設定
-    // これにより、chat_history.dbなどのファイルがプロジェクトルートのdata/に作成される
     cleanEnv.PYSCF_ENV = 'development';
-    console.log('Setting PYSCF_ENV=development for consistent file paths');
+    console.log('Setting PYSCF_ENV=development');
   }
 
-  // macOS ARM64のNumPy初期化問題対策
+  // 5. Platform-specific fixes
   if (process.platform === 'darwin' && process.arch === 'arm64') {
     cleanEnv.OPENBLAS_CORETYPE = 'ARMV8';
-    cleanEnv.LC_ALL = 'C'; // longdouble初期化問題の回避
+    if (!cleanEnv.LC_ALL) cleanEnv.LC_ALL = 'C';
   }
 
   return cleanEnv;
@@ -332,9 +352,9 @@ const startPythonServer = async (): Promise<void> => {
     if (!pythonExecutablePath) {
       const errorMessage = app.isPackaged
         ? `Python environment not found.\n\nThe bundled conda environment is missing or incomplete.\nThis appears to be a packaging issue. Please report this as a bug.\n\nRequired location: ${path.join(
-            process.resourcesPath,
-            'conda_env'
-          )}\nRequired components: python, gunicorn, and all dependencies`
+          process.resourcesPath,
+          'conda_env'
+        )}\nRequired components: python, gunicorn, and all dependencies`
         : `Python environment not found.\n\nSetup instructions:\n1. Run automated setup: npm run setup-env\n2. Or set environment variable: export CONDA_ENV_PATH=/path/to/your/pyscf-env\n3. Verify setup: npm run verify-env\n\nFor detailed setup instructions, see CLAUDE.md`;
       console.error(errorMessage);
       reject(new Error(errorMessage));
@@ -406,6 +426,12 @@ const startPythonServer = async (): Promise<void> => {
       ? path.join(process.resourcesPath, 'src', 'python') // パッケージ時は同梱されたPythonソースコード
       : path.join(__dirname, '..', 'src', 'python'); // 開発時
 
+    // パッケージ環境では初回起動時の初期化（大規模ライブラリロード、バイトコードコンパイル等）に時間がかかるため、
+    // 遅延とタイムアウトを大幅に延長。2回目以降はキャッシュにより高速化されるため、実際の待機時間は短くなる
+    const initialDelay = app.isPackaged ? 10000 : 2000;
+    const healthCheckRetries = app.isPackaged ? 120 : 20; // パッケージ環境: 初回最大130秒, 開発環境: 10秒
+    const healthCheckInterval = app.isPackaged ? 1000 : 500; // パッケージ環境: 1秒間隔, 開発環境: 0.5秒間隔
+
     // 本番環境でもGunicornを使用する統一ロジック
     if (productionSettings.use_gunicorn) {
       console.log('Starting server with Gunicorn (unified mode)');
@@ -427,7 +453,7 @@ const startPythonServer = async (): Promise<void> => {
         String(gunicornSettings.keep_alive),
         // access_logfileがnullまたは存在しない場合は引数を追加しない
         ...(gunicornSettings.access_logfile !== null &&
-        gunicornSettings.access_logfile !== undefined
+          gunicornSettings.access_logfile !== undefined
           ? ['--access-logfile', gunicornSettings.access_logfile]
           : []),
         '--log-level',
@@ -470,11 +496,6 @@ const startPythonServer = async (): Promise<void> => {
       });
 
       // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
-      // パッケージ環境では初回起動時の初期化（大規模ライブラリロード、バイトコードコンパイル等）に時間がかかるため、
-      // 遅延とタイムアウトを大幅に延長。2回目以降はキャッシュにより高速化されるため、実際の待機時間は短くなる
-      const initialDelay = app.isPackaged ? 10000 : 2000;
-      const healthCheckRetries = app.isPackaged ? 120 : 20; // パッケージ環境: 初回最大130秒, 開発環境: 10秒
-      const healthCheckInterval = app.isPackaged ? 1000 : 500; // パッケージ環境: 1秒間隔, 開発環境: 0.5秒間隔
 
       setTimeout(() => {
         console.log(
@@ -496,25 +517,23 @@ const startPythonServer = async (): Promise<void> => {
         stdio: ['pipe', 'pipe', 'pipe'],
         env: envVars,
       });
+
+      // フォールバックモードでもヘルスチェックで起動を待つ
+      // ポートは既に決定済み(flaskPort)
+      setTimeout(() => {
+        console.log(
+          `Starting health check for direct execution server on port ${flaskPort}`
+        );
+        checkServerHealth(flaskPort!, healthCheckRetries, healthCheckInterval)
+          .then(resolve)
+          .catch(reject);
+      }, 1000);
     }
 
     // stdout/stderrのログ出力
     pythonProcess.stdout?.on('data', data => {
       const output = data.toString().trim();
       console.log(`[PYTHON STDOUT] ${output}`);
-
-      // 直接実行モード（フォールバック）でのポート検出
-      if (!productionSettings.use_gunicorn) {
-        const match = output.match(/FLASK_SERVER_PORT:(\d+)/);
-        if (match && match[1]) {
-          flaskPort = parseInt(match[1], 10);
-          console.log(
-            `✓ Detected Flask server port from direct execution: ${flaskPort}`
-          );
-          // ヘルスチェックを開始してサーバー起動を待つ
-          checkServerHealth(flaskPort).then(resolve).catch(reject);
-        }
-      }
 
       // Look for important startup messages
       if (output.includes('Starting gunicorn')) {
@@ -658,22 +677,22 @@ GitHub: ${packageJson.homepage}`;
     buttons: ['OK'],
     icon: app.isPackaged
       ? path.join(
-          process.resourcesPath,
-          'src',
-          'assets',
-          'icon',
-          'mac',
-          'Pyscf_front.icns'
-        )
+        process.resourcesPath,
+        'src',
+        'assets',
+        'icon',
+        'mac',
+        'Pyscf_front.icns'
+      )
       : path.join(
-          __dirname,
-          '..',
-          'src',
-          'assets',
-          'icon',
-          'mac',
-          'Pyscf_front.icns'
-        ),
+        __dirname,
+        '..',
+        'src',
+        'assets',
+        'icon',
+        'mac',
+        'Pyscf_front.icns'
+      ),
   });
 };
 
@@ -687,24 +706,24 @@ const createApplicationMenu = (): void => {
     // macOSの場合、最初にアプリケーションメニューを追加
     ...(isMac
       ? [
-          {
-            label: app.name,
-            submenu: [
-              {
-                label: 'About PySCF_front',
-                click: showAboutDialog,
-              },
-              { type: 'separator' as const },
-              { role: 'services' as const },
-              { type: 'separator' as const },
-              { role: 'hide' as const },
-              { role: 'hideOthers' as const },
-              { role: 'unhide' as const },
-              { type: 'separator' as const },
-              { role: 'quit' as const },
-            ],
-          },
-        ]
+        {
+          label: app.name,
+          submenu: [
+            {
+              label: 'About PySCF_front',
+              click: showAboutDialog,
+            },
+            { type: 'separator' as const },
+            { role: 'services' as const },
+            { type: 'separator' as const },
+            { role: 'hide' as const },
+            { role: 'hideOthers' as const },
+            { role: 'unhide' as const },
+            { type: 'separator' as const },
+            { role: 'quit' as const },
+          ],
+        },
+      ]
       : []),
     // Editメニュー
     {
@@ -718,15 +737,15 @@ const createApplicationMenu = (): void => {
         { role: 'paste' as const },
         ...(isMac
           ? [
-              { role: 'pasteAndMatchStyle' as const },
-              { role: 'delete' as const },
-              { role: 'selectAll' as const },
-            ]
+            { role: 'pasteAndMatchStyle' as const },
+            { role: 'delete' as const },
+            { role: 'selectAll' as const },
+          ]
           : [
-              { role: 'delete' as const },
-              { type: 'separator' as const },
-              { role: 'selectAll' as const },
-            ]),
+            { role: 'delete' as const },
+            { type: 'separator' as const },
+            { role: 'selectAll' as const },
+          ]),
       ],
     },
     // Viewメニュー
@@ -752,11 +771,11 @@ const createApplicationMenu = (): void => {
         { role: 'zoom' as const },
         ...(isMac
           ? [
-              { type: 'separator' as const },
-              { role: 'front' as const },
-              { type: 'separator' as const },
-              { role: 'window' as const },
-            ]
+            { type: 'separator' as const },
+            { role: 'front' as const },
+            { type: 'separator' as const },
+            { role: 'window' as const },
+          ]
           : [{ role: 'close' as const }]),
       ],
     },
