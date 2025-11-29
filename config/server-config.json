@@ -28,7 +28,7 @@
     "async_mode": "threading",
     "ping_timeout": 60,
     "ping_interval": 25,
-    "allow_unsafe_werkzeug": true,
+    "allow_unsafe_werkzeug": false,
     "logger": true,
     "engineio_logger": false
   },

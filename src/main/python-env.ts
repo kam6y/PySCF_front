@@ -125,6 +125,13 @@ export const createCleanEnvironment = (
     // Dynamic Linker
     'LD_LIBRARY_PATH',
     'DYLD_LIBRARY_PATH',
+    // Scientific Computing
+    'OMP_NUM_THREADS',
+    'MKL_NUM_THREADS',
+    'OPENBLAS_NUM_THREADS',
+    'RDBASE',
+    // Build / System
+    'PKG_CONFIG_PATH',
   ];
 
   const cleanEnv: Record<string, string> = {};

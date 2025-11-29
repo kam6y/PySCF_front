@@ -48,7 +48,7 @@ const initializeApp = async () => {
     console.error('Failed to start Python server:', error);
     dialog.showErrorBox(
       'Fatal Error',
-      'Could not start the Python backend. The application will now close.'
+      `Could not start the Python backend. The application will now close.\n\nError details: ${error instanceof Error ? error.message : String(error)}`
     );
     app.quit();
     return;

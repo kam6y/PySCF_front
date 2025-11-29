@@ -98,7 +98,10 @@ def create_app(server_port: int = None, test_config: dict = None):
             # In production, this should be an error. 
             # In standalone dev, we might allow it but log a warning.
             if not app.debug and not os.getenv('PYSCF_ENV') == 'development':
-                 logger.warning("Running without authentication token in non-debug mode!")
+                 logger.warning("Unauthorized access attempt: Missing authentication token in production mode")
+                 return jsonify({'success': False, 'error': 'Unauthorized: Missing authentication token'}), 401
+            
+            logger.warning("Running without authentication token in debug/development mode!")
 
     # Apply test configuration if provided
     if test_config is not None:
