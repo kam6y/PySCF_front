@@ -359,59 +359,57 @@ const startPythonServer = async (): Promise<void> => {
 
     console.log(`Using Python environment: ${pythonExecutablePath}`);
 
+    /**
+     * Port Detection Strategy:
+     * Electron is solely responsible for port detection.
+     * Python passively receives the port via PYSCF_SERVER_PORT.
+     */
+
     // 統一されたポート決定ロジック
     let serverPort: number;
-    if (serverSettings.port.auto_detect) {
-      try {
-        console.log(
-          `Auto-detecting available port in range ${serverSettings.port.default}-${serverSettings.port.range.end}...`
-        );
-        serverPort = await findAvailablePort(
-          serverSettings.port.default,
-          serverSettings.port.range.end
-        );
-        console.log(`✓ Found available port: ${serverPort}`);
-      } catch (error) {
-        console.log(`⚠️  Auto-detection failed: ${error}`);
-        console.log(
-          `Attempting to use fallback port: ${serverSettings.port.default}`
-        );
+    const defaultPort = typeof serverSettings.port === 'number' ? serverSettings.port : 5000;
+    const portRangeEnd = 5100; // Fixed range for port detection
 
-        // フォールバック時もポートの利用可能性をチェック
+    try {
+      console.log(
+        `Auto-detecting available port in range ${defaultPort}-${portRangeEnd}...`
+      );
+      serverPort = await findAvailablePort(defaultPort, portRangeEnd);
+      console.log(`✓ Found available port: ${serverPort}`);
+    } catch (error) {
+      console.log(`⚠️  Auto-detection failed: ${error}`);
+      console.log(
+        `Attempting to use fallback port: ${defaultPort}`
+      );
+
+      // フォールバック時もポートの利用可能性をチェック
+      try {
+        await findAvailablePort(defaultPort, defaultPort);
+        serverPort = defaultPort;
+        console.log(
+          `✓ Fallback port ${defaultPort} is available`
+        );
+      } catch (fallbackError) {
+        console.log(
+          `✗ CRITICAL: Fallback port ${defaultPort} is also unavailable`
+        );
+        // 最後の手段として、さらに広い範囲で検索
         try {
-          await findAvailablePort(
-            serverSettings.port.default,
-            serverSettings.port.default
-          );
-          serverPort = serverSettings.port.default;
           console.log(
-            `✓ Fallback port ${serverSettings.port.default} is available`
+            `Searching in extended range ${portRangeEnd + 1}-${portRangeEnd + 100}...`
           );
-        } catch (fallbackError) {
-          console.log(
-            `✗ CRITICAL: Fallback port ${serverSettings.port.default} is also unavailable`
+          serverPort = await findAvailablePort(
+            portRangeEnd + 1,
+            portRangeEnd + 100
           );
-          // 最後の手段として、さらに広い範囲で検索
-          try {
-            console.log(
-              `Searching in extended range ${serverSettings.port.range.end + 1}-${serverSettings.port.range.end + 100}...`
-            );
-            serverPort = await findAvailablePort(
-              serverSettings.port.range.end + 1,
-              serverSettings.port.range.end + 100
-            );
-            console.log(`✓ Found port in extended range: ${serverPort}`);
-          } catch (extendedError) {
-            const errorMessage = `CRITICAL: No available ports found in any range. This may indicate:\n1. Too many services running on localhost\n2. Firewall blocking port access\n3. System resource limitations\n\nTried ranges: ${serverSettings.port.default}-${serverSettings.port.range.end}, ${serverSettings.port.range.end + 1}-${serverSettings.port.range.end + 100}`;
-            console.error(errorMessage);
-            reject(new Error(errorMessage));
-            return;
-          }
+          console.log(`✓ Found port in extended range: ${serverPort}`);
+        } catch (extendedError) {
+          const errorMessage = `CRITICAL: No available ports found in any range. This may indicate:\n1. Too many services running on localhost\n2. Firewall blocking port access\n3. System resource limitations\n\nTried ranges: ${defaultPort}-${portRangeEnd}, ${portRangeEnd + 1}-${portRangeEnd + 100}`;
+          console.error(errorMessage);
+          reject(new Error(errorMessage));
+          return;
         }
       }
-    } else {
-      serverPort = serverSettings.port.default;
-      console.log(`Using configured fixed port: ${serverPort}`);
     }
 
     flaskPort = serverPort;

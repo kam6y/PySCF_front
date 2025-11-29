@@ -1,14 +1,7 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": {
-      "default": 5000,
-      "auto_detect": true,
-      "range": {
-        "start": 5000,
-        "end": 5100
-      }
-    },
+    "port": 5000,
     "debug": false
   },
   "gunicorn": {

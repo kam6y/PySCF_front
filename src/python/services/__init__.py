@@ -18,6 +18,11 @@ from .pubchem_service import PubChemService
 from .smiles_service import SMILESService
 from .settings_service import SettingsService
 from .system_service import SystemService
+from .notification_service import (
+    NotificationService,
+    get_notification_service,
+    bind_notification_service
+)
 
 # Singleton instances
 _quantum_service = None
@@ -106,10 +111,13 @@ __all__ = [
     'SMILESService',
     'SettingsService',
     'SystemService',
+    'NotificationService',
     # Singleton getters
     'get_quantum_service',
     'get_pubchem_service',
     'get_smiles_service',
     'get_settings_service',
-    'get_system_service'
+    'get_system_service',
+    'get_notification_service',
+    'bind_notification_service'
 ]

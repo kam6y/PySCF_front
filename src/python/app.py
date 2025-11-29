@@ -122,20 +122,25 @@ def create_app(server_port: int = None, test_config: dict = None):
     register_blueprints(app)
     logger.info("Registered all API blueprints")
 
-    # Register WebSocket handlers and get immediate notification function
-    websocket_funcs = register_websocket_handlers(socketio)
+    # Register WebSocket handlers
+    register_websocket_handlers(socketio)
     logger.info("Registered all WebSocket handlers")
-    
-    # Store the immediate notification function globally for other modules to use
-    app.send_immediate_websocket_notification = websocket_funcs['send_immediate_websocket_notification']
-    
-    # Initialize process manager with WebSocket notification callback
+
+    # Bind SocketIO to NotificationService
+    from services.notification_service import (
+        bind_notification_service,
+        get_notification_service
+    )
+    bind_notification_service(socketio)
+
+    # Initialize process manager with NotificationService callback
     from quantum_calc import initialize_process_manager_with_callback
     try:
+        notification_service = get_notification_service()
         initialize_process_manager_with_callback(
-            notification_callback=websocket_funcs['send_immediate_websocket_notification']
+            notification_callback=notification_service.send_calculation_update
         )
-        logger.info("Process manager initialized with WebSocket notification callback")
+        logger.info("Process manager initialized with NotificationService callback")
     except Exception as e:
         logger.error(f"Failed to initialize process manager with callback: {e}")
         # Continue anyway - process manager will work without notifications

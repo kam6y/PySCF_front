@@ -151,20 +151,6 @@ class ServerConfig:
             return port_config.get('default', 5000)
         return port_config if isinstance(port_config, int) else 5000
 
-    def is_port_auto_detect_enabled(self) -> bool:
-        """Check if automatic port detection is enabled."""
-        port_config = self.get('server.port', {})
-        if isinstance(port_config, dict):
-            return port_config.get('auto_detect', True)
-        return True
-
-    def get_port_range(self) -> tuple:
-        """Get port range for auto-detection."""
-        port_config = self.get('server.port', {})
-        if isinstance(port_config, dict):
-            port_range = port_config.get('range', {'start': 5000, 'end': 5100})
-            return (port_range.get('start', 5000), port_range.get('end', 5100))
-        return (5000, 5100)
 
     def get_logging_level(self) -> str:
         """Get logging level."""
@@ -187,39 +173,39 @@ class ServerConfig:
 def determine_server_port(config: ServerConfig, port_arg: Optional[int] = None,
                          port_env: Optional[str] = None) -> int:
     """
-    Determine the server port based on configuration, arguments, and environment.
+    Determine the server port from environment or arguments.
+
+    Port detection is handled by Electron in production mode.
+    In standalone mode (python app.py), uses command line or default.
 
     Priority order:
-    1. Command line argument (port_arg)
-    2. Environment variable (port_env)
-    3. Default port from configuration
-
-    Note: Auto-detection has been removed to prevent race conditions.
-    The port must be assigned by the parent process (Electron).
+    1. Command line argument (port_arg) - for `python app.py 5001`
+    2. Environment variable (port_env) - set by Electron (PYSCF_SERVER_PORT)
+    3. Default port from configuration - standalone fallback
 
     Args:
         config: ServerConfig instance.
         port_arg: Port from command line argument.
-        port_env: Port from environment variable.
+        port_env: Port from environment variable (PYSCF_SERVER_PORT).
 
     Returns:
         int: Determined port number.
     """
     # Priority 1: Command line argument
     if port_arg and port_arg > 0:
-        logger.info(f"Using port from command line argument: {port_arg}")
+        logger.info(f"Using port from CLI: {port_arg}")
         return port_arg
 
-    # Priority 2: Environment variable
+    # Priority 2: Environment variable (set by Electron)
     if port_env:
         try:
             port = int(port_env)
-            logger.info(f"Using port from environment variable: {port}")
+            logger.info(f"Using port from Electron: {port}")
             return port
         except (ValueError, TypeError):
-            logger.warning(f"Invalid port in environment variable: {port_env}")
+            logger.warning(f"Invalid port in env: {port_env}")
 
-    # Priority 3: Default port
+    # Priority 3: Default (standalone fallback)
     default_port = config.get_default_port()
     logger.info(f"Using default port: {default_port}")
     return default_port

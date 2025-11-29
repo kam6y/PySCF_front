@@ -23,51 +23,6 @@ active_websockets = {}
 websocket_lock = threading.Lock()
 
 
-def send_immediate_websocket_notification(socketio, calculation_id: str, status: str, error_message: str = None):
-    """Send immediate WebSocket notification to all connected clients for a calculation."""
-    # Build complete calculation instance
-    try:
-        from quantum_calc import get_current_settings
-        settings = get_current_settings()
-        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
-        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
-        
-        if os.path.exists(calc_dir):
-            # Read current data from files
-            parameters = file_manager.read_calculation_parameters(calc_dir) or {}
-            results = file_manager.read_calculation_results(calc_dir)
-            display_name = file_manager._get_display_name(calculation_id, parameters)
-            
-            # Build calculation instance
-            calculation_instance = {
-                'id': calculation_id,
-                'name': display_name,
-                'status': status,
-                'createdAt': parameters.get('created_at', datetime.now().isoformat()),
-                'updatedAt': datetime.now().isoformat(),
-                'parameters': parameters,
-                'results': results,
-                'workingDirectory': calc_dir,
-            }
-            
-            # Add error if provided (両方のフィールドに設定してフロントエンドとの整合性を確保)
-            if error_message:
-                calculation_instance['error'] = error_message
-                calculation_instance['errorMessage'] = error_message
-            
-            # Send to all clients in the calculation room
-            socketio.emit('calculation_update', calculation_instance, room=f'calculation_{calculation_id}')
-            
-            # Also send to global updates room for non-active calculations monitoring
-            socketio.emit('calculation_update', calculation_instance, room='global_updates')
-            logger.debug(f"Sent immediate notification for calculation {calculation_id} with status {status} to both specific and global rooms")
-        else:
-            logger.warning(f"Calculation directory not found for immediate notification: {calc_dir}")
-            
-    except Exception as e:
-        logger.error(f"Error sending immediate WebSocket notification for {calculation_id}: {e}")
-
-
 def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationFileManager) -> Dict:
     """Build a complete calculation instance from file system data."""
     try:
@@ -238,7 +193,3 @@ def register_websocket_handlers(socketio):
                 logger.info(f"Cleaned up file watcher for disconnected client (calculation {calculation_id})")
             except Exception as e:
                 logger.debug(f"Error cleaning up file watcher on disconnect for {calculation_id}: {e}")
-
-    return {
-        'send_immediate_websocket_notification': lambda calc_id, status, error_msg=None: send_immediate_websocket_notification(socketio, calc_id, status, error_msg)
-    }
