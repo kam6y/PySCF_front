@@ -974,7 +974,7 @@ export const CalculationSettingsPage = ({
                 </select>
               </div>
               <div className={styles.settingRow}>
-                <label>Exchange-Correlation Functional</label>
+                <label>Exchange Functional</label>
                 <select
                   value={params.exchange_correlation || 'B3LYP'}
                   onChange={e =>
@@ -1062,7 +1062,7 @@ export const CalculationSettingsPage = ({
                       params.calculation_method === 'CCSD_T'
                     }
                   />
-                  Perform Geometry Optimization
+                  Geometry Optimization
                 </label>
                 {(params.calculation_method === 'TDDFT' ||
                   params.calculation_method === 'CASCI' ||
