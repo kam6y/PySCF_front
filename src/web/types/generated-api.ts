@@ -2106,7 +2106,7 @@ export interface operations {
                 /** @description Partial match search in calculation name (case-insensitive) */
                 name_query?: string;
                 /** @description Filter by calculation status */
-                status?: "completed" | "running" | "error" | "waiting" | "pending";
+                status?: "pending" | "running" | "completed" | "error" | "waiting" | "pausing" | "paused";
                 /** @description Filter by calculation method */
                 calculation_method?: "DFT" | "HF" | "MP2" | "CCSD" | "TDDFT" | "CASCI" | "CASSCF";
                 /** @description Filter by basis set (case-insensitive) */

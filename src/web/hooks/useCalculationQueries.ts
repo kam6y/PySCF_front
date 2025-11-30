@@ -64,9 +64,21 @@ export const useResumeCalculation = () => {
   return useMutation({
     mutationFn: (id: string) => apiClient.resumeCalculation(id),
     onSuccess: (data, id) => {
-      // 成功したら関連するキャッシュを更新
-      queryClient.invalidateQueries({ queryKey: ['calculations'] });
-      queryClient.invalidateQueries({ queryKey: ['calculation', id] });
+      // サーバーレスポンスを即座にキャッシュに反映
+      queryClient.setQueryData(['calculation', id], {
+        calculation: data.calculation,
+      });
+
+      // リストキャッシュも更新
+      queryClient.setQueryData(['calculations'], (oldData: any) => {
+        if (!oldData?.calculations) return oldData;
+        return {
+          ...oldData,
+          calculations: oldData.calculations.map((calc: any) =>
+            calc.id === id ? data.calculation : calc
+          ),
+        };
+      });
     },
   });
 };

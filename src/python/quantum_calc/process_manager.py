@@ -347,18 +347,19 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             calculation_method, parameters, calc_dir, calculator_classes, process_logger
         )
 
+        # Parse XYZ and setup calculation
+        atoms = calculator.parse_xyz(parameters['xyz'])
+        setup_params = _prepare_setup_parameters(parameters, memory_mb)
+        calculator.setup_calculation(atoms, **setup_params)
+
         # Resume from checkpoint if this is a resumed calculation
+        # IMPORTANT: Must be called AFTER setup_calculation() so that self.mf exists
         if parameters.get('resume_from_pause', False):
             pause_state = parameters.get('pause_state')
             process_logger.info(f"Resuming calculation {calculation_id} from checkpoint")
             if pause_state:
                 process_logger.info(f"Pause state: {pause_state}")
             calculator.resume_from_checkpoint(pause_state)
-
-        # Parse XYZ and setup calculation
-        atoms = calculator.parse_xyz(parameters['xyz'])
-        setup_params = _prepare_setup_parameters(parameters, memory_mb)
-        calculator.setup_calculation(atoms, **setup_params)
         
         # Run calculation with controlled BLAS/LAPACK threading
         process_logger.info(f"Executing calculation with threadpool_limits(limits={cpu_cores}, user_api='blas')")
