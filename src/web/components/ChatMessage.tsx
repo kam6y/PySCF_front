@@ -10,26 +10,102 @@ import { LazyViewer } from './LazyViewer';
 import { useNotificationStore } from '../store/notificationStore';
 import styles from './ChatMessage.module.css';
 
-// パラメータパース関数（汎用的なコードブロックパラメータ用）
-const parseCodeBlockParams = (code: string): Record<string, any> => {
+// コードブロックタイプごとのパラメータ型定義
+interface OrbitalViewerParams {
+  calculation_id: string;
+  orbital_index: number;
+  grid_size?: number;
+  isovalue_pos?: number;
+  isovalue_neg?: number;
+}
+
+interface IRSpectrumParams {
+  calculation_id: string;
+  broadening_fwhm?: number;
+  x_min?: number;
+  x_max?: number;
+  show_peaks?: boolean;
+  height?: number;
+}
+
+interface MullikenChargesParams {
+  calculation_id: string;
+  height?: number;
+}
+
+type CodeBlockType = 'orbital-viewer' | 'ir-spectrum' | 'mulliken-charges';
+
+// パラメータ型のスキーマ定義
+const PARAM_SCHEMAS: Record<
+  CodeBlockType,
+  Record<string, 'string' | 'number' | 'boolean'>
+> = {
+  'orbital-viewer': {
+    calculation_id: 'string',
+    orbital_index: 'number',
+    grid_size: 'number',
+    isovalue_pos: 'number',
+    isovalue_neg: 'number',
+  },
+  'ir-spectrum': {
+    calculation_id: 'string',
+    broadening_fwhm: 'number',
+    x_min: 'number',
+    x_max: 'number',
+    show_peaks: 'boolean',
+    height: 'number',
+  },
+  'mulliken-charges': {
+    calculation_id: 'string',
+    height: 'number',
+  },
+};
+
+// 型安全なパラメータパース関数
+const parseCodeBlockParams = <T extends Record<string, any>>(
+  code: string,
+  blockType: CodeBlockType
+): T => {
   const params: Record<string, any> = {};
   const lines = code.trim().split('\n');
+  const schema = PARAM_SCHEMAS[blockType];
 
   lines.forEach(line => {
     const colonIndex = line.indexOf(':');
     if (colonIndex === -1) return;
 
     const key = line.substring(0, colonIndex).trim();
-    const value = line.substring(colonIndex + 1).trim();
+    const rawValue = line.substring(colonIndex + 1).trim();
 
-    if (!key || !value) return;
+    if (!key || !rawValue) return;
 
-    // 数値に変換できる場合は数値として扱う
-    const numValue = Number(value);
-    params[key] = isNaN(numValue) ? value : numValue;
+    // スキーマに基づいて型変換
+    const expectedType = schema[key];
+    if (!expectedType) {
+      // スキーマにないパラメータは無視（将来の拡張性のため警告のみ）
+      console.warn(`Unknown parameter "${key}" for ${blockType} block`);
+      return;
+    }
+
+    switch (expectedType) {
+      case 'string':
+        params[key] = rawValue;
+        break;
+      case 'number':
+        const numValue = Number(rawValue);
+        if (!isNaN(numValue)) {
+          params[key] = numValue;
+        } else {
+          console.warn(`Invalid number value for ${key}: ${rawValue}`);
+        }
+        break;
+      case 'boolean':
+        params[key] = rawValue.toLowerCase() === 'true';
+        break;
+    }
   });
 
-  return params;
+  return params as T;
 };
 
 interface ChatMessageProps {
@@ -59,7 +135,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
                   /\n$/,
                   ''
                 );
-                const params = parseCodeBlockParams(codeContent);
+                const params = parseCodeBlockParams<OrbitalViewerParams>(
+                  codeContent,
+                  'orbital-viewer'
+                );
 
                 // Validate required parameters
                 if (
@@ -132,7 +211,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
                   /\n$/,
                   ''
                 );
-                const params = parseCodeBlockParams(codeContent);
+                const params = parseCodeBlockParams<IRSpectrumParams>(
+                  codeContent,
+                  'ir-spectrum'
+                );
 
                 // Validate required parameters
                 if (!params.calculation_id) {
@@ -203,7 +285,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
                   /\n$/,
                   ''
                 );
-                const params = parseCodeBlockParams(codeContent);
+                const params = parseCodeBlockParams<MullikenChargesParams>(
+                  codeContent,
+                  'mulliken-charges'
+                );
 
                 // Validate required parameters
                 if (!params.calculation_id) {
@@ -278,7 +363,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
           if (!inline && className?.includes('language-orbital-viewer')) {
             try {
               const codeContent = String(children).replace(/\n$/, '');
-              const params = parseCodeBlockParams(codeContent);
+              const params = parseCodeBlockParams<OrbitalViewerParams>(
+                codeContent,
+                'orbital-viewer'
+              );
 
               // Validate required parameters
               if (
@@ -348,7 +436,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
           if (!inline && className?.includes('language-ir-spectrum')) {
             try {
               const codeContent = String(children).replace(/\n$/, '');
-              const params = parseCodeBlockParams(codeContent);
+              const params = parseCodeBlockParams<IRSpectrumParams>(
+                codeContent,
+                'ir-spectrum'
+              );
 
               // Validate required parameters
               if (!params.calculation_id) {
@@ -416,7 +507,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
           if (!inline && className?.includes('language-mulliken-charges')) {
             try {
               const codeContent = String(children).replace(/\n$/, '');
-              const params = parseCodeBlockParams(codeContent);
+              const params = parseCodeBlockParams<MullikenChargesParams>(
+                codeContent,
+                'mulliken-charges'
+              );
 
               // Validate required parameters
               if (!params.calculation_id) {
