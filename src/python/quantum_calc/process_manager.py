@@ -415,8 +415,8 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
 
             process_logger.info(f"Calculation {calculation_id} paused successfully, state saved")
 
-            # Return success - the 'paused' status is saved in the file
-            return True, None
+            # Re-raise exception so the parent process knows it was paused
+            raise e
 
         # For all other exceptions, handle as errors
         return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
