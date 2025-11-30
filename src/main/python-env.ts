@@ -23,7 +23,7 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
     }
   }
 
-  // 2. conda info --base で環境パスを取得（1回のみ試行）
+  // 2. conda info --base で環境パスを取得
   try {
     const { stdout } = await execFilePromise('conda', ['info', '--base'], {
       timeout: 3000,
@@ -32,14 +32,41 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
     const basePath = stdout.trim();
     const pythonPath = path.join(basePath, 'envs', envName, 'bin', 'python');
     if (fs.existsSync(pythonPath)) {
-      console.log(`Found conda environment: ${pythonPath}`);
+      console.log(`Found conda environment via command: ${pythonPath}`);
       return pythonPath;
     }
   } catch (error) {
-    console.log('conda command unavailable or failed');
+    console.log('conda command unavailable in PATH, trying fallback locations...');
   }
 
-  console.log(`conda environment '${envName}' not found`);
+  // 3. 一般的なインストールパスを探索（フォールバック）
+  const homeDir = app.getPath('home');
+  const commonLocations = [
+    // macOS / Linux
+    path.join(homeDir, 'miniconda3'),
+    path.join(homeDir, 'anaconda3'),
+    path.join(homeDir, 'opt', 'miniconda3'),
+    path.join(homeDir, 'opt', 'anaconda3'),
+    '/opt/miniconda3',
+    '/opt/anaconda3',
+    // Windows (typically handled by different path structure, but good to have)
+    path.join(homeDir, 'Miniconda3'),
+    path.join(homeDir, 'Anaconda3'),
+    'C:\\ProgramData\\miniconda3',
+    'C:\\ProgramData\\Anaconda3',
+    path.join(homeDir, 'AppData', 'Local', 'Continuum', 'miniconda3'),
+    path.join(homeDir, 'AppData', 'Local', 'Continuum', 'anaconda3'),
+  ];
+
+  for (const basePath of commonLocations) {
+    const pythonPath = path.join(basePath, 'envs', envName, 'bin', 'python');
+    if (fs.existsSync(pythonPath)) {
+      console.log(`Found conda environment at fallback path: ${pythonPath}`);
+      return pythonPath;
+    }
+  }
+
+  console.log(`conda environment '${envName}' not found in PATH or common locations`);
   return null;
 };
 
