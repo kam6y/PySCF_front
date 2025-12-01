@@ -11,7 +11,10 @@ export const setMainWindow = (window: BrowserWindow | null): void => {
   mainWindow = window;
 };
 
-export const createWindow = (flaskPort: number, authToken: string): BrowserWindow => {
+export const createWindow = (
+  flaskPort: number,
+  authToken: string
+): BrowserWindow => {
   // Create the browser window.
   const newWindow = new BrowserWindow({
     width: 1400,

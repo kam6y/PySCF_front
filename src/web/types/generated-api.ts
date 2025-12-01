@@ -560,12 +560,6 @@ export interface components {
              * @default true
              */
             frozen_core: boolean;
-            /**
-             * @description Geometry optimization not available for CCSD
-             * @default false
-             * @enum {boolean}
-             */
-            optimize_geometry: false;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -583,12 +577,6 @@ export interface components {
              * @default true
              */
             frozen_core: boolean;
-            /**
-             * @description Geometry optimization not available for CCSD(T)
-             * @default false
-             * @enum {boolean}
-             */
-            optimize_geometry: false;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -622,12 +610,6 @@ export interface components {
              * @default false
              */
             tddft_analyze_nto: boolean;
-            /**
-             * @description Geometry optimization not available for TDDFT
-             * @default false
-             * @enum {boolean}
-             */
-            optimize_geometry: false;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -660,12 +642,6 @@ export interface components {
              * @default true
              */
             natorb: boolean;
-            /**
-             * @description Geometry optimization not available for CASCI
-             * @default false
-             * @enum {boolean}
-             */
-            optimize_geometry: false;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -715,12 +691,6 @@ export interface components {
              * @default 0.0001
              */
             conv_tol_grad: number;
-            /**
-             * @description Geometry optimization not available for CASSCF
-             * @default false
-             * @enum {boolean}
-             */
-            optimize_geometry: false;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript

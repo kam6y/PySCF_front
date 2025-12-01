@@ -36,22 +36,22 @@ GitHub: ${packageJson.homepage}`;
     buttons: ['OK'],
     icon: app.isPackaged
       ? path.join(
-        process.resourcesPath,
-        'src',
-        'assets',
-        'icon',
-        'mac',
-        'Pyscf_front.icns'
-      )
+          process.resourcesPath,
+          'src',
+          'assets',
+          'icon',
+          'mac',
+          'Pyscf_front.icns'
+        )
       : path.join(
-        __dirname,
-        '..',
-        'src',
-        'assets',
-        'icon',
-        'mac',
-        'Pyscf_front.icns'
-      ),
+          __dirname,
+          '..',
+          'src',
+          'assets',
+          'icon',
+          'mac',
+          'Pyscf_front.icns'
+        ),
   });
 };
 
@@ -65,24 +65,24 @@ export const createApplicationMenu = (): void => {
     // macOSの場合、最初にアプリケーションメニューを追加
     ...(isMac
       ? [
-        {
-          label: app.name,
-          submenu: [
-            {
-              label: 'About PySCF_front',
-              click: showAboutDialog,
-            },
-            { type: 'separator' as const },
-            { role: 'services' as const },
-            { type: 'separator' as const },
-            { role: 'hide' as const },
-            { role: 'hideOthers' as const },
-            { role: 'unhide' as const },
-            { type: 'separator' as const },
-            { role: 'quit' as const },
-          ],
-        },
-      ]
+          {
+            label: app.name,
+            submenu: [
+              {
+                label: 'About PySCF_front',
+                click: showAboutDialog,
+              },
+              { type: 'separator' as const },
+              { role: 'services' as const },
+              { type: 'separator' as const },
+              { role: 'hide' as const },
+              { role: 'hideOthers' as const },
+              { role: 'unhide' as const },
+              { type: 'separator' as const },
+              { role: 'quit' as const },
+            ],
+          },
+        ]
       : []),
     // Editメニュー
     {
@@ -96,15 +96,15 @@ export const createApplicationMenu = (): void => {
         { role: 'paste' as const },
         ...(isMac
           ? [
-            { role: 'pasteAndMatchStyle' as const },
-            { role: 'delete' as const },
-            { role: 'selectAll' as const },
-          ]
+              { role: 'pasteAndMatchStyle' as const },
+              { role: 'delete' as const },
+              { role: 'selectAll' as const },
+            ]
           : [
-            { role: 'delete' as const },
-            { type: 'separator' as const },
-            { role: 'selectAll' as const },
-          ]),
+              { role: 'delete' as const },
+              { type: 'separator' as const },
+              { role: 'selectAll' as const },
+            ]),
       ],
     },
     // Viewメニュー
@@ -130,11 +130,11 @@ export const createApplicationMenu = (): void => {
         { role: 'zoom' as const },
         ...(isMac
           ? [
-            { type: 'separator' as const },
-            { role: 'front' as const },
-            { type: 'separator' as const },
-            { role: 'window' as const },
-          ]
+              { type: 'separator' as const },
+              { role: 'front' as const },
+              { type: 'separator' as const },
+              { role: 'window' as const },
+            ]
           : [{ role: 'close' as const }]),
       ],
     },

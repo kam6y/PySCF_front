@@ -80,14 +80,14 @@ def create_app(server_port: int = None, test_config: dict = None):
     def verify_auth_token():
         """
         Verify authentication token for all requests.
-        Skips verification for OPTIONS requests (CORS preflight).
+        Skips verification for OPTIONS requests (CORS preflight) and TESTING mode.
         """
         # Skip auth for OPTIONS requests to allow CORS preflight
         if request.method == 'OPTIONS':
             return None
-            
-        # If no auth token is configured (e.g. during dev without Electron), 
-        # we might want to skip auth or warn. 
+
+        # If no auth token is configured (e.g. during dev without Electron),
+        # we might want to skip auth or warn.
         # For security, we enforce it if the env var is present.
         if auth_token:
             client_token = request.headers.get('X-Auth-Token')
@@ -95,6 +95,10 @@ def create_app(server_port: int = None, test_config: dict = None):
                 logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
                 return jsonify({'success': False, 'error': 'Unauthorized'}), 401
         else:
+            # Skip auth for test environment (only if not simulating production)
+            if app.config.get('TESTING') and os.getenv('PYSCF_ENV') != 'production':
+                return None
+
             # In production, this should be an error.
             # In standalone dev, we might allow it but log a warning.
             if not app.debug and not os.getenv('PYSCF_ENV') == 'development':

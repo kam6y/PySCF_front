@@ -11,7 +11,10 @@
  */
 
 import { useSupportedParameters } from './useCalculationQueries';
-import { QuantumCalculationRequest, CalculationParameters } from '../types/api-types';
+import {
+  QuantumCalculationRequest,
+  CalculationParameters,
+} from '../types/api-types';
 
 export const useMethodDefaults = () => {
   const { data: supportedParams } = useSupportedParameters();
@@ -45,7 +48,10 @@ export const useMethodDefaults = () => {
    * isParameterApplicable('ncas', 'CASCI');  // Returns: true
    * isParameterApplicable('ncas', 'DFT');    // Returns: false
    */
-  const isParameterApplicable = (paramName: string, method: string): boolean => {
+  const isParameterApplicable = (
+    paramName: string,
+    method: string
+  ): boolean => {
     const constraint = supportedParams?.parameter_constraints?.[paramName];
     if (!constraint) return true;
 
@@ -143,7 +149,8 @@ export const useMethodDefaults = () => {
     return {
       ...defaults,
       ...preservedParams,
-      calculation_method: newMethod as QuantumCalculationRequest['calculation_method'],
+      calculation_method:
+        newMethod as QuantumCalculationRequest['calculation_method'],
     } as Partial<QuantumCalculationRequest>;
   };
 

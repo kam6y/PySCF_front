@@ -157,7 +157,14 @@ const STATUS_CONFIG = {
   },
   pausing: {
     icon: (
-      <span style={{ position: 'relative', display: 'inline-block', width: '20px', height: '20px' }}>
+      <span
+        style={{
+          position: 'relative',
+          display: 'inline-block',
+          width: '20px',
+          height: '20px',
+        }}
+      >
         <svg
           width="20"
           height="20"
@@ -186,8 +193,8 @@ const STATUS_CONFIG = {
           xmlns="http://www.w3.org/2000/svg"
           style={{ position: 'absolute', top: 0, left: 0 }}
         >
-          <rect x="5" y="5" width="1.5" height="6" fill="currentColor"/>
-          <rect x="9.5" y="5" width="1.5" height="6" fill="currentColor"/>
+          <rect x="5" y="5" width="1.5" height="6" fill="currentColor" />
+          <rect x="9.5" y="5" width="1.5" height="6" fill="currentColor" />
         </svg>
       </span>
     ),
@@ -210,8 +217,8 @@ const STATUS_CONFIG = {
           strokeWidth="1.5"
           fill="none"
         />
-        <rect x="5" y="5" width="1.5" height="6" fill="currentColor"/>
-        <rect x="9.5" y="5" width="1.5" height="6" fill="currentColor"/>
+        <rect x="5" y="5" width="1.5" height="6" fill="currentColor" />
+        <rect x="9.5" y="5" width="1.5" height="6" fill="currentColor" />
       </svg>
     ),
     label: 'Paused',

@@ -224,7 +224,10 @@ export const CalculationSettingsPage = ({
           activeCalculation.status === 'error';
         const currentParams = activeCalculation.parameters;
 
-        const updatedParams = { ...currentParams, xyz: xyzData } as QuantumCalculationRequest;
+        const updatedParams = {
+          ...currentParams,
+          xyz: xyzData,
+        } as QuantumCalculationRequest;
 
         if (isCompleted) {
           createNewCalculationFromExisting(activeCalculation, updatedParams);
@@ -659,7 +662,9 @@ export const CalculationSettingsPage = ({
                     !(
                       params.calculation_method === 'DFT' ||
                       params.calculation_method === 'TDDFT'
-                    ) || calculationStatus === 'running' || isLoadingParams
+                    ) ||
+                    calculationStatus === 'running' ||
+                    isLoadingParams
                   }
                 >
                   {isLoadingParams ? (
@@ -714,10 +719,7 @@ export const CalculationSettingsPage = ({
                     type="checkbox"
                     checked={(params as any).optimize_geometry ?? true}
                     onChange={e =>
-                      handleParamChange(
-                        'optimize_geometry',
-                        e.target.checked
-                      )
+                      handleParamChange('optimize_geometry', e.target.checked)
                     }
                     disabled={
                       calculationStatus === 'running' ||
@@ -757,7 +759,9 @@ export const CalculationSettingsPage = ({
                     max={20}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running' || isLoadingParams}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   />
                 </div>
                 <div className={styles.settingRow}>
@@ -775,7 +779,9 @@ export const CalculationSettingsPage = ({
                     max={40}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running' || isLoadingParams}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   />
                 </div>
                 {params.calculation_method === 'CASSCF' && (
@@ -892,7 +898,9 @@ export const CalculationSettingsPage = ({
                     max={50}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running' || isLoadingParams}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   />
                 </div>
                 <div className={styles.settingRow}>
@@ -902,7 +910,9 @@ export const CalculationSettingsPage = ({
                     onChange={e =>
                       handleParamChange('tddft_method', e.target.value)
                     }
-                    disabled={calculationStatus === 'running' || isLoadingParams}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   >
                     {isLoadingParams ? (
                       <option value="">Loading...</option>
@@ -927,10 +937,7 @@ export const CalculationSettingsPage = ({
                       type="checkbox"
                       checked={(params as any).tddft_analyze_nto || false}
                       onChange={e =>
-                        handleParamChange(
-                          'tddft_analyze_nto',
-                          e.target.checked
-                        )
+                        handleParamChange('tddft_analyze_nto', e.target.checked)
                       }
                       disabled={calculationStatus === 'running'}
                     />
@@ -948,10 +955,7 @@ export const CalculationSettingsPage = ({
                       type="checkbox"
                       checked={(params as any).frozen_core !== false}
                       onChange={e =>
-                        handleParamChange(
-                          'frozen_core',
-                          e.target.checked
-                        )
+                        handleParamChange('frozen_core', e.target.checked)
                       }
                       disabled={calculationStatus === 'running'}
                     />

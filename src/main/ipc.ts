@@ -4,7 +4,9 @@ import { showAboutDialog } from './menu';
 /**
  * IPCハンドラーを登録する関数
  */
-export const registerIpcHandlers = (getMainWindow: () => BrowserWindow | null): void => {
+export const registerIpcHandlers = (
+  getMainWindow: () => BrowserWindow | null
+): void => {
   // IPC handler for getting platform information
   ipcMain.handle('get-platform', () => process.platform);
 
@@ -24,7 +26,10 @@ export const registerIpcHandlers = (getMainWindow: () => BrowserWindow | null): 
       const parsedUrl = new URL(url);
       if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
         console.warn(`Blocked attempt to open non-http(s) URL: ${url}`);
-        return { success: false, error: 'Only HTTP and HTTPS URLs are allowed' };
+        return {
+          success: false,
+          error: 'Only HTTP and HTTPS URLs are allowed',
+        };
       }
 
       console.log(`Opening external URL in default browser: ${url}`);
@@ -46,7 +51,9 @@ export const registerIpcHandlers = (getMainWindow: () => BrowserWindow | null): 
     try {
       const mainWindow = getMainWindow();
       const result = await dialog.showOpenDialog(
-        mainWindow && !mainWindow.isDestroyed() ? mainWindow : (undefined as any),
+        mainWindow && !mainWindow.isDestroyed()
+          ? mainWindow
+          : (undefined as any),
         {
           properties: ['openDirectory', 'createDirectory'],
           title: 'Select Calculations Directory',

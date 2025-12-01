@@ -94,8 +94,7 @@ export const CalculationResultsPage = ({
         '⏳ This calculation is pending. Please run the calculation first.',
       running:
         '⚛️ This calculation is currently running. Please wait for completion.',
-      pausing:
-        '⏸️ This calculation is pausing. Please wait...',
+      pausing: '⏸️ This calculation is pausing. Please wait...',
       paused:
         '⏸️ This calculation is paused. You can resume it from where it was paused.',
       error:

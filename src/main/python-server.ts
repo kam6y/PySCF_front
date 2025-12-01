@@ -3,7 +3,10 @@ import http from 'node:http';
 import path from 'node:path';
 import fs from 'fs';
 import { app, dialog } from 'electron';
-import { detectPythonEnvironmentPath, createCleanEnvironment } from './python-env';
+import {
+  detectPythonEnvironmentPath,
+  createCleanEnvironment,
+} from './python-env';
 import { findAvailablePort } from './port-manager';
 
 let pythonProcess: ChildProcess | null = null;
@@ -64,7 +67,10 @@ export const checkServerHealth = (
  * Python/Flaskサーバーを起動する統一関数
  * 設定ファイルに基づいて開発・本番環境で同一の起動方法を使用
  */
-export const startPythonServer = async (serverConfig: any, authToken: string): Promise<number> => {
+export const startPythonServer = async (
+  serverConfig: any,
+  authToken: string
+): Promise<number> => {
   return new Promise(async (resolve, reject) => {
     // 重複実行防止: 既にサーバーが起動している場合はスキップ
     if (pythonProcess && !pythonProcess.killed && flaskPort) {
@@ -84,9 +90,9 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
     if (!pythonExecutablePath) {
       const errorMessage = app.isPackaged
         ? `Python environment not found.\n\nThe bundled conda environment is missing or incomplete.\nThis appears to be a packaging issue. Please report this as a bug.\n\nRequired location: ${path.join(
-          process.resourcesPath,
-          'conda_env'
-        )}\nRequired components: python, gunicorn, and all dependencies`
+            process.resourcesPath,
+            'conda_env'
+          )}\nRequired components: python, gunicorn, and all dependencies`
         : `Python environment not found.\n\nSetup instructions:\n1. Run automated setup: npm run setup-env\n2. Or set environment variable: export CONDA_ENV_PATH=/path/to/your/pyscf-env\n3. Verify setup: npm run verify-env\n\nFor detailed setup instructions, see CLAUDE.md`;
       console.error(errorMessage);
       reject(new Error(errorMessage));
@@ -103,7 +109,8 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
 
     // 統一されたポート決定ロジック
     let serverPort: number;
-    const defaultPort = typeof serverSettings.port === 'number' ? serverSettings.port : 5000;
+    const defaultPort =
+      typeof serverSettings.port === 'number' ? serverSettings.port : 5000;
     const portRangeEnd = 5100; // Fixed range for port detection
 
     try {
@@ -114,17 +121,13 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
       console.log(`✓ Found available port: ${serverPort}`);
     } catch (error) {
       console.log(`⚠️  Auto-detection failed: ${error}`);
-      console.log(
-        `Attempting to use fallback port: ${defaultPort}`
-      );
+      console.log(`Attempting to use fallback port: ${defaultPort}`);
 
       // フォールバック時もポートの利用可能性をチェック
       try {
         await findAvailablePort(defaultPort, defaultPort);
         serverPort = defaultPort;
-        console.log(
-          `✓ Fallback port ${defaultPort} is available`
-        );
+        console.log(`✓ Fallback port ${defaultPort} is available`);
       } catch (fallbackError) {
         console.log(
           `✗ CRITICAL: Fallback port ${defaultPort} is also unavailable`
@@ -183,7 +186,7 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
         String(gunicornSettings.keep_alive),
         // access_logfileがnullまたは存在しない場合は引数を追加しない
         ...(gunicornSettings.access_logfile !== null &&
-          gunicornSettings.access_logfile !== undefined
+        gunicornSettings.access_logfile !== undefined
           ? ['--access-logfile', gunicornSettings.access_logfile]
           : []),
         '--log-level',
@@ -217,7 +220,11 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
 
       // pyenv環境変数を除外した、conda環境専用の環境変数を作成
       const condaBinDir = path.dirname(pythonExecutablePath);
-      const envVars = createCleanEnvironment(condaBinDir, serverPort, authToken);
+      const envVars = createCleanEnvironment(
+        condaBinDir,
+        serverPort,
+        authToken
+      );
 
       pythonProcess = spawn(pythonExecutablePath, gunicornArgs, {
         cwd: pythonPath,
@@ -231,7 +238,12 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
         console.log(
           `Starting health check for Gunicorn server on port ${flaskPort}`
         );
-        checkServerHealth(flaskPort!, authToken, healthCheckRetries, healthCheckInterval)
+        checkServerHealth(
+          flaskPort!,
+          authToken,
+          healthCheckRetries,
+          healthCheckInterval
+        )
           .then(() => resolve(flaskPort!))
           .catch(reject);
       }, initialDelay);
@@ -241,7 +253,11 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
 
       // pyenv環境変数を除外した、conda環境専用の環境変数を作成
       const condaBinDir = path.dirname(pythonExecutablePath);
-      const envVars = createCleanEnvironment(condaBinDir, serverPort, authToken);
+      const envVars = createCleanEnvironment(
+        condaBinDir,
+        serverPort,
+        authToken
+      );
 
       pythonProcess = spawn(pythonExecutablePath, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -254,7 +270,12 @@ export const startPythonServer = async (serverConfig: any, authToken: string): P
         console.log(
           `Starting health check for direct execution server on port ${flaskPort}`
         );
-        checkServerHealth(flaskPort!, authToken, healthCheckRetries, healthCheckInterval)
+        checkServerHealth(
+          flaskPort!,
+          authToken,
+          healthCheckRetries,
+          healthCheckInterval
+        )
           .then(() => resolve(flaskPort!))
           .catch(reject);
       }, 1000);

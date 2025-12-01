@@ -36,7 +36,9 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
       return pythonPath;
     }
   } catch (error) {
-    console.log('conda command unavailable in PATH, trying fallback locations...');
+    console.log(
+      'conda command unavailable in PATH, trying fallback locations...'
+    );
   }
 
   // 3. 一般的なインストールパスを探索（フォールバック）
@@ -66,7 +68,9 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
     }
   }
 
-  console.log(`conda environment '${envName}' not found in PATH or common locations`);
+  console.log(
+    `conda environment '${envName}' not found in PATH or common locations`
+  );
   return null;
 };
 
