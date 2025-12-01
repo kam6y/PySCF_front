@@ -58,73 +58,23 @@ export const useUnifiedWebSocket = ({
       const calculationId = updatedCalculation.id;
 
       try {
-        // 1. 個別計算詳細のキャッシュを更新
-        queryClient.setQueryData(['calculation', calculationId], {
-          calculation: updatedCalculation,
-        });
-
-        // 2. 計算リストのキャッシュを更新（楽観的更新）
-        queryClient.setQueryData(['calculations'], (oldData: any) => {
-          if (!oldData?.calculations) {
-            console.warn(
-              '[UnifiedWebSocket] No calculations data found for cache update'
-            );
-            return oldData;
-          }
-
-          const calculationIndex = oldData.calculations.findIndex(
-            (calc: any) => calc.id === calculationId
-          );
-
-          let updatedCalculations;
-          if (calculationIndex === -1) {
-            // 計算がリストに存在しない場合は新規追加
-            const newCalculationItem = {
-              id: calculationId,
-              name: updatedCalculation.name || calculationId,
-              status: updatedCalculation.status,
-              date:
-                updatedCalculation.updatedAt ||
-                updatedCalculation.createdAt ||
-                new Date().toISOString(),
-            };
-
-            updatedCalculations = [newCalculationItem, ...oldData.calculations];
-            console.log(
-              `[UnifiedWebSocket] Added new calculation ${calculationId} to cache with status ${updatedCalculation.status}`
-            );
-          } else {
-            // 既存の計算の場合は更新
-            updatedCalculations = oldData.calculations.map((calc: any) =>
-              calc.id === calculationId
-                ? {
-                    ...calc,
-                    status: updatedCalculation.status,
-                    date: updatedCalculation.updatedAt || calc.date,
-                    name: updatedCalculation.name || calc.name,
-                  }
-                : calc
-            );
-            console.log(
-              `[UnifiedWebSocket] Updated existing calculation ${calculationId} with status ${updatedCalculation.status}`
-            );
-          }
-
-          return {
-            ...oldData,
-            calculations: updatedCalculations,
-          };
-        });
-      } catch (error) {
-        console.error(
-          `[UnifiedWebSocket] Failed to update cache for calculation ${calculationId}:`,
-          error
-        );
-        // フォールバック：エラーが発生した場合は関連クエリを無効化
+        // キャッシュを無効化して再取得を促す（データの整合性はサーバーが保証）
+        // 1. 個別計算詳細のキャッシュを無効化
         queryClient.invalidateQueries({
           queryKey: ['calculation', calculationId],
         });
+
+        // 2. 計算リストのキャッシュを無効化
         queryClient.invalidateQueries({ queryKey: ['calculations'] });
+
+        console.log(
+          `[UnifiedWebSocket] Invalidated queries for calculation ${calculationId}`
+        );
+      } catch (error) {
+        console.error(
+          `[UnifiedWebSocket] Failed to invalidate queries for calculation ${calculationId}:`,
+          error
+        );
       }
     },
     [queryClient]
@@ -498,9 +448,9 @@ export const useUnifiedWebSocket = ({
             }),
             activeId && !activeId.startsWith('new-calculation-')
               ? queryClient.invalidateQueries({
-                  queryKey: ['calculation', activeId],
-                  refetchType: 'active',
-                })
+                queryKey: ['calculation', activeId],
+                refetchType: 'active',
+              })
               : Promise.resolve(),
           ]);
 
