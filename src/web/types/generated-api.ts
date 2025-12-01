@@ -1120,6 +1120,60 @@ export interface components {
             };
             /** @description Supported TDDFT calculation methods */
             tddft_methods: string[];
+            /** @description Default parameter values for each calculation method */
+            method_defaults: components["schemas"]["MethodDefaultValues"];
+            /** @description Constraints and validation rules for calculation parameters */
+            parameter_constraints: components["schemas"]["ParameterConstraints"];
+        };
+        /** @description Default values for each calculation method (e.g., DFT, CCSD, TDDFT) */
+        MethodDefaultValues: {
+            [key: string]: {
+                /** @description Default basis function for this method */
+                basis_function?: string;
+                /** @description Default memory allocation in megabytes */
+                memory_mb?: number;
+                /** @description Default geometry optimization setting */
+                optimize_geometry?: boolean;
+                /** @description Default frozen core approximation setting (CCSD/CCSD_T) */
+                frozen_core?: boolean;
+                /** @description Default number of excited states (TDDFT) */
+                tddft_nstates?: number;
+                /** @description Default TDDFT method (TDDFT) */
+                tddft_method?: string;
+                /** @description Default NTO analysis setting (TDDFT) */
+                tddft_analyze_nto?: boolean;
+                /** @description Default number of active orbitals (CASCI/CASSCF) */
+                ncas?: number;
+                /** @description Default number of active electrons (CASCI/CASSCF) */
+                nelecas?: number;
+                /** @description Default maximum macro iterations (CASSCF) */
+                max_cycle_macro?: number;
+                /** @description Default maximum micro iterations (CASCI/CASSCF) */
+                max_cycle_micro?: number;
+                /** @description Default natural orbital transformation setting (CASCI/CASSCF) */
+                natorb?: boolean;
+                /** @description Default energy convergence tolerance (CASSCF) */
+                conv_tol?: number;
+                /** @description Default gradient convergence tolerance (CASSCF) */
+                conv_tol_grad?: number;
+            };
+        };
+        /** @description Constraint definition for a calculation parameter */
+        ParameterConstraint: {
+            /** @description Minimum allowed value for this parameter */
+            min?: number;
+            /** @description Maximum allowed value for this parameter */
+            max?: number;
+            /** @description List of calculation methods this parameter applies to */
+            applicable_methods?: string[];
+            /** @description List of calculation methods where this parameter is disabled */
+            disabled_for?: string[];
+            /** @description Human-readable description of the constraint */
+            description?: string;
+        };
+        /** @description Constraints for all calculation parameters (e.g., ncas, optimize_geometry) */
+        ParameterConstraints: {
+            [key: string]: components["schemas"]["ParameterConstraint"];
         };
         SupportedParametersResponse: {
             /** @example true */

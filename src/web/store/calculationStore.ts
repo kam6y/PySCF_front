@@ -59,29 +59,20 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
   },
 
   createNewCalculation: () => {
+    // Minimal default parameters - method-specific defaults are applied by
+    // useMethodDefaults hook in CalculationSettingsPage.tsx
     const defaultParams: QuantumCalculationRequest = {
       calculation_method: 'DFT',
-      basis_function: '6-31G(d)',
-      exchange_correlation: 'B3LYP',
+      basis_function: '6-31G(d)', // Will be overridden by method defaults
+      exchange_correlation: 'B3LYP', // Will be overridden by method defaults
       charges: 0,
       spin: 0,
       solvent_method: 'none',
       solvent: '-',
       xyz: '',
       name: '',
-      tddft_nstates: 10,
-      tddft_method: 'TDDFT',
-      tddft_analyze_nto: false,
-      // CASCI/CASSCF parameters (required by generated types)
-      ncas: 4,
-      nelecas: 4,
-      max_cycle_macro: 50,
-      max_cycle_micro: 4,
-      natorb: true,
-      conv_tol: 1e-6,
-      conv_tol_grad: 1e-4,
-      optimize_geometry: true,
-    };
+      // Method-specific parameters will be set by useMethodDefaults
+    } as QuantumCalculationRequest;
 
     const newId = `new-calculation-${Date.now()}`;
     const newCalculation: CalculationInstance = {

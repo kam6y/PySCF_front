@@ -4,6 +4,7 @@ import logging
 from typing import Dict, List, Any
 from pyscf import gto, dft
 from data.solvent_properties import SOLVENT_DIELECTRIC
+from quantum_calc.method_defaults import get_method_defaults, get_parameter_constraints
 
 logger = logging.getLogger(__name__)
 
@@ -147,5 +148,7 @@ def get_all_supported_parameters() -> Dict[str, Any]:
         'exchange_correlation': get_supported_exchange_correlation(),
         'solvent_methods': get_supported_solvent_methods(),
         'solvents': get_supported_solvents(),
-        'tddft_methods': get_supported_tddft_methods()
+        'tddft_methods': get_supported_tddft_methods(),
+        'method_defaults': get_method_defaults(),
+        'parameter_constraints': get_parameter_constraints()
     }

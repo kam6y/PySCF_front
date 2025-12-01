@@ -2052,7 +2052,7 @@ components:
 
     SupportedParametersData:
       type: object
-      required: [calculation_methods, basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods]
+      required: [calculation_methods, basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods, method_defaults, parameter_constraints]
       properties:
         calculation_methods:
           type: array
@@ -2090,6 +2090,92 @@ components:
           items:
             type: string
           description: Supported TDDFT calculation methods
+        method_defaults:
+          $ref: '#/components/schemas/MethodDefaultValues'
+          description: Default parameter values for each calculation method
+        parameter_constraints:
+          $ref: '#/components/schemas/ParameterConstraints'
+          description: Constraints and validation rules for calculation parameters
+
+    MethodDefaultValues:
+      type: object
+      additionalProperties:
+        type: object
+        description: Default parameter values for a specific calculation method
+        properties:
+          basis_function:
+            type: string
+            description: Default basis function for this method
+          memory_mb:
+            type: integer
+            description: Default memory allocation in megabytes
+          optimize_geometry:
+            type: boolean
+            description: Default geometry optimization setting
+          frozen_core:
+            type: boolean
+            description: Default frozen core approximation setting (CCSD/CCSD_T)
+          tddft_nstates:
+            type: integer
+            description: Default number of excited states (TDDFT)
+          tddft_method:
+            type: string
+            description: Default TDDFT method (TDDFT)
+          tddft_analyze_nto:
+            type: boolean
+            description: Default NTO analysis setting (TDDFT)
+          ncas:
+            type: integer
+            description: Default number of active orbitals (CASCI/CASSCF)
+          nelecas:
+            type: integer
+            description: Default number of active electrons (CASCI/CASSCF)
+          max_cycle_macro:
+            type: integer
+            description: Default maximum macro iterations (CASSCF)
+          max_cycle_micro:
+            type: integer
+            description: Default maximum micro iterations (CASCI/CASSCF)
+          natorb:
+            type: boolean
+            description: Default natural orbital transformation setting (CASCI/CASSCF)
+          conv_tol:
+            type: number
+            description: Default energy convergence tolerance (CASSCF)
+          conv_tol_grad:
+            type: number
+            description: Default gradient convergence tolerance (CASSCF)
+      description: Default values for each calculation method (e.g., DFT, CCSD, TDDFT)
+
+    ParameterConstraint:
+      type: object
+      properties:
+        min:
+          type: number
+          description: Minimum allowed value for this parameter
+        max:
+          type: number
+          description: Maximum allowed value for this parameter
+        applicable_methods:
+          type: array
+          items:
+            type: string
+          description: List of calculation methods this parameter applies to
+        disabled_for:
+          type: array
+          items:
+            type: string
+          description: List of calculation methods where this parameter is disabled
+        description:
+          type: string
+          description: Human-readable description of the constraint
+      description: Constraint definition for a calculation parameter
+
+    ParameterConstraints:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/ParameterConstraint'
+      description: Constraints for all calculation parameters (e.g., ncas, optimize_geometry)
 
     SupportedParametersResponse:
       type: object
