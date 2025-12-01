@@ -296,16 +296,20 @@ H    1.4671  1.1550  0.0848"""
         GIVEN a calculation that is not in 'running' state
         WHEN pause is requested
         THEN a 400 error is returned
+
+        NOTE: Uses DFT parameters, therefore DFT calculator must be mocked.
         """
         # ARRANGE - Create a completed calculation
         mock_mol = mocker.MagicMock()
         mock_scf = mocker.MagicMock()
-        mock_scf.kernel.return_value = -1.06
+        mock_scf.kernel.return_value = -76.0
         mock_scf.mo_energy = [-0.5, 0.3]
         mock_scf.mo_occ = [2.0, 0.0]
 
-        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
-        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
+        # Mock DFT calculator (not HF) since quick_DFT_params uses calculation_method="DFT"
+        mocker.patch('quantum_calc.dft_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.dft_calculator.dft.RKS', return_value=mock_scf)
+        mocker.patch('quantum_calc.dft_calculator.dft.UKS', return_value=mock_scf)
 
         # Submit and wait for completion
         response = client.post('/api/quantum/calculate', json=quick_DFT_params)
@@ -329,16 +333,20 @@ H    1.4671  1.1550  0.0848"""
         GIVEN a calculation that is not in 'paused' state
         WHEN resume is requested
         THEN a 400 error is returned
+
+        NOTE: Uses DFT parameters, therefore DFT calculator must be mocked.
         """
         # ARRANGE - Create a completed calculation
         mock_mol = mocker.MagicMock()
         mock_scf = mocker.MagicMock()
-        mock_scf.kernel.return_value = -1.06
+        mock_scf.kernel.return_value = -76.0
         mock_scf.mo_energy = [-0.5, 0.3]
         mock_scf.mo_occ = [2.0, 0.0]
 
-        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
-        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
+        # Mock DFT calculator (not HF) since quick_DFT_params uses calculation_method="DFT"
+        mocker.patch('quantum_calc.dft_calculator.gto.M', return_value=mock_mol)
+        mocker.patch('quantum_calc.dft_calculator.dft.RKS', return_value=mock_scf)
+        mocker.patch('quantum_calc.dft_calculator.dft.UKS', return_value=mock_scf)
 
         # Submit and wait for completion
         response = client.post('/api/quantum/calculate', json=quick_DFT_params)
