@@ -246,27 +246,75 @@ The built AppImage will be available in the `dist/` directory.
 
     # Complete build test (frontend + backend)
     npm run test:build
-    
+
     # Test Python imports and dependencies
     npm run test:python-build
-    
+
     # Test Gunicorn server locally with unified configuration
     npm run test:gunicorn-local
-    
+
     # Full packaging test (build + package)
     npm run test:run-packaged
-    
-    # --- Manual Python Backend Testing (in a separate terminal) ---
-    cd src/python
-    
-    # Activate conda environment
-    conda activate pyscf-env
-    
-    # Start Flask API server directly
-    python app.py
-    
-    # Run Python backend tests
-    pytest tests/
+
+#### Python Backend Testing
+
+**IMPORTANT:** Always use the conda environment's Python interpreter directly when running tests. Using the system Python (`python` or `python3`) may cause import errors or use the wrong dependencies.
+
+**Find Your Conda Environment Path:**
+```bash
+# macOS/Linux - Common conda locations
+ls ~/miniforge3/envs/pyscf-env/bin/python     # Miniforge
+ls ~/miniconda3/envs/pyscf-env/bin/python     # Miniconda
+ls ~/anaconda3/envs/pyscf-env/bin/python      # Anaconda
+
+# Or use conda to find it
+conda activate pyscf-env
+which python
+```
+
+**Run Tests with Conda Python:**
+```bash
+# Navigate to Python source directory
+cd src/python
+
+# Run all tests
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ -v
+
+# Run specific test file
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py -v
+
+# Run specific test class or function
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py::TestCalculationSubmissionAPI::test_dft_rejects_casci_parameters -xvs
+
+# Run tests with coverage
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ --cov=. --cov-report=html
+
+# Run tests matching a keyword
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ -k "pause_resume" -v
+```
+
+**Alternative: Activate Environment First (Traditional Method):**
+```bash
+# Activate conda environment
+conda activate pyscf-env
+
+# Then you can use 'python' directly
+cd src/python
+python -m pytest tests/ -v
+
+# Start Flask API server for manual testing
+python app.py
+```
+
+**Common pytest Options:**
+- `-v` or `-vv`: Verbose output (show test names and details)
+- `-x`: Stop at first failure
+- `-s`: Show print statements and logging output
+- `--tb=short`: Shorter traceback format
+- `--tb=line`: One-line traceback format
+- `-k "keyword"`: Run tests matching keyword
+- `--lf`: Run only last failed tests
+- `--ff`: Run failures first, then remaining tests
 
 ## Development Workflow
 The `npm run dev` script is the primary command for development. It automatically:

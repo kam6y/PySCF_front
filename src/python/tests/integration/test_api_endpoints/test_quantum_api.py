@@ -176,7 +176,9 @@ class TestCalculationSubmissionAPI:
         assert response.status_code == 400
         data = response.get_json()
         assert data['success'] is False
-        assert 'ncas' in data['error'].lower() or 'not applicable' in data['error'].lower()
+        # Check for error in either 'error' or 'validation_error' field
+        error_message = data.get('error', data.get('validation_error', '')).lower()
+        assert 'ncas' in error_message or 'not applicable' in error_message
 
     def test_tddft_rejects_optimize_geometry_true(self, client, mocker, sample_h2_xyz):
         """

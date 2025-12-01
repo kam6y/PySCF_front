@@ -136,7 +136,7 @@ H    1.4671  1.1550  0.0848"""
             "name": "Test Ethanol DFT for Pause/Resume",
             "xyz": ethanol_xyz,
             "calculation_method": "DFT",
-            "functional": "b3lyp",  # Hybrid functional
+            "exchange_correlation": "b3lyp",  # Hybrid functional (correct field name)
             "basis_function": "cc-pvdz",  # Larger basis set for longer calculation
             "charges": 0,
             "spin": 0,

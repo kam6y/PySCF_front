@@ -50,14 +50,53 @@ def get_supported_parameters():
 
 
 @quantum_bp.route('/api/quantum/calculate', methods=['POST'])
-@validate()
-def quantum_calculate(body: QuantumCalculationRequest):
+def quantum_calculate():
     """
     Starts a quantum chemistry calculation in the background.
     Immediately returns a calculation ID to track the job.
     """
     try:
         quantum_service = get_quantum_service()
+
+        # Get raw JSON data before Pydantic validation
+        raw_data = request.get_json()
+        if not raw_data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body is required'
+            }), 400
+
+        # Extract calculation method for early validation
+        calculation_method = raw_data.get('calculation_method')
+        if not calculation_method:
+            return jsonify({
+                'success': False,
+                'error': 'calculation_method is required'
+            }), 400
+
+        # Validate parameter applicability BEFORE Pydantic validation
+        # This ensures we catch inapplicable parameters that Pydantic would ignore
+        from quantum_calc.method_defaults import validate_parameters_for_method
+        is_valid, applicability_error = validate_parameters_for_method(
+            calculation_method,
+            raw_data
+        )
+        if not is_valid:
+            logger.warning(f"Parameter applicability check failed: {applicability_error}")
+            return jsonify({
+                'success': False,
+                'validation_error': applicability_error
+            }), 400
+
+        # Now validate with Pydantic
+        try:
+            body = QuantumCalculationRequest.model_validate(raw_data)
+        except Exception as e:
+            logger.warning(f"Pydantic validation failed: {e}")
+            return jsonify({
+                'success': False,
+                'validation_error': str(e)
+            }), 400
 
         # Extract enum values helper function
         def get_enum_value(field_value):
@@ -82,11 +121,11 @@ def quantum_calculate(body: QuantumCalculationRequest):
         # タイムスタンプを追加
         parameters['created_at'] = datetime.now().isoformat()
 
-        # Call service layer (will validate parameter applicability)
+        # Call service layer (also validates parameters for defense-in-depth and AI agent calls)
         result = quantum_service.start_calculation(parameters)
-        
+
         return jsonify({'success': True, 'data': {'calculation': result}}), 202
-    
+
     except ServiceError as e:
         logger.error(f"Service error starting calculation: {e}")
         return jsonify({'success': False, 'error': e.message}), e.status_code

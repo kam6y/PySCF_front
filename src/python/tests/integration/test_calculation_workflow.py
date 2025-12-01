@@ -206,17 +206,31 @@ class TestCalculationWorkflowSync:
         # (Cannot delete running calculations)
         max_wait = 15  # seconds
         start_time = time.time()
+        final_status = None
         while time.time() - start_time < max_wait:
             response = client.get(f'/api/quantum/calculations/{calc_id}')
             calc_status = response.get_json()['data']['calculation']['status']
+            final_status = calc_status
             if calc_status in ['completed', 'error']:
                 break
             time.sleep(0.1)
 
+        # Ensure calculation has finished
+        assert final_status in ['completed', 'error'], \
+            f"Calculation did not complete within {max_wait}s. Final status: {final_status}"
+
         # ACT
         response_delete = client.delete(f'/api/quantum/calculations/{calc_id}')
 
-        # ASSERT
+        # ASSERT - provide detailed error info if deletion fails
+        if response_delete.status_code != 200:
+            delete_data = response_delete.get_json()
+            error_msg = delete_data.get('error', 'Unknown error')
+            pytest.fail(
+                f"Expected 200 OK, got {response_delete.status_code}. "
+                f"Error: {error_msg}. Final calc status: {final_status}"
+            )
+
         assert response_delete.status_code == 200
         delete_data = response_delete.get_json()
         assert delete_data['success'] is True
