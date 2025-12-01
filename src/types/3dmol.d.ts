@@ -42,6 +42,11 @@ export interface StyleSpec {
   };
 }
 
+export interface ExtendedStyleSpec extends StyleSpec {
+  _useAtomicRadii?: boolean;
+  _baseAtomRadius?: number;
+}
+
 export interface ViewerSpec {
   defaultcolors?: any;
   nomouse?: boolean;

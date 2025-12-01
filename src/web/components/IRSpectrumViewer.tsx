@@ -19,7 +19,7 @@ import {
 import styles from './IRSpectrumViewer.module.css';
 import { getIRSpectrum } from '../apiClient';
 import type { components } from '../types/generated-api';
-import { MoleculeViewer, MoleculeViewerRef } from './MoleculeViewer';
+import { MoleculeViewer } from './MoleculeViewer';
 
 type IRSpectrumData = components['schemas']['IRSpectrumData'];
 type IRPeak = components['schemas']['IRPeak'];
@@ -98,7 +98,6 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
     const [moleculeXYZ, setMoleculeXYZ] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const isMountedRef = useRef(true);
-    const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
 
     const fetchIRSpectrum = useCallback(async () => {
       if (!calculationId || !isMountedRef.current) return;
@@ -575,7 +574,6 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
               </div>
               <div className={styles.moleculeViewerContainer}>
                 <MoleculeViewer
-                  ref={moleculeViewerRef}
                   width="100%"
                   height="500px"
                   backgroundColor="#f8f9fa"

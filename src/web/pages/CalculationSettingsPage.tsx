@@ -3,10 +3,10 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 import styles from './CalculationSettingsPage.module.css';
-import { MoleculeViewerRef } from '../components/MoleculeViewer';
+import { MoleculeViewer } from '../components/MoleculeViewer';
 import { XYZInput } from '../components/XYZInput';
 import { MoleculeViewerSection } from '../components/MoleculeViewerSection';
-import { StyleSpec } from '../../types/3dmol';
+import { StyleSpec, ExtendedStyleSpec } from '../../types/3dmol';
 import {
   QuantumCalculationRequest,
   CalculationInstance,
@@ -44,9 +44,10 @@ export const CalculationSettingsPage = ({
   onCalculationResume,
   createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
-  const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const previousCalculationIdRef = useRef<string | null>(null);
-  const currentStyleRef = useRef<StyleSpec | null>(null);
+  const [currentStyle, setCurrentStyle] = useState<ExtendedStyleSpec | null>(
+    null
+  );
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [inputMethod, setInputMethod] = useState('pubchem');
   const [pubchemInput, setPubchemInput] = useState('');
@@ -69,6 +70,7 @@ export const CalculationSettingsPage = ({
   const { applyMethodDefaults, isParameterDisabled, getParameterConstraint } =
     useMethodDefaults();
 
+  // Initialize local state when active calculation changes
   useEffect(() => {
     const currentCalculationId = activeCalculation?.id || null;
     const previousCalculationId = previousCalculationIdRef.current;
@@ -82,25 +84,12 @@ export const CalculationSettingsPage = ({
             ''
         );
       }
-
-      const xyz = activeCalculation.parameters?.xyz;
-      if (xyz && xyz.trim() !== '') {
-        // Ensure viewer is initialized before loading molecule
-        setTimeout(() => {
-          moleculeViewerRef.current?.loadXYZ(xyz);
-          // Apply the current style after loading the molecule
-          if (currentStyleRef.current) {
-            setTimeout(() => {
-              moleculeViewerRef.current?.setStyle(currentStyleRef.current!);
-            }, 100); // Small delay to ensure the molecule is fully loaded
-          }
-        }, 0);
-      } else {
-        moleculeViewerRef.current?.clearModels();
+      // Initialize inputs based on calculation data
+      if (activeCalculation.parameters?.xyz) {
+        // setXyzInput was removed as it was unused
       }
     } else {
       setLocalName('');
-      moleculeViewerRef.current?.clearModels();
       setIsEditingName(false);
     }
 
@@ -108,28 +97,23 @@ export const CalculationSettingsPage = ({
   }, [activeCalculation, isEditingName]);
 
   useEffect(() => {
-    moleculeViewerRef.current?.showAxes(showAxes);
-  }, [showAxes, activeCalculation]);
-
-  useEffect(() => {
-    moleculeViewerRef.current?.showAtomCoordinates(showCoordinates);
-  }, [showCoordinates, activeCalculation]);
-
-  useEffect(() => {
     // Re-apply the current style when atomic radii setting changes
     const hasValidMolecule = !!(
       activeCalculation?.parameters?.xyz &&
       activeCalculation.parameters.xyz.trim() !== ''
     );
-    if (currentStyleRef.current && hasValidMolecule) {
-      const style = { ...currentStyleRef.current };
-      if (useAtomicRadii) {
-        (style as any)._useAtomicRadii = true;
-        (style as any)._baseAtomRadius = 0.3;
-      } else {
-        (style as any)._useAtomicRadii = false;
-      }
-      moleculeViewerRef.current?.setStyle(style);
+    if (hasValidMolecule) {
+      setCurrentStyle(prevStyle => {
+        if (!prevStyle) return null;
+        const style = { ...prevStyle };
+        if (useAtomicRadii) {
+          style._useAtomicRadii = true;
+          style._baseAtomRadius = 0.3;
+        } else {
+          style._useAtomicRadii = false;
+        }
+        return style;
+      });
     }
   }, [useAtomicRadii, activeCalculation?.parameters?.xyz]);
 
@@ -206,15 +190,9 @@ export const CalculationSettingsPage = ({
     activeCalculation.parameters.xyz.trim() !== ''
   );
 
-  const handleStyleChange = useCallback(
-    (style: StyleSpec) => {
-      currentStyleRef.current = style;
-      if (hasValidMolecule) {
-        moleculeViewerRef.current?.setStyle(style);
-      }
-    },
-    [hasValidMolecule]
-  );
+  const handleStyleChange = useCallback((style: StyleSpec) => {
+    setCurrentStyle(style);
+  }, []);
 
   const handleXYZChange = useCallback(
     (xyzData: string, isValid: boolean) => {
@@ -1100,8 +1078,9 @@ export const CalculationSettingsPage = ({
           </div>
         </div>
         <MoleculeViewerSection
-          moleculeViewerRef={moleculeViewerRef}
           hasValidMolecule={hasValidMolecule}
+          xyzData={activeCalculation?.parameters?.xyz}
+          currentStyle={currentStyle}
           onStyleChange={handleStyleChange}
           showAxes={showAxes}
           onShowAxesChange={setShowAxes}

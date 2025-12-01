@@ -1,12 +1,13 @@
 import { RefObject } from 'react';
-import { MoleculeViewer, MoleculeViewerRef } from './MoleculeViewer';
+import { MoleculeViewer } from './MoleculeViewer';
 import { StyleControls } from './StyleControls';
 import { StyleSpec } from '../../types/3dmol';
 import styles from './MoleculeViewerSection.module.css';
 
 interface MoleculeViewerSectionProps {
-  moleculeViewerRef: RefObject<MoleculeViewerRef | null>;
   hasValidMolecule: boolean;
+  xyzData?: string | null;
+  currentStyle?: StyleSpec | null;
   onStyleChange: (style: StyleSpec) => void;
   showAxes: boolean;
   onShowAxesChange: (show: boolean) => void;
@@ -17,8 +18,9 @@ interface MoleculeViewerSectionProps {
 }
 
 export const MoleculeViewerSection = ({
-  moleculeViewerRef,
   hasValidMolecule,
+  xyzData,
+  currentStyle,
   onStyleChange,
   showAxes,
   onShowAxesChange,
@@ -31,7 +33,10 @@ export const MoleculeViewerSection = ({
     <div className={styles.mainContent}>
       <div className={styles.leftColumn}>
         <MoleculeViewer
-          ref={moleculeViewerRef}
+          xyzData={xyzData}
+          currentStyle={currentStyle}
+          showAxes={showAxes}
+          showCoordinates={showCoordinates}
           width={'100%'}
           height={'100%'}
           backgroundColor="white"
