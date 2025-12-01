@@ -46,6 +46,14 @@ class TestCalculationWorkflowSync:
         mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
         mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
 
+        # Mock resource manager to ensure calculation starts immediately
+        # This prevents CI failures where low resources might cause queuing
+        from quantum_calc.resource_manager import AllocationStatus
+        mocker.patch(
+            'quantum_calc.resource_manager.SystemResourceManager.check_allocation_status',
+            return_value=(AllocationStatus.CAN_START, "Mocked resources available")
+        )
+
         # ACT
         # Step 1: Submit calculation
         response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
