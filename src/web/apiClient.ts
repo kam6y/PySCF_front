@@ -109,47 +109,8 @@ export class ApiError extends Error {
     }
   }
 
-  /**
-   * エラーのタイプを判定するヘルパーメソッド
-   */
-  get errorType(): 'network' | 'client' | 'server' | 'unknown' {
-    if (this.isNetworkError) return 'network';
-    if (this.status >= 400 && this.status < 500) return 'client';
-    if (this.status >= 500) return 'server';
-    return 'unknown';
-  }
-
-  /**
-   * ユーザーフレンドリーなエラーメッセージを生成
-   */
-  getUserMessage(): string {
-    switch (this.errorType) {
-      case 'network':
-        return 'A network connection error occurred. Please check your internet connection.';
-      case 'client':
-        if (this.status === 404) {
-          return 'The requested resource was not found.';
-        }
-        if (this.status === 400) {
-          return 'There is an issue with the request. Please check your input.';
-        }
-        if (this.status === 401) {
-          return 'Authentication is required.';
-        }
-        if (this.status === 403) {
-          return 'You do not have permission to access this resource.';
-        }
-        return 'A request error occurred.';
-      case 'server':
-        if (this.status === 503) {
-          return 'The server is temporarily unavailable. Please try again later.';
-        }
-        return 'A server error occurred. Please contact the administrator.';
-      default:
-        return this.message || 'An unknown error occurred.';
-    }
-  }
 }
+
 
 /**
  * APIリクエストを処理する汎用関数
@@ -393,9 +354,8 @@ export const getOrbitalCube = (
   }
 
   const queryString = queryParams.toString();
-  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube${
-    queryString ? `?${queryString}` : ''
-  }`;
+  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube${queryString ? `?${queryString}` : ''
+    }`;
 
   return request<OrbitalCubeResponseData>(endpoint, { method: 'GET' });
 };
@@ -436,9 +396,8 @@ export const deleteCubeFiles = (
   }
 
   const queryString = queryParams.toString();
-  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/cube-files${
-    queryString ? `?${queryString}` : ''
-  }`;
+  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/cube-files${queryString ? `?${queryString}` : ''
+    }`;
 
   return request<CubeFilesDeleteResponseData>(endpoint, { method: 'DELETE' });
 };
@@ -487,9 +446,8 @@ export const getIRSpectrum = (
   }
 
   const queryString = queryParams.toString();
-  const endpoint = `/api/quantum/calculations/${calculationId}/ir-spectrum${
-    queryString ? `?${queryString}` : ''
-  }`;
+  const endpoint = `/api/quantum/calculations/${calculationId}/ir-spectrum${queryString ? `?${queryString}` : ''
+    }`;
 
   return request<IRSpectrumResponseData>(endpoint, { method: 'GET' });
 };
@@ -604,7 +562,7 @@ export const streamChatWithAgent = (
             callbacks.onError(
               new Error(
                 parsedData.payload?.message ||
-                  'An unknown stream error occurred.'
+                'An unknown stream error occurred.'
               )
             );
           }

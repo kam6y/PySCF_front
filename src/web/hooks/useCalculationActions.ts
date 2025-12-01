@@ -15,8 +15,8 @@ import { useCalculationStore } from '../store/calculationStore';
 import {
   showErrorNotification,
   showInfoNotification,
-  showResourceInsufficientErrorNotification,
 } from '../store/notificationStore';
+import { handleError } from '../utils/errorHandler';
 
 export const useCalculationActions = () => {
   const queryClient = useQueryClient();
@@ -28,17 +28,7 @@ export const useCalculationActions = () => {
   const { clearStagedCalculation, setActiveCalculationId } =
     useCalculationStore();
 
-  const handleApiError = (error: unknown, defaultMessage: string) => {
-    console.error(defaultMessage, error);
 
-    if (error instanceof ApiError) {
-      showErrorNotification(defaultMessage, error.getUserMessage());
-    } else if (error instanceof Error) {
-      showErrorNotification(defaultMessage, error.message);
-    } else {
-      showErrorNotification(defaultMessage, 'An unknown error occurred.');
-    }
-  };
 
   const handleStartCalculation = async (
     calculationParams: QuantumCalculationRequest
@@ -86,23 +76,12 @@ export const useCalculationActions = () => {
             errorMessage.toLowerCase().includes('no active calculations');
 
           if (isResourceInsufficientError) {
-            showResourceInsufficientErrorNotification(
-              errorMessage,
-              runningCalculation.id
-            );
+            handleError(new Error(errorMessage), 'Calculation failed');
           } else {
-            showErrorNotification(
-              `Calculation "${calculationParams.name}" failed`,
-              errorMessage,
-              runningCalculation.id
-            );
+            handleError(new Error(errorMessage), `Calculation "${calculationParams.name}" failed`);
           }
         } else {
-          showErrorNotification(
-            `Calculation "${calculationParams.name}" failed`,
-            'Detailed error information is not available.',
-            runningCalculation.id
-          );
+          handleError(new Error('Detailed error information is not available.'), `Calculation "${calculationParams.name}" failed`);
         }
       } else {
         // その他のステータスの場合は汎用メッセージ
@@ -114,7 +93,7 @@ export const useCalculationActions = () => {
 
       return runningCalculation;
     } catch (error) {
-      handleApiError(error, 'Failed to start calculation');
+      handleError(error, 'Failed to start calculation');
       throw error;
     }
   };
@@ -133,7 +112,7 @@ export const useCalculationActions = () => {
       await deleteCalculationMutation.mutateAsync(calculationId);
       // 削除された計算がアクティブだった場合の後処理は呼び出し元で処理
     } catch (error) {
-      handleApiError(error, 'Failed to delete calculation');
+      handleError(error, 'Failed to delete calculation');
       throw error;
     }
   };
@@ -146,7 +125,7 @@ export const useCalculationActions = () => {
         'The calculation will pause after the current iteration completes.'
       );
     } catch (error) {
-      handleApiError(error, 'Failed to pause calculation');
+      handleError(error, 'Failed to pause calculation');
       throw error;
     }
   };
@@ -159,7 +138,7 @@ export const useCalculationActions = () => {
         'The calculation is resuming from where it was paused.'
       );
     } catch (error) {
-      handleApiError(error, 'Failed to resume calculation');
+      handleError(error, 'Failed to resume calculation');
       throw error;
     }
   };

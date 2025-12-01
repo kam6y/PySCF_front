@@ -3,11 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { io, Socket } from 'socket.io-client';
 import { CalculationInstance } from '../types/api-types';
 import {
-  showErrorNotification,
   showSuccessNotification,
   showInfoNotification,
-  showResourceInsufficientErrorNotification,
 } from '../store/notificationStore';
+import { handleError } from '../utils/errorHandler';
 
 export interface UseUnifiedWebSocketOptions {
   activeCalculationId: string | null;
@@ -130,12 +129,9 @@ export const useUnifiedWebSocket = ({
             : `Calculation "${molecularName}" failed to start`;
 
         if (isResourceInsufficientError) {
-          showResourceInsufficientErrorNotification(
-            errorMessage,
-            calculationId
-          );
+          handleError(new Error(errorMessage), 'Calculation failed');
         } else {
-          showErrorNotification(title, errorMessage, calculationId);
+          handleError(new Error(errorMessage), `Calculation "${molecularName}" failed`);
         }
       }
 
@@ -267,7 +263,7 @@ export const useUnifiedWebSocket = ({
         now - lastErrorNotificationTimeRef.current;
 
       if (timeSinceLastNotification > 30000) {
-        showErrorNotification('Real-time monitoring error', error);
+        handleError(error, 'Real-time monitoring error');
         lastErrorNotificationTimeRef.current = now;
       } else {
         console.log(
@@ -464,9 +460,11 @@ export const useUnifiedWebSocket = ({
           );
 
           if (syncFailureCountRef.current >= 2) {
-            showErrorNotification(
-              'Connection synchronization failed',
-              'Unable to sync calculation data after reconnection. Please refresh the page if calculations appear outdated.'
+            handleError(
+              new Error(
+                'Unable to sync calculation data after reconnection. Please refresh the page if calculations appear outdated.'
+              ),
+              'Connection synchronization failed'
             );
             syncFailureCountRef.current = 0;
           }

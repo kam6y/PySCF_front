@@ -9,7 +9,7 @@ import {
   CalculationInstance,
   ApiError,
 } from '../types/api-types';
-import { showErrorNotification } from '../store/notificationStore';
+import { handleError } from '../utils/errorHandler';
 
 export interface CalculationOperations {
   handleStartCalculation: (
@@ -35,17 +35,7 @@ export const useCalculationOperations = (
     clearStagedCalculation,
   } = useCalculationStore();
 
-  const handleApiError = (error: unknown, defaultMessage: string) => {
-    console.error(defaultMessage, error);
 
-    if (error instanceof ApiError) {
-      showErrorNotification(defaultMessage, error.getUserMessage());
-    } else if (error instanceof Error) {
-      showErrorNotification(defaultMessage, error.message);
-    } else {
-      showErrorNotification(defaultMessage, 'An unknown error occurred.');
-    }
-  };
 
   const handleStartCalculation = async (
     params: QuantumCalculationRequest
@@ -59,7 +49,7 @@ export const useCalculationOperations = (
 
       return runningCalculation;
     } catch (error) {
-      handleApiError(error, 'Failed to start calculation');
+      handleError(error, 'Failed to start calculation');
       throw error;
     }
   };
@@ -74,7 +64,7 @@ export const useCalculationOperations = (
         newName,
       });
     } catch (error) {
-      handleApiError(error, 'Failed to change calculation name');
+      handleError(error, 'Failed to change calculation name');
     }
   };
 
@@ -89,7 +79,7 @@ export const useCalculationOperations = (
         setCurrentPage('calculation-settings');
       }
     } catch (error) {
-      handleApiError(error, 'Failed to delete calculation');
+      handleError(error, 'Failed to delete calculation');
     }
   };
 
