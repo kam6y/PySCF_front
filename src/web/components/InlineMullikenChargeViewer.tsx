@@ -134,8 +134,8 @@ export const InlineMullikenChargeViewer: React.FC<InlineMullikenChargeViewerProp
             colorscheme: {
               prop: 'charge',
               gradient: 'rwb',
-              min: -chargeRange,
-              max: chargeRange,
+              min: chargeRange,
+              max: -chargeRange,
             },
           },
           {},

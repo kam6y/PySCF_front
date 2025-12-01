@@ -35,8 +35,6 @@ export const useCalculationOperations = (
     clearStagedCalculation,
   } = useCalculationStore();
 
-
-
   const handleStartCalculation = async (
     params: QuantumCalculationRequest
   ): Promise<CalculationInstance> => {

@@ -53,19 +53,17 @@ export const MoleculeViewerSection = ({
           </div>
         )}
       </div>
-      <div>
-        <section className={styles.rightColumn}>
-          <StyleControls
-            onStyleChange={onStyleChange}
-            showAxes={showAxes}
-            onShowAxesChange={onShowAxesChange}
-            showCoordinates={showCoordinates}
-            onShowCoordinatesChange={onShowCoordinatesChange}
-            useAtomicRadii={useAtomicRadii}
-            onUseAtomicRadiiChange={onUseAtomicRadiiChange}
-          />
-        </section>
-      </div>
+      <section className={styles.rightColumn}>
+        <StyleControls
+          onStyleChange={onStyleChange}
+          showAxes={showAxes}
+          onShowAxesChange={onShowAxesChange}
+          showCoordinates={showCoordinates}
+          onShowCoordinatesChange={onShowCoordinatesChange}
+          useAtomicRadii={useAtomicRadii}
+          onUseAtomicRadiiChange={onUseAtomicRadiiChange}
+        />
+      </section>
     </div>
   );
 };

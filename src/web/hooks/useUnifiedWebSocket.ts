@@ -131,7 +131,10 @@ export const useUnifiedWebSocket = ({
         if (isResourceInsufficientError) {
           handleError(new Error(errorMessage), 'Calculation failed');
         } else {
-          handleError(new Error(errorMessage), `Calculation "${molecularName}" failed`);
+          handleError(
+            new Error(errorMessage),
+            `Calculation "${molecularName}" failed`
+          );
         }
       }
 
@@ -444,9 +447,9 @@ export const useUnifiedWebSocket = ({
             }),
             activeId && !activeId.startsWith('new-calculation-')
               ? queryClient.invalidateQueries({
-                queryKey: ['calculation', activeId],
-                refetchType: 'active',
-              })
+                  queryKey: ['calculation', activeId],
+                  refetchType: 'active',
+                })
               : Promise.resolve(),
           ]);
 

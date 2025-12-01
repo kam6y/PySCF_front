@@ -41,7 +41,8 @@ export const handleError = (error: unknown, context?: string) => {
       message = 'You do not have permission to access this resource.';
     } else if (error.status === 503) {
       title = 'Service Unavailable';
-      message = 'The server is temporarily unavailable. Please try again later.';
+      message =
+        'The server is temporarily unavailable. Please try again later.';
     } else if (error.status >= 500) {
       title = 'Server Error';
       message = 'A server error occurred. Please contact the administrator.';

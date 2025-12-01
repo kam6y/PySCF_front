@@ -108,9 +108,7 @@ export class ApiError extends Error {
       Error.captureStackTrace(this, ApiError);
     }
   }
-
 }
-
 
 /**
  * APIリクエストを処理する汎用関数
@@ -354,8 +352,9 @@ export const getOrbitalCube = (
   }
 
   const queryString = queryParams.toString();
-  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube${queryString ? `?${queryString}` : ''
-    }`;
+  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/${orbitalIndex}/cube${
+    queryString ? `?${queryString}` : ''
+  }`;
 
   return request<OrbitalCubeResponseData>(endpoint, { method: 'GET' });
 };
@@ -396,8 +395,9 @@ export const deleteCubeFiles = (
   }
 
   const queryString = queryParams.toString();
-  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/cube-files${queryString ? `?${queryString}` : ''
-    }`;
+  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/cube-files${
+    queryString ? `?${queryString}` : ''
+  }`;
 
   return request<CubeFilesDeleteResponseData>(endpoint, { method: 'DELETE' });
 };
@@ -446,8 +446,9 @@ export const getIRSpectrum = (
   }
 
   const queryString = queryParams.toString();
-  const endpoint = `/api/quantum/calculations/${calculationId}/ir-spectrum${queryString ? `?${queryString}` : ''
-    }`;
+  const endpoint = `/api/quantum/calculations/${calculationId}/ir-spectrum${
+    queryString ? `?${queryString}` : ''
+  }`;
 
   return request<IRSpectrumResponseData>(endpoint, { method: 'GET' });
 };
@@ -562,7 +563,7 @@ export const streamChatWithAgent = (
             callbacks.onError(
               new Error(
                 parsedData.payload?.message ||
-                'An unknown stream error occurred.'
+                  'An unknown stream error occurred.'
               )
             );
           }

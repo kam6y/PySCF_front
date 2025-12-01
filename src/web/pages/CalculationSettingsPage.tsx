@@ -723,7 +723,7 @@ export const CalculationSettingsPage = ({
               params.calculation_method === 'CASSCF') && (
               <section className={styles.calculationSettingsSection}>
                 <div className={styles.settingRow}>
-                  <label>Number of Active Orbitals (ncas)</label>
+                  <label>Number of Active Orbitals</label>
                   <input
                     type="number"
                     value={(params as any).ncas}
@@ -743,7 +743,7 @@ export const CalculationSettingsPage = ({
                   />
                 </div>
                 <div className={styles.settingRow}>
-                  <label>Number of Active Electrons (nelecas)</label>
+                  <label>Number of Active Electrons</label>
                   <input
                     type="number"
                     value={(params as any).nelecas}
@@ -818,7 +818,7 @@ export const CalculationSettingsPage = ({
                   </label>
                 </div>
                 {params.calculation_method === 'CASSCF' && (
-                  <>
+                  <div className={styles.nestedSettings}>
                     <div className={styles.settingRow}>
                       <label>Energy Convergence Tolerance</label>
                       <select
@@ -855,7 +855,7 @@ export const CalculationSettingsPage = ({
                         <option value={1e-6}>1e-6 (very tight)</option>
                       </select>
                     </div>
-                  </>
+                  </div>
                 )}
               </section>
             )}

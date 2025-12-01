@@ -28,8 +28,6 @@ export const useCalculationActions = () => {
   const { clearStagedCalculation, setActiveCalculationId } =
     useCalculationStore();
 
-
-
   const handleStartCalculation = async (
     calculationParams: QuantumCalculationRequest
   ): Promise<CalculationInstance> => {
@@ -78,10 +76,16 @@ export const useCalculationActions = () => {
           if (isResourceInsufficientError) {
             handleError(new Error(errorMessage), 'Calculation failed');
           } else {
-            handleError(new Error(errorMessage), `Calculation "${calculationParams.name}" failed`);
+            handleError(
+              new Error(errorMessage),
+              `Calculation "${calculationParams.name}" failed`
+            );
           }
         } else {
-          handleError(new Error('Detailed error information is not available.'), `Calculation "${calculationParams.name}" failed`);
+          handleError(
+            new Error('Detailed error information is not available.'),
+            `Calculation "${calculationParams.name}" failed`
+          );
         }
       } else {
         // その他のステータスの場合は汎用メッセージ

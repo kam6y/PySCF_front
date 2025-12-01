@@ -131,9 +131,9 @@ export const MullikenChargeViewer: React.FC<MullikenChargeViewerProps> =
               opacity: opacity,
               colorscheme: {
                 prop: 'charge',
-                gradient: 'rwb', // Red (negative) - White (neutral) - Blue (positive)
-                min: -chargeRange,
-                max: chargeRange,
+                gradient: 'rwb', // Red (negative) - White (neutral) - Blue (positive) -> Swapped min/max to invert
+                min: chargeRange,
+                max: -chargeRange,
               },
             },
             {},

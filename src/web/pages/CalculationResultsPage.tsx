@@ -135,9 +135,11 @@ export const CalculationResultsPage = ({
   const completedAt = activeCalculation.updatedAt;
 
   return (
-    <div className="page-container">
-      <div className="page-content">
-        <h1>Quantum Chemistry Calculation Results</h1>
+    <div className={styles.pageContainer}>
+      <div className={styles.pageContent}>
+        <h1 className={styles.pageTitle}>
+          Quantum Chemistry Calculation Results
+        </h1>
 
         {/* ========================================
             1️⃣ OVERVIEW SECTION - Integrated Summary and Energy
