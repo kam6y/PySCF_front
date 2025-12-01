@@ -294,6 +294,9 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     process_logger = logging.getLogger(f'worker_{calculation_id}')
     process_logger.setLevel(logging.INFO)
     
+    # Initialize variables for finally block
+    original_threads = None
+    
     # Setup environment and get configuration
     cpu_cores, memory_mb = _setup_worker_environment(parameters, process_logger)
     calculation_method = parameters.get('calculation_method', 'DFT')
@@ -304,6 +307,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     # Import calculator classes and exception types
     from quantum_calc.file_manager import CalculationFileManager
     from quantum_calc import get_current_settings
+    from quantum_calc.pause_manager import pause_manager
     from threadpoolctl import threadpool_info, threadpool_limits
     from pyscf import lib
 
@@ -333,7 +337,6 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             process_logger.warning(f"Could not get threadpool info: {e}")
         
         # Set PySCF thread count
-        original_threads = None
         try:
             original_threads = lib.num_threads()
             lib.num_threads(int(cpu_cores))
@@ -410,7 +413,6 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             file_manager.save_calculation_status(calc_dir, 'paused')
 
             # Remove pause flag file
-            from quantum_calc.pause_manager import pause_manager
             pause_manager.remove_pause_flag_file(calc_dir)
 
             process_logger.info(f"Calculation {calculation_id} paused successfully, state saved")
@@ -833,7 +835,7 @@ class CalculationProcessManager:
                             
                             # Start the calculation
                             # Check if executor has been shut down before submitting
-                            if self._shutdown or self.executor._shutdown:
+                            if self._shutdown:
                                 logger.warning(f"Executor has been shut down. Cannot schedule calculation {next_calc.calculation_id}")
                                 self._update_calculation_status_from_queue(next_calc.calculation_id, 'error', 'Process manager has been shut down')
                                 started = True
