@@ -152,6 +152,59 @@ class TestCalculationSubmissionAPI:
         data = response.get_json()
         assert data['success'] is False
 
+    def test_dft_rejects_casci_parameters(self, client, mocker, sample_h2_xyz):
+        """
+        GIVEN DFT calculation with CASCI-specific parameters (ncas, nelecas)
+        WHEN POST /api/quantum/calculate is called
+        THEN 400 Bad Request is returned with parameter applicability error
+        """
+        # ARRANGE
+        invalid_params = {
+            "name": "Test DFT with invalid params",
+            "xyz": sample_h2_xyz,
+            "calculation_method": "DFT",
+            "basis_function": "sto-3g",
+            "exchange_correlation": "b3lyp",
+            "ncas": 4,  # Not applicable to DFT
+            "nelecas": 4  # Not applicable to DFT
+        }
+
+        # ACT
+        response = client.post('/api/quantum/calculate', json=invalid_params)
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'ncas' in data['error'].lower() or 'not applicable' in data['error'].lower()
+
+    def test_tddft_rejects_optimize_geometry_true(self, client, mocker, sample_h2_xyz):
+        """
+        GIVEN TDDFT calculation with optimize_geometry=True (disabled parameter)
+        WHEN POST /api/quantum/calculate is called
+        THEN 400 Bad Request is returned with Pydantic validation error
+        """
+        # ARRANGE
+        invalid_params = {
+            "name": "Test TDDFT with invalid params",
+            "xyz": sample_h2_xyz,
+            "calculation_method": "TDDFT",
+            "basis_function": "sto-3g",
+            "exchange_correlation": "b3lyp",
+            "tddft_nstates": 10,
+            "optimize_geometry": True  # Disabled for TDDFT
+        }
+
+        # ACT
+        response = client.post('/api/quantum/calculate', json=invalid_params)
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        # Pydantic validation error format
+        assert 'validation_error' in data
+        assert 'optimize_geometry' in str(data['validation_error']).lower()
+
 
 class TestCalculationListAPI:
     """Integration tests for GET /api/quantum/calculations endpoint."""

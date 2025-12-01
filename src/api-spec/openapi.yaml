@@ -1,8 +1,77 @@
-openapi: 3.1.1
+openapi: 3.0.3
 info:
-  title: PySCF Native App API
-  description: API for quantum chemistry calculations using PySCF with PubChem and SMILES integration
-  version: 0.1.5-beta
+  title: PySCF Native Application API
+  description: |
+    Backend API for managing quantum chemistry calculations using PySCF.
+    
+    ## Discriminated Union Pattern for Calculation Requests
+    
+    This API uses **discriminated unions** (also known as tagged unions) to provide type-safe calculation request schemas.
+    Each calculation method (DFT, HF, MP2, CCSD, CCSD(T), TDDFT, CASCI, CASSCF) has its own dedicated schema with 
+    method-specific parameters.
+    
+    ### Design Principles
+    
+    1. **Type Safety**: The `calculation_method` field acts as a discriminator that determines which schema applies
+    2. **Single Source of Truth**: Each method's parameters are defined once in the schema and enforced by backend validation
+    3. **Method-Specific Parameters**: Parameters like `exchange_correlation` (DFT/TDDFT only), `ncas` (CASCI/CASSCF only), 
+       or `frozen_core` (CCSD/CCSD(T) only) are only present in their applicable schemas
+    4. **Explicit Constraints**: Disabled parameters (e.g., `optimize_geometry` for TDDFT) use `enum: [false]` to enforce restrictions
+    
+    ### Schema Structure
+    
+    ```yaml
+    QuantumCalculationRequest:
+      oneOf:
+        - $ref: '#/components/schemas/DFTCalculationRequest'
+        - $ref: '#/components/schemas/HFCalculationRequest'
+        - $ref: '#/components/schemas/MP2CalculationRequest'
+        # ... (all 8 method-specific schemas)
+      discriminator:
+        propertyName: calculation_method
+    ```
+    
+    Each method-specific schema extends `CalculationRequestBase` (common parameters) and adds its own unique parameters.
+    
+    ### Usage Examples
+    
+    **DFT Calculation Request:**
+    ```json
+    {
+      "calculation_method": "DFT",
+      "xyz": "H 0 0 0\nH 0 0 0.74",
+      "exchange_correlation": "B3LYP",
+      "basis_function": "6-31G(d)",
+      "optimize_geometry": true,
+      "charges": 0,
+      "spin": 0
+    }
+    ```
+    
+    **CASCI Calculation Request:**
+    ```json
+    {
+      "calculation_method": "CASCI",
+      "xyz": "O 0 0 0\nH 0.757 0.586 0\nH -0.757 0.586 0",
+      "basis_function": "6-31G(d)",
+      "ncas": 6,
+      "nelecas": 8,
+      "optimize_geometry": false,
+      "charges": 0,
+      "spin": 0
+    }
+    ```
+    
+    ### Backend Validation
+    
+    The backend enforces parameter applicability:
+    - ✅ Accepts: DFT request with `exchange_correlation`
+    - ❌ Rejects: DFT request with `ncas` (only valid for CASCI/CASSCF)
+    - ❌ Rejects: TDDFT request with `optimize_geometry: true` (disabled for TDDFT)
+    
+    See the `/api/quantum/supported-parameters` endpoint for runtime parameter constraints and method defaults.
+    
+  version: 0.4.0
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
@@ -990,9 +1059,10 @@ components:
           minLength: 1
           description: XYZ string to validate
 
-    QuantumCalculationRequest:
+    # Base schema containing parameters common to all calculation methods
+    CalculationRequestBase:
       type: object
-      required: [xyz]
+      required: [xyz, calculation_method]
       properties:
         xyz:
           type: string
@@ -1000,16 +1070,9 @@ components:
           description: XYZ molecular structure data
         calculation_method:
           $ref: '#/components/schemas/CalculationMethod'
-          default: DFT
         basis_function:
           type: string
-          default: "6-31G(d)"
-          description: Basis set for calculation (e.g., STO-3G, 6-31G(d), 6-31+G(d,p), cc-pVDZ, aug-cc-pVTZ, def2-SVP)
-        exchange_correlation:
-          type: string
-          default: "B3LYP"
-          nullable: true
-          description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS). Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
+          description: Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ)
         charges:
           type: integer
           minimum: -10
@@ -1030,14 +1093,14 @@ components:
           default: "-"
           description: |
             Solvent type or custom parameters. Options include:
-            - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, nitromethane, methanol, ethanol, acetone, dichloroethane, dichloromethane, tetrahydrofuran, chlorobenzene, chloroform, diethylether, toluene, benzene, 1,4-dioxane, cyclohexane
+            - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, etc.
             - Custom dielectric constant (numeric value > 1.0)
         name:
           type: string
           minLength: 1
           maxLength: 100
           default: "Unnamed Calculation"
-          description: Display name for the calculation instance (distinct from molecule_name which is the chemical name)
+          description: Display name for the calculation instance
         cpu_cores:
           type: integer
           minimum: 1
@@ -1050,71 +1113,250 @@ components:
           maximum: 32768
           nullable: true
           description: Memory in MB
-        tddft_nstates:
-          type: integer
-          minimum: 1
-          maximum: 50
-          default: 10
-          description: Number of excited states to calculate (TDDFT only)
-        tddft_method:
-          type: string
-          enum: [TDDFT, TDA]
-          default: TDDFT
-          description: TDDFT calculation method - TDDFT or Tamm-Dancoff approximation
-        tddft_analyze_nto:
-          type: boolean
-          default: false
-          description: Perform Natural Transition Orbital analysis (TDDFT only)
-        ncas:
-          type: integer
-          minimum: 1
-          maximum: 50
-          default: 4
-          description: Number of active space orbitals (CASCI/CASSCF only)
-        nelecas:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 4
-          description: Number of active space electrons (CASCI/CASSCF only)
-        max_cycle_macro:
-          type: integer
-          minimum: 1
-          maximum: 200
-          default: 50
-          description: Maximum CASSCF macro iterations (CASSCF only)
-        max_cycle_micro:
-          type: integer
-          minimum: 1
-          maximum: 20
-          default: 3
-          description: Maximum CI solver micro iterations (CASCI/CASSCF)
-        natorb:
-          type: boolean
-          default: true
-          description: Transform to natural orbitals in active space (CASCI/CASSCF only)
-        conv_tol:
-          type: number
-          format: float
-          minimum: 1e-12
-          maximum: 1e-3
-          default: 0.000001
-          description: Energy convergence tolerance (CASSCF only)
-        conv_tol_grad:
-          type: number
-          format: float
-          minimum: 1e-8
-          maximum: 1e-2
-          default: 0.0001
-          description: Gradient convergence tolerance (CASSCF only)
-        optimize_geometry:
-          type: boolean
-          default: true
-          description: Whether to perform geometry optimization before the main calculation
         ketcher_data:
           type: string
           nullable: true
-          description: Ketcher molecule format (JSON) for preserving the original drawn structure
+          description: Ketcher molecule format (JSON)
+
+    # DFT-specific calculation request
+    DFTCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [DFT]
+            exchange_correlation:
+              type: string
+              default: "B3LYP"
+              description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X)
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            optimize_geometry:
+              type: boolean
+              default: true
+              description: Whether to perform geometry optimization
+
+    # Hartree-Fock calculation request
+    HFCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [HF]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            optimize_geometry:
+              type: boolean
+              default: true
+
+    # MP2 calculation request
+    MP2CalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [MP2]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            optimize_geometry:
+              type: boolean
+              default: true
+
+    # CCSD calculation request
+    CCSDCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CCSD]
+            basis_function:
+              type: string
+              default: "cc-pVDZ"
+            frozen_core:
+              type: boolean
+              default: true
+              description: Use frozen core approximation to reduce computational cost
+
+    # CCSD(T) calculation request
+    CCSD_TCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CCSD_T]
+            basis_function:
+              type: string
+              default: "cc-pVDZ"
+            frozen_core:
+              type: boolean
+              default: true
+              description: Use frozen core approximation
+
+    # TDDFT calculation request
+    TDDFTCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [TDDFT]
+            exchange_correlation:
+              type: string
+              default: "B3LYP"
+              description: Exchange-correlation functional
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            tddft_nstates:
+              type: integer
+              minimum: 1
+              maximum: 50
+              default: 10
+              description: Number of excited states to calculate
+            tddft_method:
+              type: string
+              enum: [TDDFT, TDA]
+              default: TDDFT
+              description: TDDFT or Tamm-Dancoff approximation
+            tddft_analyze_nto:
+              type: boolean
+              default: false
+              description: Perform Natural Transition Orbital analysis
+
+    # CASCI calculation request
+    CASCICalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method, ncas, nelecas]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CASCI]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            ncas:
+              type: integer
+              minimum: 1
+              maximum: 50
+              default: 4
+              description: Number of active space orbitals
+            nelecas:
+              type: integer
+              minimum: 1
+              maximum: 100
+              default: 4
+              description: Number of active space electrons
+            max_cycle_micro:
+              type: integer
+              minimum: 1
+              maximum: 20
+              default: 3
+              description: Maximum CI solver micro iterations
+            natorb:
+              type: boolean
+              default: true
+              description: Transform to natural orbitals in active space
+
+    # CASSCF calculation request
+    CASSCFCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method, ncas, nelecas]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CASSCF]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            ncas:
+              type: integer
+              minimum: 1
+              maximum: 50
+              default: 4
+              description: Number of active space orbitals
+            nelecas:
+              type: integer
+              minimum: 1
+              maximum: 100
+              default: 4
+              description: Number of active space electrons
+            max_cycle_macro:
+              type: integer
+              minimum: 1
+              maximum: 200
+              default: 50
+              description: Maximum CASSCF macro iterations
+            max_cycle_micro:
+              type: integer
+              minimum: 1
+              maximum: 20
+              default: 3
+              description: Maximum CI solver micro iterations
+            natorb:
+              type: boolean
+              default: true
+              description: Transform to natural orbitals
+            conv_tol:
+              type: number
+              format: float
+              minimum: 1e-12
+              maximum: 1e-3
+              default: 0.000001
+              description: Energy convergence tolerance
+            conv_tol_grad:
+              type: number
+              format: float
+              minimum: 1e-8
+              maximum: 1e-2
+              default: 0.0001
+              description: Gradient convergence tolerance
+
+    # Discriminated union of all calculation request types
+    QuantumCalculationRequest:
+      oneOf:
+        - $ref: '#/components/schemas/DFTCalculationRequest'
+        - $ref: '#/components/schemas/HFCalculationRequest'
+        - $ref: '#/components/schemas/MP2CalculationRequest'
+        - $ref: '#/components/schemas/CCSDCalculationRequest'
+        - $ref: '#/components/schemas/CCSD_TCalculationRequest'
+        - $ref: '#/components/schemas/TDDFTCalculationRequest'
+        - $ref: '#/components/schemas/CASCICalculationRequest'
+        - $ref: '#/components/schemas/CASSCFCalculationRequest'
+      discriminator:
+        propertyName: calculation_method
+        mapping:
+          DFT: '#/components/schemas/DFTCalculationRequest'
+          HF: '#/components/schemas/HFCalculationRequest'
+          MP2: '#/components/schemas/MP2CalculationRequest'
+          CCSD: '#/components/schemas/CCSDCalculationRequest'
+          CCSD_T: '#/components/schemas/CCSD_TCalculationRequest'
+          TDDFT: '#/components/schemas/TDDFTCalculationRequest'
+          CASCI: '#/components/schemas/CASCICalculationRequest'
+          CASSCF: '#/components/schemas/CASSCFCalculationRequest'
 
     CalculationUpdateRequest:
       type: object

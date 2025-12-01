@@ -95,12 +95,12 @@ def create_app(server_port: int = None, test_config: dict = None):
                 logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
                 return jsonify({'success': False, 'error': 'Unauthorized'}), 401
         else:
-            # In production, this should be an error. 
+            # In production, this should be an error.
             # In standalone dev, we might allow it but log a warning.
             if not app.debug and not os.getenv('PYSCF_ENV') == 'development':
                  logger.warning("Unauthorized access attempt: Missing authentication token in production mode")
                  return jsonify({'success': False, 'error': 'Unauthorized: Missing authentication token'}), 401
-            
+
             logger.warning("Running without authentication token in debug/development mode!")
 
     # Apply test configuration if provided

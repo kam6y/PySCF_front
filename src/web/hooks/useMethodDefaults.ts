@@ -92,7 +92,10 @@ export const useMethodDefaults = () => {
 
   /**
    * Apply method-specific default values when switching calculation methods.
-   * This completely replaces parameter values with the method's defaults.
+   *
+   * This function implements the Single Source of Truth principle by completely
+   * trusting the backend's method_defaults. The backend already provides only
+   * the applicable parameters for each method, so no frontend filtering is needed.
    *
    * @param currentParams - Current calculation parameters
    * @param newMethod - New calculation method to switch to
@@ -100,59 +103,48 @@ export const useMethodDefaults = () => {
    *
    * @example
    * const updated = applyMethodDefaults(
-   *   { calculation_method: 'DFT', basis_function: '6-31G(d)', ... },
-   *   'CCSD'
+   *   { calculation_method: 'DFT', basis_function: '6-31G(d)', exchange_correlation: 'B3LYP', ... },
+   *   'HF'
    * );
-   * // Returns: { calculation_method: 'CCSD', basis_function: 'cc-pVDZ', memory_mb: 4000, ... }
+   * // Returns: { calculation_method: 'HF', basis_function: '6-31G(d)', ... }
+   * // Note: exchange_correlation is automatically removed because it's not in HF's defaults
    *
    * @remarks
-   * This function follows the user requirement to ALWAYS overwrite with defaults when
-   * the calculation method changes, providing a consistent starting point for each method.
+   * Design principles:
+   * - Backend method_defaults is the single source of truth
+   * - No hardcoded parameter lists in frontend
+   * - Molecular and system settings are preserved across method changes
    */
   const applyMethodDefaults = (
     currentParams: Partial<QuantumCalculationRequest> | CalculationParameters,
     newMethod: string
-  ): QuantumCalculationRequest => {
+  ): Partial<QuantumCalculationRequest> => {
     const defaults = getDefaultsForMethod(newMethod);
     const params = currentParams as any;
 
-    // Preserve core parameters that should not be overwritten
-    const preservedParams = {
+    // Preserve molecular structure and system settings that transcend calculation methods
+    const preservedParams: Record<string, any> = {
       xyz: params.xyz || '',
       name: params.name || params.molecule_name || '',
       charges: params.charges ?? 0,
       spin: params.spin ?? 0,
       solvent_method: params.solvent_method || 'none',
       solvent: params.solvent || '-',
-      cpu_cores: params.cpu_cores,
       ketcher_data: params.ketcher_data,
     };
 
-    // Apply defaults for the new method, overwriting everything except preserved params
-    // Ensure all required fields are present
-    const result: QuantumCalculationRequest = {
-      ...params,
+    // Preserve cpu_cores if explicitly set by user
+    if (params.cpu_cores !== undefined) {
+      preservedParams.cpu_cores = params.cpu_cores;
+    }
+
+    // Trust backend defaults completely - they already contain only applicable parameters
+    // Preserved params override defaults to maintain user's molecular structure and settings
+    return {
       ...defaults,
       ...preservedParams,
-      calculation_method: newMethod as any,
-      basis_function: (defaults.basis_function as string) || params.basis_function || '6-31G(d)',
-      exchange_correlation: (defaults.exchange_correlation as string | null) ?? params.exchange_correlation ?? null,
-      optimize_geometry: defaults.optimize_geometry ?? params.optimize_geometry ?? true,
-
-      // Ensure required fields have defaults (handling null/undefined from CalculationParameters)
-      tddft_nstates: (defaults.tddft_nstates ?? params.tddft_nstates ?? 10) as number,
-      tddft_method: (defaults.tddft_method ?? params.tddft_method ?? 'TDDFT') as "TDDFT" | "TDA",
-      tddft_analyze_nto: defaults.tddft_analyze_nto ?? params.tddft_analyze_nto ?? false,
-      ncas: (defaults.ncas ?? params.ncas ?? 4) as number,
-      nelecas: (defaults.nelecas ?? params.nelecas ?? 4) as number,
-      max_cycle_macro: (defaults.max_cycle_macro ?? params.max_cycle_macro ?? 50) as number,
-      max_cycle_micro: (defaults.max_cycle_micro ?? params.max_cycle_micro ?? 3) as number,
-      natorb: defaults.natorb ?? params.natorb ?? true,
-      conv_tol: (defaults.conv_tol ?? params.conv_tol ?? 0.000001) as number,
-      conv_tol_grad: (defaults.conv_tol_grad ?? params.conv_tol_grad ?? 0.0001) as number,
-    };
-
-    return result;
+      calculation_method: newMethod as QuantumCalculationRequest['calculation_method'],
+    } as Partial<QuantumCalculationRequest>;
   };
 
   /**

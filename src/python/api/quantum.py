@@ -58,48 +58,31 @@ def quantum_calculate(body: QuantumCalculationRequest):
     """
     try:
         quantum_service = get_quantum_service()
-        
-        # Extract enum values and build parameters
+
+        # Extract enum values helper function
         def get_enum_value(field_value):
             if hasattr(field_value, 'value'):
                 return field_value.value
             return field_value
-        
-        calculation_method = get_enum_value(body.calculation_method)
-        
-        parameters = {
-            'calculation_method': calculation_method,
-            'basis_function': body.basis_function,
-            'charges': body.charges,
-            'spin': body.spin,
-            'solvent_method': get_enum_value(body.solvent_method),
-            'solvent': body.solvent,
-            'xyz': body.xyz,
-            'name': body.name,
-            'cpu_cores': body.cpu_cores,
-            'memory_mb': body.memory_mb,
-            'created_at': datetime.now().isoformat(),
-            'optimize_geometry': body.optimize_geometry,
-            'tddft_nstates': body.tddft_nstates,
-            'tddft_method': get_enum_value(body.tddft_method) if body.tddft_method else 'TDDFT',
-            'tddft_analyze_nto': body.tddft_analyze_nto,
-            'ncas': body.ncas,
-            'nelecas': body.nelecas,
-            'max_cycle_macro': body.max_cycle_macro,
-            'max_cycle_micro': body.max_cycle_micro,
-            'natorb': body.natorb,
-            'conv_tol': body.conv_tol,
-            'conv_tol_grad': body.conv_tol_grad,
-            'ketcher_data': body.ketcher_data
-        }
 
-        # Add exchange_correlation only for DFT methods
-        if calculation_method != 'HF':
-            parameters['exchange_correlation'] = body.exchange_correlation
+        # Handle Pydantic RootModel[Union[...]] structure
+        # Access .root attribute if present (discriminated union from OpenAPI)
+        if hasattr(body, 'root'):
+            validated_model = body.root
         else:
-            parameters['exchange_correlation'] = None
-        
-        # Call service layer
+            validated_model = body
+
+        # Pydanticモデルを辞書に変換
+        parameters = validated_model.model_dump(exclude_none=False, mode='python')
+
+        # Enum値を文字列に変換
+        for key, value in list(parameters.items()):
+            parameters[key] = get_enum_value(value)
+
+        # タイムスタンプを追加
+        parameters['created_at'] = datetime.now().isoformat()
+
+        # Call service layer (will validate parameter applicability)
         result = quantum_service.start_calculation(parameters)
         
         return jsonify({'success': True, 'data': {'calculation': result}}), 202

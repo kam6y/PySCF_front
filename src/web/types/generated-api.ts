@@ -462,21 +462,12 @@ export interface components {
             /** @description XYZ string to validate */
             xyz: string;
         };
-        QuantumCalculationRequest: {
+        CalculationRequestBase: {
             /** @description XYZ molecular structure data */
             xyz: string;
-            /** @default DFT */
             calculation_method: components["schemas"]["CalculationMethod"];
-            /**
-             * @description Basis set for calculation (e.g., STO-3G, 6-31G(d), 6-31+G(d,p), cc-pVDZ, aug-cc-pVTZ, def2-SVP)
-             * @default 6-31G(d)
-             */
-            basis_function: string;
-            /**
-             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS). Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
-             * @default B3LYP
-             */
-            exchange_correlation: string | null;
+            /** @description Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ) */
+            basis_function?: string;
             /**
              * @description Molecular charge
              * @default 0
@@ -491,14 +482,14 @@ export interface components {
             solvent_method: components["schemas"]["SolventMethod"];
             /**
              * @description Solvent type or custom parameters. Options include:
-             *     - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, nitromethane, methanol, ethanol, acetone, dichloroethane, dichloromethane, tetrahydrofuran, chlorobenzene, chloroform, diethylether, toluene, benzene, 1,4-dioxane, cyclohexane
+             *     - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, etc.
              *     - Custom dielectric constant (numeric value > 1.0)
              *
              * @default -
              */
             solvent: string;
             /**
-             * @description Display name for the calculation instance (distinct from molecule_name which is the chemical name)
+             * @description Display name for the calculation instance
              * @default Unnamed Calculation
              */
             name: string;
@@ -506,67 +497,238 @@ export interface components {
             cpu_cores?: number | null;
             /** @description Memory in MB */
             memory_mb?: number | null;
+            /** @description Ketcher molecule format (JSON) */
+            ketcher_data?: string | null;
+        };
+        DFTCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "DFT";
             /**
-             * @description Number of excited states to calculate (TDDFT only)
+             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X)
+             * @default B3LYP
+             */
+            exchange_correlation: string;
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Whether to perform geometry optimization
+             * @default true
+             */
+            optimize_geometry: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "DFT";
+        };
+        HFCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "HF";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /** @default true */
+            optimize_geometry: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "HF";
+        };
+        MP2CalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "MP2";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /** @default true */
+            optimize_geometry: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "MP2";
+        };
+        CCSDCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CCSD";
+            /** @default cc-pVDZ */
+            basis_function: string;
+            /**
+             * @description Use frozen core approximation to reduce computational cost
+             * @default true
+             */
+            frozen_core: boolean;
+            /**
+             * @description Geometry optimization not available for CCSD
+             * @default false
+             * @enum {boolean}
+             */
+            optimize_geometry: false;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "CCSD";
+        };
+        CCSD_TCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CCSD_T";
+            /** @default cc-pVDZ */
+            basis_function: string;
+            /**
+             * @description Use frozen core approximation
+             * @default true
+             */
+            frozen_core: boolean;
+            /**
+             * @description Geometry optimization not available for CCSD(T)
+             * @default false
+             * @enum {boolean}
+             */
+            optimize_geometry: false;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "CCSD_T";
+        };
+        TDDFTCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "TDDFT";
+            /**
+             * @description Exchange-correlation functional
+             * @default B3LYP
+             */
+            exchange_correlation: string;
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Number of excited states to calculate
              * @default 10
              */
             tddft_nstates: number;
             /**
-             * @description TDDFT calculation method - TDDFT or Tamm-Dancoff approximation
+             * @description TDDFT or Tamm-Dancoff approximation
              * @default TDDFT
              * @enum {string}
              */
             tddft_method: "TDDFT" | "TDA";
             /**
-             * @description Perform Natural Transition Orbital analysis (TDDFT only)
+             * @description Perform Natural Transition Orbital analysis
              * @default false
              */
             tddft_analyze_nto: boolean;
             /**
-             * @description Number of active space orbitals (CASCI/CASSCF only)
+             * @description Geometry optimization not available for TDDFT
+             * @default false
+             * @enum {boolean}
+             */
+            optimize_geometry: false;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "TDDFT";
+        };
+        CASCICalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CASCI";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Number of active space orbitals
              * @default 4
              */
             ncas: number;
             /**
-             * @description Number of active space electrons (CASCI/CASSCF only)
+             * @description Number of active space electrons
              * @default 4
              */
             nelecas: number;
             /**
-             * @description Maximum CASSCF macro iterations (CASSCF only)
-             * @default 50
-             */
-            max_cycle_macro: number;
-            /**
-             * @description Maximum CI solver micro iterations (CASCI/CASSCF)
+             * @description Maximum CI solver micro iterations
              * @default 3
              */
             max_cycle_micro: number;
             /**
-             * @description Transform to natural orbitals in active space (CASCI/CASSCF only)
+             * @description Transform to natural orbitals in active space
+             * @default true
+             */
+            natorb: boolean;
+            /**
+             * @description Geometry optimization not available for CASCI
+             * @default false
+             * @enum {boolean}
+             */
+            optimize_geometry: false;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "CASCI";
+        };
+        CASSCFCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CASSCF";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Number of active space orbitals
+             * @default 4
+             */
+            ncas: number;
+            /**
+             * @description Number of active space electrons
+             * @default 4
+             */
+            nelecas: number;
+            /**
+             * @description Maximum CASSCF macro iterations
+             * @default 50
+             */
+            max_cycle_macro: number;
+            /**
+             * @description Maximum CI solver micro iterations
+             * @default 3
+             */
+            max_cycle_micro: number;
+            /**
+             * @description Transform to natural orbitals
              * @default true
              */
             natorb: boolean;
             /**
              * Format: float
-             * @description Energy convergence tolerance (CASSCF only)
+             * @description Energy convergence tolerance
              * @default 0.000001
              */
             conv_tol: number;
             /**
              * Format: float
-             * @description Gradient convergence tolerance (CASSCF only)
+             * @description Gradient convergence tolerance
              * @default 0.0001
              */
             conv_tol_grad: number;
             /**
-             * @description Whether to perform geometry optimization before the main calculation
-             * @default true
+             * @description Geometry optimization not available for CASSCF
+             * @default false
+             * @enum {boolean}
              */
-            optimize_geometry: boolean;
-            /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
-            ketcher_data?: string | null;
+            optimize_geometry: false;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "CASSCF";
         };
+        QuantumCalculationRequest: components["schemas"]["DFTCalculationRequest"] | components["schemas"]["HFCalculationRequest"] | components["schemas"]["MP2CalculationRequest"] | components["schemas"]["CCSDCalculationRequest"] | components["schemas"]["CCSD_TCalculationRequest"] | components["schemas"]["TDDFTCalculationRequest"] | components["schemas"]["CASCICalculationRequest"] | components["schemas"]["CASSCFCalculationRequest"];
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */
             name: string;

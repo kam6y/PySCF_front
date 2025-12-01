@@ -17,6 +17,9 @@ import { searchPubChem, convertSmilesToXyz } from '../apiClient';
 import { useSupportedParameters } from '../hooks/useCalculationQueries';
 import { useMethodDefaults } from '../hooks/useMethodDefaults';
 
+// Helper type to extract all keys from a union type
+type DistributiveKeyOf<T> = T extends any ? keyof T : never;
+
 interface CalculationSettingsPageProps {
   activeCalculation?: CalculationInstance;
   onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
@@ -132,7 +135,7 @@ export const CalculationSettingsPage = ({
 
   const handleParamChange = useCallback(
     (
-      field: keyof QuantumCalculationRequest,
+      field: DistributiveKeyOf<QuantumCalculationRequest>,
       value: string | number | boolean
     ) => {
       if (!activeCalculation || !onCalculationUpdate) return;
@@ -597,11 +600,11 @@ export const CalculationSettingsPage = ({
               <div className={styles.settingRow}>
                 <label>Calculation Method</label>
                 <select
-                  value={params.calculation_method || 'DFT'}
+                  value={params.calculation_method}
                   onChange={e =>
                     handleParamChange('calculation_method', e.target.value)
                   }
-                  disabled={calculationStatus === 'running'}
+                  disabled={calculationStatus === 'running' || isLoadingParams}
                 >
                   {isLoadingParams ? (
                     <option value="">Loading...</option>
@@ -619,11 +622,11 @@ export const CalculationSettingsPage = ({
               <div className={styles.settingRow}>
                 <label>Basis Function</label>
                 <select
-                  value={params.basis_function || '6-31G(d)'}
+                  value={params.basis_function}
                   onChange={e =>
                     handleParamChange('basis_function', e.target.value)
                   }
-                  disabled={calculationStatus === 'running'}
+                  disabled={calculationStatus === 'running' || isLoadingParams}
                 >
                   {isLoadingParams ? (
                     <option value="">Loading...</option>
@@ -648,7 +651,7 @@ export const CalculationSettingsPage = ({
               <div className={styles.settingRow}>
                 <label>Exchange Functional</label>
                 <select
-                  value={params.exchange_correlation || 'B3LYP'}
+                  value={params.exchange_correlation || ''}
                   onChange={e =>
                     handleParamChange('exchange_correlation', e.target.value)
                   }
@@ -656,7 +659,7 @@ export const CalculationSettingsPage = ({
                     !(
                       params.calculation_method === 'DFT' ||
                       params.calculation_method === 'TDDFT'
-                    ) || calculationStatus === 'running'
+                    ) || calculationStatus === 'running' || isLoadingParams
                   }
                 >
                   {isLoadingParams ? (
@@ -712,7 +715,7 @@ export const CalculationSettingsPage = ({
                     checked={(params as any).optimize_geometry ?? true}
                     onChange={e =>
                       handleParamChange(
-                        'optimize_geometry' as any,
+                        'optimize_geometry',
                         e.target.checked
                       )
                     }
@@ -743,10 +746,10 @@ export const CalculationSettingsPage = ({
                   <label>Number of Active Orbitals (ncas)</label>
                   <input
                     type="number"
-                    value={(params as any).ncas ?? 4}
+                    value={(params as any).ncas}
                     onChange={e =>
                       handleParamChange(
-                        'ncas' as any,
+                        'ncas',
                         Math.max(1, Math.min(20, Number(e.target.value)))
                       )
                     }
@@ -754,17 +757,17 @@ export const CalculationSettingsPage = ({
                     max={20}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
+                    disabled={calculationStatus === 'running' || isLoadingParams}
                   />
                 </div>
                 <div className={styles.settingRow}>
                   <label>Number of Active Electrons (nelecas)</label>
                   <input
                     type="number"
-                    value={(params as any).nelecas ?? 4}
+                    value={(params as any).nelecas}
                     onChange={e =>
                       handleParamChange(
-                        'nelecas' as any,
+                        'nelecas',
                         Math.max(1, Math.min(40, Number(e.target.value)))
                       )
                     }
@@ -772,7 +775,7 @@ export const CalculationSettingsPage = ({
                     max={40}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
+                    disabled={calculationStatus === 'running' || isLoadingParams}
                   />
                 </div>
                 {params.calculation_method === 'CASSCF' && (
@@ -780,14 +783,10 @@ export const CalculationSettingsPage = ({
                     <label>CASSCF Max Macro Iterations</label>
                     <input
                       type="number"
-                      value={
-                        (params as any).max_cycle_macro !== undefined
-                          ? (params as any).max_cycle_macro
-                          : 50
-                      }
+                      value={(params as any).max_cycle_macro}
                       onChange={e =>
                         handleParamChange(
-                          'max_cycle_macro' as any,
+                          'max_cycle_macro',
                           Math.max(1, Math.min(200, Number(e.target.value)))
                         )
                       }
@@ -810,7 +809,7 @@ export const CalculationSettingsPage = ({
                     }
                     onChange={e =>
                       handleParamChange(
-                        'max_cycle_micro' as any,
+                        'max_cycle_micro',
                         Math.max(1, Math.min(100, Number(e.target.value)))
                       )
                     }
@@ -827,7 +826,7 @@ export const CalculationSettingsPage = ({
                       type="checkbox"
                       checked={(params as any).natorb !== false}
                       onChange={e =>
-                        handleParamChange('natorb' as any, e.target.checked)
+                        handleParamChange('natorb', e.target.checked)
                       }
                       disabled={calculationStatus === 'running'}
                     />
@@ -842,7 +841,7 @@ export const CalculationSettingsPage = ({
                         value={(params as any).conv_tol ?? 1e-6}
                         onChange={e =>
                           handleParamChange(
-                            'conv_tol' as any,
+                            'conv_tol',
                             parseFloat(e.target.value)
                           )
                         }
@@ -860,7 +859,7 @@ export const CalculationSettingsPage = ({
                         value={(params as any).conv_tol_grad ?? 1e-4}
                         onChange={e =>
                           handleParamChange(
-                            'conv_tol_grad' as any,
+                            'conv_tol_grad',
                             parseFloat(e.target.value)
                           )
                         }
@@ -882,10 +881,10 @@ export const CalculationSettingsPage = ({
                   <label>Number of Excited States</label>
                   <input
                     type="number"
-                    value={(params as any).tddft_nstates || 10}
+                    value={(params as any).tddft_nstates}
                     onChange={e =>
                       handleParamChange(
-                        'tddft_nstates' as any,
+                        'tddft_nstates',
                         Math.max(1, Math.min(50, Number(e.target.value)))
                       )
                     }
@@ -893,17 +892,17 @@ export const CalculationSettingsPage = ({
                     max={50}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
+                    disabled={calculationStatus === 'running' || isLoadingParams}
                   />
                 </div>
                 <div className={styles.settingRow}>
                   <label>TDDFT Method</label>
                   <select
-                    value={(params as any).tddft_method || 'TDDFT'}
+                    value={(params as any).tddft_method}
                     onChange={e =>
-                      handleParamChange('tddft_method' as any, e.target.value)
+                      handleParamChange('tddft_method', e.target.value)
                     }
-                    disabled={calculationStatus === 'running'}
+                    disabled={calculationStatus === 'running' || isLoadingParams}
                   >
                     {isLoadingParams ? (
                       <option value="">Loading...</option>
@@ -929,7 +928,7 @@ export const CalculationSettingsPage = ({
                       checked={(params as any).tddft_analyze_nto || false}
                       onChange={e =>
                         handleParamChange(
-                          'tddft_analyze_nto' as any,
+                          'tddft_analyze_nto',
                           e.target.checked
                         )
                       }
@@ -950,7 +949,7 @@ export const CalculationSettingsPage = ({
                       checked={(params as any).frozen_core !== false}
                       onChange={e =>
                         handleParamChange(
-                          'frozen_core' as any,
+                          'frozen_core',
                           e.target.checked
                         )
                       }

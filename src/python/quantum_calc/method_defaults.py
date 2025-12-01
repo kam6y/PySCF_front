@@ -30,14 +30,12 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
     'CCSD': {
         'basis_function': 'cc-pVDZ',  # Correlation-consistent basis recommended for CCSD
         'memory_mb': 4000,            # Higher memory requirements
-        'frozen_core': True,          # Frozen core approximation to reduce cost
-        'optimize_geometry': False    # Geometry optimization not available
+        'frozen_core': True           # Frozen core approximation to reduce cost
     },
     'CCSD_T': {
         'basis_function': 'cc-pVDZ',  # Correlation-consistent basis recommended
         'memory_mb': 4000,            # Higher memory requirements
-        'frozen_core': True,          # Frozen core approximation to reduce cost
-        'optimize_geometry': False    # Geometry optimization not available
+        'frozen_core': True           # Frozen core approximation to reduce cost
     },
     'TDDFT': {
         'basis_function': '6-31G(d)',
@@ -45,8 +43,7 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'memory_mb': 2000,
         'tddft_nstates': 10,          # Default number of excited states
         'tddft_method': 'TDDFT',      # Full TDDFT (vs TDA approximation)
-        'tddft_analyze_nto': False,   # NTO analysis off by default
-        'optimize_geometry': False    # Geometry optimization not available
+        'tddft_analyze_nto': False    # NTO analysis off by default
     },
     'CASCI': {
         'basis_function': '6-31G(d)',
@@ -54,8 +51,7 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'ncas': 4,                    # Number of active orbitals
         'nelecas': 4,                 # Number of active electrons
         'natorb': True,               # Natural orbital transformation recommended
-        'max_cycle_micro': 3,         # CI solver iterations
-        'optimize_geometry': False    # Geometry optimization not available
+        'max_cycle_micro': 3          # CI solver iterations
     },
     'CASSCF': {
         'basis_function': '6-31G(d)',
@@ -66,14 +62,17 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'max_cycle_micro': 3,         # CI solver iterations
         'natorb': True,               # Natural orbital transformation recommended
         'conv_tol': 1e-6,             # Energy convergence tolerance
-        'conv_tol_grad': 1e-4,        # Gradient convergence tolerance
-        'optimize_geometry': False    # Geometry optimization not available
+        'conv_tol_grad': 1e-4         # Gradient convergence tolerance
     }
 }
 
 # Parameter validation constraints
 # Defines min/max bounds, applicable methods, and UI constraints for each parameter
 PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
+    'exchange_correlation': {
+        'applicable_methods': ['DFT', 'TDDFT'],
+        'description': 'Exchange-correlation functional (only applicable for DFT and TDDFT methods)'
+    },
     'ncas': {
         'min': 1,
         'max': 20,
@@ -105,8 +104,8 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
         'description': 'Number of excited states to calculate (1-50)'
     },
     'optimize_geometry': {
-        'disabled_for': ['TDDFT', 'CASCI', 'CASSCF', 'CCSD', 'CCSD_T'],
-        'description': 'Geometry optimization is not available for these calculation methods'
+        'applicable_methods': ['DFT', 'HF', 'MP2'],
+        'description': 'Geometry optimization (only applicable for DFT, HF, and MP2 methods)'
     },
     'frozen_core': {
         'applicable_methods': ['CCSD', 'CCSD_T'],
@@ -257,5 +256,77 @@ def validate_parameter_value(param_name: str, value: Any) -> tuple[bool, str]:
     # Check maximum value
     if 'max' in constraint and value > constraint['max']:
         return False, f"Value {value} exceeds maximum of {constraint['max']}"
+
+    return True, ''
+
+
+def validate_parameters_for_method(
+    method: str,
+    params: Dict[str, Any]
+) -> tuple[bool, str]:
+    """Validate that only applicable parameters are provided for a calculation method.
+
+    This function performs strict validation by rejecting requests that contain
+    parameters which are either:
+    1. Not applicable to the specified method (e.g., 'ncas' for DFT)
+    2. Explicitly disabled for the method (e.g., 'optimize_geometry' for TDDFT)
+
+    Args:
+        method: Calculation method name (e.g., 'DFT', 'CASCI', 'TDDFT')
+        params: Dictionary of all provided parameters including their values
+
+    Returns:
+        Tuple of (is_valid, error_message). error_message is empty string if valid.
+
+    Examples:
+        >>> validate_parameters_for_method('DFT', {'xyz': '...', 'basis_function': '6-31G(d)'})
+        (True, '')
+
+        >>> validate_parameters_for_method('DFT', {'xyz': '...', 'ncas': 4})
+        (False, "Parameter 'ncas' is not applicable for method 'DFT'. This parameter is only valid for: CASCI, CASSCF")
+
+        >>> validate_parameters_for_method('TDDFT', {'xyz': '...', 'optimize_geometry': True})
+        (False, "Parameter 'optimize_geometry' is disabled for method 'TDDFT'. Reason: Geometry optimization is not available for these calculation methods")
+    """
+    # Universal parameters that are applicable to all calculation methods
+    UNIVERSAL_PARAMS = {
+        'xyz', 'calculation_method', 'basis_function', 'charges', 'spin',
+        'solvent_method', 'solvent', 'name', 'cpu_cores', 'memory_mb',
+        'ketcher_data', 'created_at'
+    }
+
+    invalid_params = []
+
+    for param_name, param_value in params.items():
+        # Skip None values (parameter not explicitly provided)
+        if param_value is None:
+            continue
+
+        # Skip universal parameters that apply to all methods
+        if param_name in UNIVERSAL_PARAMS:
+            continue
+
+        # Check if parameter is applicable to this method
+        if not is_parameter_applicable(param_name, method):
+            constraint = PARAMETER_CONSTRAINTS.get(param_name, {})
+            applicable_to = constraint.get('applicable_methods', [])
+            invalid_params.append({
+                'param': param_name,
+                'value': param_value,
+                'applicable_to': applicable_to
+            })
+
+    # Build comprehensive error message if any invalid parameters found
+    if invalid_params:
+        error_lines = []
+        for invalid in invalid_params:
+            param = invalid['param']
+            applicable = ', '.join(invalid['applicable_to']) if invalid['applicable_to'] else 'none'
+            error_lines.append(
+                f"Parameter '{param}' is not applicable for method '{method}'. "
+                f"This parameter is only valid for: {applicable}"
+            )
+
+        return False, '; '.join(error_lines)
 
     return True, ''

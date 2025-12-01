@@ -69,23 +69,26 @@ class QuantumService:
     def validate_calculation_parameters(self, params: Dict[str, Any]) -> Optional[str]:
         """
         Validate calculation parameters for compatibility and theoretical correctness.
-        
+
         Args:
             params: Dictionary of calculation parameters
-            
+
         Returns:
             None if validation passes, error message string if validation fails
         """
         calculation_method = params.get('calculation_method')
-        
-        # Check HF method specific constraints
-        if calculation_method == 'HF':
-            if params.get('exchange_correlation') and params.get('exchange_correlation') != 'B3LYP':
-                logger.warning(f"HF calculation with non-default exchange_correlation: {params.get('exchange_correlation')}")
-            
-            if params.get('tddft_nstates') and params.get('tddft_nstates') > 10:
-                logger.warning(f"TDDFT parameters specified for HF calculation - these will be ignored")
-        
+
+        # Strict parameter applicability check
+        from quantum_calc.method_defaults import validate_parameters_for_method
+
+        is_valid, applicability_error = validate_parameters_for_method(
+            calculation_method,
+            params
+        )
+        if not is_valid:
+            # Reject requests with inapplicable or disabled parameters
+            return applicability_error
+
         # Check DFT method constraints
         if calculation_method == 'DFT':
             if not params.get('exchange_correlation'):

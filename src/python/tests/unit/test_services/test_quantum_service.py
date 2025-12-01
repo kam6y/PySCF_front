@@ -40,9 +40,9 @@ def test_validate_hf_method_valid_params():
 
 def test_validate_hf_with_exchange_correlation_warning(caplog):
     """
-    GIVEN HF parameters with non-default exchange_correlation
+    GIVEN HF parameters with exchange_correlation
     WHEN validate_calculation_parameters is called
-    THEN it should log a warning but not fail
+    THEN it should reject the request with an error message
     """
     # ARRANGE
     service = QuantumService()
@@ -51,21 +51,24 @@ def test_validate_hf_with_exchange_correlation_warning(caplog):
         'basis_function': '6-31G',
         'charges': 0,
         'spin': 0,
-        'exchange_correlation': 'PBE0'  # Non-default for HF
+        'exchange_correlation': 'PBE0'  # Not applicable to HF
     }
-    
+
     # ACT
     result = service.validate_calculation_parameters(params)
-    
+
     # ASSERT
-    assert result is None  # Still passes validation
+    assert result is not None  # Should fail validation
+    assert 'exchange_correlation' in result
+    assert 'not applicable' in result.lower()
+    assert 'DFT' in result or 'TDDFT' in result
 
 
 def test_validate_hf_with_tddft_params_warning(caplog):
     """
     GIVEN HF parameters with TDDFT-specific parameters
     WHEN validate_calculation_parameters is called
-    THEN it should log a warning but not fail
+    THEN it should reject the request with an error message
     """
     # ARRANGE
     service = QuantumService()
@@ -74,14 +77,17 @@ def test_validate_hf_with_tddft_params_warning(caplog):
         'basis_function': 'sto-3g',
         'charges': 0,
         'spin': 0,
-        'tddft_nstates': 20  # TDDFT parameter ignored for HF
+        'tddft_nstates': 20  # Not applicable to HF
     }
-    
+
     # ACT
     result = service.validate_calculation_parameters(params)
-    
+
     # ASSERT
-    assert result is None  # Still passes
+    assert result is not None  # Should fail validation
+    assert 'tddft_nstates' in result
+    assert 'not applicable' in result.lower()
+    assert 'TDDFT' in result
 
 
 # ============================================================================
