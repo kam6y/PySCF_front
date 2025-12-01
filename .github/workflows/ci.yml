@@ -28,9 +28,9 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/conda_pkgs_dir
-        key: ${{ runner.os }}-conda-${{ hashFiles('.github/environment.yml') }}
+        key: ${{ runner.os }}-conda-v1-${{ hashFiles('.github/environment.yml') }}
         restore-keys: |
-          ${{ runner.os }}-conda-
+          ${{ runner.os }}-conda-v1-
     
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v3
