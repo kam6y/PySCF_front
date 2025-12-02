@@ -120,7 +120,8 @@ const request = async <T>(
   const url = `${API_BASE_URL}${endpoint}`;
 
   try {
-    const authToken = window.electronAPI?.authToken;
+    // トークンが届くまで確実に待機
+    const authToken = await window.electronAPI?.getAuthToken();
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -514,89 +515,113 @@ export const streamChatWithAgent = (
   const ctrl = new AbortController();
   let isStreamClosed = false; // 重複イベント防止フラグ
 
-  fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify({ message, history, session_id: sessionId }),
-    signal: ctrl.signal,
-
-    onopen: async response => {
-      if (!response.ok) {
-        const errorText = await response.text();
-        callbacks.onError(
-          new Error(`Failed to connect: ${response.status} ${errorText}`)
-        );
-        ctrl.abort(); // Stop further processing
-      }
-    },
-
-    onmessage(event) {
-      if (isStreamClosed) {
-        return;
+  // 非同期でトークンを取得してからリクエストを開始
+  (async () => {
+    try {
+      // トークンが届くまで確実に待機
+      const authToken = await window.electronAPI?.getAuthToken();
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      };
+      if (authToken) {
+        (headers as any)['X-Auth-Token'] = authToken;
       }
 
-      try {
-        const parsedData = JSON.parse(event.data);
+      fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message, history, session_id: sessionId }),
+        signal: ctrl.signal,
 
-        if (parsedData.type === 'chunk' && parsedData.payload?.text) {
-          callbacks.onMessage(parsedData.payload.text);
-        } else if (parsedData.type === 'agent_status' && parsedData.payload) {
-          // New event type: Agent status update
-          if (callbacks.onAgentStatus) {
-            callbacks.onAgentStatus(
-              parsedData.payload.status,
-              parsedData.payload.agent
+        onopen: async response => {
+          if (!response.ok) {
+            const errorText = await response.text();
+            callbacks.onError(
+              new Error(`Failed to connect: ${response.status} ${errorText}`)
             );
+            ctrl.abort(); // Stop further processing
           }
-        } else if (parsedData.type === 'done') {
+        },
+
+        onmessage(event) {
+          if (isStreamClosed) {
+            return;
+          }
+
+          try {
+            const parsedData = JSON.parse(event.data);
+
+            if (parsedData.type === 'chunk' && parsedData.payload?.text) {
+              callbacks.onMessage(parsedData.payload.text);
+            } else if (
+              parsedData.type === 'agent_status' &&
+              parsedData.payload
+            ) {
+              // New event type: Agent status update
+              if (callbacks.onAgentStatus) {
+                callbacks.onAgentStatus(
+                  parsedData.payload.status,
+                  parsedData.payload.agent
+                );
+              }
+            } else if (parsedData.type === 'done') {
+              if (!isStreamClosed) {
+                isStreamClosed = true;
+                callbacks.onClose();
+              }
+              ctrl.abort(); // End the connection
+            } else if (parsedData.type === 'error') {
+              if (!isStreamClosed) {
+                isStreamClosed = true;
+                callbacks.onError(
+                  new Error(
+                    parsedData.payload?.message ||
+                      'An unknown stream error occurred.'
+                  )
+                );
+              }
+              ctrl.abort();
+            }
+          } catch (e) {
+            if (!isStreamClosed) {
+              isStreamClosed = true;
+              callbacks.onError(
+                new Error('Failed to parse message from stream.')
+              );
+              ctrl.abort();
+            }
+          }
+        },
+
+        onclose() {
+          // onClose は onmessage の 'done' イベントで既に呼ばれている可能性があるため、
+          // 重複呼び出しを防止
           if (!isStreamClosed) {
             isStreamClosed = true;
             callbacks.onClose();
           }
-          ctrl.abort(); // End the connection
-        } else if (parsedData.type === 'error') {
+        },
+
+        onerror(err) {
           if (!isStreamClosed) {
             isStreamClosed = true;
             callbacks.onError(
-              new Error(
-                parsedData.payload?.message ||
-                  'An unknown stream error occurred.'
-              )
+              err instanceof Error ? err : new Error(String(err))
             );
           }
-          ctrl.abort();
-        }
-      } catch (e) {
-        if (!isStreamClosed) {
-          isStreamClosed = true;
-          callbacks.onError(new Error('Failed to parse message from stream.'));
-          ctrl.abort();
-        }
-      }
-    },
-
-    onclose() {
-      // onClose は onmessage の 'done' イベントで既に呼ばれている可能性があるため、
-      // 重複呼び出しを防止
-      if (!isStreamClosed) {
-        isStreamClosed = true;
-        callbacks.onClose();
-      }
-    },
-
-    onerror(err) {
-      if (!isStreamClosed) {
-        isStreamClosed = true;
-        callbacks.onError(err instanceof Error ? err : new Error(String(err)));
-      }
-      // fetchEventSource の自動リトライを防止するためにエラーを投げる
-      // これにより、エラー時に確実に停止する
-      throw err;
-    },
-  });
+          // fetchEventSource の自動リトライを防止するためにエラーを投げる
+          // これにより、エラー時に確実に停止する
+          throw err;
+        },
+      });
+    } catch (error) {
+      // トークン取得エラーなどの初期化エラー
+      callbacks.onError(
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  })();
 
   return () => ctrl.abort(); // Return a function to abort the stream
 };

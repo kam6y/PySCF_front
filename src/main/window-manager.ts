@@ -77,14 +77,20 @@ export const createWindow = (
     mainWindow = null;
   });
 
-  // ポート番号をURLパラメータとして渡す（IPC不要の堅牢な方式）
+  // ポート番号をURLパラメータとして渡す
+  // 認証トークンはセキュリティのためIPC経由で送信
   // dist/index.html
   const htmlPath = path.join(__dirname, 'index.html');
   newWindow.loadFile(htmlPath, {
     query: {
       flask_port: String(flaskPort),
-      auth_token: authToken,
     },
+  });
+
+  // ウィンドウのロード完了後にIPCで認証トークンを送信
+  newWindow.webContents.once('did-finish-load', () => {
+    newWindow.webContents.send('auth-token', authToken);
+    console.log('[Main] Auth token sent via IPC');
   });
 
   console.log(`[Main] Loading window with Flask port: ${flaskPort}`);

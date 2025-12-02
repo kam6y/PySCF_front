@@ -2,12 +2,26 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
-// URLパラメータからポート番号を取得（IPC不要）
+// URLパラメータからポート番号を取得
 const urlParams = new URLSearchParams(window.location.search);
 const flaskPortParam = urlParams.get('flask_port');
 const flaskPort = flaskPortParam ? parseInt(flaskPortParam, 10) : null;
 
-const authToken = urlParams.get('auth_token');
+// 認証トークンはIPC経由で受信（セキュリティのためURLパラメータを使用しない）
+// Promise化: トークンが届くまで待機
+let authTokenResolve: ((value: string | null) => void) | null = null;
+const authTokenPromise = new Promise<string | null>(resolve => {
+  authTokenResolve = resolve;
+});
+
+// メインプロセスから認証トークンを受信
+ipcRenderer.once('auth-token', (_event, token: string) => {
+  console.log('[Preload] Auth token received via IPC');
+  // Promiseを解決して待機中の処理を再開
+  if (authTokenResolve) {
+    authTokenResolve(token);
+  }
+});
 
 console.log(`[Preload] Flask port from URL: ${flaskPort}`);
 
@@ -22,7 +36,8 @@ if (!isValidPort) {
 contextBridge.exposeInMainWorld('electronAPI', {
   // URLパラメータから取得したポート番号を公開
   flaskPort: isValidPort ? flaskPort : null,
-  authToken: authToken || null,
+  // 認証トークンを非同期で取得（トークンが届くまで待機）
+  getAuthToken: () => authTokenPromise,
 
   // Electron API methods
   openExternalUrl: (url: string) =>
