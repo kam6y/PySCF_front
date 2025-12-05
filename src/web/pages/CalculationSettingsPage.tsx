@@ -763,62 +763,7 @@ export const CalculationSettingsPage = ({
                   />
                 </div>
                 {params.calculation_method === 'CASSCF' && (
-                  <div className={styles.settingRow}>
-                    <label>CASSCF Max Macro Iterations</label>
-                    <input
-                      type="number"
-                      value={(params as any).max_cycle_macro}
-                      onChange={e =>
-                        handleParamChange(
-                          'max_cycle_macro',
-                          Math.max(1, Math.min(200, Number(e.target.value)))
-                        )
-                      }
-                      min={1}
-                      max={200}
-                      step={1}
-                      className={`${styles.numberInput} ${styles.withSpinner}`}
-                      disabled={calculationStatus === 'running'}
-                    />
-                  </div>
-                )}
-                <div className={styles.settingRow}>
-                  <label>CI Max Micro Iterations</label>
-                  <input
-                    type="number"
-                    value={
-                      (params as any).max_cycle_micro !== undefined
-                        ? (params as any).max_cycle_micro
-                        : 3
-                    }
-                    onChange={e =>
-                      handleParamChange(
-                        'max_cycle_micro',
-                        Math.max(1, Math.min(100, Number(e.target.value)))
-                      )
-                    }
-                    min={1}
-                    max={100}
-                    step={1}
-                    className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
-                  />
-                </div>
-                <div className={styles.settingRow}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={(params as any).natorb !== false}
-                      onChange={e =>
-                        handleParamChange('natorb', e.target.checked)
-                      }
-                      disabled={calculationStatus === 'running'}
-                    />
-                    Transform to Natural Orbitals in Active Space
-                  </label>
-                </div>
-                {params.calculation_method === 'CASSCF' && (
-                  <div className={styles.nestedSettings}>
+                  <>
                     <div className={styles.settingRow}>
                       <label>Energy Convergence Tolerance</label>
                       <select
@@ -855,8 +800,61 @@ export const CalculationSettingsPage = ({
                         <option value={1e-6}>1e-6 (very tight)</option>
                       </select>
                     </div>
-                  </div>
+                    <div className={styles.settingRow}>
+                      <label>CASSCF Max Macro Iterations</label>
+                      <input
+                        type="number"
+                        value={(params as any).max_cycle_macro}
+                        onChange={e =>
+                          handleParamChange(
+                            'max_cycle_macro',
+                            Math.max(1, Math.min(200, Number(e.target.value)))
+                          )
+                        }
+                        min={1}
+                        max={200}
+                        step={1}
+                        className={`${styles.numberInput} ${styles.withSpinner}`}
+                        disabled={calculationStatus === 'running'}
+                      />
+                    </div>
+                  </>
                 )}
+                <div className={styles.settingRow}>
+                  <label>CI Max Micro Iterations</label>
+                  <input
+                    type="number"
+                    value={
+                      (params as any).max_cycle_micro !== undefined
+                        ? (params as any).max_cycle_micro
+                        : 3
+                    }
+                    onChange={e =>
+                      handleParamChange(
+                        'max_cycle_micro',
+                        Math.max(1, Math.min(100, Number(e.target.value)))
+                      )
+                    }
+                    min={1}
+                    max={100}
+                    step={1}
+                    className={`${styles.numberInput} ${styles.withSpinner}`}
+                    disabled={calculationStatus === 'running'}
+                  />
+                </div>
+                <div className={styles.settingRow}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={(params as any).natorb !== false}
+                      onChange={e =>
+                        handleParamChange('natorb', e.target.checked)
+                      }
+                      disabled={calculationStatus === 'running'}
+                    />
+                    Transform to Natural Orbitals in Active Space
+                  </label>
+                </div>
               </section>
             )}
             {params.calculation_method === 'TDDFT' && (
