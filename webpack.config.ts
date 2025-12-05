@@ -71,7 +71,7 @@ const common: Configuration = {
       },
       {
         // 画像やフォントなどのアセット類
-        test: /\.(ico|png|svg|eot|woff?2?)$/,
+        test: /\.(ico|png|svg|eot|woff?2?|ttf)$/,
         /**
          * アセット類も同様に asset/inline は使用しない
          * なお、webpack@5.x では file-loader or url-loader は不要になった
@@ -109,6 +109,15 @@ const preload: Configuration = {
   target: "electron-preload",
   entry: {
     preload: "./src/preload.ts",
+  },
+};
+
+// スプラッシュウィンドウ用プリロードスクリプト設定
+const splashPreload: Configuration = {
+  ...common,
+  target: "electron-preload",
+  entry: {
+    splashPreload: "./src/splash/preload.ts",
   },
 };
 
@@ -168,5 +177,28 @@ const renderer: Configuration = {
   ],
 };
 
-// 上記 3 つの設定を配列にしてデフォルト・エクスポート
-export default [main, preload, renderer];
+// スプラッシュウィンドウ用レンダラー設定
+const splashRenderer: Configuration = {
+  ...common,
+  target: "web",
+  entry: {
+    splash: "./src/splash/splash.ts",
+  },
+  plugins: [
+    // 環境変数をバンドルに注入
+    new webpack.DefinePlugin({
+      "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV || "development"),
+    }),
+    // CSS を JS へバンドルせず別ファイルとして出力
+    new MiniCssExtractPlugin(),
+    // splash.html を生成
+    new HtmlWebpackPlugin({
+      template: "./src/splash/splash.html",
+      filename: "splash.html",
+      chunks: ["splash"],
+    }),
+  ],
+};
+
+// 上記 5 つの設定を配列にしてデフォルト・エクスポート
+export default [main, preload, renderer, splashPreload, splashRenderer];

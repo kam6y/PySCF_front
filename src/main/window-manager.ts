@@ -21,6 +21,7 @@ export const createWindow = (
     height: 800,
     minWidth: 1200,
     minHeight: 800,
+    show: false, // 初期状態で非表示
     titleBarStyle: 'hidden',
     titleBarOverlay: {
       color: 'rgba(0, 0, 0, 0)',
@@ -61,6 +62,11 @@ export const createWindow = (
         });
     });
   }
+
+  // ウィンドウの準備が完了したら表示
+  newWindow.once('ready-to-show', () => {
+    newWindow.show();
+  });
 
   // 全画面状態の変更をレンダラープロセスに通知
   newWindow.on('enter-full-screen', () => {

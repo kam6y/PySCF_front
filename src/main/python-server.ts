@@ -8,6 +8,7 @@ import {
   createCleanEnvironment,
 } from './python-env';
 import { findAvailablePort } from './port-manager';
+import { updateSplashStatus } from './splash-window-manager';
 
 let pythonProcess: ChildProcess | null = null;
 let flaskPort: number | null = null;
@@ -51,6 +52,14 @@ export const checkServerHealth = (
           console.log(
             `Health check attempt ${attempts}/${retries} failed for ${url}`
           );
+
+          // スプラッシュにリトライカウントを表示
+          updateSplashStatus(
+            'health-check',
+            'Waiting for server...',
+            attempts
+          );
+
           if (attempts >= retries) {
             clearInterval(interval);
             const diagnosticMessage = app.isPackaged
@@ -113,6 +122,9 @@ export const startPythonServer = async (
       typeof serverSettings.port === 'number' ? serverSettings.port : 5000;
     const portRangeEnd = 5100; // Fixed range for port detection
 
+    // ポート検出の進捗を通知
+    updateSplashStatus('finding-port', 'Finding available port...');
+
     try {
       console.log(
         `Auto-detecting available port in range ${defaultPort}-${portRangeEnd}...`
@@ -168,6 +180,9 @@ export const startPythonServer = async (
     // 本番環境でもGunicornを使用する統一ロジック
     if (productionSettings.use_gunicorn) {
       console.log('Starting server with Gunicorn (unified mode)');
+
+      // サーバー起動の進捗を通知
+      updateSplashStatus('starting-server', 'Starting Python backend...');
 
       const gunicornArgs = [
         '-m',
@@ -250,6 +265,9 @@ export const startPythonServer = async (
     } else {
       // フォールバック: 直接実行（設定でGunicorn無効時のみ）
       console.log('Starting server with direct execution (fallback mode)');
+
+      // サーバー起動の進捗を通知
+      updateSplashStatus('starting-server', 'Starting Python backend...');
 
       // pyenv環境変数を除外した、conda環境専用の環境変数を作成
       const condaBinDir = path.dirname(pythonExecutablePath);

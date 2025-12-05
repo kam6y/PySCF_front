@@ -116,6 +116,15 @@ npm run package:linux:docker
 npm run package:linux
 ```
 
+### Debug Options
+
+```bash
+# Automatically open DevTools for splash window
+DEBUG_SPLASH=true npm run dev
+```
+
+Useful for debugging splash window startup sequence and IPC communication.
+
 ### Building for Linux on Windows
 
 There are two methods for building Linux applications on Windows:

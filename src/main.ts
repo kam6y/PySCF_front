@@ -1,10 +1,17 @@
-import { app, BrowserWindow, dialog } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import crypto from 'crypto';
 import { loadServerConfig } from './main/config';
 import { startPythonServer, stopPythonServer } from './main/python-server';
 import { createWindow, getMainWindow } from './main/window-manager';
 import { createApplicationMenu } from './main/menu';
 import { registerIpcHandlers } from './main/ipc';
+import {
+  createSplashWindow,
+  updateSplashStatus,
+  showSplashError,
+  closeSplashWindow,
+  closeSplashWindowWhenReady,
+} from './main/splash-window-manager';
 
 let flaskPort: number | null = null;
 let authToken: string = '';
@@ -15,6 +22,10 @@ let isQuitting = false;
 let serverConfig: any = null;
 
 const initializeApp = async () => {
+  // スプラッシュウィンドウを作成
+  createSplashWindow();
+  updateSplashStatus('initializing', 'Initializing PySCF Native App...');
+
   if (!serverConfig) {
     serverConfig = loadServerConfig();
   }
@@ -26,6 +37,7 @@ const initializeApp = async () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.focus();
     }
+    closeSplashWindow();
     return;
   }
 
@@ -39,24 +51,34 @@ const initializeApp = async () => {
   console.log('Starting window creation...');
 
   try {
+    // Python環境検出開始を通知
+    updateSplashStatus('detecting-env', 'Detecting Python environment...');
+
     flaskPort = await startPythonServer(serverConfig, authToken);
     if (!flaskPort) {
       throw new Error('Could not determine Flask server port.');
     }
     console.log('Python server started successfully.');
+
+    // メインウィンドウ作成開始を通知
+    updateSplashStatus('creating-window', 'Creating main window...');
   } catch (error) {
     console.error('Failed to start Python server:', error);
-    dialog.showErrorBox(
-      'Fatal Error',
-      `Could not start the Python backend. The application will now close.\n\nError details: ${error instanceof Error ? error.message : String(error)}`
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // スプラッシュにエラーを表示（5秒後に自動終了）
+    showSplashError(
+      `Could not start the Python backend.\n\nError details: ${errorMessage}`
     );
-    app.quit();
     return;
   } finally {
     isCreatingWindow = false;
   }
 
-  createWindow(flaskPort, authToken);
+  const mainWindow = createWindow(flaskPort, authToken);
+
+  // メインウィンドウの準備完了を待ってスプラッシュをクローズ
+  closeSplashWindowWhenReady(mainWindow);
 };
 
 // シングルインスタンスロックを取得
