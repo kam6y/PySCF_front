@@ -94,7 +94,8 @@ export const createWindow = (
   });
 
   // ウィンドウのロード完了後にIPCで認証トークンを送信
-  newWindow.webContents.once('did-finish-load', () => {
+  // リロード時にもトークンを送信するため 'on' を使用
+  newWindow.webContents.on('did-finish-load', () => {
     newWindow.webContents.send('auth-token', authToken);
     console.log('[Main] Auth token sent via IPC');
   });
