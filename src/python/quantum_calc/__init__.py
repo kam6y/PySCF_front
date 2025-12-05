@@ -1,4 +1,4 @@
-"""Quantum chemistry calculation module for PySCF Native App."""
+"""Quantum chemistry calculation module for PySCF_front."""
 
 from .base_calculator import BaseCalculator
 from .dft_calculator import DFTCalculator

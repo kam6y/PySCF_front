@@ -1,5 +1,5 @@
 """
-Database package for PySCF Native App.
+Database package for PySCF_front.
 
 This package contains database-related modules for persistent data storage.
 """

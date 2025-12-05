@@ -1,5 +1,5 @@
 """
-Unified configuration management module for PySCF Native App.
+Unified configuration management module for PySCF_front.
 
 This module serves as the single source of truth for all application configuration,
 loading settings from config/server-config.json and providing a unified interface

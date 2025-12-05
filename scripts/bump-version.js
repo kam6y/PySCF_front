@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Version bump script for PySCF Native App
+ * Version bump script for PySCF_front
  *
  * This script updates version across all project files and creates a git tag.
  *
@@ -327,7 +327,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>`;
 
 // Main execution
 function main() {
-  log('\n🚀 PySCF Native App - Version Bump Script', 'cyan');
+  log('\n🚀 PySCF_front - Version Bump Script', 'cyan');
   log('==========================================\n', 'cyan');
 
   info(`New version: ${newVersion}`);

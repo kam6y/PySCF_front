@@ -24,7 +24,7 @@ let serverConfig: any = null;
 const initializeApp = async () => {
   // スプラッシュウィンドウを作成
   createSplashWindow();
-  updateSplashStatus('initializing', 'Initializing PySCF Native App...');
+  updateSplashStatus('initializing', 'Initializing PySCF_front...');
 
   if (!serverConfig) {
     serverConfig = loadServerConfig();

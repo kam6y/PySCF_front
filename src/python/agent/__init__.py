@@ -1,5 +1,5 @@
 """
-AI Agent module for PySCF native application.
+AI Agent module for PySCF_frontlication.
 Provides multi-agent supervisor system for molecular analysis and research assistance.
 """
 

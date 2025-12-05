@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-PySCF Native App - 環境検証スクリプト
+PySCF_front - 環境検証スクリプト
 このスクリプトは、開発環境の健全性を検証します
 """
 
@@ -216,7 +216,7 @@ def check_project_structure() -> bool:
 
 def main() -> None:
     """メイン実行関数"""
-    print(f"{Colors.CYAN}=== PySCF Native App 環境検証 ==={Colors.NC}")
+    print(f"{Colors.CYAN}=== PySCF_front 環境検証 ==={Colors.NC}")
     print()
     
     tests = [

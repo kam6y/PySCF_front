@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: PySCF Native Application API
+  title: PySCF_frontlication API
   description: |
     Backend API for managing quantum chemistry calculations using PySCF.
     

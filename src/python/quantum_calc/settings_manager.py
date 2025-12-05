@@ -1,4 +1,4 @@
-"""Application settings manager for PySCF Native App."""
+"""Application settings manager for PySCF_front."""
 
 import os
 import json

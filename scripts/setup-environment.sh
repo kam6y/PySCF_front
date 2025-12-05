@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# PySCF Native App - 自動環境構築スクリプト
+# PySCF_front - 自動環境構築スクリプト
 # このスクリプトは、開発に必要なconda環境を自動的にセットアップします
 
 set -e  # エラー時に終了
@@ -33,7 +33,7 @@ log_error() {
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-log_info "PySCF Native App 環境構築を開始します..."
+log_info "PySCF_front 環境構築を開始します..."
 log_info "プロジェクトルート: $PROJECT_ROOT"
 
 # conda の存在確認

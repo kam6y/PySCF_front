@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-PySCF Native App - ビルド完了後検証スクリプト
+PySCF_front - ビルド完了後検証スクリプト
 このスクリプトは、ビルド完了後にbundled環境の完全性を検証します
 """
 
@@ -213,7 +213,7 @@ def validate_conda_functionality(project_root: Path) -> bool:
 
 def main() -> None:
     """メイン実行関数"""
-    print(f"{Colors.CYAN}=== PySCF Native App ビルド完全性検証 ==={Colors.NC}")
+    print(f"{Colors.CYAN}=== PySCF_front ビルド完全性検証 ==={Colors.NC}")
     print()
     
     # プロジェクトルートを一度だけ取得
