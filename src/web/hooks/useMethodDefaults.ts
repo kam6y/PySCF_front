@@ -64,21 +64,30 @@ export const useMethodDefaults = () => {
   /**
    * Check if a parameter should be disabled for a specific calculation method.
    *
+   * This function uses `applicable_methods` constraint to determine if a parameter
+   * should be disabled. If a method is NOT in the `applicable_methods` list,
+   * the parameter is disabled for that method.
+   *
    * @param paramName - Name of the parameter (e.g., 'optimize_geometry')
    * @param method - Calculation method name
    * @returns True if the parameter should be disabled for the method
    *
    * @example
-   * isParameterDisabled('optimize_geometry', 'TDDFT');  // Returns: true
-   * isParameterDisabled('optimize_geometry', 'DFT');    // Returns: false
+   * isParameterDisabled('optimize_geometry', 'TDDFT');  // Returns: true (TDDFT not in ['DFT', 'HF', 'MP2'])
+   * isParameterDisabled('optimize_geometry', 'DFT');    // Returns: false (DFT is in ['DFT', 'HF', 'MP2'])
+   * isParameterDisabled('cpu_cores', 'DFT');            // Returns: false (no constraint, universal parameter)
    */
   const isParameterDisabled = (paramName: string, method: string): boolean => {
     const constraint = supportedParams?.parameter_constraints?.[paramName];
     if (!constraint) return false;
 
-    if (constraint.disabled_for) {
-      return constraint.disabled_for.includes(method);
+    // Check applicable_methods constraint (inverted logic)
+    // If method is NOT in the applicable_methods list, the parameter is disabled
+    if (constraint.applicable_methods) {
+      return !constraint.applicable_methods.includes(method);
     }
+
+    // No constraint means parameter is universally applicable
     return false;
   };
 
@@ -100,25 +109,25 @@ export const useMethodDefaults = () => {
    * Apply method-specific default values when switching calculation methods.
    *
    * This function implements the Single Source of Truth principle by completely
-   * trusting the backend's method_defaults. The backend already provides only
-   * the applicable parameters for each method, so no frontend filtering is needed.
+   * trusting the backend's method_defaults. It also removes any parameters that
+   * are not applicable to the new method to prevent backend validation errors.
    *
    * @param currentParams - Current calculation parameters
    * @param newMethod - New calculation method to switch to
-   * @returns Updated parameters with method defaults applied
+   * @returns Updated parameters with method defaults applied and inapplicable parameters removed
    *
    * @example
    * const updated = applyMethodDefaults(
-   *   { calculation_method: 'DFT', basis_function: '6-31G(d)', exchange_correlation: 'B3LYP', ... },
-   *   'HF'
+   *   { calculation_method: 'DFT', basis_function: '6-31G(d)', optimize_geometry: true, ... },
+   *   'TDDFT'
    * );
-   * // Returns: { calculation_method: 'HF', basis_function: '6-31G(d)', ... }
-   * // Note: exchange_correlation is automatically removed because it's not in HF's defaults
+   * // Returns: { calculation_method: 'TDDFT', basis_function: '6-31G(d)', ... }
+   * // Note: optimize_geometry is automatically removed because it's not applicable to TDDFT
    *
    * @remarks
    * Design principles:
    * - Backend method_defaults is the single source of truth
-   * - No hardcoded parameter lists in frontend
+   * - Explicitly remove inapplicable parameters to prevent validation errors
    * - Molecular and system settings are preserved across method changes
    */
   const applyMethodDefaults = (
@@ -144,14 +153,27 @@ export const useMethodDefaults = () => {
       preservedParams.cpu_cores = params.cpu_cores;
     }
 
-    // Trust backend defaults completely - they already contain only applicable parameters
-    // Preserved params override defaults to maintain user's molecular structure and settings
-    return {
+    // Build final parameters from defaults and preserved params
+    const finalParams = {
       ...defaults,
       ...preservedParams,
       calculation_method:
         newMethod as QuantumCalculationRequest['calculation_method'],
-    } as Partial<QuantumCalculationRequest>;
+    };
+
+    // IMPORTANT: Remove any parameters that are not applicable to the new method
+    // This prevents backend validation errors when switching methods
+    const cleanedParams: Record<string, any> = {};
+    for (const [key, value] of Object.entries(finalParams)) {
+      // Keep the parameter if:
+      // 1. It has no constraint (universal parameter)
+      // 2. It is applicable to the new method
+      if (isParameterApplicable(key, newMethod)) {
+        cleanedParams[key] = value;
+      }
+    }
+
+    return cleanedParams as Partial<QuantumCalculationRequest>;
   };
 
   /**

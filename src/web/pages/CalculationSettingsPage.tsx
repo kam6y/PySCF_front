@@ -917,7 +917,7 @@ export const CalculationSettingsPage = ({
                       }
                       disabled={calculationStatus === 'running'}
                     />
-                    Perform Natural Transition Orbital Analysis
+                    Natural Transition Orbital Analysis
                   </label>
                 </div>
               </section>

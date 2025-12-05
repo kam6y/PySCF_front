@@ -105,7 +105,7 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
     },
     'optimize_geometry': {
         'applicable_methods': ['DFT', 'HF', 'MP2'],
-        'description': 'Geometry optimization (only applicable for DFT, HF, and MP2 methods)'
+        'description': 'DFT, HF, and MP2 methods only'
     },
     'frozen_core': {
         'applicable_methods': ['CCSD', 'CCSD_T'],
