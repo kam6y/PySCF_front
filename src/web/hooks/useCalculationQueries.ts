@@ -9,6 +9,14 @@ export const useGetCalculations = () => {
   return useQuery({
     queryKey: ['calculations'],
     queryFn: apiClient.getCalculations,
+
+    // リストは頻繁に変更される可能性があるため、staleTimeを短めに
+    staleTime: 30 * 1000, // 30秒
+    gcTime: 5 * 60 * 1000, // 5分
+
+    // リストはフォーカス時に再フェッチすると便利
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 };
 
@@ -18,6 +26,19 @@ export const useGetCalculationDetails = (id: string | null) => {
     queryKey: ['calculation', id],
     queryFn: () => apiClient.getCalculationDetails(id!),
     enabled: !!id && !id.startsWith('new-calculation-'), // idが存在し、一時IDでない場合にのみ実行
+
+    // WebSocketがリアルタイム更新を提供するため、ポーリングは不要
+    staleTime: 60 * 1000, // 1分 - WebSocketが主な更新メカニズム
+    gcTime: 10 * 60 * 1000, // 10分 - 詳細データを長めに保持
+
+    // ウィンドウフォーカス時の再フェッチを無効化（WebSocketが更新を管理）
+    refetchOnWindowFocus: false,
+
+    // ネットワーク復帰時の再フェッチは有効（WebSocketより先に復帰する可能性）
+    refetchOnReconnect: true,
+
+    // コンポーネント再マウント時は同期（WebSocket切断時の不整合を防ぐ）
+    refetchOnMount: true,
   });
 };
 

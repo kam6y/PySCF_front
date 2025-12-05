@@ -438,18 +438,77 @@ export const useUnifiedWebSocket = ({
 
         const activeId = currentActiveCalculationId.current;
 
+        /**
+         * リトライ機能付きクエリ無効化ヘルパー
+         * 指数バックオフとジッターを使用してネットワークエラーから回復
+         */
+        const invalidateQueriesWithRetry = async (
+          queryKey: any[],
+          maxRetries = 3
+        ): Promise<void> => {
+          for (let attempt = 0; attempt < maxRetries; attempt++) {
+            try {
+              // 初回以外は指数バックオフで待機
+              if (attempt > 0) {
+                const baseDelay = 500 * Math.pow(2, attempt - 1); // 500ms, 1000ms, 2000ms
+                const jitter = Math.random() * 200; // 0-200msのランダムジッター
+                const delay = baseDelay + jitter;
+
+                console.log(
+                  `[UnifiedWebSocket] Retrying query invalidation for ${JSON.stringify(queryKey)} (attempt ${attempt + 1}/${maxRetries}) after ${Math.round(delay)}ms`
+                );
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+
+              // クエリを無効化して再フェッチ
+              await queryClient.invalidateQueries({
+                queryKey,
+                refetchType: 'active',
+              });
+
+              console.log(
+                `[UnifiedWebSocket] Successfully invalidated queries for ${JSON.stringify(queryKey)}`
+              );
+              return; // 成功したら終了
+            } catch (error) {
+              const isLastAttempt = attempt === maxRetries - 1;
+
+              // エラーの種類を判定
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              const isNetworkError =
+                errorMessage.includes('ERR_NETWORK_CHANGED') ||
+                errorMessage.includes('NetworkError') ||
+                errorMessage.includes('Failed to fetch');
+
+              console.error(
+                `[UnifiedWebSocket] Query invalidation failed for ${JSON.stringify(queryKey)} (attempt ${attempt + 1}/${maxRetries}):`,
+                errorMessage
+              );
+
+              // 最後の試行でエラーの場合は例外をスロー
+              if (isLastAttempt) {
+                throw new Error(
+                  `Failed to invalidate queries after ${maxRetries} attempts: ${errorMessage}`
+                );
+              }
+
+              // ネットワークエラー以外の場合は即座に失敗
+              if (!isNetworkError) {
+                console.warn(
+                  `[UnifiedWebSocket] Non-network error detected, skipping retry`
+                );
+                throw error;
+              }
+            }
+          }
+        };
+
         try {
-          // 並行実行で効率化（合計時間を約50%短縮）
+          // 並行実行で効率化しつつ、各クエリにリトライロジックを適用
           await Promise.all([
-            queryClient.invalidateQueries({
-              queryKey: ['calculations'],
-              refetchType: 'active',
-            }),
+            invalidateQueriesWithRetry(['calculations']),
             activeId && !activeId.startsWith('new-calculation-')
-              ? queryClient.invalidateQueries({
-                  queryKey: ['calculation', activeId],
-                  refetchType: 'active',
-                })
+              ? invalidateQueriesWithRetry(['calculation', activeId])
               : Promise.resolve(),
           ]);
 
