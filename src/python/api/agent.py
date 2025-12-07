@@ -246,135 +246,106 @@ def _create_supervisor_stream(message: str, history: list, session_id: str = Non
         current_worker = None
         supervisor_response_started = False
 
-        # Stream graph execution with updates mode to track node executions
-        logger.debug("Starting LangGraph Supervisor stream with updates mode and subgraphs enabled")
+        # Stream graph execution with messages mode to get actual text chunks
+        logger.debug("Starting LangGraph Supervisor stream with messages mode and subgraphs enabled")
         for chunk in graph_app.stream(
             graph_input,
-            stream_mode="updates",
+            stream_mode="messages",
             subgraphs=True  # Enable subgraph (worker) updates
         ):
-            logger.debug(f"Received chunk: {type(chunk)}, is_tuple: {isinstance(chunk, tuple)}")
+            # Debug: Log chunk structure
+            logger.debug(f"Received chunk: type={type(chunk).__name__}, is_tuple={isinstance(chunk, tuple)}")
+            if hasattr(chunk, '__dict__'):
+                logger.debug(f"Chunk attributes: {list(chunk.__dict__.keys())[:10]}")  # First 10 attributes
 
-            # Check if this is a subgraph update (worker agent execution)
+            # stream_mode="messages" returns message objects (or tuples with messages)
+            # Extract the message from the chunk
             if isinstance(chunk, tuple):
-                namespace, node_updates = chunk
-
-                # Subgraph execution detected
-                if len(namespace) > 0:
-                    # Extract worker name from namespace
-                    # Format: ('quantum_calculation_worker:uuid',) or ('research_expert:uuid',)
-                    worker_id = namespace[-1]
-                    worker_name = worker_id.split(":")[0] if ":" in worker_id else worker_id
-
-                    # Worker execution started
-                    if current_worker != worker_name:
-                        logger.info(f"Worker agent '{worker_name}' started execution")
-                        current_worker = worker_name
-                        yield _format_sse_event("agent_status", {
-                            "status": "running",
-                            "agent": worker_name
-                        })
-
-                    # Note: We'll send "completed" when we detect the parent graph update after worker finishes
+                # Tuple format: (message, metadata) or (namespace, message)
+                if len(chunk) == 2:
+                    # Try to identify which is the message
+                    if hasattr(chunk[0], 'content'):
+                        message = chunk[0]
+                        metadata = chunk[1]
+                    elif hasattr(chunk[1], 'content'):
+                        message = chunk[1]
+                        metadata = chunk[0]
+                    else:
+                        # Neither seems to be a message, skip
+                        logger.debug(f"Skipping tuple chunk without message: {chunk}")
+                        continue
                 else:
-                    # Parent graph update (Supervisor)
-                    logger.debug(f"Parent graph update: {list(node_updates.keys())}")
+                    logger.debug(f"Skipping unexpected tuple format: {chunk}")
+                    continue
+            else:
+                # Direct message object
+                message = chunk
+                metadata = {}
 
-                    # If we were tracking a worker, mark it as completed
+            logger.debug(f"Extracted message: type={type(message).__name__}, has_content={hasattr(message, 'content')}")
+
+            # Check if this is an AIMessage with content
+            # Handle both message.type attribute and __class__.__name__
+            message_type = getattr(message, 'type', None) or type(message).__name__.lower()
+            is_ai_message = message_type in ['ai', 'aimessage', 'aimessagechunk']
+
+            if is_ai_message:
+                # Track which agent is responding
+                agent_name = getattr(message, 'name', 'supervisor')
+                logger.debug(f"AI message from agent: {agent_name}")
+
+                # Detect worker transitions
+                if agent_name != current_worker:
                     if current_worker:
+                        # Previous worker completed
                         logger.info(f"Worker agent '{current_worker}' completed execution")
                         yield _format_sse_event("agent_status", {
                             "status": "completed",
                             "agent": current_worker
                         })
-                        current_worker = None
 
-                    # Process supervisor's response
-                    for node_name, data in node_updates.items():
-                        if "messages" in data:
-                            messages = data["messages"]
-                            if messages:
-                                # Get the last message
-                                last_message = messages[-1]
+                    if agent_name != 'supervisor' and agent_name:
+                        # New worker started
+                        logger.info(f"Worker agent '{agent_name}' started execution")
+                        current_worker = agent_name
+                        yield _format_sse_event("agent_status", {
+                            "status": "running",
+                            "agent": agent_name
+                        })
 
-                                # Log tool calls for debugging transfer execution
-                                if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-                                    for tool_call in last_message.tool_calls:
-                                        tool_name = tool_call.get('name', 'unknown') if isinstance(tool_call, dict) else getattr(tool_call, 'name', 'unknown')
-                                        logger.info(f"Supervisor calling tool: {tool_name}")
+                # Check for tool calls (for debugging)
+                if hasattr(message, 'tool_calls') and message.tool_calls:
+                    for tool_call in message.tool_calls:
+                        tool_name = tool_call.get('name', 'unknown') if isinstance(tool_call, dict) else getattr(tool_call, 'name', 'unknown')
+                        logger.info(f"Tool call detected from {agent_name}: {tool_name}")
 
-                                if hasattr(last_message, "content") and last_message.content:
-                                    # Filter out internal transfer messages
-                                    if _is_internal_transfer_message(last_message.content):
-                                        logger.debug(f"Filtering internal transfer message: {last_message.content[:100]}")
-                                        continue
-                                    
-                                    # Notify that supervisor is responding
-                                    if not supervisor_response_started:
-                                        logger.info("Supervisor started generating response")
-                                        yield _format_sse_event("agent_status", {
-                                            "status": "responding",
-                                            "agent": "supervisor"
-                                        })
-                                        supervisor_response_started = True
+                # Stream content if available
+                if hasattr(message, 'content') and message.content:
+                    content = message.content
 
-                                    # Stream the supervisor's response (with markdown normalization)
-                                    normalized_content = _normalize_markdown_codeblocks(last_message.content)
-                                    logger.info(f"Streaming supervisor response, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
+                    # Filter internal transfer messages
+                    if _is_internal_transfer_message(content):
+                        logger.debug(f"Filtering internal transfer message: {content[:100]}")
+                        continue
 
-                                    # Accumulate for saving
-                                    accumulated_response.append(normalized_content)
+                    # Notify supervisor is responding
+                    if not supervisor_response_started and agent_name == 'supervisor':
+                        logger.info("Supervisor started generating response")
+                        yield _format_sse_event("agent_status", {
+                            "status": "responding",
+                            "agent": "supervisor"
+                        })
+                        supervisor_response_started = True
 
-                                    yield _format_sse_event("chunk", {"text": normalized_content})
-            else:
-                # Regular dict format (parent graph without namespace)
-                logger.debug(f"Dict format update: {list(chunk.keys())}")
+                    # Normalize and stream content
+                    normalized_content = _normalize_markdown_codeblocks(content)
+                    logger.info(f"Streaming response from {agent_name}, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
 
-                # If we were tracking a worker, mark it as completed
-                if current_worker:
-                    logger.info(f"Worker agent '{current_worker}' completed execution")
-                    yield _format_sse_event("agent_status", {
-                        "status": "completed",
-                        "agent": current_worker
-                    })
-                    current_worker = None
+                    # Accumulate for database
+                    accumulated_response.append(normalized_content)
 
-                # Process updates
-                for node_name, data in chunk.items():
-                    if "messages" in data:
-                        messages = data["messages"]
-                        if messages:
-                            last_message = messages[-1]
-
-                            # Log tool calls for debugging transfer execution
-                            if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-                                for tool_call in last_message.tool_calls:
-                                    tool_name = tool_call.get('name', 'unknown') if isinstance(tool_call, dict) else getattr(tool_call, 'name', 'unknown')
-                                    logger.info(f"Supervisor calling tool: {tool_name}")
-
-                            if hasattr(last_message, "content") and last_message.content:
-                                # Filter out internal transfer messages
-                                if _is_internal_transfer_message(last_message.content):
-                                    logger.debug(f"Filtering internal transfer message: {last_message.content[:100]}")
-                                    continue
-                                
-                                # Notify that supervisor is responding
-                                if not supervisor_response_started:
-                                    logger.info("Supervisor started generating response")
-                                    yield _format_sse_event("agent_status", {
-                                        "status": "responding",
-                                        "agent": "supervisor"
-                                    })
-                                    supervisor_response_started = True
-
-                                # Stream the response (with markdown normalization)
-                                normalized_content = _normalize_markdown_codeblocks(last_message.content)
-                                logger.info(f"Streaming response from {node_name}, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
-
-                                # Accumulate for saving
-                                accumulated_response.append(normalized_content)
-
-                                yield _format_sse_event("chunk", {"text": normalized_content})
+                    # Stream to client
+                    yield _format_sse_event("chunk", {"text": normalized_content})
 
         logger.debug("Stream completed successfully")
 
