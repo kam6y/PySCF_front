@@ -1313,3 +1313,65 @@
   padding-bottom: 8px;
   border-bottom: 2px solid #e0e0e0;
 }
+
+/* Reference Information Box (for CCSD diagnostics) */
+.referenceInfo {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #f0f7ff;
+  border: 1px solid #bde0fe;
+  border-radius: 6px;
+}
+
+.referenceInfo h4 {
+  margin: 0 0 12px 0;
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #1976d2;
+}
+
+.referenceInfo ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.referenceInfo li {
+  margin: 6px 0;
+  font-size: 0.9em;
+  color: #495057;
+  line-height: 1.5;
+}
+
+/* SCF Convergence Grid */
+.convergenceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.convergenceGrid div {
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #dee2e6;
+}
+
+.convergenceGrid strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9em;
+  color: #495057;
+}
+
+.convergenceGrid code {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #ffffff;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
+  font-size: 0.9em;
+  color: #1976d2;
+}

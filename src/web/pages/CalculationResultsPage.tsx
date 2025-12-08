@@ -130,8 +130,7 @@ export const CalculationResultsPage = ({
     return null;
   }
 
-  const { results, parameters, primaryEnergyLabel, primaryEnergyValue } =
-    processedData;
+  const { results, parameters } = processedData;
   const completedAt = activeCalculation.updatedAt;
 
   return (
@@ -176,15 +175,6 @@ export const CalculationResultsPage = ({
             <div>
               <strong>Convergence:</strong>{' '}
               {results.converged ? '✅ Converged' : '❌ Not Converged'}
-            </div>
-          </div>
-
-          {/* Primary Energy Result - Prominently Displayed */}
-          <div className={styles.primaryEnergyResult}>
-            <div className={styles.energyLabel}>Primary Energy Result</div>
-            <div className={styles.energyValue}>
-              <strong>{primaryEnergyLabel}:</strong>{' '}
-              <code>{primaryEnergyValue}</code>
             </div>
           </div>
         </section>
@@ -1077,6 +1067,30 @@ export const CalculationResultsPage = ({
               <div className={styles.propertySubsection}>
                 <h3>Frontier Orbital Analysis</h3>
                 <div className={styles.frontierOrbitalsGrid}>
+                  {results.homo_index != null && (
+                    <div className={styles.orbitalEnergyBox}>
+                      <strong>HOMO Index:</strong>
+                      <code>{results.homo_index}</code>
+                    </div>
+                  )}
+                  {results.lumo_index != null && (
+                    <div className={styles.orbitalEnergyBox}>
+                      <strong>LUMO Index:</strong>
+                      <code>{results.lumo_index}</code>
+                    </div>
+                  )}
+                  {results.num_occupied_orbitals != null && (
+                    <div className={styles.orbitalEnergyBox}>
+                      <strong>Occupied Orbitals:</strong>
+                      <code>{results.num_occupied_orbitals}</code>
+                    </div>
+                  )}
+                  {results.num_virtual_orbitals != null && (
+                    <div className={styles.orbitalEnergyBox}>
+                      <strong>Virtual Orbitals:</strong>
+                      <code>{results.num_virtual_orbitals}</code>
+                    </div>
+                  )}
                   {results.homo_energy_ev != null && (
                     <div className={styles.orbitalEnergyBox}>
                       <strong>HOMO Energy:</strong>
@@ -1113,15 +1127,6 @@ export const CalculationResultsPage = ({
                         <code className={styles.secondaryUnit}>
                           ({results.homo_lumo_gap_hartree?.toFixed(6)} hartree)
                         </code>
-                      </div>
-                      <div className={styles.gapInterpretation}>
-                        {results.homo_lumo_gap_ev > 5.0 &&
-                          '→ Large gap - chemically stable'}
-                        {results.homo_lumo_gap_ev > 2.0 &&
-                          results.homo_lumo_gap_ev <= 5.0 &&
-                          '→ Moderate gap'}
-                        {results.homo_lumo_gap_ev <= 2.0 &&
-                          '→ Small gap - reactive'}
                       </div>
                     </div>
                   )}
@@ -1209,15 +1214,6 @@ export const CalculationResultsPage = ({
                       </tbody>
                     </table>
                   </div>
-                  <div className={styles.dipolePolarityInfo}>
-                    <strong>Polarity:</strong>{' '}
-                    {results.dipole_moment_total_debye > 1.0 && 'High polarity'}
-                    {results.dipole_moment_total_debye > 0.5 &&
-                      results.dipole_moment_total_debye <= 1.0 &&
-                      'Moderate polarity'}
-                    {results.dipole_moment_total_debye <= 0.5 &&
-                      'Low polarity (nearly nonpolar)'}
-                  </div>
                 </div>
               </div>
             )}
@@ -1260,23 +1256,20 @@ export const CalculationResultsPage = ({
           >
             <h2 className={styles.primaryHeader}>Vibrational Analysis</h2>
 
-            {/* Optimization Quality Assessment */}
+            {/* Frequency Data */}
             <div className={styles.frequencyStatus}>
-              <strong>Geometry Optimization Status:</strong>{' '}
-              {results.imaginary_frequencies_count === 0 ? (
-                <span className={styles.successStatus}>
-                  ✅ Successful (no imaginary frequencies)
-                </span>
-              ) : results.imaginary_frequencies_count === 1 ? (
-                <span className={styles.warningStatus}>
-                  ⚠️ Possible transition state (1 imaginary frequency)
-                </span>
-              ) : (
-                <span className={styles.errorStatus}>
-                  ❌ Poor optimization ({results.imaginary_frequencies_count}{' '}
-                  imaginary frequencies)
-                </span>
-              )}
+              <div>
+                <strong>Imaginary Frequencies:</strong>{' '}
+                <code>{results.imaginary_frequencies_count}</code>
+              </div>
+              {results.vibrational_frequencies &&
+                results.vibrational_frequencies.length > 0 && (
+                  <div>
+                    <strong>Real Frequencies:</strong>{' '}
+                    <code>{results.vibrational_frequencies.length}</code> (modes
+                    ≥80 cm⁻¹)
+                  </div>
+                )}
             </div>
 
             {/* Vibrational Frequencies */}
@@ -1290,10 +1283,6 @@ export const CalculationResultsPage = ({
                         {freq.toFixed(1)}
                       </span>
                     ))}
-                  </div>
-                  <div className={styles.frequencyCount}>
-                    Total: {results.vibrational_frequencies.length} normal modes
-                    (≥80 cm⁻¹)
                   </div>
                 </div>
               )}
@@ -1379,27 +1368,6 @@ export const CalculationResultsPage = ({
           className={`${styles.calculationSection} ${styles.molecularOrbitalsSection}`}
         >
           <h2 className={styles.primaryHeader}>Molecular Orbitals</h2>
-
-          {/* Basic Orbital Information */}
-          <div className={styles.orbitalBasicInfo}>
-            <h3>Orbital Information</h3>
-            <div className={styles.orbitalInfoGrid}>
-              <div>
-                <strong>HOMO Index:</strong> <code>{results.homo_index}</code>
-              </div>
-              <div>
-                <strong>LUMO Index:</strong> <code>{results.lumo_index}</code>
-              </div>
-              <div>
-                <strong>Occupied Orbitals:</strong>{' '}
-                <code>{results.num_occupied_orbitals}</code>
-              </div>
-              <div>
-                <strong>Virtual Orbitals:</strong>{' '}
-                <code>{results.num_virtual_orbitals}</code>
-              </div>
-            </div>
-          </div>
 
           {/* Molecular Orbital Energy Diagram */}
           <div className={styles.orbitalEnergyDiagram}>
@@ -1802,20 +1770,20 @@ export const CalculationResultsPage = ({
                     </h4>
                     <ul className={styles.ntoHelpList}>
                       <li>
-                        <strong>Hole軌道（赤色）</strong>: Orbitals from which
+                        <strong>Hole Orbitals (red)</strong>: Orbitals from which
                         electrons are excited (mainly HOMO-type)
                       </li>
                       <li>
-                        <strong>Particle軌道（青色）</strong>: Orbitals to which
-                        electrons are excited (mainly LUMO-type)
+                        <strong>Particle Orbitals (blue)</strong>: Orbitals to
+                        which electrons are excited (mainly LUMO-type)
                       </li>
                       <li>
-                        <strong>Weight</strong>:
-                        その軌道ペアの寄与を表す重み（特異値）
+                        <strong>Weight</strong>: Contribution weight of this
+                        orbital pair (singular value)
                       </li>
                       <li>
-                        <strong>Contribution</strong>:
-                        全遷移に対するそのペアの寄与率（%）
+                        <strong>Contribution</strong>: Percentage contribution of
+                        this pair to the total transition
                       </li>
                       <li>
                         Higher contribution pairs represent the main electronic
@@ -1885,27 +1853,16 @@ export const CalculationResultsPage = ({
                 </h3>
                 <div className={styles.diagnosticsGrid}>
                   {results.ccsd_t1_diagnostic != null && (
-                    <div
-                      className={`${styles.diagnosticBox} ${
-                        results.ccsd_t1_diagnostic > 0.02
-                          ? styles.diagnosticWarning
-                          : styles.diagnosticOk
-                      }`}
-                    >
-                      <strong>T1 Diagnostic:</strong>
+                    <div className={styles.diagnosticBox}>
+                      <strong>T1 Diagnostic:</strong>{' '}
                       <code className={styles.diagnosticValue}>
                         {results.ccsd_t1_diagnostic.toFixed(6)}
                       </code>
-                      <span className={styles.diagnosticInterpretation}>
-                        {results.ccsd_t1_diagnostic > 0.02
-                          ? '⚠️ Multi-reference character detected - single-reference CCSD may be unreliable'
-                          : '✓ Single-reference CCSD is appropriate'}
-                      </span>
                     </div>
                   )}
                   {results.ccsd_d1_diagnostic != null && (
                     <div className={styles.diagnosticBox}>
-                      <strong>D1 Diagnostic:</strong>
+                      <strong>D1 Diagnostic:</strong>{' '}
                       <code className={styles.diagnosticValue}>
                         {results.ccsd_d1_diagnostic.toFixed(6)}
                       </code>
@@ -1913,12 +1870,28 @@ export const CalculationResultsPage = ({
                   )}
                   {results.ccsd_d2_diagnostic != null && (
                     <div className={styles.diagnosticBox}>
-                      <strong>D2 Diagnostic:</strong>
+                      <strong>D2 Diagnostic:</strong>{' '}
                       <code className={styles.diagnosticValue}>
                         {results.ccsd_d2_diagnostic.toFixed(6)}
                       </code>
                     </div>
                   )}
+                </div>
+                <div className={styles.referenceInfo}>
+                  <h4>Diagnostic Reference Values</h4>
+                  <ul>
+                    <li>
+                      T1: Values &gt; 0.02 may indicate multi-reference
+                      character
+                    </li>
+                    <li>
+                      D1: Values &gt; 0.05 may indicate open-shell character
+                    </li>
+                    <li>
+                      D2: Values &gt; 0.15 may indicate strong correlation
+                      effects
+                    </li>
+                  </ul>
                 </div>
               </div>
             )}
@@ -2003,13 +1976,47 @@ export const CalculationResultsPage = ({
         >
           <h2 className={styles.primaryHeader}>Technical Details</h2>
 
+          {/* SCF Convergence Information */}
+          {(results.scf_iterations != null ||
+            results.final_energy_change != null ||
+            results.final_density_change != null) && (
+            <div className={styles.technicalSubsection}>
+              <h3>SCF Convergence Information</h3>
+              <div className={styles.convergenceGrid}>
+                {results.scf_iterations != null && (
+                  <div>
+                    <strong>SCF Iterations:</strong>{' '}
+                    <code>{results.scf_iterations}</code>
+                  </div>
+                )}
+                {results.final_energy_change != null && (
+                  <div>
+                    <strong>Final Energy Change:</strong>{' '}
+                    <code>{results.final_energy_change.toExponential(4)}</code>
+                  </div>
+                )}
+                {results.final_density_change != null && (
+                  <div>
+                    <strong>Final Density Change:</strong>{' '}
+                    <code>
+                      {results.final_density_change.toExponential(4)}
+                    </code>
+                  </div>
+                )}
+                {results.max_cycle != null && (
+                  <div>
+                    <strong>Max SCF Cycles (Setting):</strong>{' '}
+                    <code>{results.max_cycle}</code>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Calculation Parameters */}
           <div className={styles.technicalSubsection}>
             <h3>Calculation Parameters</h3>
             <div className={styles.parametersGrid}>
-              <div>
-                <strong>Max SCF Cycles:</strong> {results.max_cycle}
-              </div>
               <div>
                 <strong>CPU Cores:</strong> {parameters.cpu_cores || 'Default'}
               </div>
@@ -2064,7 +2071,7 @@ export const CalculationResultsPage = ({
                     <code>calculation.chk</code>
                   </p>
                   <p className={styles.sectionDescription}>
-                    ※ This directory contains molecular orbital data and wave
+                    Note: This directory contains molecular orbital data and wave
                     function information
                   </p>
                 </div>

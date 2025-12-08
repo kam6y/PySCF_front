@@ -526,18 +526,6 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
               <h4>Analysis Information</h4>
               <div className={styles.metadataGrid}>
                 <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Method:</span>
-                  <span className={styles.metadataValue}>
-                    {metadata.method}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Basis Set:</span>
-                  <span className={styles.metadataValue}>
-                    {metadata.basis_set}
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
                   <span className={styles.metadataLabel}>Scale Factor:</span>
                   <span className={styles.metadataValue}>
                     {metadata.scale_factor.toFixed(3)}
