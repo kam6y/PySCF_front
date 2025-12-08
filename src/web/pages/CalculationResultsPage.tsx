@@ -514,8 +514,7 @@ export const CalculationResultsPage = ({
 
             {/* Flex layout for Mulliken Charge List (left) and 3D Visualization (right) */}
             {results.mulliken_charges &&
-              results.mulliken_charges.length > 0 &&
-              results.optimized_geometry && (
+              results.mulliken_charges.length > 0 && (
                 <div className={styles.electronicPropertiesFlexWrapper}>
                   {/* Left Column: Mulliken Charge List */}
                   <div className={styles.mullikenChargeListColumn}>
@@ -589,20 +588,22 @@ export const CalculationResultsPage = ({
                   </div>
 
                   {/* Right Column: 3D Charge Distribution Visualization */}
-                  <div className={styles.chargeVisualizationColumn}>
-                    <h3>3D Charge Distribution Visualization</h3>
-                    <div className={styles.sectionDescription}>
-                      Interactive 3D visualization of the electrostatic
-                      potential on the molecular surface.
+                  {(results.optimized_geometry || parameters.xyz) && (
+                    <div className={styles.chargeVisualizationColumn}>
+                      <h3>3D Charge Distribution Visualization</h3>
+                      <div className={styles.sectionDescription}>
+                        Interactive 3D visualization of the electrostatic
+                        potential on the molecular surface.
+                      </div>
+                      <LazyViewer>
+                        <MullikenChargeViewer
+                          key={activeCalculation.id}
+                          xyzData={results.optimized_geometry || parameters.xyz}
+                          mullikenCharges={results.mulliken_charges}
+                        />
+                      </LazyViewer>
                     </div>
-                    <LazyViewer>
-                      <MullikenChargeViewer
-                        key={activeCalculation.id}
-                        xyzData={results.optimized_geometry}
-                        mullikenCharges={results.mulliken_charges}
-                      />
-                    </LazyViewer>
-                  </div>
+                  )}
                 </div>
               )}
 
