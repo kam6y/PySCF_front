@@ -1850,9 +1850,11 @@ class BaseCalculator(ABC):
                 logger.info("Extracting basis set information...")
                 properties['num_basis_functions'] = int(mol.nao)
                 properties['num_primitive_gaussians'] = int(mol.npgto_nr())
+                properties['total_electrons'] = int(mol.nelectron)
 
                 logger.info(f"Number of basis functions: {properties['num_basis_functions']}")
                 logger.info(f"Number of primitive Gaussians: {properties['num_primitive_gaussians']}")
+                logger.info(f"Total electrons: {properties['total_electrons']}")
             except Exception as e:
                 logger.warning(f"Failed to extract basis set information: {e}")
 

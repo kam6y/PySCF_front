@@ -61,7 +61,11 @@ export const updateSplashStatus = (
   message: string,
   retryCount?: number
 ): void => {
-  if (!splashWindow || splashWindow.isDestroyed() || !splashWindow.webContents) {
+  if (
+    !splashWindow ||
+    splashWindow.isDestroyed() ||
+    !splashWindow.webContents
+  ) {
     console.warn('Splash window is not available for status update');
     return;
   }
@@ -81,7 +85,11 @@ export const updateSplashStatus = (
  * @param message エラーメッセージ
  */
 export const showSplashError = (message: string): void => {
-  if (!splashWindow || splashWindow.isDestroyed() || !splashWindow.webContents) {
+  if (
+    !splashWindow ||
+    splashWindow.isDestroyed() ||
+    !splashWindow.webContents
+  ) {
     console.warn('Splash window is not available for error display');
     return;
   }
@@ -101,7 +109,11 @@ export const showSplashError = (message: string): void => {
  * フェードアウトアニメーション後にクローズ
  */
 export const closeSplashWindow = (): void => {
-  if (!splashWindow || splashWindow.isDestroyed() || !splashWindow.webContents) {
+  if (
+    !splashWindow ||
+    splashWindow.isDestroyed() ||
+    !splashWindow.webContents
+  ) {
     console.warn('Splash window is already closed');
     return;
   }

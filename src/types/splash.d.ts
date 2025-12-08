@@ -36,7 +36,9 @@ export interface SplashAPI {
    * @param callback 状態更新時に呼び出されるコールバック関数
    * @returns クリーンアップ関数
    */
-  onUpdateStatus: (callback: (update: SplashStatusUpdate) => void) => () => void;
+  onUpdateStatus: (
+    callback: (update: SplashStatusUpdate) => void
+  ) => () => void;
 
   /**
    * エラーメッセージの受信

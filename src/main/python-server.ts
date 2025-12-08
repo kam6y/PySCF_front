@@ -54,11 +54,7 @@ export const checkServerHealth = (
           );
 
           // スプラッシュにリトライカウントを表示
-          updateSplashStatus(
-            'health-check',
-            'Waiting for server...',
-            attempts
-          );
+          updateSplashStatus('health-check', 'Waiting for server...', attempts);
 
           if (attempts >= retries) {
             clearInterval(interval);

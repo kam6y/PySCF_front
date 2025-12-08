@@ -1698,6 +1698,10 @@ components:
           type: integer
           nullable: true
           description: Total number of primitive Gaussian functions
+        total_electrons:
+          type: integer
+          nullable: true
+          description: Total number of electrons in the molecule
         mp2_same_spin_correlation:
           type: number
           nullable: true

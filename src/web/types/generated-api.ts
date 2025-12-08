@@ -894,6 +894,8 @@ export interface components {
             num_basis_functions?: number | null;
             /** @description Total number of primitive Gaussian functions */
             num_primitive_gaussians?: number | null;
+            /** @description Total number of electrons in the molecule */
+            total_electrons?: number | null;
             /** @description MP2 same-spin correlation energy in hartree */
             mp2_same_spin_correlation?: number | null;
             /** @description MP2 opposite-spin correlation energy in hartree */

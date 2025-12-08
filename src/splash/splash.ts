@@ -7,16 +7,30 @@
 import './splash.css';
 
 // DOM要素の取得
-const stageMessageEl = document.getElementById('stageMessage') as HTMLDivElement;
-const detailMessageEl = document.getElementById('detailMessage') as HTMLDivElement;
-const errorContainerEl = document.getElementById('errorContainer') as HTMLDivElement;
-const errorMessageEl = document.getElementById('errorMessage') as HTMLDivElement;
-const splashContainerEl = document.querySelector('.splash-container') as HTMLDivElement;
+const stageMessageEl = document.getElementById(
+  'stageMessage'
+) as HTMLDivElement;
+const detailMessageEl = document.getElementById(
+  'detailMessage'
+) as HTMLDivElement;
+const errorContainerEl = document.getElementById(
+  'errorContainer'
+) as HTMLDivElement;
+const errorMessageEl = document.getElementById(
+  'errorMessage'
+) as HTMLDivElement;
+const splashContainerEl = document.querySelector(
+  '.splash-container'
+) as HTMLDivElement;
 
 /**
  * 進捗状態を更新
  */
-const updateStatus = (update: { stage: string; message: string; retryCount?: number }) => {
+const updateStatus = (update: {
+  stage: string;
+  message: string;
+  retryCount?: number;
+}) => {
   console.log('Splash: updateStatus', update);
 
   // ステージメッセージを更新

@@ -11,7 +11,10 @@ const splashAPI: SplashAPI = {
    * 進捗状態の更新を受信
    */
   onUpdateStatus: (callback: (update: SplashStatusUpdate) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, update: SplashStatusUpdate) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      update: SplashStatusUpdate
+    ) => {
       callback(update);
     };
     ipcRenderer.on('splash:update-status', handler);

@@ -40,7 +40,7 @@ const queryClient = new QueryClient({
       },
 
       // 指数バックオフによるリトライ遅延
-      retryDelay: (attemptIndex) => {
+      retryDelay: attemptIndex => {
         // 指数バックオフ: 1秒 * 2^attemptIndex + ランダムジッター
         // 1回目: ~1秒, 2回目: ~2秒, 3回目: ~4秒
         const baseDelay = Math.min(1000 * Math.pow(2, attemptIndex), 10000);
