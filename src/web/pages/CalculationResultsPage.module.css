@@ -207,6 +207,7 @@
 
 .chargeVisualizationColumn {
   min-width: 0;
+  width: 55%;
   background: white;
   border-radius: 6px;
   padding: 20px;
