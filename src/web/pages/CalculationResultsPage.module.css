@@ -10,19 +10,8 @@
 }
 
 .pageContent {
-  flex: 1;
-  display: flex;
   flex-direction: column;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.pageTitle {
-  font-size: 28px;
-  font-weight: 700;
-  margin: 0 0 24px 0;
-  padding: 0;
-  letter-spacing: -0.02em;
+  margin: 0;
 }
 
 /* Status Badges */
@@ -62,11 +51,7 @@
 .noCalculationContainer,
 .statusMessageContainer {
   text-align: center;
-  padding: 40px;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-bottom: 4px;
 }
 
 .loadingText {
@@ -325,6 +310,7 @@
   background: #f8f9fa;
   border-radius: 6px;
   border-left: 3px solid #50D4F5;
+  flex-shrink: 0;
 }
 
 /* Frequency Analysis */
@@ -858,27 +844,24 @@
 }
 
 /* Molecular Structure Section */
-.molecularStructureInfo {
-  margin-bottom: 12px;
-  color: #666;
-  line-height: 1.6;
-}
-
 .xyzCoordinatesContainer {
-  margin-top: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
-\.xyzCoordinates {
-  background: #f8f9fa;
-  padding: 16px;
-  border-radius: 6px;
-  overflow: auto;
-  font-size: 14px;
+.xyzCoordinates {
+  padding: 12px;
+  border-radius: 12px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 12px;
   font-family: 'SF Mono', Monaco, monospace;
   border: 1px solid #e0e0e0;
-  margin-top: 12px;
-  line-height: 1.4;
   color: #333;
+  background: #f8f9fa;
+  margin: 0;
 }
 
 /* Mulliken Charges Table */
@@ -1374,4 +1357,79 @@
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Consolas', monospace;
   font-size: 0.9em;
   color: #1976d2;
+}
+
+/* ========================================
+   Optimized Molecular Structure Section
+   ======================================== */
+
+.structureSection {
+  background: #fafbfc;
+}
+
+.structureContentWrapper {
+  display: flex;
+  gap: 24px;
+  margin-top: 16px;
+  align-items: stretch;
+  height: 600px;
+}
+
+.structureLeftColumn {
+  flex: 1;
+  min-width: 0;
+  max-width: 30%;
+  display: flex;
+  flex-direction: column;
+}
+
+.structureRightColumn {
+  flex: 1;
+  min-width: 0;
+}
+
+.viewer3DContainer {
+  padding: 20px;
+  height: 100%;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.viewer3DContainer h3 {
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+/* Imaginary Frequency Warning */
+.imaginaryFrequencyWarning {
+  margin-top: 20px;
+  padding: 16px 20px;
+  background: #fff3cd;
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+}
+
+.imaginaryFrequencyWarning strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+  color: #d97706;
+}
+
+.warningContent {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.warningContent ul {
+  margin: 10px 0 0 20px;
+  padding: 0;
+}
+
+.warningContent li {
+  margin: 6px 0;
 }

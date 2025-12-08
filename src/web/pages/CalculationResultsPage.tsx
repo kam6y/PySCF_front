@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import styles from './CalculationResultsPage.module.css';
 import { CalculationInstance } from '../types/api-types';
 import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
@@ -8,6 +8,8 @@ import { CIAnalysisViewer } from '../components/CIAnalysisViewer';
 import { MullikenChargeViewer } from '../components/MullikenChargeViewer';
 import { LazyViewer } from '../components/LazyViewer';
 import { useProcessedCalculationResults } from '../hooks/useProcessedCalculationResults';
+import { StyleSpec } from '../../types/3dmol';
+import { MoleculeViewerSection } from '../components/MoleculeViewerSection';
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -28,6 +30,14 @@ export const CalculationResultsPage = ({
   >(null);
   const [isMullikenListOpen, setIsMullikenListOpen] = useState(false);
 
+  // Molecule viewer state for optimized structure section
+  const [currentStyle, setCurrentStyle] = useState<StyleSpec | null>({
+    stick: {},
+  });
+  const [showAxes, setShowAxes] = useState(false);
+  const [showCoordinates, setShowCoordinates] = useState(false);
+  const [useAtomicRadii, setUseAtomicRadii] = useState(false);
+
   useEffect(() => {
     setError(detailsError);
   }, [detailsError]);
@@ -44,15 +54,61 @@ export const CalculationResultsPage = ({
   // Process and memoize calculation results data
   const processedData = useProcessedCalculationResults(activeCalculation);
 
+  // Determine if optimized structure section should be shown
+  const shouldShowOptimizedStructure = useMemo(() => {
+    if (!processedData) return false;
+
+    const { parameters, results } = processedData;
+
+    return (
+      ['HF', 'DFT', 'MP2'].includes(parameters.calculation_method) &&
+      (parameters as any).optimize_geometry !== false &&
+      !!results.optimized_geometry
+    );
+  }, [processedData]);
+
+  // Helper function to determine structure section title
+  const getStructureTitle = useCallback((): string => {
+    if (!processedData) return '';
+
+    const { parameters } = processedData;
+
+    switch (parameters.calculation_method) {
+      case 'HF':
+        return 'HF-Optimized Molecular Structure';
+      case 'MP2':
+        return 'MP2-Optimized Molecular Structure';
+      case 'DFT':
+      default:
+        return 'DFT-Optimized Molecular Structure';
+    }
+  }, [processedData]);
+
+  // Helper function to determine structure section description
+  const getStructureDescription = useCallback((): string => {
+    if (!processedData) return '';
+
+    const { parameters } = processedData;
+
+    switch (parameters.calculation_method) {
+      case 'HF':
+        return 'Geometry optimized using Hartree-Fock method';
+      case 'MP2':
+        return 'Geometry optimized using MP2 method';
+      case 'DFT':
+      default:
+        return 'Geometry optimized using DFT method';
+    }
+  }, [processedData]);
+
   // Show loading state
   if (isLoadingDetails) {
     return (
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
-          <h1>Calculation Results</h1>
           <div className={styles.loadingContainer}>
             <div className={styles.loadingText}>
-              ⚛️ Loading calculation details...
+              Loading calculation details...
             </div>
           </div>
         </div>
@@ -65,7 +121,6 @@ export const CalculationResultsPage = ({
     return (
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
-          <h1>Calculation Results</h1>
           <div className={styles.errorContainer}>❌ {error}</div>
         </div>
       </div>
@@ -77,9 +132,8 @@ export const CalculationResultsPage = ({
     return (
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
-          <h1>Calculation Results</h1>
           <div className={styles.noCalculationContainer}>
-            📊 No calculation selected. Please select a calculation from the
+            No calculation selected. Please select a calculation from the
             sidebar to view its results.
           </div>
         </div>
@@ -91,24 +145,23 @@ export const CalculationResultsPage = ({
   if (activeCalculation.status !== 'completed' || !activeCalculation.results) {
     const statusMessages = {
       pending:
-        '⏳ This calculation is pending. Please run the calculation first.',
+        'This calculation is pending. Please run the calculation first.',
       running:
-        '⚛️ This calculation is currently running. Please wait for completion.',
-      pausing: '⏸️ This calculation is pausing. Please wait...',
+        'This calculation is currently running. Please wait for completion.',
+      pausing: 'This calculation is pausing. Please wait...',
       paused:
-        '⏸️ This calculation is paused. You can resume it from where it was paused.',
+        'This calculation is paused. You can resume it from where it was paused.',
       error:
-        '❌ This calculation failed. Please check the settings and try again.',
+        'This calculation failed. Please check the settings and try again.',
     };
 
     return (
       <div className={styles.pageContainer}>
         <div className={styles.pageContent}>
-          <h1>Calculation Results</h1>
           <div className={styles.statusMessageContainer}>
             {statusMessages[
               activeCalculation.status as keyof typeof statusMessages
-            ] || '❓ Calculation results are not available.'}
+            ] || 'Calculation results are not available.'}
           </div>
           <div className={styles.statusMessageMeta}>
             <strong>Calculation:</strong> {activeCalculation.name}
@@ -136,10 +189,6 @@ export const CalculationResultsPage = ({
   return (
     <div className={styles.pageContainer}>
       <div className={styles.pageContent}>
-        <h1 className={styles.pageTitle}>
-          Quantum Chemistry Calculation Results
-        </h1>
-
         {/* ========================================
             1️⃣ OVERVIEW SECTION - Integrated Summary and Energy
             ======================================== */}
@@ -174,122 +223,83 @@ export const CalculationResultsPage = ({
             </div>
             <div>
               <strong>Convergence:</strong>{' '}
-              {results.converged ? '✅ Converged' : '❌ Not Converged'}
+              {results.converged ? 'Converged' : 'Not Converged'}
             </div>
           </div>
         </section>
 
         {/* ========================================
-            2️⃣ MOLECULAR STRUCTURE SECTION
+            2️⃣ OPTIMIZED MOLECULAR STRUCTURE SECTION
             ======================================== */}
-        <section
-          className={`${styles.calculationSection} ${styles.structureSection}`}
-        >
-          {(() => {
-            // Check if geometry optimization was performed
-            const optimizeGeometry =
-              (parameters as any).optimize_geometry !== false;
+        {shouldShowOptimizedStructure && (
+          <section
+            className={`${styles.calculationSection} ${styles.structureSection}`}
+          >
+            <h2 className={styles.primaryHeader}>{getStructureTitle()}</h2>
 
-            if (!optimizeGeometry) {
-              return (
-                <>
-                  <h2 className={styles.primaryHeader}>
-                    Initial Molecular Structure
-                  </h2>
-                  <div className={styles.sectionDescription}>
-                    ℹ️ No geometry optimization performed - using initial
-                    structure
+            {/* 2-Column Layout: Left (Info + Coordinates) and Right (3D Viewer) */}
+            <div className={styles.structureContentWrapper}>
+              {/* Left Column: Description, Molecular Info, and XYZ Coordinates */}
+              <div className={styles.structureLeftColumn}>
+                <div className={styles.sectionDescription}>
+                  {getStructureDescription()}
+                </div>
+                {/* XYZ Coordinates Display */}
+                <div className={styles.xyzCoordinatesContainer}>
+                  <strong>XYZ Coordinates:</strong>
+                  <pre className={styles.xyzCoordinates}>
+                    {results.optimized_geometry}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Right Column: 3D Molecular Viewer */}
+              <div className={styles.structureRightColumn}>
+                <div className={styles.viewer3DContainer}>
+                  <h3>3D Molecular Visualization</h3>
+                  <MoleculeViewerSection
+                    hasValidMolecule={!!results.optimized_geometry}
+                    xyzData={results.optimized_geometry}
+                    currentStyle={currentStyle}
+                    onStyleChange={setCurrentStyle}
+                    showAxes={showAxes}
+                    onShowAxesChange={setShowAxes}
+                    showCoordinates={showCoordinates}
+                    onShowCoordinatesChange={setShowCoordinates}
+                    useAtomicRadii={useAtomicRadii}
+                    onUseAtomicRadiiChange={setUseAtomicRadii}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Imaginary Frequencies Warning */}
+            {results.frequency_analysis_performed &&
+              results.imaginary_frequencies_count != null &&
+              results.imaginary_frequencies_count > 0 && (
+                <div className={styles.imaginaryFrequencyWarning}>
+                  <strong>⚠️ Optimization Quality Warning:</strong>
+                  <div className={styles.warningContent}>
+                    This structure has {results.imaginary_frequencies_count}{' '}
+                    imaginary
+                    {results.imaginary_frequencies_count === 1
+                      ? ' frequency'
+                      : ' frequencies'}
+                    , which may indicate:
+                    <ul>
+                      <li>
+                        The structure is at a transition state or saddle point
+                      </li>
+                      <li>
+                        The optimization did not fully converge to a minimum
+                      </li>
+                      <li>Further optimization may be needed</li>
+                    </ul>
                   </div>
-                </>
-              );
-            }
-
-            // Determine optimization method based on calculation method
-            switch (parameters.calculation_method) {
-              case 'MP2':
-                return (
-                  <>
-                    <h2 className={styles.primaryHeader}>
-                      MP2-Optimized Molecular Structure
-                    </h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ Geometry optimized using MP2 method
-                    </div>
-                  </>
-                );
-              case 'HF':
-                return (
-                  <>
-                    <h2 className={styles.primaryHeader}>
-                      HF-Optimized Molecular Structure
-                    </h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ Geometry optimized using Hartree-Fock method
-                    </div>
-                  </>
-                );
-              case 'CCSD':
-              case 'CCSD_T':
-                return (
-                  <>
-                    <h2 className={styles.primaryHeader}>
-                      Initial Molecular Structure
-                    </h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ CCSD calculations use initial geometry (no
-                      optimization)
-                    </div>
-                  </>
-                );
-              case 'CASCI':
-              case 'CASSCF':
-                return (
-                  <>
-                    <h2 className={styles.primaryHeader}>
-                      Initial Molecular Structure
-                    </h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ CASCI/CASSCF calculations use initial geometry (no
-                      optimization)
-                    </div>
-                  </>
-                );
-              case 'TDDFT':
-                return (
-                  <>
-                    <h2 className={styles.primaryHeader}>
-                      Initial Molecular Structure
-                    </h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ TDDFT calculations use initial geometry (no
-                      optimization)
-                    </div>
-                  </>
-                );
-              default:
-                // DFT and other methods
-                return (
-                  <>
-                    <h2 className={styles.primaryHeader}>
-                      DFT-Optimized Molecular Structure
-                    </h2>
-                    <div className={styles.sectionDescription}>
-                      ℹ️ Geometry optimized using DFT method
-                    </div>
-                  </>
-                );
-            }
-          })()}
-          <div className={styles.molecularStructureInfo}>
-            <strong>Number of Atoms:</strong> {results.atom_count}
-          </div>
-          <div className={styles.xyzCoordinatesContainer}>
-            <strong>XYZ Coordinates:</strong>
-            <pre className={styles.xyzCoordinates}>
-              {results.optimized_geometry}
-            </pre>
-          </div>
-        </section>
+                </div>
+              )}
+          </section>
+        )}
 
         {/* ========================================
             3️⃣ ELECTRONIC PROPERTIES SECTION - New Unified Section
