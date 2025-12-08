@@ -28,7 +28,6 @@ export const CalculationResultsPage = ({
   const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
     number | null
   >(null);
-  const [isMullikenListOpen, setIsMullikenListOpen] = useState(false);
 
   // Molecule viewer state for optimized structure section
   const [currentStyle, setCurrentStyle] = useState<StyleSpec | null>({
@@ -310,128 +309,97 @@ export const CalculationResultsPage = ({
           >
             <h2 className={styles.primaryHeader}>Electronic Properties</h2>
 
-            {/* 3D Charge Distribution Visualization - Now first */}
+            {/* Flex layout for Mulliken Charge List (left) and 3D Visualization (right) */}
             {results.mulliken_charges &&
               results.mulliken_charges.length > 0 &&
               results.optimized_geometry && (
-                <div className={styles.propertySubsection}>
-                  <h3>3D Charge Distribution Visualization</h3>
-                  <div className={styles.sectionDescription}>
-                    Interactive 3D visualization of the electrostatic potential
-                    on the molecular surface. The surface color represents
-                    charge distribution based on Mulliken population analysis.
-                  </div>
-                  <LazyViewer>
-                    <MullikenChargeViewer
-                      key={activeCalculation.id}
-                      xyzData={results.optimized_geometry}
-                      mullikenCharges={results.mulliken_charges}
-                    />
-                  </LazyViewer>
-                </div>
-              )}
-
-            {/* Mulliken Charge List - Now second, with toggle */}
-            {results.mulliken_charges &&
-              results.mulliken_charges.length > 0 && (
-                <div className={styles.propertySubsection}>
-                  <div
-                    className={styles.toggleHeader}
-                    onClick={() => setIsMullikenListOpen(!isMullikenListOpen)}
-                  >
+                <div className={styles.electronicPropertiesFlexWrapper}>
+                  {/* Left Column: Mulliken Charge List */}
+                  <div className={styles.mullikenChargeListColumn}>
                     <h3>Mulliken Charge List</h3>
-                    <span
-                      className={`${styles.toggleIcon} ${isMullikenListOpen ? styles.rotated : ''}`}
-                    >
-                      <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          d="M4 6L8 10L12 6"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </span>
-                  </div>
-                  {isMullikenListOpen && (
-                    <>
-                      <div className={styles.sectionDescription}>
-                        Partial charges of each atom by Mulliken population
-                        analysis. Positive values indicate electron deficiency
-                        (positive charge), negative values indicate electron
-                        excess (negative charge).
-                      </div>
-                      <div className={styles.tableContainer}>
-                        <table className={styles.mullikenChargeTable}>
-                          <thead>
-                            <tr>
-                              <th>Atom Number</th>
-                              <th>Element</th>
-                              <th>Mulliken Charge (e)</th>
-                              <th>Charge Character</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {results.mulliken_charges.map(
-                              (chargeData: any, index: number) => {
-                                const isPositive = chargeData.charge > 0;
+                    <div className={styles.sectionDescription}>
+                      Partial charges of each atom by Mulliken population
+                      analysis.
+                    </div>
+                    <div className={styles.mullikenChargeTableWrapper}>
+                      <table className={styles.mullikenChargeTable}>
+                        <thead>
+                          <tr>
+                            <th>Atom Number</th>
+                            <th>Element</th>
+                            <th>Mulliken Charge (e)</th>
+                            <th>Charge Character</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {results.mulliken_charges.map(
+                            (chargeData: any, index: number) => {
+                              const isPositive = chargeData.charge > 0;
 
-                                return (
-                                  <tr key={index}>
-                                    <td>{chargeData.atom_index + 1}</td>
-                                    <td style={{ fontWeight: 'bold' }}>
-                                      {chargeData.element}
-                                    </td>
-                                    <td
-                                      className={`${styles.chargeValueCell} ${
-                                        isPositive
-                                          ? styles.chargeValueCellPositive
-                                          : styles.chargeValueCellNegative
-                                      }`}
-                                    >
-                                      {chargeData.charge > 0 ? '+' : ''}
-                                      {chargeData.charge.toFixed(4)}
-                                    </td>
-                                    <td
-                                      className={
-                                        isPositive
-                                          ? styles.chargeCharacterPositive
-                                          : styles.chargeCharacterNegative
-                                      }
-                                    >
-                                      {isPositive
-                                        ? 'Positive (δ+)'
-                                        : 'Negative (δ−)'}
-                                    </td>
-                                  </tr>
-                                );
-                              }
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className={styles.chargeSummary}>
-                        <strong>Total Charge:</strong>{' '}
-                        <code>
-                          {results.mulliken_charges
-                            .reduce(
-                              (sum: number, charge: any) => sum + charge.charge,
-                              0
-                            )
-                            .toFixed(4)}{' '}
-                          e
-                        </code>{' '}
-                        (Molecular Charge: <code>{results.charge || 0}</code> e)
-                      </div>
-                    </>
-                  )}
+                              return (
+                                <tr key={index}>
+                                  <td>{chargeData.atom_index + 1}</td>
+                                  <td style={{ fontWeight: 'bold' }}>
+                                    {chargeData.element}
+                                  </td>
+                                  <td
+                                    className={`${styles.chargeValueCell} ${
+                                      isPositive
+                                        ? styles.chargeValueCellPositive
+                                        : styles.chargeValueCellNegative
+                                    }`}
+                                  >
+                                    {chargeData.charge > 0 ? '+' : ''}
+                                    {chargeData.charge.toFixed(4)}
+                                  </td>
+                                  <td
+                                    className={
+                                      isPositive
+                                        ? styles.chargeCharacterPositive
+                                        : styles.chargeCharacterNegative
+                                    }
+                                  >
+                                    {isPositive
+                                      ? 'Positive (δ+)'
+                                      : 'Negative (δ−)'}
+                                  </td>
+                                </tr>
+                              );
+                            }
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className={styles.chargeSummary}>
+                      <strong>Total Charge:</strong>{' '}
+                      <code>
+                        {results.mulliken_charges
+                          .reduce(
+                            (sum: number, charge: any) => sum + charge.charge,
+                            0
+                          )
+                          .toFixed(4)}{' '}
+                        e
+                      </code>{' '}
+                      (Molecular Charge: <code>{results.charge || 0}</code> e)
+                    </div>
+                  </div>
+
+                  {/* Right Column: 3D Charge Distribution Visualization */}
+                  <div className={styles.chargeVisualizationColumn}>
+                    <h3>3D Charge Distribution Visualization</h3>
+                    <div className={styles.sectionDescription}>
+                      Interactive 3D visualization of the electrostatic
+                      potential on the molecular surface.
+                    </div>
+                    <LazyViewer>
+                      <MullikenChargeViewer
+                        key={activeCalculation.id}
+                        xyzData={results.optimized_geometry}
+                        mullikenCharges={results.mulliken_charges}
+                      />
+                    </LazyViewer>
+                  </div>
                 </div>
               )}
 
