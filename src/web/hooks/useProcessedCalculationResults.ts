@@ -75,12 +75,9 @@ export const useProcessedCalculationResults = (
 
     const shouldShowVibrationalSection = results.frequency_analysis_performed;
 
-    const shouldShowEnergeticsSection =
-      results.dipole_moment_total_debye != null ||
-      results.homo_lumo_gap_ev != null ||
-      results.nuclear_repulsion_energy != null ||
-      results.electronic_energy != null ||
-      results.num_basis_functions != null;
+    // Energetics section is always shown for completed calculations
+    // (all calculations have at least SCF energy)
+    const shouldShowEnergeticsSection = true;
 
     return {
       results,

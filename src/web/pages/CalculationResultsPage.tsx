@@ -512,6 +512,94 @@ export const CalculationResultsPage = ({
           >
             <h2 className={styles.primaryHeader}>Electronic Properties</h2>
 
+            {/* Dipole Moment - First subsection */}
+            {results.dipole_moment_total_debye != null && (
+              <div className={styles.propertySubsection}>
+                <h3>Dipole Moment</h3>
+                <div className={styles.sectionDescription}>
+                  Electric dipole moment quantifies the separation of positive
+                  and negative charges in the molecule.
+                </div>
+                <div className={styles.dipoleMomentContainer}>
+                  <div className={styles.dipoleComponents}>
+                    <table className={styles.dipoleTable}>
+                      <thead>
+                        <tr>
+                          <th>Component</th>
+                          <th className={styles.rightAlign}>Value (Debye)</th>
+                          <th className={styles.rightAlign}>Value (a.u.)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td>
+                            <strong>μx</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_x_debye?.toFixed(4)}
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_x_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <strong>μy</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_y_debye?.toFixed(4)}
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_y_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td>
+                            <strong>μz</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_z_debye?.toFixed(4)}
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_z_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                        <tr className={styles.totalRow}>
+                          <td>
+                            <strong>|μ| (Total)</strong>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              <strong>
+                                {results.dipole_moment_total_debye.toFixed(4)}
+                              </strong>
+                            </code>
+                          </td>
+                          <td className={styles.rightAlign}>
+                            <code>
+                              {results.dipole_moment_total_au?.toFixed(4)}
+                            </code>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Flex layout for Mulliken Charge List (left) and 3D Visualization (right) */}
             {results.mulliken_charges &&
               results.mulliken_charges.length > 0 && (
@@ -1206,9 +1294,7 @@ export const CalculationResultsPage = ({
           <section
             className={`${styles.calculationSection} ${styles.energeticsSection}`}
           >
-            <h2 className={styles.primaryHeader}>
-              Energetics and Electronic Structure Details
-            </h2>
+            <h2 className={styles.primaryHeader}>Energetics</h2>
 
             {/* Energy Components */}
             {(results.nuclear_repulsion_energy != null ||
@@ -1239,6 +1325,241 @@ export const CalculationResultsPage = ({
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Thermochemistry Subsection */}
+            {(results.zero_point_energy != null ||
+              results.thermal_energy_298K != null) && (
+              <div className={styles.propertySubsection}>
+                <h3>Thermochemistry</h3>
+                <div className={styles.thermochemicalGrid}>
+                  {results.zero_point_energy !== undefined &&
+                    results.zero_point_energy !== null && (
+                      <div>
+                        <strong>Zero-Point Energy:</strong>
+                        <br />
+                        <code>
+                          {results.zero_point_energy.toFixed(8)} hartree
+                        </code>
+                      </div>
+                    )}
+                  {results.thermal_energy_298K !== undefined &&
+                    results.thermal_energy_298K !== null && (
+                      <div>
+                        <strong>Thermal Energy (298.15 K):</strong>
+                        <br />
+                        <code>
+                          {results.thermal_energy_298K.toFixed(8)} hartree
+                        </code>
+                      </div>
+                    )}
+                  {results.entropy_298K !== undefined &&
+                    results.entropy_298K !== null && (
+                      <div>
+                        <strong>Entropy (298.15 K):</strong>
+                        <br />
+                        <code>
+                          {results.entropy_298K.toFixed(8)} hartree/K
+                        </code>
+                      </div>
+                    )}
+                  {results.gibbs_free_energy_298K !== undefined &&
+                    results.gibbs_free_energy_298K !== null && (
+                      <div>
+                        <strong>Gibbs Free Energy (298.15 K):</strong>
+                        <br />
+                        <code>
+                          {results.gibbs_free_energy_298K.toFixed(8)} hartree
+                        </code>
+                      </div>
+                    )}
+                  {results.heat_capacity_298K !== undefined &&
+                    results.heat_capacity_298K !== null && (
+                      <div>
+                        <strong>Heat Capacity (298.15 K):</strong>
+                        <br />
+                        <code>
+                          {results.heat_capacity_298K.toFixed(8)} hartree/K
+                        </code>
+                      </div>
+                    )}
+                </div>
+              </div>
+            )}
+
+            {/* MP2 Energetics - Conditional subsection */}
+            {parameters.calculation_method === 'MP2' && (
+              <div className={styles.propertySubsection}>
+                <h3>MP2 Energetics</h3>
+                <div className={styles.thermochemicalGrid}>
+                  <div>
+                    <strong>HF Energy:</strong>{' '}
+                    <code>
+                      {((results as any).hf_energy || results.scf_energy)?.toFixed(
+                        6
+                      )}{' '}
+                      Hartree
+                    </code>
+                  </div>
+                  <div>
+                    <strong>MP2 Correlation Energy:</strong>{' '}
+                    <code>
+                      {(results as any).mp2_correlation_energy?.toFixed(6)}{' '}
+                      Hartree
+                    </code>
+                  </div>
+                  <div>
+                    <strong>MP2 Total Energy:</strong>{' '}
+                    <code>
+                      {(results as any).mp2_total_energy?.toFixed(6)} Hartree
+                    </code>
+                  </div>
+                </div>
+
+                {/* Correlation Components */}
+                {(results.mp2_same_spin_correlation != null ||
+                  results.mp2_opposite_spin_correlation != null) && (
+                  <div className={styles.correlationComponents}>
+                    <h4 className={styles.subsectionHeader}>
+                      Correlation Energy Components
+                    </h4>
+                    <div className={styles.thermochemicalGrid}>
+                      {results.mp2_same_spin_correlation != null && (
+                        <div>
+                          <strong>Same-Spin Correlation:</strong>{' '}
+                          <code>
+                            {results.mp2_same_spin_correlation.toFixed(6)}{' '}
+                            Hartree
+                          </code>
+                        </div>
+                      )}
+                      {results.mp2_opposite_spin_correlation != null && (
+                        <div>
+                          <strong>Opposite-Spin Correlation:</strong>{' '}
+                          <code>
+                            {results.mp2_opposite_spin_correlation.toFixed(6)}{' '}
+                            Hartree
+                          </code>
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.sectionDescription}>
+                      ℹ️ These components provide insight into the nature of
+                      electron correlation
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* CCSD Energetics - Conditional subsection */}
+            {processedData.shouldShowCCSDSection && (
+              <div className={styles.propertySubsection}>
+                <h3>CCSD Energetics</h3>
+                <div className={styles.thermochemicalGrid}>
+                  <div>
+                    <strong>HF Energy:</strong>{' '}
+                    <code>
+                      {((results as any).hf_energy || results.scf_energy)?.toFixed(
+                        6
+                      )}{' '}
+                      Hartree
+                    </code>
+                  </div>
+                  <div>
+                    <strong>CCSD Correlation Energy:</strong>{' '}
+                    <code>
+                      {(results as any).ccsd_correlation_energy?.toFixed(6)}{' '}
+                      Hartree
+                    </code>
+                  </div>
+                  <div>
+                    <strong>CCSD Total Energy:</strong>{' '}
+                    <code>
+                      {(results as any).ccsd_total_energy?.toFixed(6)} Hartree
+                    </code>
+                  </div>
+                  {parameters.calculation_method === 'CCSD_T' &&
+                    (results as any).ccsd_t_correction && (
+                      <>
+                        <div>
+                          <strong>CCSD(T) Triples Correction:</strong>{' '}
+                          <code>
+                            {(results as any).ccsd_t_correction?.toFixed(6)}{' '}
+                            Hartree
+                          </code>
+                        </div>
+                        <div>
+                          <strong>CCSD(T) Total Energy:</strong>{' '}
+                          <code>
+                            {(results as any).ccsd_t_total_energy?.toFixed(6)}{' '}
+                            Hartree
+                          </code>
+                        </div>
+                      </>
+                    )}
+                </div>
+
+                {/* CCSD Diagnostic Indicators */}
+                {(results.ccsd_t1_diagnostic != null ||
+                  results.ccsd_d1_diagnostic != null ||
+                  results.ccsd_d2_diagnostic != null) && (
+                  <div className={styles.diagnosticsSection}>
+                    <h4 className={styles.subsectionHeader}>
+                      Diagnostic Indicators
+                    </h4>
+                    <div className={styles.diagnosticsGrid}>
+                      {results.ccsd_t1_diagnostic != null && (
+                        <div className={styles.diagnosticBox}>
+                          <strong>T1 Diagnostic:</strong>{' '}
+                          <code className={styles.diagnosticValue}>
+                            {results.ccsd_t1_diagnostic.toFixed(6)}
+                          </code>
+                        </div>
+                      )}
+                      {results.ccsd_d1_diagnostic != null && (
+                        <div className={styles.diagnosticBox}>
+                          <strong>D1 Diagnostic:</strong>{' '}
+                          <code className={styles.diagnosticValue}>
+                            {results.ccsd_d1_diagnostic.toFixed(6)}
+                          </code>
+                        </div>
+                      )}
+                      {results.ccsd_d2_diagnostic != null && (
+                        <div className={styles.diagnosticBox}>
+                          <strong>D2 Diagnostic:</strong>{' '}
+                          <code className={styles.diagnosticValue}>
+                            {results.ccsd_d2_diagnostic.toFixed(6)}
+                          </code>
+                        </div>
+                      )}
+                    </div>
+                    <div className={styles.referenceInfo}>
+                      <h4>Diagnostic Reference Values</h4>
+                      <ul>
+                        <li>
+                          T1: Values &gt; 0.02 may indicate multi-reference
+                          character
+                        </li>
+                        <li>
+                          D1: Values &gt; 0.05 may indicate open-shell
+                          character
+                        </li>
+                        <li>
+                          D2: Values &gt; 0.15 may indicate strong correlation
+                          effects
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {(results as any).frozen_core && (
+                  <div className={styles.sectionDescription}>
+                    ℹ️ Frozen core approximation was used in this calculation
+                  </div>
+                )}
               </div>
             )}
 
@@ -1316,116 +1637,6 @@ export const CalculationResultsPage = ({
               </div>
             )}
 
-            {/* Dipole Moment */}
-            {results.dipole_moment_total_debye != null && (
-              <div className={styles.propertySubsection}>
-                <h3>Dipole Moment</h3>
-                <div className={styles.dipoleMomentContainer}>
-                  <div className={styles.dipoleComponents}>
-                    <table className={styles.dipoleTable}>
-                      <thead>
-                        <tr>
-                          <th>Component</th>
-                          <th className={styles.rightAlign}>Value (Debye)</th>
-                          <th className={styles.rightAlign}>Value (a.u.)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>
-                            <strong>μx</strong>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              {results.dipole_moment_x_debye?.toFixed(4)}
-                            </code>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              {results.dipole_moment_x_au?.toFixed(4)}
-                            </code>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>μy</strong>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              {results.dipole_moment_y_debye?.toFixed(4)}
-                            </code>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              {results.dipole_moment_y_au?.toFixed(4)}
-                            </code>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>
-                            <strong>μz</strong>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              {results.dipole_moment_z_debye?.toFixed(4)}
-                            </code>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              {results.dipole_moment_z_au?.toFixed(4)}
-                            </code>
-                          </td>
-                        </tr>
-                        <tr className={styles.totalRow}>
-                          <td>
-                            <strong>|μ| (Total)</strong>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              <strong>
-                                {results.dipole_moment_total_debye.toFixed(4)}
-                              </strong>
-                            </code>
-                          </td>
-                          <td className={styles.rightAlign}>
-                            <code>
-                              {results.dipole_moment_total_au?.toFixed(4)}
-                            </code>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Basis Set Information */}
-            {(results.num_basis_functions != null ||
-              results.num_primitive_gaussians != null) && (
-              <div className={styles.propertySubsection}>
-                <h3>Basis Set Information</h3>
-                <div className={styles.basisInfoGrid}>
-                  {results.basis && (
-                    <div>
-                      <strong>Basis Set:</strong> <code>{results.basis}</code>
-                    </div>
-                  )}
-                  {results.num_basis_functions != null && (
-                    <div>
-                      <strong>Number of Basis Functions:</strong>{' '}
-                      <code>{results.num_basis_functions}</code>
-                    </div>
-                  )}
-                  {results.num_primitive_gaussians != null && (
-                    <div>
-                      <strong>Number of Primitive Gaussians:</strong>{' '}
-                      <code>{results.num_primitive_gaussians}</code>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </section>
         )}
 
@@ -1469,55 +1680,7 @@ export const CalculationResultsPage = ({
                 </div>
               )}
 
-            {/* Thermochemical Properties */}
-            <div className={styles.thermochemicalGrid}>
-              {results.zero_point_energy !== undefined &&
-                results.zero_point_energy !== null && (
-                  <div>
-                    <strong>Zero-Point Energy:</strong>
-                    <br />
-                    <code>{results.zero_point_energy.toFixed(8)} hartree</code>
-                  </div>
-                )}
-              {results.thermal_energy_298K !== undefined &&
-                results.thermal_energy_298K !== null && (
-                  <div>
-                    <strong>Thermal Energy (298.15 K):</strong>
-                    <br />
-                    <code>
-                      {results.thermal_energy_298K.toFixed(8)} hartree
-                    </code>
-                  </div>
-                )}
-              {results.entropy_298K !== undefined &&
-                results.entropy_298K !== null && (
-                  <div>
-                    <strong>Entropy (298.15 K):</strong>
-                    <br />
-                    <code>{results.entropy_298K.toFixed(8)} hartree/K</code>
-                  </div>
-                )}
-              {results.gibbs_free_energy_298K !== undefined &&
-                results.gibbs_free_energy_298K !== null && (
-                  <div>
-                    <strong>Gibbs Free Energy (298.15 K):</strong>
-                    <br />
-                    <code>
-                      {results.gibbs_free_energy_298K.toFixed(8)} hartree
-                    </code>
-                  </div>
-                )}
-              {results.heat_capacity_298K !== undefined &&
-                results.heat_capacity_298K !== null && (
-                  <div>
-                    <strong>Heat Capacity (298.15 K):</strong>
-                    <br />
-                    <code>
-                      {results.heat_capacity_298K.toFixed(8)} hartree/K
-                    </code>
-                  </div>
-                )}
-            </div>
+
 
             {/* IR Spectrum - Integrated into Vibrational Analysis */}
             {results.vibrational_frequencies &&
@@ -1977,178 +2140,6 @@ export const CalculationResultsPage = ({
               )}
             </>
           )}
-
-        {/* CCSD Results Section */}
-        {processedData.shouldShowCCSDSection && (
-          <section
-            className={`${styles.calculationSection} ${styles.ccsdSection}`}
-          >
-            <h2 className={styles.secondaryHeader}>CCSD Advanced Results</h2>
-            <div className={styles.thermochemicalGrid}>
-              <div>
-                <strong>HF Energy:</strong>{' '}
-                <code>
-                  {((results as any).hf_energy || results.scf_energy)?.toFixed(
-                    6
-                  )}{' '}
-                  Hartree
-                </code>
-              </div>
-              <div>
-                <strong>CCSD Correlation Energy:</strong>{' '}
-                <code>
-                  {(results as any).ccsd_correlation_energy?.toFixed(6)} Hartree
-                </code>
-              </div>
-              <div>
-                <strong>CCSD Total Energy:</strong>{' '}
-                <code>
-                  {(results as any).ccsd_total_energy?.toFixed(6)} Hartree
-                </code>
-              </div>
-              {parameters.calculation_method === 'CCSD_T' &&
-                (results as any).ccsd_t_correction && (
-                  <>
-                    <div>
-                      <strong>CCSD(T) Triples Correction:</strong>{' '}
-                      <code>
-                        {(results as any).ccsd_t_correction?.toFixed(6)} Hartree
-                      </code>
-                    </div>
-                    <div>
-                      <strong>CCSD(T) Total Energy:</strong>{' '}
-                      <code>
-                        {(results as any).ccsd_t_total_energy?.toFixed(6)}{' '}
-                        Hartree
-                      </code>
-                    </div>
-                  </>
-                )}
-            </div>
-            {/* CCSD Diagnostic Indicators */}
-            {(results.ccsd_t1_diagnostic != null ||
-              results.ccsd_d1_diagnostic != null ||
-              results.ccsd_d2_diagnostic != null) && (
-              <div className={styles.diagnosticsSection}>
-                <h3 className={styles.subsectionHeader}>
-                  Diagnostic Indicators
-                </h3>
-                <div className={styles.diagnosticsGrid}>
-                  {results.ccsd_t1_diagnostic != null && (
-                    <div className={styles.diagnosticBox}>
-                      <strong>T1 Diagnostic:</strong>{' '}
-                      <code className={styles.diagnosticValue}>
-                        {results.ccsd_t1_diagnostic.toFixed(6)}
-                      </code>
-                    </div>
-                  )}
-                  {results.ccsd_d1_diagnostic != null && (
-                    <div className={styles.diagnosticBox}>
-                      <strong>D1 Diagnostic:</strong>{' '}
-                      <code className={styles.diagnosticValue}>
-                        {results.ccsd_d1_diagnostic.toFixed(6)}
-                      </code>
-                    </div>
-                  )}
-                  {results.ccsd_d2_diagnostic != null && (
-                    <div className={styles.diagnosticBox}>
-                      <strong>D2 Diagnostic:</strong>{' '}
-                      <code className={styles.diagnosticValue}>
-                        {results.ccsd_d2_diagnostic.toFixed(6)}
-                      </code>
-                    </div>
-                  )}
-                </div>
-                <div className={styles.referenceInfo}>
-                  <h4>Diagnostic Reference Values</h4>
-                  <ul>
-                    <li>
-                      T1: Values &gt; 0.02 may indicate multi-reference
-                      character
-                    </li>
-                    <li>
-                      D1: Values &gt; 0.05 may indicate open-shell character
-                    </li>
-                    <li>
-                      D2: Values &gt; 0.15 may indicate strong correlation
-                      effects
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            )}
-            {(results as any).frozen_core && (
-              <div className={styles.sectionDescription}>
-                ℹ️ Frozen core approximation was used in this calculation
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* MP2 Results Section */}
-        {parameters.calculation_method === 'MP2' && (
-          <section
-            className={`${styles.calculationSection} ${styles.mp2Section}`}
-          >
-            <h2 className={styles.secondaryHeader}>MP2 Advanced Results</h2>
-            <div className={styles.thermochemicalGrid}>
-              <div>
-                <strong>HF Energy:</strong>{' '}
-                <code>
-                  {((results as any).hf_energy || results.scf_energy)?.toFixed(
-                    6
-                  )}{' '}
-                  Hartree
-                </code>
-              </div>
-              <div>
-                <strong>MP2 Correlation Energy:</strong>{' '}
-                <code>
-                  {(results as any).mp2_correlation_energy?.toFixed(6)} Hartree
-                </code>
-              </div>
-              <div>
-                <strong>MP2 Total Energy:</strong>{' '}
-                <code>
-                  {(results as any).mp2_total_energy?.toFixed(6)} Hartree
-                </code>
-              </div>
-            </div>
-
-            {/* MP2 Correlation Components */}
-            {(results.mp2_same_spin_correlation != null ||
-              results.mp2_opposite_spin_correlation != null) && (
-              <div className={styles.correlationComponents}>
-                <h3 className={styles.subsectionHeader}>
-                  Correlation Energy Components
-                </h3>
-                <div className={styles.thermochemicalGrid}>
-                  {results.mp2_same_spin_correlation != null && (
-                    <div>
-                      <strong>Same-Spin Correlation:</strong>{' '}
-                      <code>
-                        {results.mp2_same_spin_correlation.toFixed(6)} Hartree
-                      </code>
-                    </div>
-                  )}
-                  {results.mp2_opposite_spin_correlation != null && (
-                    <div>
-                      <strong>Opposite-Spin Correlation:</strong>{' '}
-                      <code>
-                        {results.mp2_opposite_spin_correlation.toFixed(6)}{' '}
-                        Hartree
-                      </code>
-                    </div>
-                  )}
-                </div>
-                <div className={styles.sectionDescription}>
-                  ℹ️ These components provide insight into the nature of
-                  electron correlation
-                </div>
-              </div>
-            )}
-          </section>
-        )}
 
         {/* ========================================
             7️⃣ TECHNICAL DETAILS SECTION - Bottom
