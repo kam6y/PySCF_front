@@ -611,6 +611,19 @@ export const CalculationResultsPage = ({
                       Partial charges of each atom by Mulliken population
                       analysis.
                     </div>
+                    <div className={styles.chargeSummary}>
+                      <strong>Total Charge:</strong>{' '}
+                      <code>
+                        {results.mulliken_charges
+                          .reduce(
+                            (sum: number, charge: any) => sum + charge.charge,
+                            0
+                          )
+                          .toFixed(4)}{' '}
+                        e
+                      </code>{' '}
+                      (Molecular Charge: <code>{results.charge || 0}</code> e)
+                    </div>
                     <div className={styles.mullikenChargeTableWrapper}>
                       <table className={styles.mullikenChargeTable}>
                         <thead>
@@ -659,19 +672,6 @@ export const CalculationResultsPage = ({
                           )}
                         </tbody>
                       </table>
-                    </div>
-                    <div className={styles.chargeSummary}>
-                      <strong>Total Charge:</strong>{' '}
-                      <code>
-                        {results.mulliken_charges
-                          .reduce(
-                            (sum: number, charge: any) => sum + charge.charge,
-                            0
-                          )
-                          .toFixed(4)}{' '}
-                        e
-                      </code>{' '}
-                      (Molecular Charge: <code>{results.charge || 0}</code> e)
                     </div>
                   </div>
 
@@ -1359,9 +1359,7 @@ export const CalculationResultsPage = ({
                       <div>
                         <strong>Entropy (298.15 K):</strong>
                         <br />
-                        <code>
-                          {results.entropy_298K.toFixed(8)} hartree/K
-                        </code>
+                        <code>{results.entropy_298K.toFixed(8)} hartree/K</code>
                       </div>
                     )}
                   {results.gibbs_free_energy_298K !== undefined &&
@@ -1396,9 +1394,9 @@ export const CalculationResultsPage = ({
                   <div>
                     <strong>HF Energy:</strong>{' '}
                     <code>
-                      {((results as any).hf_energy || results.scf_energy)?.toFixed(
-                        6
-                      )}{' '}
+                      {(
+                        (results as any).hf_energy || results.scf_energy
+                      )?.toFixed(6)}{' '}
                       Hartree
                     </code>
                   </div>
@@ -1461,9 +1459,9 @@ export const CalculationResultsPage = ({
                   <div>
                     <strong>HF Energy:</strong>{' '}
                     <code>
-                      {((results as any).hf_energy || results.scf_energy)?.toFixed(
-                        6
-                      )}{' '}
+                      {(
+                        (results as any).hf_energy || results.scf_energy
+                      )?.toFixed(6)}{' '}
                       Hartree
                     </code>
                   </div>
@@ -1543,8 +1541,7 @@ export const CalculationResultsPage = ({
                           character
                         </li>
                         <li>
-                          D1: Values &gt; 0.05 may indicate open-shell
-                          character
+                          D1: Values &gt; 0.05 may indicate open-shell character
                         </li>
                         <li>
                           D2: Values &gt; 0.15 may indicate strong correlation
@@ -1636,7 +1633,6 @@ export const CalculationResultsPage = ({
                 </div>
               </div>
             )}
-
           </section>
         )}
 
@@ -1679,8 +1675,6 @@ export const CalculationResultsPage = ({
                   </div>
                 </div>
               )}
-
-
 
             {/* IR Spectrum - Integrated into Vibrational Analysis */}
             {results.vibrational_frequencies &&
