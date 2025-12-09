@@ -446,6 +446,46 @@ export const CalculationResultsPage = ({
                 <div className={styles.sectionDescription}>
                   {getStructureDescription()}
                 </div>
+
+                {/* Frequency Quality Indicators */}
+                {results.frequency_analysis_performed &&
+                  results.imaginary_frequencies_count != null &&
+                  results.imaginary_frequencies_count >= 0 && (
+                    <>
+                      {/* Frequency Data */}
+                      <div className={styles.frequencyStatus}>
+                        <div>
+                          <strong>Imaginary Frequencies:</strong>{' '}
+                          <code>{results.imaginary_frequencies_count}</code>
+                        </div>
+                      </div>
+
+                      {/* Imaginary Frequencies Warning */}
+                      {results.imaginary_frequencies_count > 0 && (
+                        <div className={styles.imaginaryFrequencyWarning}>
+                          <strong>⚠️ Optimization Quality Warning:</strong>
+                          <div className={styles.warningContent}>
+                            This structure has {results.imaginary_frequencies_count}{' '}
+                            imaginary
+                            {results.imaginary_frequencies_count === 1
+                              ? ' frequency'
+                              : ' frequencies'}
+                            , which may indicate:
+                            <ul>
+                              <li>
+                                The structure is at a transition state or saddle point
+                              </li>
+                              <li>
+                                The optimization did not fully converge to a minimum
+                              </li>
+                              <li>Further optimization may be needed</li>
+                            </ul>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                 {/* XYZ Coordinates Display */}
                 <div className={styles.xyzCoordinatesContainer}>
                   <strong>XYZ Coordinates:</strong>
@@ -474,32 +514,6 @@ export const CalculationResultsPage = ({
                 </div>
               </div>
             </div>
-
-            {/* Imaginary Frequencies Warning */}
-            {results.frequency_analysis_performed &&
-              results.imaginary_frequencies_count != null &&
-              results.imaginary_frequencies_count > 0 && (
-                <div className={styles.imaginaryFrequencyWarning}>
-                  <strong>⚠️ Optimization Quality Warning:</strong>
-                  <div className={styles.warningContent}>
-                    This structure has {results.imaginary_frequencies_count}{' '}
-                    imaginary
-                    {results.imaginary_frequencies_count === 1
-                      ? ' frequency'
-                      : ' frequencies'}
-                    , which may indicate:
-                    <ul>
-                      <li>
-                        The structure is at a transition state or saddle point
-                      </li>
-                      <li>
-                        The optimization did not fully converge to a minimum
-                      </li>
-                      <li>Further optimization may be needed</li>
-                    </ul>
-                  </div>
-                </div>
-              )}
           </section>
         )}
 
@@ -1644,37 +1658,6 @@ export const CalculationResultsPage = ({
             className={`${styles.calculationSection} ${styles.vibrationalSection}`}
           >
             <h2 className={styles.primaryHeader}>Vibrational Analysis</h2>
-
-            {/* Frequency Data */}
-            <div className={styles.frequencyStatus}>
-              <div>
-                <strong>Imaginary Frequencies:</strong>{' '}
-                <code>{results.imaginary_frequencies_count}</code>
-              </div>
-              {results.vibrational_frequencies &&
-                results.vibrational_frequencies.length > 0 && (
-                  <div>
-                    <strong>Real Frequencies:</strong>{' '}
-                    <code>{results.vibrational_frequencies.length}</code> (modes
-                    ≥80 cm⁻¹)
-                  </div>
-                )}
-            </div>
-
-            {/* Vibrational Frequencies */}
-            {results.vibrational_frequencies &&
-              results.vibrational_frequencies.length > 0 && (
-                <div className={styles.frequencyStatus}>
-                  <strong>Vibrational Frequencies (cm⁻¹):</strong>
-                  <div className={styles.frequencyList}>
-                    {results.vibrational_frequencies.map((freq, index) => (
-                      <span key={index} className={styles.frequencyItem}>
-                        {freq.toFixed(1)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
 
             {/* IR Spectrum - Integrated into Vibrational Analysis */}
             {results.vibrational_frequencies &&

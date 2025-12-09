@@ -88,7 +88,6 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
       x_max: 4000.0,
       show_peaks: true,
     });
-    const [showSettings, setShowSettings] = useState(false);
     const [selectedVibrationMode, setSelectedVibrationMode] = useState<
       AtomDisplacement[] | null
     >(null);
@@ -156,11 +155,6 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
           abortControllerRef.current.abort();
         }
       };
-    }, []);
-
-    const handleSettingsUpdate = useCallback(() => {
-      setShowSettings(false);
-      // fetchIRSpectrumはuseEffectで自動実行される
     }, []);
 
     const handleRetry = useCallback(() => {
@@ -269,11 +263,9 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
 
     if (isLoading) {
       return (
-        <div className={styles.container}>
-          <div className={styles.loadingContainer}>
-            <div className={styles.loadingText}>
-              ⚛️ Generating IR spectrum...
-            </div>
+        <div className={styles.loadingContainer}>
+          <div className={styles.loadingText}>
+            ⚛️ Generating IR spectrum...
           </div>
         </div>
       );
@@ -281,23 +273,19 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
 
     if (error) {
       return (
-        <div className={styles.container}>
-          <div className={styles.errorContainer}>
-            <div className={styles.errorText}>❌ {error}</div>
-            <button onClick={handleRetry} className={styles.retryButton}>
-              Retry
-            </button>
-          </div>
+        <div className={styles.errorContainer}>
+          <div className={styles.errorText}>❌ {error}</div>
+          <button onClick={handleRetry} className={styles.retryButton}>
+            Retry
+          </button>
         </div>
       );
     }
 
     if (!spectrumData) {
       return (
-        <div className={styles.container}>
-          <div className={styles.noDataContainer}>
-            No IR spectrum data available
-          </div>
+        <div className={styles.noDataContainer}>
+          No IR spectrum data available
         </div>
       );
     }
@@ -306,327 +294,296 @@ export const IRSpectrumViewer: React.FC<IRSpectrumViewerProps> = React.memo(
     const { metadata, peaks } = spectrum;
 
     return (
-      <div className={styles.container}>
-        <div className={styles.header}>
-          <h3>IR Spectrum Analysis</h3>
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={styles.settingsButton}
-          >
-            Settings
-          </button>
-        </div>
-
-        {showSettings && (
+        <section>
           <div className={styles.settingsPanel}>
-            <div className={styles.settingsGrid}>
-              <div className={styles.settingItem}>
-                <label>Broadening FWHM (cm⁻¹):</label>
-                <input
-                  type="number"
-                  value={settings.broadening_fwhm}
-                  onChange={e =>
-                    setSettings(prev => ({
-                      ...prev,
-                      broadening_fwhm: parseFloat(e.target.value) || 100,
-                    }))
-                  }
-                  min={0.1}
-                  max={1000}
-                  step={10}
-                  className={styles.settingInput}
-                />
-              </div>
-              <div className={styles.settingItem}>
-                <label>Wavenumber range (cm⁻¹):</label>
-                <div className={styles.rangeInputs}>
+              <div className={styles.settingsGrid}>
+                <div className={styles.settingItem}>
+                  <label>Broadening FWHM (cm⁻¹):</label>
                   <input
                     type="number"
-                    value={settings.x_min}
+                    value={settings.broadening_fwhm}
                     onChange={e =>
                       setSettings(prev => ({
                         ...prev,
-                        x_min: parseFloat(e.target.value) || 400,
+                        broadening_fwhm: parseFloat(e.target.value) || 100,
                       }))
                     }
-                    min={0}
-                    max={10000}
-                    step={100}
+                    min={0.1}
+                    max={1000}
+                    step={10}
                     className={styles.settingInput}
-                    placeholder="Min"
-                  />
-                  <input
-                    type="number"
-                    value={settings.x_max}
-                    onChange={e =>
-                      setSettings(prev => ({
-                        ...prev,
-                        x_max: parseFloat(e.target.value) || 4000,
-                      }))
-                    }
-                    min={0}
-                    max={10000}
-                    step={100}
-                    className={styles.settingInput}
-                    placeholder="Max"
                   />
                 </div>
-              </div>
-              <div className={styles.settingItem}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={settings.show_peaks}
-                    onChange={e =>
-                      setSettings(prev => ({
-                        ...prev,
-                        show_peaks: e.target.checked,
-                      }))
-                    }
-                  />
-                  Show peak markers
-                </label>
-              </div>
-            </div>
-            <div className={styles.settingsActions}>
-              <button
-                onClick={handleSettingsUpdate}
-                className={styles.applyButton}
-              >
-                Apply
-              </button>
-              <button
-                onClick={() => setShowSettings(false)}
-                className={styles.cancelButton}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className={styles.contentWrapper}>
-          {/* IR Spectrum and Peak Information */}
-          <div className={styles.spectrumSection}>
-            <div className={styles.chartSection}>
-              <ResponsiveContainer width="100%" height={400}>
-                <LineChart
-                  data={filteredChartData}
-                  margin={{
-                    top: 20,
-                    right: 30,
-                    left: 40,
-                    bottom: 40,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                  <XAxis
-                    dataKey="wavenumber"
-                    type="number"
-                    scale="linear"
-                    domain={[settings.x_max, settings.x_min]}
-                    tick={{ fontSize: 11 }}
-                    tickFormatter={value => Math.round(value).toString()}
-                    ticks={[
-                      settings.x_max,
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.1
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.2
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.3
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.4
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.5
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.6
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.7
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.8
-                      ),
-                      Math.round(
-                        settings.x_max - (settings.x_max - settings.x_min) * 0.9
-                      ),
-                      settings.x_min,
-                    ]}
-                    label={{
-                      value: 'Wavenumber (cm⁻¹)',
-                      position: 'insideBottom',
-                      offset: -25,
-                      style: { textAnchor: 'middle' },
-                    }}
-                  />
-                  <YAxis
-                    tick={{ fontSize: 12 }}
-                    domain={[0, 'dataMax']}
-                    tickFormatter={value => {
-                      if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
-                      if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
-                      return value.toFixed(1);
-                    }}
-                    label={{
-                      value: 'Intensity (arb. units)',
-                      angle: -90,
-                      position: 'insideLeft',
-                      style: { textAnchor: 'middle' },
-                    }}
-                  />
-                  <Tooltip
-                    content={<CustomTooltip peaks={peaks} />}
-                    cursor={{ strokeDasharray: '3 3' }}
-                  />
-
-                  <Line
-                    type="monotone"
-                    dataKey="intensity"
-                    stroke="#2563eb"
-                    strokeWidth={1.5}
-                    dot={false}
-                    name="IR Spectrum"
-                    isAnimationActive={false}
-                  />
-
-                  {settings.show_peaks &&
-                    peaks.map((peak: IRPeak, index: number) => {
-                      if (
-                        peak.frequency_cm >= settings.x_min &&
-                        peak.frequency_cm <= settings.x_max
-                      ) {
-                        return (
-                          <ReferenceLine
-                            key={index}
-                            x={peak.frequency_cm}
-                            stroke="#dc2626"
-                            strokeDasharray="5 5"
-                            strokeOpacity={0.7}
-                            label={{
-                              value: peak.frequency_cm.toFixed(0),
-                              position: 'top',
-                              style: { fill: '#dc2626', fontSize: '10px' },
-                            }}
-                          />
-                        );
+                <div className={styles.settingItem}>
+                  <label>Wavenumber range (cm⁻¹):</label>
+                  <div className={styles.rangeInputs}>
+                    <input
+                      type="number"
+                      value={settings.x_min}
+                      onChange={e =>
+                        setSettings(prev => ({
+                          ...prev,
+                          x_min: parseFloat(e.target.value) || 400,
+                        }))
                       }
-                      return null;
-                    })}
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className={styles.metadataSection}>
-              <h4>Analysis Information</h4>
-              <div className={styles.metadataGrid}>
-                <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Scale Factor:</span>
-                  <span className={styles.metadataValue}>
-                    {metadata.scale_factor.toFixed(3)}
-                  </span>
+                      min={0}
+                      max={10000}
+                      step={100}
+                      className={styles.settingInput}
+                      placeholder="Min"
+                    />
+                    <input
+                      type="number"
+                      value={settings.x_max}
+                      onChange={e =>
+                        setSettings(prev => ({
+                          ...prev,
+                          x_max: parseFloat(e.target.value) || 4000,
+                        }))
+                      }
+                      min={0}
+                      max={10000}
+                      step={100}
+                      className={styles.settingInput}
+                      placeholder="Max"
+                    />
+                  </div>
                 </div>
-                <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Broadening FWHM:</span>
-                  <span className={styles.metadataValue}>
-                    {metadata.broadening_fwhm_cm.toFixed(0)} cm⁻¹
-                  </span>
-                </div>
-                <div className={styles.metadataItem}>
-                  <span className={styles.metadataLabel}>Peaks Shown:</span>
-                  <span className={styles.metadataValue}>
-                    {metadata.num_peaks_in_range}/{metadata.num_peaks_total}
-                  </span>
+                <div className={styles.settingItem}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={settings.show_peaks}
+                      onChange={e =>
+                        setSettings(prev => ({
+                          ...prev,
+                          show_peaks: e.target.checked,
+                        }))
+                      }
+                    />
+                    Show peak markers
+                  </label>
                 </div>
               </div>
             </div>
-
-            {/* Vibration Mode Visualization - Above Peak Information */}
-            <div className={styles.viewerSection}>
-              <div className={styles.viewerHeader}>
-                <h4>Vibration Mode Visualization</h4>
-                {selectedVibrationMode && (
-                  <button
-                    onClick={handleClearSelection}
-                    className={styles.clearButton}
-                    title="Clear selection"
+          <div className={styles.contentWrapper}>
+            {/* IR Spectrum and Peak Information */}
+            <div className={styles.spectrumSection}>
+              <div className={styles.chartSection}>
+                <ResponsiveContainer width="100%" height={400}>
+                  <LineChart
+                    data={filteredChartData}
+                    margin={{
+                      top: 20,
+                      right: 30,
+                      left: 40,
+                      bottom: 40,
+                    }}
                   >
-                    ✕
-                  </button>
-                )}
+                    <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                    <XAxis
+                      dataKey="wavenumber"
+                      type="number"
+                      scale="linear"
+                      domain={[settings.x_min, settings.x_max]}
+                      reversed={true}
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={value => Math.round(value).toString()}
+                      ticks={[
+                        settings.x_max,
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.1
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.2
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.3
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.4
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.5
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.6
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.7
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.8
+                        ),
+                        Math.round(
+                          settings.x_max - (settings.x_max - settings.x_min) * 0.9
+                        ),
+                        settings.x_min,
+                      ]}
+                      label={{
+                        value: 'Wavenumber (cm⁻¹)',
+                        position: 'insideBottom',
+                        offset: -25,
+                        style: { textAnchor: 'middle' },
+                      }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      domain={[0, 'dataMax']}
+                      tickFormatter={value => {
+                        if (value >= 1e6) return (value / 1e6).toFixed(1) + 'M';
+                        if (value >= 1e3) return (value / 1e3).toFixed(1) + 'K';
+                        return value.toFixed(1);
+                      }}
+                      label={{
+                        value: 'Intensity (arb. units)',
+                        angle: -90,
+                        position: 'insideLeft',
+                        style: { textAnchor: 'middle' },
+                      }}
+                    />
+                    <Tooltip
+                      content={<CustomTooltip peaks={peaks} />}
+                      cursor={{ strokeDasharray: '3 3' }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="intensity"
+                      stroke="#2563eb"
+                      strokeWidth={1.5}
+                      dot={false}
+                      name="IR Spectrum"
+                      isAnimationActive={false}
+                    />
+                    {settings.show_peaks &&
+                      peaks.map((peak: IRPeak, index: number) => {
+                        if (
+                          peak.frequency_cm >= settings.x_min &&
+                          peak.frequency_cm <= settings.x_max
+                        ) {
+                          return (
+                            <ReferenceLine
+                              key={index}
+                              x={peak.frequency_cm}
+                              stroke="#dc2626"
+                              strokeDasharray="5 5"
+                              strokeOpacity={0.7}
+                              label={{
+                                value: peak.frequency_cm.toFixed(0),
+                                position: 'top',
+                                style: { fill: '#dc2626', fontSize: '10px' },
+                              }}
+                            />
+                          );
+                        }
+                        return null;
+                      })}
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-              <div className={styles.moleculeViewerContainer}>
-                <MoleculeViewer
-                  width="100%"
-                  height="500px"
-                  backgroundColor="#f8f9fa"
-                  xyzData={moleculeXYZ}
-                  vibrationMode={selectedVibrationMode}
-                  animationAmplitude={0.3}
-                  className={styles.irSpectrumMoleculeViewer}
-                />
-                {!selectedVibrationMode && (
-                  <div className={styles.viewerPlaceholder}>
-                    <p>Select a peak to view its vibration mode</p>
+              <div className={styles.metadataSection}>
+                <h4>Analysis Information</h4>
+                <div className={styles.metadataGrid}>
+                  <div className={styles.metadataItem}>
+                    <span className={styles.metadataLabel}>Scale Factor:</span>
+                    <span className={styles.metadataValue}>
+                      {metadata.scale_factor.toFixed(3)}
+                    </span>
                   </div>
-                )}
-              </div>
-            </div>
-
-            {settings.show_peaks && peaks.length > 0 && (
-              <div className={styles.peaksSection}>
-                <h4>Peak Information (Click to view vibration)</h4>
-                <div className={styles.peaksTable}>
-                  <div className={styles.peaksHeader}>
-                    <span>Frequency (cm⁻¹)</span>
-                    <span>Intensity</span>
-                    <span>Original Freq.</span>
+                  <div className={styles.metadataItem}>
+                    <span className={styles.metadataLabel}>Broadening FWHM:</span>
+                    <span className={styles.metadataValue}>
+                      {metadata.broadening_fwhm_cm.toFixed(0)} cm⁻¹
+                    </span>
                   </div>
-                  {peaks
-                    .filter(
-                      (peak: IRPeak) =>
-                        peak.frequency_cm >= settings.x_min &&
-                        peak.frequency_cm <= settings.x_max
-                    )
-                    .sort((a: IRPeak, b: IRPeak) => b.intensity - a.intensity)
-                    .slice(0, 10)
-                    .map((peak: IRPeak, index: number) => {
-                      const hasVibrationData =
-                        peak.mode_displacements &&
-                        peak.mode_displacements.length > 0;
-                      const isSelected = selectedPeakIndex === index;
-                      return (
-                        <div
-                          key={index}
-                          className={`${styles.peaksRow} ${
-                            hasVibrationData ? styles.clickableRow : ''
-                          } ${isSelected ? styles.selectedRow : ''}`}
-                          onClick={() =>
-                            hasVibrationData && handlePeakClick(peak, index)
-                          }
-                          style={{
-                            cursor: hasVibrationData ? 'pointer' : 'default',
-                          }}
-                        >
-                          <span>{formatFrequency(peak.frequency_cm)}</span>
-                          <span>{formatIntensity(peak.intensity)}</span>
-                          <span>
-                            {formatFrequency(peak.original_frequency_cm)}
-                          </span>
-                        </div>
-                      );
-                    })}
+                  <div className={styles.metadataItem}>
+                    <span className={styles.metadataLabel}>Peaks Shown:</span>
+                    <span className={styles.metadataValue}>
+                      {metadata.num_peaks_in_range}/{metadata.num_peaks_total}
+                    </span>
+                  </div>
                 </div>
               </div>
-            )}
+              {/* Vibration Mode Visualization - Above Peak Information */}
+              <div className={styles.viewerSection}>
+                <div className={styles.viewerHeader}>
+                  <h4>Vibration Mode Visualization</h4>
+                  {selectedVibrationMode && (
+                    <button
+                      onClick={handleClearSelection}
+                      className={styles.clearButton}
+                      title="Clear selection"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <div className={styles.moleculeViewerContainer}>
+                  <MoleculeViewer
+                    width="100%"
+                    height="500px"
+                    backgroundColor="#f8f9fa"
+                    xyzData={moleculeXYZ}
+                    vibrationMode={selectedVibrationMode}
+                    animationAmplitude={0.3}
+                    className={styles.irSpectrumMoleculeViewer}
+                  />
+                  {!selectedVibrationMode && (
+                    <div className={styles.viewerPlaceholder}>
+                      <p>Select a peak to view its vibration mode</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {settings.show_peaks && peaks.length > 0 && (
+                <div className={styles.peaksSection}>
+                  <h4>Peak Information (Click to view vibration)</h4>
+                  <div className={styles.peaksTable}>
+                    <div className={styles.peaksHeader}>
+                      <span>Frequency (cm⁻¹)</span>
+                      <span>Intensity</span>
+                      <span>Original Freq.</span>
+                    </div>
+                    {peaks
+                      .filter(
+                        (peak: IRPeak) =>
+                          peak.frequency_cm >= settings.x_min &&
+                          peak.frequency_cm <= settings.x_max
+                      )
+                      .sort((a: IRPeak, b: IRPeak) => b.intensity - a.intensity)
+                      .slice(0, 10)
+                      .map((peak: IRPeak, index: number) => {
+                        const hasVibrationData =
+                          peak.mode_displacements &&
+                          peak.mode_displacements.length > 0;
+                        const isSelected = selectedPeakIndex === index;
+                        return (
+                          <div
+                            key={index}
+                            className={`${styles.peaksRow} ${
+                              hasVibrationData ? styles.clickableRow : ''
+                            } ${isSelected ? styles.selectedRow : ''}`}
+                            onClick={() =>
+                              hasVibrationData && handlePeakClick(peak, index)
+                            }
+                            style={{
+                              cursor: hasVibrationData ? 'pointer' : 'default',
+                            }}
+                          >
+                            <span>{formatFrequency(peak.frequency_cm)}</span>
+                            <span>{formatIntensity(peak.intensity)}</span>
+                            <span>
+                              {formatFrequency(peak.original_frequency_cm)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        </section>
     );
   }
 );
