@@ -3,13 +3,23 @@ import styles from './CalculationResultsPage.module.css';
 import { CalculationInstance } from '../types/api-types';
 import { MolecularOrbitalViewer } from '../components/MolecularOrbitalViewer';
 import { MolecularOrbitalEnergyDiagram } from '../components/MolecularOrbitalEnergyDiagram';
-import { IRSpectrumViewer } from '../components/IRSpectrumViewer';
+import { IRSpectrumChart } from '../components/IRSpectrumChart';
+import { VibrationModeViewer } from '../components/VibrationModeViewer';
 import { CIAnalysisViewer } from '../components/CIAnalysisViewer';
 import { MullikenChargeViewer } from '../components/MullikenChargeViewer';
 import { LazyViewer } from '../components/LazyViewer';
 import { useProcessedCalculationResults } from '../hooks/useProcessedCalculationResults';
 import { StyleSpec } from '../../types/3dmol';
 import { MoleculeViewerSection } from '../components/MoleculeViewerSection';
+import type { components } from '../types/generated-api';
+import {
+  IR_SPECTRUM_DEFAULTS,
+  type PartialIRSettings,
+} from '../utils/irSpectrumConstants';
+
+type IRSpectrumData = components['schemas']['IRSpectrumData'];
+type IRPeak = components['schemas']['IRPeak'];
+type AtomDisplacement = components['schemas']['AtomDisplacement'];
 
 interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
@@ -37,6 +47,22 @@ export const CalculationResultsPage = ({
   const [showCoordinates, setShowCoordinates] = useState(false);
   const [useAtomicRadii, setUseAtomicRadii] = useState(false);
 
+  // IR Spectrum shared state
+  const [irSpectrumData, setIRSpectrumData] = useState<IRSpectrumData | null>(
+    null
+  );
+  const [selectedIRPeakIndex, setSelectedIRPeakIndex] = useState<number | null>(
+    null
+  );
+  const [selectedVibrationMode, setSelectedVibrationMode] = useState<
+    AtomDisplacement[] | null
+  >(null);
+  const [irSettings, setIRSettings] = useState<PartialIRSettings>({
+    x_min: IR_SPECTRUM_DEFAULTS.x_min,
+    x_max: IR_SPECTRUM_DEFAULTS.x_max,
+    show_peaks: IR_SPECTRUM_DEFAULTS.show_peaks,
+  });
+
   useEffect(() => {
     setError(detailsError);
   }, [detailsError]);
@@ -48,6 +74,25 @@ export const CalculationResultsPage = ({
 
   const handleOrbitalSelect = useCallback((orbitalIndex: number) => {
     setSelectedOrbitalIndex(orbitalIndex);
+  }, []);
+
+  const handleIRPeakSelect = useCallback((peak: IRPeak, peakIndex: number) => {
+    setSelectedIRPeakIndex(peakIndex);
+    setSelectedVibrationMode(peak.mode_displacements || null);
+  }, []);
+
+  const handleClearVibrationSelection = useCallback(() => {
+    setSelectedIRPeakIndex(null);
+    setSelectedVibrationMode(null);
+  }, []);
+
+  const handleSpectrumDataLoaded = useCallback((data: IRSpectrumData) => {
+    setIRSpectrumData(data);
+    setIRSettings({
+      x_min: IR_SPECTRUM_DEFAULTS.x_min,
+      x_max: IR_SPECTRUM_DEFAULTS.x_max,
+      show_peaks: IR_SPECTRUM_DEFAULTS.show_peaks,
+    });
   }, []);
 
   // Process and memoize calculation results data
@@ -465,18 +510,20 @@ export const CalculationResultsPage = ({
                         <div className={styles.imaginaryFrequencyWarning}>
                           <strong>⚠️ Optimization Quality Warning:</strong>
                           <div className={styles.warningContent}>
-                            This structure has {results.imaginary_frequencies_count}{' '}
-                            imaginary
+                            This structure has{' '}
+                            {results.imaginary_frequencies_count} imaginary
                             {results.imaginary_frequencies_count === 1
                               ? ' frequency'
                               : ' frequencies'}
                             , which may indicate:
                             <ul>
                               <li>
-                                The structure is at a transition state or saddle point
+                                The structure is at a transition state or saddle
+                                point
                               </li>
                               <li>
-                                The optimization did not fully converge to a minimum
+                                The optimization did not fully converge to a
+                                minimum
                               </li>
                               <li>Further optimization may be needed</li>
                             </ul>
@@ -1659,26 +1706,41 @@ export const CalculationResultsPage = ({
           >
             <h2 className={styles.primaryHeader}>Vibrational Analysis</h2>
 
-            {/* IR Spectrum - Integrated into Vibrational Analysis */}
+            {/* IR Spectrum - Split into two sections */}
             {results.vibrational_frequencies &&
               results.vibrational_frequencies.length > 0 && (
-                <div className={styles.irSpectrumSubsection}>
-                  <h3>Infrared (IR) Spectrum</h3>
-                  <div className={styles.sectionDescription}>
-                    Theoretical infrared spectrum generated from vibrational
-                    frequency calculations with scale factor corrections and
-                    Lorentzian broadening for realistic peak shapes.
+                <>
+                  <div className={styles.irSpectrumSubsection}>
+                    <h3>Infrared (IR) Spectrum</h3>
+                    <div className={styles.sectionDescription}>
+                      Theoretical infrared spectrum generated from vibrational
+                      frequency calculations with scale factor corrections and
+                      Lorentzian broadening for realistic peak shapes.
+                    </div>
+                    <LazyViewer>
+                      <IRSpectrumChart
+                        calculationId={activeCalculation.id}
+                        onError={handleSetError}
+                        onSpectrumDataLoaded={handleSpectrumDataLoaded}
+                        selectedPeakIndex={selectedIRPeakIndex}
+                      />
+                    </LazyViewer>
                   </div>
+
                   <LazyViewer>
-                    <IRSpectrumViewer
-                      calculationId={activeCalculation.id}
-                      onError={handleSetError}
+                    <VibrationModeViewer
+                      spectrumData={irSpectrumData}
                       optimizedGeometry={
                         activeCalculation.results?.optimized_geometry
                       }
+                      selectedPeakIndex={selectedIRPeakIndex}
+                      selectedVibrationMode={selectedVibrationMode}
+                      onPeakSelect={handleIRPeakSelect}
+                      onClearSelection={handleClearVibrationSelection}
+                      settings={irSettings}
                     />
                   </LazyViewer>
-                </div>
+                </>
               )}
           </section>
         )}
