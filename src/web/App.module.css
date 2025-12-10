@@ -58,6 +58,7 @@
 .appContent {
   max-width: calc(100vw);
   margin: auto;
+  margin-top: 40px;
   width: 100%;
   height: calc(100vh - 40px);
   transition: margin-left 0.3s ease-out;
