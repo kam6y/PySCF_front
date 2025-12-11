@@ -2236,14 +2236,6 @@ export const CalculationResultsPage = ({
                   ? `${parameters.memory_mb} MB`
                   : 'Default'}
               </div>
-              <div>
-                <strong>Solvent Method:</strong> {parameters.solvent_method}
-              </div>
-              {parameters.solvent !== '-' && (
-                <div>
-                  <strong>Solvent:</strong> {parameters.solvent}
-                </div>
-              )}
             </div>
           </div>
 
