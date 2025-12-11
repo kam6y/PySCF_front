@@ -21,6 +21,11 @@ let isQuitting = false;
 // グローバル設定を読み込み
 let serverConfig: any = null;
 
+// Increase memory limits for rendering large SVG and 3D graphics
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-gpu-memory-buffer-video-frames');
+
 const initializeApp = async () => {
   // スプラッシュウィンドウを作成
   createSplashWindow();
