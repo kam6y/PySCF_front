@@ -228,20 +228,34 @@
   background: #fafbfc;
 }
 
+/* Flex layout for Energy Diagram and 3D Visualization */
+.orbitalsFlexWrapper {
+  display: flex;
+  gap: 24px;
+  align-items: stretch;
+}
+
 .orbitalBasicInfo,
-.orbitalEnergyDiagram,
 .orbitalVisualization {
-  margin-bottom: 28px;
+  width: 55%;
+  min-width: 0;
   padding: 20px;
   background: white;
   border-radius: 6px;
   border: 1px solid #e5e7eb;
 }
 
-.orbitalBasicInfo:last-child,
-.orbitalEnergyDiagram:last-child,
-.orbitalVisualization:last-child {
-  margin-bottom: 0;
+.orbitalEnergyDiagram {
+  width: 45%;
+  min-width: 0;
+  padding: 20px;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.orbitalBasicInfo {
+  margin-bottom: 28px;
 }
 
 /* 4. Vibrational Analysis Section */

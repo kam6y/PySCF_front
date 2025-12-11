@@ -1753,39 +1753,39 @@ export const CalculationResultsPage = ({
         >
           <h2 className={styles.primaryHeader}>Molecular Orbitals</h2>
 
-          {/* Molecular Orbital Energy Diagram */}
-          <div className={styles.orbitalEnergyDiagram}>
-            <h3>Energy Level Diagram</h3>
-            <div className={styles.sectionDescription}>
-              Energy levels of molecular orbitals are illustrated. Click on
-              orbitals to view details in 3D visualization below.
+          {/* Flex wrapper for horizontal layout */}
+          <div className={styles.orbitalsFlexWrapper}>
+            {/* Molecular Orbital Energy Diagram */}
+            <div className={styles.orbitalEnergyDiagram}>
+              <h3>Energy Level Diagram</h3>
+              <div className={styles.sectionDescription}>
+                Energy levels of molecular orbitals are illustrated.
+              </div>
+              <LazyViewer>
+                <MolecularOrbitalEnergyDiagram
+                  key={`energy-${activeCalculation.id}`}
+                  calculationId={activeCalculation.id}
+                  selectedOrbitalIndex={selectedOrbitalIndex}
+                  onOrbitalSelect={handleOrbitalSelect}
+                  onError={handleSetError}
+                />
+              </LazyViewer>
             </div>
-            <LazyViewer>
-              <MolecularOrbitalEnergyDiagram
-                key={`energy-${activeCalculation.id}`}
-                calculationId={activeCalculation.id}
-                selectedOrbitalIndex={selectedOrbitalIndex}
-                onOrbitalSelect={handleOrbitalSelect}
-                onError={handleSetError}
-              />
-            </LazyViewer>
-          </div>
 
-          {/* Molecular Orbital 3D Visualization */}
-          <div className={styles.orbitalVisualization}>
-            <h3>3D Orbital Visualization</h3>
-            <div className={styles.sectionDescription}>
-              Interactive 3D visualization of molecular orbitals. Select
-              orbitals from the energy diagram above or use the controls to view
-              their shapes and spatial distributions.
+            {/* Molecular Orbital 3D Visualization */}
+            <div className={styles.orbitalVisualization}>
+              <h3>3D Orbital Visualization</h3>
+              <div className={styles.sectionDescription}>
+                Interactive 3D visualization of molecular orbitals.
+              </div>
+              <LazyViewer>
+                <MolecularOrbitalViewer
+                  key={activeCalculation.id}
+                  calculationId={activeCalculation.id}
+                  onError={handleSetError}
+                />
+              </LazyViewer>
             </div>
-            <LazyViewer>
-              <MolecularOrbitalViewer
-                key={activeCalculation.id}
-                calculationId={activeCalculation.id}
-                onError={handleSetError}
-              />
-            </LazyViewer>
           </div>
         </section>
 

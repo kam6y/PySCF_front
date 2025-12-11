@@ -34,7 +34,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       number | null
     >(null);
     const [viewerOptions, setViewerOptions] = useState<ViewerOptions>({
-      gridSize: 80,
+      gridSize: 120,
       isovaluePos: 0.02,
       isovalueNeg: -0.02,
     });
@@ -495,41 +495,13 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
               </select>
             </div>
 
-            {/* グリッドサイズ */}
-            <div>
-              <label
-                htmlFor="grid-size"
-                style={{
-                  display: 'block',
-                  marginBottom: '4px',
-                  fontWeight: 'bold',
-                }}
-              >
-                Grid Size: {viewerOptions.gridSize}
-              </label>
-              <input
-                id="grid-size"
-                type="range"
-                min="40"
-                max="120"
-                step="10"
-                value={viewerOptions.gridSize}
-                onChange={e =>
-                  handleOptionsChange({
-                    gridSize: parseInt(e.target.value, 10),
-                  })
-                }
-                style={{ width: '100%' }}
-              />
-            </div>
-
             {/* 正の等値面 */}
             <div className={styles.controlGroup}>
               <label
                 htmlFor="isovalue-pos"
                 className={`${styles.rangeLabel} ${styles.controlLabel}`}
               >
-                Positive Isovalue: {viewerOptions.isovaluePos.toFixed(3)}
+                Red Isovalue: {viewerOptions.isovaluePos.toFixed(3)}
               </label>
               <input
                 id="isovalue-pos"
@@ -553,7 +525,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
                 htmlFor="isovalue-neg"
                 className={`${styles.rangeLabel} ${styles.controlLabel}`}
               >
-                Negative Isovalue: {viewerOptions.isovalueNeg.toFixed(3)}
+                Blue Isovalue: {viewerOptions.isovalueNeg.toFixed(3)}
               </label>
               <input
                 id="isovalue-neg"

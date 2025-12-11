@@ -1,13 +1,8 @@
 // src/web/components/MolecularOrbitalEnergyDiagram.tsx
+// D3.js-based implementation for better zoom/pan and label handling
 
-import React, { useMemo, useState, useRef, useEffect } from 'react';
-import {
-  ReactSVGPanZoom,
-  TOOL_AUTO,
-  fitToViewer,
-  Tool,
-  Value,
-} from 'react-svg-pan-zoom';
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import * as d3 from 'd3';
 import { useGetOrbitals } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
 import styles from './MolecularOrbitalEnergyDiagram.module.css';
@@ -24,24 +19,30 @@ interface ProcessedOrbital extends OrbitalInfo {
   displayLevel: number;
 }
 
+interface LabelInfo {
+  orbital: ProcessedOrbital;
+  x: number;
+  y: number;
+  visible: boolean;
+  offsetY: number;
+}
+
 const DIAGRAM_CONFIG = {
   width: 800,
   height: 600,
-  margin: { top: 40, right: 100, bottom: 60, left: 80 },
-  orbitalWidth: 120,
+  margin: { top: 40, right: 150, bottom: 60, left: 160 },
+  orbitalWidth: 80, // Half width for better appearance
   orbitalHeight: 3,
-  gapThreshold: 0.5, // eV - threshold for highlighting HOMO-LUMO gap
+  gapThreshold: 0.5,
+  minLabelSpacing: 14,
 };
 
 export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagramProps> =
   React.memo(
     ({ calculationId, onError, onOrbitalSelect, selectedOrbitalIndex }) => {
-      // Viewer state for zoom/pan
-      const viewerRef = useRef<any>(null);
-      const [tool, setTool] = useState<Tool>(TOOL_AUTO);
-      const [value, setValue] = useState<Value | null>(null);
-      const [viewerSize, setViewerSize] = useState({ width: 800, height: 600 });
+      const svgRef = useRef<SVGSVGElement>(null);
       const containerRef = useRef<HTMLDivElement>(null);
+      const [viewerSize, setViewerSize] = useState({ width: 800, height: 600 });
 
       // Get orbital information
       const {
@@ -50,7 +51,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         error: orbitalsError,
       } = useGetOrbitals(calculationId);
 
-      // レスポンシブ対応: コンテナサイズの監視とViewerサイズの更新（ResizeObserver使用）
+      // Responsive sizing
       useEffect(() => {
         if (!containerRef.current) return;
 
@@ -62,51 +63,18 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
               width: newWidth,
               height: 600,
             });
-
-            // Set default value if initial value is not set
-            if (value === null) {
-              setValue({
-                version: 2,
-                mode: 'idle',
-                focus: false,
-                a: 1,
-                b: 0,
-                c: 0,
-                d: 1,
-                e: 0,
-                f: 0,
-                viewerWidth: newWidth,
-                viewerHeight: 600,
-                SVGWidth: DIAGRAM_CONFIG.width,
-                SVGHeight: DIAGRAM_CONFIG.height,
-                startX: null,
-                startY: null,
-                endX: null,
-                endY: null,
-                miniatureOpen: false,
-                focus_miniature: false,
-              } as Value);
-            }
           }
         };
 
-        // Initial size setup
         updateSize();
-
-        // Monitor container size changes with ResizeObserver
-        const resizeObserver = new ResizeObserver(() => {
-          updateSize();
-        });
-
+        const resizeObserver = new ResizeObserver(updateSize);
         resizeObserver.observe(containerRef.current);
 
-        return () => {
-          resizeObserver.disconnect();
-        };
-      }, [value]);
+        return () => resizeObserver.disconnect();
+      }, []);
 
-      // エラーハンドリング
-      React.useEffect(() => {
+      // Error handling
+      useEffect(() => {
         if (orbitalsError) {
           console.error('Failed to load orbital information:', orbitalsError);
           onError?.(
@@ -119,16 +87,14 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       const processedOrbitals: ProcessedOrbital[] = useMemo(() => {
         if (!orbitalsData?.orbitals) return [];
 
-        // Sort by energy
         const sortedOrbitals = [...orbitalsData.orbitals].sort(
           (a, b) => a.energy_ev - b.energy_ev
         );
 
-        // Calculate Y-axis position
         const energyRange = Math.max(
           sortedOrbitals[sortedOrbitals.length - 1].energy_ev -
             sortedOrbitals[0].energy_ev,
-          10 // Set minimum range
+          10
         );
         const minEnergy = sortedOrbitals[0].energy_ev;
         const drawableHeight =
@@ -165,120 +131,378 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         };
       }, [processedOrbitals]);
 
-      // Calculate zoom scale and smart scaling
-      const scalingFactors = useMemo(() => {
-        const scale = value?.a || 1;
-
-        // ベースサイズ
-        const baseFontSize = 12;
-        const baseSmallFontSize = 10;
-        const baseLabelFontSize = 14;
-        const baseStrokeWidth = 2;
-        const baseThinStrokeWidth = 1;
-
-        // スケールに応じて逆スケーリング（拡大時にテキストが相対的に小さくなる）
-        const invScale = 1 / scale;
-
-        // ズームレベルに応じた表示密度の決定
-        let labelDensity: 'sparse' | 'medium' | 'dense' | 'all';
-        if (scale < 1.5) {
-          labelDensity = 'sparse'; // 主要な軌道のみ
-        } else if (scale < 3) {
-          labelDensity = 'medium'; // 一部の軌道
-        } else if (scale < 5) {
-          labelDensity = 'dense'; // 多くの軌道
-        } else {
-          labelDensity = 'all'; // 全ての軌道
+      // Get orbital color
+      const getOrbitalColor = useCallback((orbital: OrbitalInfo): string => {
+        // Check for SOMO first (occupancy = 1 or label contains SOMO)
+        const isSomo = orbital.label?.includes('SOMO') || 
+          (orbital.occupancy > 0.5 && orbital.occupancy < 1.5);
+        
+        if (isSomo) {
+          return '#f39c12'; // Orange for SOMO
         }
-
-        return {
-          scale,
-          invScale,
-          fontSize: baseFontSize * invScale,
-          smallFontSize: baseSmallFontSize * invScale,
-          labelFontSize: baseLabelFontSize * invScale,
-          strokeWidth: baseStrokeWidth * invScale,
-          thinStrokeWidth: baseThinStrokeWidth * invScale,
-          labelDensity,
-        };
-      }, [value]);
-
-      // 初期ビューの設定とデータ変更時のリセット
-      useEffect(() => {
-        if (
-          viewerRef.current &&
-          processedOrbitals.length > 0 &&
-          viewerSize.width > 0
-        ) {
-          // 二重のrequestAnimationFrameでDOMの準備完了を確実に待つ
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (viewerRef.current) {
-                const viewer = viewerRef.current;
-                const initialValue = viewer.getValue();
-                const fittedValue = fitToViewer(initialValue);
-                setValue(fittedValue);
-              }
-            });
-          });
-        }
-      }, [processedOrbitals.length, viewerSize.width]);
-
-      // 軌道の色を決定
-      const getOrbitalColor = (orbital: OrbitalInfo): string => {
+        
         switch (orbital.orbital_type) {
           case 'homo':
-            return '#e74c3c'; // 赤
+            return '#e74c3c';
           case 'lumo':
-            return '#3498db'; // 青
+            return '#3498db';
           case 'core':
-            return '#2ecc71'; // 緑
+            return '#2ecc71';
           case 'virtual':
-            return '#95a5a6'; // 灰色
+            return '#95a5a6';
           default:
-            if (orbital.occupancy > 0) {
-              return '#2ecc71'; // 占有軌道は緑
+            return orbital.occupancy > 0 ? '#2ecc71' : '#95a5a6';
+        }
+      }, []);
+
+      // Calculate label positions with collision detection
+      const calculateLabelPositions = useCallback(
+        (orbitals: ProcessedOrbital[], scale: number): LabelInfo[] => {
+          const invScale = 1 / scale;
+          // Label X position: right after orbital end (scales with zoom)
+          const labelX =
+            DIAGRAM_CONFIG.margin.left +
+            10 * invScale +
+            DIAGRAM_CONFIG.orbitalWidth * invScale +
+            10 * invScale;
+
+          // Determine which labels to show based on zoom level
+          const labelDensity =
+            scale < 1.5
+              ? 'sparse'
+              : scale < 3
+                ? 'medium'
+                : scale < 5
+                  ? 'dense'
+                  : 'all';
+
+          const labels: LabelInfo[] = orbitals.map((orbital, index) => {
+            const isImportant =
+              orbital.orbital_type === 'homo' ||
+              orbital.orbital_type === 'lumo' ||
+              orbital.label?.includes('HOMO') ||
+              orbital.label?.includes('LUMO') ||
+              orbital.label?.includes('SOMO');
+
+            let visible = false;
+            if (isImportant) {
+              visible = true;
+            } else {
+              switch (labelDensity) {
+                case 'all':
+                  visible = true;
+                  break;
+                case 'dense':
+                  visible = index % 2 === 0;
+                  break;
+                case 'medium':
+                  visible = index % 4 === 0;
+                  break;
+                case 'sparse':
+                  visible = false;
+                  break;
+              }
             }
-            return '#95a5a6'; // 仮想軌道は灰色
-        }
-      };
 
-      // 軌道クリックハンドラー
-      const handleOrbitalClick = (orbital: ProcessedOrbital) => {
-        onOrbitalSelect?.(orbital.index);
-      };
+            return {
+              orbital,
+              x: labelX,
+              y: orbital.yPosition,
+              visible,
+              offsetY: 0,
+            };
+          });
 
-      // ズームレベルに応じて軌道ラベルを表示すべきか判定
-      const shouldShowLabel = (
-        orbital: ProcessedOrbital,
-        index: number
-      ): boolean => {
-        const { labelDensity } = scalingFactors;
+          // Collision detection and resolution for visible labels
+          const visibleLabels = labels.filter(l => l.visible);
+          const minSpacing = DIAGRAM_CONFIG.minLabelSpacing / scale;
 
-        // 常に表示する軌道（HOMO, LUMO）
-        if (
-          orbital.orbital_type === 'homo' ||
-          orbital.orbital_type === 'lumo' ||
-          orbital.label?.includes('HOMO') ||
-          orbital.label?.includes('LUMO')
-        ) {
-          return true;
-        }
+          // Sort by y position
+          visibleLabels.sort((a, b) => a.y - b.y);
 
-        // ズームレベルに応じた表示密度
-        switch (labelDensity) {
-          case 'all':
-            return true; // 全ての軌道を表示
-          case 'dense':
-            return index % 2 === 0; // 2つおきに表示
-          case 'medium':
-            return index % 4 === 0; // 4つおきに表示
-          case 'sparse':
-            return false; // 主要な軌道のみ（上記のHOMO/LUMOチェックで既に処理済み）
-          default:
-            return false;
-        }
-      };
+          // Resolve collisions
+          for (let i = 1; i < visibleLabels.length; i++) {
+            const prev = visibleLabels[i - 1];
+            const curr = visibleLabels[i];
+            const actualPrevY = prev.y + prev.offsetY;
+            const actualCurrY = curr.y + curr.offsetY;
+            const spacing = actualCurrY - actualPrevY;
+
+            if (spacing < minSpacing) {
+              curr.offsetY += minSpacing - spacing;
+            }
+          }
+
+          return labels;
+        },
+        []
+      );
+
+      // D3 zoom behavior and rendering
+      useEffect(() => {
+        if (!svgRef.current || processedOrbitals.length === 0) return;
+
+        const svg = d3.select(svgRef.current);
+        const chartWidth =
+          DIAGRAM_CONFIG.width -
+          DIAGRAM_CONFIG.margin.left -
+          DIAGRAM_CONFIG.margin.right;
+
+        // Clear previous content
+        svg.selectAll('*').remove();
+
+        // Create main group for zooming
+        const mainGroup = svg.append('g').attr('class', 'main-group');
+
+        // Background
+        mainGroup
+          .append('rect')
+          .attr('width', DIAGRAM_CONFIG.width)
+          .attr('height', DIAGRAM_CONFIG.height)
+          .attr('fill', '#fafafa');
+
+        // Grid pattern
+        const defs = svg.append('defs');
+        const pattern = defs
+          .append('pattern')
+          .attr('id', 'grid-pattern')
+          .attr('width', 40)
+          .attr('height', 40)
+          .attr('patternUnits', 'userSpaceOnUse');
+        pattern
+          .append('path')
+          .attr('d', 'M 40 0 L 0 0 0 40')
+          .attr('fill', 'none')
+          .attr('stroke', '#f0f0f0')
+          .attr('stroke-width', 1);
+
+        mainGroup
+          .append('rect')
+          .attr('width', DIAGRAM_CONFIG.width)
+          .attr('height', DIAGRAM_CONFIG.height)
+          .attr('fill', 'url(#grid-pattern)');
+
+        // Content group (this will be transformed)
+        const contentGroup = mainGroup.append('g').attr('class', 'content-group');
+
+        // UI group (labels, axes - will have inverse scaling)
+        const uiGroup = mainGroup.append('g').attr('class', 'ui-group');
+
+        // Function to render content at current transform
+        const render = (transform: d3.ZoomTransform) => {
+          const scale = transform.k;
+          const invScale = 1 / scale;
+
+          // Clear content
+          contentGroup.selectAll('*').remove();
+          uiGroup.selectAll('*').remove();
+
+          // Apply transform to content
+          contentGroup.attr('transform', transform.toString());
+
+          // Y axis (in UI group, no scaling)
+          uiGroup
+            .append('line')
+            .attr('x1', DIAGRAM_CONFIG.margin.left * scale + transform.x)
+            .attr('y1', DIAGRAM_CONFIG.margin.top * scale + transform.y)
+            .attr('x2', DIAGRAM_CONFIG.margin.left * scale + transform.x)
+            .attr(
+              'y2',
+              (DIAGRAM_CONFIG.height - DIAGRAM_CONFIG.margin.bottom) * scale +
+                transform.y
+            )
+            .attr('stroke', '#333')
+            .attr('stroke-width', 2);
+
+          // Y axis label
+          uiGroup
+            .append('text')
+            .attr('x', 20)
+            .attr('y', viewerSize.height / 2)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', 14)
+            .attr('fill', '#666')
+            .attr(
+              'transform',
+              `rotate(-90, 20, ${viewerSize.height / 2})`
+            )
+            .text('Energy (eV)');
+
+          // HOMO-LUMO gap highlight
+          if (orbitalSummary.homoOrbital && orbitalSummary.lumoOrbital) {
+            contentGroup
+              .append('rect')
+              .attr('x', DIAGRAM_CONFIG.margin.left)
+              .attr('y', orbitalSummary.lumoOrbital.yPosition)
+              .attr('width', chartWidth)
+              .attr(
+                'height',
+                orbitalSummary.homoOrbital.yPosition -
+                  orbitalSummary.lumoOrbital.yPosition
+              )
+              .attr('fill', 'rgba(255, 193, 7, 0.1)')
+              .attr('stroke', 'rgba(255, 193, 7, 0.3)')
+              .attr('stroke-width', invScale)
+              .attr('stroke-dasharray', `${5 * invScale},${5 * invScale}`);
+          }
+
+          // Orbital lines positioned close to Y-axis (distance scales inversely with zoom)
+          const orbitalX = DIAGRAM_CONFIG.margin.left + 10 * invScale;
+          const scaledOrbitalWidth = DIAGRAM_CONFIG.orbitalWidth * invScale;
+
+          const orbitalGroup = contentGroup
+            .selectAll('.orbital')
+            .data(processedOrbitals)
+            .enter()
+            .append('g')
+            .attr('class', 'orbital');
+
+          // Orbital rectangles with inverse scaling to maintain constant visual size
+          orbitalGroup
+            .append('rect')
+            .attr('x', orbitalX)
+            .attr('y', d => d.yPosition - (DIAGRAM_CONFIG.orbitalHeight * invScale) / 2)
+            .attr('width', scaledOrbitalWidth)
+            .attr('height', DIAGRAM_CONFIG.orbitalHeight * invScale)
+            .attr('fill', d => getOrbitalColor(d))
+            .attr('stroke', d => getOrbitalColor(d))
+            .attr('stroke-width', invScale);
+
+          // Electrons
+          orbitalGroup
+            .filter(d => d.occupancy > 0)
+            .append('circle')
+            .attr('cx', orbitalX + scaledOrbitalWidth / 4)
+            .attr('cy', d => d.yPosition)
+            .attr('r', 3 * invScale)
+            .attr('fill', '#34495e');
+
+          orbitalGroup
+            .filter(d => d.occupancy > 1)
+            .append('circle')
+            .attr('cx', orbitalX + (3 * scaledOrbitalWidth) / 4)
+            .attr('cy', d => d.yPosition)
+            .attr('r', 3 * invScale)
+            .attr('fill', '#34495e');
+
+          // Calculate and render labels with collision detection
+          const labelPositions = calculateLabelPositions(
+            processedOrbitals,
+            scale
+          );
+
+          labelPositions
+            .filter(l => l.visible)
+            .forEach(labelInfo => {
+              const { orbital, x, y, offsetY } = labelInfo;
+              const transformedX = x * scale + transform.x;
+              const transformedY = (y + offsetY) * scale + transform.y;
+
+              const isImportant =
+                orbital.orbital_type === 'homo' ||
+                orbital.orbital_type === 'lumo';
+
+              // Connection line from orbital to label (solid line, starting at orbital edge)
+              const orbitalEndX =
+                (orbitalX + scaledOrbitalWidth) * scale + transform.x;
+              const orbitalY = orbital.yPosition * scale + transform.y;
+
+              uiGroup
+                .append('line')
+                .attr('x1', orbitalEndX)
+                .attr('y1', orbitalY)
+                .attr('x2', transformedX - 5 * invScale)
+                .attr('y2', transformedY)
+                .attr('stroke', '#ccc')
+                .attr('stroke-width', 1);
+
+              uiGroup
+                .append('text')
+                .attr('x', transformedX)
+                .attr('y', transformedY + 4)
+                .attr('font-size', 12)
+                .attr('font-family', 'monospace')
+                .attr('fill', isImportant ? '#333' : '#666')
+                .attr('font-weight', isImportant ? 'bold' : 'normal')
+                .text(
+                  `#${orbital.index}: ${orbital.energy_ev.toFixed(3)} eV${
+                    orbital.label &&
+                    (orbital.label.includes('HOMO') ||
+                      orbital.label.includes('LUMO') ||
+                      orbital.label.includes('SOMO'))
+                      ? ` (${orbital.label})`
+                      : ''
+                  }`
+                );
+            });
+
+          // Energy axis ticks
+          const tickOrbitals = processedOrbitals.filter(
+            (_, index) =>
+              index %
+                Math.max(1, Math.floor(processedOrbitals.length / 10)) ===
+              0
+          );
+
+          tickOrbitals.forEach(orbital => {
+            const tickY = orbital.yPosition * scale + transform.y;
+            const tickX = DIAGRAM_CONFIG.margin.left * scale + transform.x;
+
+            uiGroup
+              .append('line')
+              .attr('x1', tickX - 5)
+              .attr('y1', tickY)
+              .attr('x2', tickX)
+              .attr('y2', tickY)
+              .attr('stroke', '#666')
+              .attr('stroke-width', 1);
+
+            uiGroup
+              .append('text')
+              .attr('x', tickX - 10)
+              .attr('y', tickY + 4)
+              .attr('text-anchor', 'end')
+              .attr('font-size', 10)
+              .attr('font-family', 'monospace')
+              .attr('fill', '#666')
+              .text(orbital.energy_ev.toFixed(1));
+          });
+        };
+
+        // Initial render
+        render(d3.zoomIdentity);
+
+        // Zoom behavior with translation limits
+        const zoom = d3
+          .zoom<SVGSVGElement, unknown>()
+          .scaleExtent([1, 100])
+          .translateExtent([
+            [0, 0],
+            [DIAGRAM_CONFIG.width, DIAGRAM_CONFIG.height],
+          ])
+          .extent([
+            [0, 0],
+            [viewerSize.width, viewerSize.height],
+          ])
+          .on('zoom', event => {
+            render(event.transform);
+          });
+
+        svg.call(zoom);
+
+        // Double-click to reset
+        svg.on('dblclick.zoom', () => {
+          svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
+        });
+      }, [
+        processedOrbitals,
+        orbitalSummary,
+        selectedOrbitalIndex,
+        viewerSize,
+        getOrbitalColor,
+        calculateLabelPositions,
+        onOrbitalSelect,
+      ]);
 
       if (orbitalsLoading) {
         return (
@@ -313,342 +537,17 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         );
       }
 
-      const chartWidth =
-        DIAGRAM_CONFIG.width -
-        DIAGRAM_CONFIG.margin.left -
-        DIAGRAM_CONFIG.margin.right;
-
       return (
         <div className={styles.diagramContainer}>
-          {/* ヘッダー情報 */}
-          <div className={styles.diagramHeader}>
-            <h3 className={styles.diagramTitle}>
-              Molecular Orbital Energy Level Diagram
-            </h3>
-            {orbitalSummary.homoLumoGap && (
-              <div className={styles.homoLumoGap}>
-                <strong>HOMO-LUMO Gap:</strong>{' '}
-                <span className={styles.gapValue}>
-                  {orbitalSummary.homoLumoGap.toFixed(4)} eV
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* SVGエネルギー準位図 with Zoom/Pan */}
+          {/* SVG Diagram */}
           <div ref={containerRef} className={styles.viewerContainer}>
-            <ReactSVGPanZoom
-              ref={viewerRef}
+            <svg
+              ref={svgRef}
               width={viewerSize.width}
               height={viewerSize.height}
-              tool={tool}
-              onChangeTool={setTool}
-              value={value}
-              onChangeValue={setValue}
-              detectAutoPan={false}
-              preventPanOutside={true}
-              background="#fafafa"
-              SVGBackground="#fafafa"
-              toolbarProps={{
-                position: 'right',
-                SVGAlignX: 'center',
-                SVGAlignY: 'top',
-              }}
-              miniatureProps={{
-                position: 'none',
-                background: '#fafafa',
-                width: 100,
-                height: 80,
-              }}
-              scaleFactorMin={0.8}
-              scaleFactorMax={10}
-              scaleFactorOnWheel={1.06}
-            >
-              <svg
-                width={DIAGRAM_CONFIG.width}
-                height={DIAGRAM_CONFIG.height}
-                className={styles.diagramSvg}
-              >
-                {/* 背景グリッド */}
-                <defs>
-                  <pattern
-                    id="grid"
-                    width="40"
-                    height="40"
-                    patternUnits="userSpaceOnUse"
-                  >
-                    <path
-                      d="M 40 0 L 0 0 0 40"
-                      fill="none"
-                      stroke="#f5f5f5"
-                      strokeWidth="1"
-                    />
-                  </pattern>
-                </defs>
-                <rect
-                  width={DIAGRAM_CONFIG.width}
-                  height={DIAGRAM_CONFIG.height}
-                  fill="url(#grid)"
-                />
-
-                {/* Y軸 */}
-                <line
-                  x1={DIAGRAM_CONFIG.margin.left}
-                  y1={DIAGRAM_CONFIG.margin.top}
-                  x2={DIAGRAM_CONFIG.margin.left}
-                  y2={DIAGRAM_CONFIG.height - DIAGRAM_CONFIG.margin.bottom}
-                  stroke="#333"
-                  strokeWidth={scalingFactors.strokeWidth}
-                />
-
-                {/* Y軸ラベル */}
-                <text
-                  x={20}
-                  y={DIAGRAM_CONFIG.height / 2}
-                  textAnchor="middle"
-                  fontSize={scalingFactors.labelFontSize}
-                  fill="#666"
-                  transform={`rotate(-90, 20, ${DIAGRAM_CONFIG.height / 2})`}
-                >
-                  Energy (eV)
-                </text>
-
-                {/* HOMO-LUMOギャップの強調表示 */}
-                {orbitalSummary.homoOrbital && orbitalSummary.lumoOrbital && (
-                  <rect
-                    x={DIAGRAM_CONFIG.margin.left}
-                    y={orbitalSummary.lumoOrbital.yPosition}
-                    width={chartWidth}
-                    height={
-                      orbitalSummary.homoOrbital.yPosition -
-                      orbitalSummary.lumoOrbital.yPosition
-                    }
-                    fill="rgba(255, 193, 7, 0.1)"
-                    stroke="rgba(255, 193, 7, 0.3)"
-                    strokeWidth="1"
-                    strokeDasharray="5,5"
-                  />
-                )}
-
-                {/* 軌道レベル */}
-                {processedOrbitals.map((orbital, index) => {
-                  const isSelected = selectedOrbitalIndex === orbital.index;
-                  const color = getOrbitalColor(orbital);
-                  const x =
-                    DIAGRAM_CONFIG.margin.left +
-                    chartWidth / 2 -
-                    DIAGRAM_CONFIG.orbitalWidth / 2;
-
-                  // ズームスケールに応じた軌道の高さ
-                  const scaledOrbitalHeight =
-                    DIAGRAM_CONFIG.orbitalHeight * scalingFactors.invScale;
-
-                  // 電子の半径もスケール調整
-                  const electronRadius = 3 * scalingFactors.invScale;
-
-                  // ラベルを表示するか判定
-                  const showLabel = shouldShowLabel(orbital, index);
-
-                  return (
-                    <g key={orbital.index}>
-                      {/* 軌道線 */}
-                      <rect
-                        x={x}
-                        y={orbital.yPosition - scaledOrbitalHeight / 2}
-                        width={DIAGRAM_CONFIG.orbitalWidth}
-                        height={scaledOrbitalHeight}
-                        fill={color}
-                        stroke={isSelected ? '#f39c12' : color}
-                        strokeWidth={
-                          isSelected
-                            ? scalingFactors.strokeWidth * 1.5
-                            : scalingFactors.thinStrokeWidth
-                        }
-                        style={{
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          filter: isSelected ? 'brightness(1.1)' : 'none',
-                        }}
-                        onClick={() => handleOrbitalClick(orbital)}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.filter = 'brightness(1.2)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.filter = isSelected
-                            ? 'brightness(1.1)'
-                            : 'none';
-                        }}
-                      >
-                        <title>
-                          #{orbital.index}: {orbital.energy_ev.toFixed(4)} eV
-                          {orbital.label ? ` (${orbital.label})` : ''}
-                        </title>
-                      </rect>
-
-                      {/* 軌道ラベル：番号とエネルギーを1行で表示 */}
-                      {showLabel && (
-                        <text
-                          x={x + DIAGRAM_CONFIG.orbitalWidth + 10}
-                          y={orbital.yPosition + scalingFactors.fontSize / 3}
-                          fontSize={scalingFactors.fontSize}
-                          fill={
-                            orbital.orbital_type === 'homo' ||
-                            orbital.orbital_type === 'lumo'
-                              ? '#333'
-                              : '#666'
-                          }
-                          fontFamily="monospace"
-                          style={{
-                            fontWeight:
-                              orbital.orbital_type === 'homo' ||
-                              orbital.orbital_type === 'lumo'
-                                ? 'bold'
-                                : 'normal',
-                          }}
-                        >
-                          #{orbital.index}: {orbital.energy_ev.toFixed(3)} eV
-                          {orbital.label &&
-                            (orbital.label.includes('HOMO') ||
-                              orbital.label.includes('LUMO')) &&
-                            ` (${orbital.label})`}
-                        </text>
-                      )}
-
-                      {/* 占有を示す電子（占有軌道の場合） */}
-                      {orbital.occupancy > 0 && (
-                        <circle
-                          cx={x + DIAGRAM_CONFIG.orbitalWidth / 4}
-                          cy={orbital.yPosition}
-                          r={electronRadius}
-                          fill="#34495e"
-                        />
-                      )}
-                      {orbital.occupancy > 1 && (
-                        <circle
-                          cx={x + (3 * DIAGRAM_CONFIG.orbitalWidth) / 4}
-                          cy={orbital.yPosition}
-                          r={electronRadius}
-                          fill="#34495e"
-                        />
-                      )}
-                    </g>
-                  );
-                })}
-
-                {/* エネルギー軸の目盛り */}
-                {processedOrbitals
-                  .filter(
-                    (_, index) =>
-                      index %
-                        Math.max(
-                          1,
-                          Math.floor(processedOrbitals.length / 10)
-                        ) ===
-                      0
-                  )
-                  .map(orbital => (
-                    <g key={`tick-${orbital.index}`}>
-                      <line
-                        x1={DIAGRAM_CONFIG.margin.left - 5}
-                        y1={orbital.yPosition}
-                        x2={DIAGRAM_CONFIG.margin.left}
-                        y2={orbital.yPosition}
-                        stroke="#666"
-                        strokeWidth={scalingFactors.thinStrokeWidth}
-                      />
-                      <text
-                        x={DIAGRAM_CONFIG.margin.left - 10}
-                        y={orbital.yPosition + scalingFactors.smallFontSize / 3}
-                        textAnchor="end"
-                        fontSize={scalingFactors.smallFontSize}
-                        fill="#666"
-                        fontFamily="monospace"
-                      >
-                        {orbital.energy_ev.toFixed(1)}
-                      </text>
-                    </g>
-                  ))}
-              </svg>
-            </ReactSVGPanZoom>
+              className={styles.diagramSvg}
+            />
           </div>
-
-          {/* 凡例 */}
-          <div
-            style={{
-              marginTop: '20px',
-              display: 'flex',
-              gap: '20px',
-              fontSize: '14px',
-            }}
-          >
-            <div className={styles.legendItem}>
-              <div
-                className={`${styles.legendColorBox} ${styles.legendHomo}`}
-              />
-              <span>HOMO</span>
-            </div>
-            <div className={styles.legendItem}>
-              <div
-                className={`${styles.legendColorBox} ${styles.legendLumo}`}
-              />
-              <span>LUMO</span>
-            </div>
-            <div className={styles.legendItem}>
-              <div
-                className={`${styles.legendColorBox} ${styles.legendOccupied}`}
-              />
-              <span>Occupied Orbitals</span>
-            </div>
-            <div className={styles.legendItem}>
-              <div
-                className={`${styles.legendColorBox} ${styles.legendVirtual}`}
-              />
-              <span>Virtual Orbitals</span>
-            </div>
-            <div className={styles.legendItem}>
-              <div className={styles.legendElectron} />
-              <span>Electrons</span>
-            </div>
-          </div>
-
-          {/* 選択された軌道の詳細情報 */}
-          {selectedOrbitalIndex !== null && (
-            <div className={styles.selectedOrbitalDetails}>
-              {(() => {
-                const selectedOrbital = processedOrbitals.find(
-                  o => o.index === selectedOrbitalIndex
-                );
-                if (!selectedOrbital) return null;
-
-                return (
-                  <div>
-                    <div className={styles.selectedOrbitalTitle}>
-                      Selected Orbital:{' '}
-                      {selectedOrbital.label ||
-                        `Orbital ${selectedOrbital.index}`}
-                    </div>
-                    <div className={styles.selectedOrbitalGrid}>
-                      <div>
-                        <strong>Energy:</strong>{' '}
-                        {selectedOrbital.energy_ev.toFixed(4)} eV
-                      </div>
-                      <div>
-                        <strong>Energy (a.u.):</strong>{' '}
-                        {selectedOrbital.energy_hartree.toFixed(6)}
-                      </div>
-                      <div>
-                        <strong>Occupancy:</strong> {selectedOrbital.occupancy}
-                      </div>
-                      <div>
-                        <strong>Orbital type:</strong>{' '}
-                        {selectedOrbital.orbital_type}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          )}
         </div>
       );
     }
