@@ -1,7 +1,13 @@
 // src/web/components/MolecularOrbitalEnergyDiagram.tsx
 // D3.js-based implementation for better zoom/pan and label handling
 
-import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
+import React, {
+  useMemo,
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+} from 'react';
 import * as d3 from 'd3';
 import { useGetOrbitals } from '../hooks/useCalculationQueries';
 import { OrbitalInfo } from '../types/api-types';
@@ -134,13 +140,14 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       // Get orbital color
       const getOrbitalColor = useCallback((orbital: OrbitalInfo): string => {
         // Check for SOMO first (occupancy = 1 or label contains SOMO)
-        const isSomo = orbital.label?.includes('SOMO') || 
+        const isSomo =
+          orbital.label?.includes('SOMO') ||
           (orbital.occupancy > 0.5 && orbital.occupancy < 1.5);
-        
+
         if (isSomo) {
           return '#f39c12'; // Orange for SOMO
         }
-        
+
         switch (orbital.orbital_type) {
           case 'homo':
             return '#e74c3c';
@@ -283,7 +290,9 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
           .attr('fill', 'url(#grid-pattern)');
 
         // Content group (this will be transformed)
-        const contentGroup = mainGroup.append('g').attr('class', 'content-group');
+        const contentGroup = mainGroup
+          .append('g')
+          .attr('class', 'content-group');
 
         // UI group (labels, axes - will have inverse scaling)
         const uiGroup = mainGroup.append('g').attr('class', 'ui-group');
@@ -322,10 +331,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
             .attr('text-anchor', 'middle')
             .attr('font-size', 14)
             .attr('fill', '#666')
-            .attr(
-              'transform',
-              `rotate(-90, 20, ${viewerSize.height / 2})`
-            )
+            .attr('transform', `rotate(-90, 20, ${viewerSize.height / 2})`)
             .text('Energy (eV)');
 
           // HOMO-LUMO gap highlight
@@ -361,7 +367,10 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
           orbitalGroup
             .append('rect')
             .attr('x', orbitalX)
-            .attr('y', d => d.yPosition - (DIAGRAM_CONFIG.orbitalHeight * invScale) / 2)
+            .attr(
+              'y',
+              d => d.yPosition - (DIAGRAM_CONFIG.orbitalHeight * invScale) / 2
+            )
             .attr('width', scaledOrbitalWidth)
             .attr('height', DIAGRAM_CONFIG.orbitalHeight * invScale)
             .attr('fill', d => getOrbitalColor(d))
@@ -439,8 +448,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
           // Energy axis ticks
           const tickOrbitals = processedOrbitals.filter(
             (_, index) =>
-              index %
-                Math.max(1, Math.floor(processedOrbitals.length / 10)) ===
+              index % Math.max(1, Math.floor(processedOrbitals.length / 10)) ===
               0
           );
 

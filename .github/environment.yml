@@ -44,17 +44,5 @@ dependencies:
     - pytest-flask==1.3.0
     # YAML parsing for OpenAPI spec
     - pyyaml==6.0.1
-    # AI/ML API integration
-    - google-genai==1.39.1
-    # LangChain ecosystem for multi-agent architecture
-    - langchain==1.1.2
-    - langgraph>=1.0.2
-    - langchain-google-genai==2.1.12
-    - langchain-core>=1.0.0
-    - langgraph-supervisor==0.0.31
-    # Research agent search tools
-    - arxiv==2.2.0              # arXiv preprint search
-    - langchain-tavily==0.2.12  # Tavily web search integration
-    - chemrxiv                  # Chemistry preprint search (latest from June 2025)
-    - pyalex==0.18              # OpenAlex comprehensive academic search
-    - semanticscholar==0.9.0    # Semantic Scholar AI/ML/science papers
+    # AI Chat integration (Gemini API)
+    - google-generativeai>=0.8.0

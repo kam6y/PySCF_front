@@ -1,13 +1,5 @@
+# Agent module - simplified chat implementation
 """
-AI Agent module for PySCF_frontlication.
-Provides multi-agent supervisor system for molecular analysis and research assistance.
+Simplified agent module that provides basic chat functionality
+using the Gemini API instead of the previous multi-agent system.
 """
-
-# The agent system uses a Supervisor pattern with specialized workers:
-# - Quantum Calculation Worker: Handles quantum chemistry and molecular analysis
-# - Research Agent: Handles academic literature search
-
-# Main entry point
-from .graph import get_compiled_graph
-
-__all__ = ['get_compiled_graph']

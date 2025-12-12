@@ -10,7 +10,7 @@ export type ChatHistory = {
 
 // エージェントステータスの型定義
 export type AgentStatus = {
-  agent: 'supervisor' | 'quantum_calculation_worker' | 'research_expert' | null;
+  agent: 'chat' | null;
   status: 'idle' | 'running' | 'responding';
 };
 

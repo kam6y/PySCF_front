@@ -1,70 +1,23 @@
 """
 AI Agent API endpoints.
-Handles chat interactions with the multi-agent supervisor system for molecular analysis and research.
+Handles chat interactions using simple Gemini API for molecular analysis assistance.
 """
 
 import logging
 import json
-from typing import Iterator, Dict, Any, List
+from typing import Iterator, Dict, Any
 from flask import Blueprint, jsonify, Response, stream_with_context
 from flask_pydantic import validate
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
-from generated_models import AgentChatRequest, ExecuteConfirmedActionRequest, AgentActionType
-from agent.common_tools.execution_tools import _execute_confirmed_deletion
-from agent.graph import get_compiled_graph
+from generated_models import AgentChatRequest
 from services.chat_history_service import get_chat_history_service
+from services.settings_service import SettingsService
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 # Constants
 MAX_MESSAGE_LENGTH = 100000  # Maximum allowed message length in characters
-
-# Global cache for compiled graph (lazy-loaded on first request)
-# This prevents re-compilation on every request and ensures initialization
-# happens only once, avoiding potential file system side effects on subsequent requests
-_compiled_graph_cache = None
-
-
-def _get_or_create_compiled_graph():
-    """
-    Get the compiled graph, creating it if necessary.
-
-    This function implements lazy loading with caching to ensure:
-    1. Graph is compiled only once during the application lifecycle
-    2. First-time initialization side effects (file creation, module loading) occur
-       on the first request rather than at import time
-    3. Subsequent requests use the cached graph for better performance
-
-    Returns:
-        Compiled LangGraph supervisor application
-    """
-    global _compiled_graph_cache
-
-    if _compiled_graph_cache is None:
-        logger.info("Compiling supervisor graph (first-time initialization)")
-        _compiled_graph_cache = get_compiled_graph()
-        logger.info("Supervisor graph compiled and cached successfully")
-
-    return _compiled_graph_cache
-
-
-def _is_internal_transfer_message(content: str) -> bool:
-    """
-    Check if a message is an internal transfer message that should be filtered out.
-    
-    Args:
-        content: Message content to check
-        
-    Returns:
-        True if the message is an internal transfer message, False otherwise
-    """
-    internal_patterns = [
-        "Successfully transferred to",
-        "Successfully transferred back to",
-    ]
-    return any(pattern in content for pattern in internal_patterns)
 
 
 def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
@@ -84,59 +37,9 @@ def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
     return f"data: {json.dumps(event_data)}\n\n"
 
 
-def _normalize_markdown_codeblocks(text: str) -> str:
+def _convert_history_to_gemini_format(history: list) -> list:
     """
-    Normalize markdown to ensure code blocks are properly formatted.
-
-    This function ensures that markdown code blocks (```) have proper spacing
-    before them, which is required for correct markdown rendering.
-
-    Specifically:
-    - Ensures there is a newline before ``` code blocks
-    - Handles cases like "text,```code" -> "text,\n```code"
-    - Handles cases where content might be a list instead of a string
-
-    Args:
-        text: Raw markdown text that may have formatting issues
-
-    Returns:
-        Normalized markdown text with proper code block spacing
-
-    Example:
-        >>> text = "HOMO energy is -7.89 eV.,```orbital-viewer\ncalc_id: foo"
-        >>> _normalize_markdown_codeblocks(text)
-        "HOMO energy is -7.89 eV.,\n```orbital-viewer\ncalc_id: foo"
-    """
-    import re
-
-    # Handle case where text might not be a string
-    if not isinstance(text, str):
-        # If it's a list, join the text content
-        if isinstance(text, list):
-            text_parts = []
-            for item in text:
-                if isinstance(item, str):
-                    text_parts.append(item)
-                elif isinstance(item, dict) and 'text' in item:
-                    text_parts.append(item['text'])
-                elif hasattr(item, 'text'):
-                    text_parts.append(item.text)
-            text = ''.join(text_parts)
-        else:
-            # Convert to string as fallback
-            text = str(text)
-
-    # Pattern: any non-whitespace character followed immediately by ```
-    # Replace with the same character, newline, then ```
-    # This handles cases like: "text,```code" or "text.```code"
-    text = re.sub(r'([^\s\n])(```)', r'\1\n\2', text)
-
-    return text
-
-
-def _convert_dict_to_langchain_format(history: List[Dict[str, Any]]) -> List[BaseMessage]:
-    """
-    Convert frontend message history format to LangChain BaseMessage format.
+    Convert frontend message history format to Gemini API format.
 
     Frontend format:
         [
@@ -144,17 +47,17 @@ def _convert_dict_to_langchain_format(history: List[Dict[str, Any]]) -> List[Bas
             {"role": "model", "parts": [{"text": "Hi there!"}]}
         ]
 
-    LangChain format:
+    Gemini format:
         [
-            HumanMessage(content="Hello"),
-            AIMessage(content="Hi there!")
+            {"role": "user", "parts": ["Hello"]},
+            {"role": "model", "parts": ["Hi there!"]}
         ]
 
     Args:
         history: List of message dictionaries in frontend format
 
     Returns:
-        List of LangChain BaseMessage objects
+        List of message dictionaries in Gemini format
     """
     converted = []
 
@@ -171,38 +74,26 @@ def _convert_dict_to_langchain_format(history: List[Dict[str, Any]]) -> List[Bas
             parts = getattr(msg, "parts", [])
 
         # Extract text content from parts
-        text_content = ""
+        text_parts = []
         for part in parts:
             if isinstance(part, dict) and "text" in part:
-                text_content += part["text"]
+                text_parts.append(part["text"])
             elif hasattr(part, "text"):
                 # Pydantic model
-                text_content += part.text
+                text_parts.append(part.text)
 
-        # Convert to appropriate message type
-        if role == "user":
-            converted.append(HumanMessage(content=text_content))
-        elif role == "model":
-            converted.append(AIMessage(content=text_content))
-        else:
-            logger.warning(f"Unknown role '{role}' in message history, skipping")
+        if text_parts:
+            converted.append({
+                "role": role,
+                "parts": text_parts
+            })
 
     return converted
 
 
-def _create_supervisor_stream(message: str, history: list, session_id: str = None) -> Iterator[str]:
+def _create_simple_chat_stream(message: str, history: list, session_id: str = None) -> Iterator[str]:
     """
-    Create an SSE stream for Supervisor multi-agent responses with worker status tracking.
-
-    This function integrates the LangGraph Supervisor to coordinate specialized worker agents
-    and provides real-time status updates about which agent is currently executing.
-
-    New SSE event types:
-    - agent_status: Worker execution status updates
-      {"type": "agent_status", "payload": {"status": "running"|"completed"|"responding", "agent": "agent_name"}}
-    - chunk: Text chunks from AI responses
-    - done: Stream completion
-    - error: Error messages
+    Create an SSE stream for simple Gemini API chat responses.
 
     Args:
         message: User's message
@@ -223,134 +114,59 @@ def _create_supervisor_stream(message: str, history: list, session_id: str = Non
 
     # Accumulate AI response for saving to database
     accumulated_response = []
-    # Track whether DB save was successful (for fallback logic)
     db_save_successful = False
 
     try:
-        logger.debug(f"Starting LangGraph Supervisor stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
+        logger.debug(f"Starting Gemini chat stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
 
-        # Get compiled supervisor graph (cached after first call)
-        graph_app = _get_or_create_compiled_graph()
+        # Get API key from settings
+        settings_service = SettingsService()
+        settings = settings_service.get_settings()
+        api_key = settings.get("gemini_api_key")
 
-        # Convert history to LangChain format
-        langchain_history = _convert_dict_to_langchain_format(history)
-        logger.debug(f"Converted {len(history)} history messages to LangChain format")
+        if not api_key:
+            error_msg = "Gemini API key is not configured. Please set it in Settings."
+            logger.error(error_msg)
+            yield _format_sse_event("error", {"message": error_msg})
+            return
 
-        # Add current user message
-        all_messages = langchain_history + [HumanMessage(content=message)]
+        # Import and configure Gemini
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
 
-        # Prepare graph input
-        graph_input = {"messages": all_messages}
+        # Create model with system instruction
+        model = genai.GenerativeModel(
+            'gemini-2.5-flash',
+            system_instruction="""You are a helpful AI assistant for quantum chemistry calculations.
+You can help users understand molecular structures, explain calculation results,
+and provide guidance on using the PySCF quantum chemistry application.
+Be concise and helpful. When discussing chemistry concepts, be accurate and educational."""
+        )
 
-        # Track current worker agent
-        current_worker = None
-        supervisor_response_started = False
+        # Convert history to Gemini format
+        gemini_history = _convert_history_to_gemini_format(history)
+        logger.debug(f"Converted {len(history)} history messages to Gemini format")
 
-        # Stream graph execution with messages mode to get actual text chunks
-        logger.debug("Starting LangGraph Supervisor stream with messages mode and subgraphs enabled")
-        for chunk in graph_app.stream(
-            graph_input,
-            stream_mode="messages",
-            subgraphs=True  # Enable subgraph (worker) updates
-        ):
-            # Debug: Log chunk structure
-            logger.debug(f"Received chunk: type={type(chunk).__name__}, is_tuple={isinstance(chunk, tuple)}")
-            if hasattr(chunk, '__dict__'):
-                logger.debug(f"Chunk attributes: {list(chunk.__dict__.keys())[:10]}")  # First 10 attributes
+        # Start chat with history
+        chat = model.start_chat(history=gemini_history)
 
-            # stream_mode="messages" returns message objects (or tuples with messages)
-            # Extract the message from the chunk
-            if isinstance(chunk, tuple):
-                # Tuple format: (message, metadata) or (namespace, message)
-                if len(chunk) == 2:
-                    # Try to identify which is the message
-                    if hasattr(chunk[0], 'content'):
-                        message = chunk[0]
-                        metadata = chunk[1]
-                    elif hasattr(chunk[1], 'content'):
-                        message = chunk[1]
-                        metadata = chunk[0]
-                    else:
-                        # Neither seems to be a message, skip
-                        logger.debug(f"Skipping tuple chunk without message: {chunk}")
-                        continue
-                else:
-                    logger.debug(f"Skipping unexpected tuple format: {chunk}")
-                    continue
-            else:
-                # Direct message object
-                message = chunk
-                metadata = {}
+        # Send agent status
+        yield _format_sse_event("agent_status", {
+            "status": "responding",
+            "agent": "chat"
+        })
 
-            logger.debug(f"Extracted message: type={type(message).__name__}, has_content={hasattr(message, 'content')}")
+        # Stream response
+        response = chat.send_message(message, stream=True)
 
-            # Check if this is an AIMessage with content
-            # Handle both message.type attribute and __class__.__name__
-            message_type = getattr(message, 'type', None) or type(message).__name__.lower()
-            is_ai_message = message_type in ['ai', 'aimessage', 'aimessagechunk']
-
-            if is_ai_message:
-                # Track which agent is responding
-                agent_name = getattr(message, 'name', 'supervisor')
-                logger.debug(f"AI message from agent: {agent_name}")
-
-                # Detect worker transitions
-                if agent_name != current_worker:
-                    if current_worker:
-                        # Previous worker completed
-                        logger.info(f"Worker agent '{current_worker}' completed execution")
-                        yield _format_sse_event("agent_status", {
-                            "status": "completed",
-                            "agent": current_worker
-                        })
-
-                    if agent_name != 'supervisor' and agent_name:
-                        # New worker started
-                        logger.info(f"Worker agent '{agent_name}' started execution")
-                        current_worker = agent_name
-                        yield _format_sse_event("agent_status", {
-                            "status": "running",
-                            "agent": agent_name
-                        })
-
-                # Check for tool calls (for debugging)
-                if hasattr(message, 'tool_calls') and message.tool_calls:
-                    for tool_call in message.tool_calls:
-                        tool_name = tool_call.get('name', 'unknown') if isinstance(tool_call, dict) else getattr(tool_call, 'name', 'unknown')
-                        logger.info(f"Tool call detected from {agent_name}: {tool_name}")
-
-                # Stream content if available
-                if hasattr(message, 'content') and message.content:
-                    content = message.content
-
-                    # Filter internal transfer messages
-                    if _is_internal_transfer_message(content):
-                        logger.debug(f"Filtering internal transfer message: {content[:100]}")
-                        continue
-
-                    # Notify supervisor is responding
-                    if not supervisor_response_started and agent_name == 'supervisor':
-                        logger.info("Supervisor started generating response")
-                        yield _format_sse_event("agent_status", {
-                            "status": "responding",
-                            "agent": "supervisor"
-                        })
-                        supervisor_response_started = True
-
-                    # Normalize and stream content
-                    normalized_content = _normalize_markdown_codeblocks(content)
-                    logger.info(f"Streaming response from {agent_name}, length: {len(normalized_content)}, preview: {normalized_content[:200]}...")
-
-                    # Accumulate for database
-                    accumulated_response.append(normalized_content)
-
-                    # Stream to client
-                    yield _format_sse_event("chunk", {"text": normalized_content})
+        for chunk in response:
+            if chunk.text:
+                accumulated_response.append(chunk.text)
+                yield _format_sse_event("chunk", {"text": chunk.text})
 
         logger.debug("Stream completed successfully")
 
         # Save AI response to database BEFORE sending completion event
-        # This ensures database write completes before frontend invalidates cache
         if session_id and accumulated_response:
             try:
                 complete_response = ''.join(accumulated_response)
@@ -360,41 +176,32 @@ def _create_supervisor_stream(message: str, history: list, session_id: str = Non
                 logger.info(f"Saved AI response to session: {session_id} (length: {len(complete_response)} chars)")
             except Exception as e:
                 logger.error(f"Failed to save AI response to session {session_id}: {e}", exc_info=True)
-                # Don't fail the stream due to DB error, continue with completion event
 
-        # Send completion event AFTER database write completes
-        # This ensures 'done' is sent when the stream completes normally and DB is updated
-        logger.debug("Sending stream completion event")
+        # Send completion event
         yield _format_sse_event("done")
 
     except GeneratorExit:
         # Client disconnected - clean up gracefully
         logger.info("Client disconnected from SSE stream (GeneratorExit)")
-        # Don't yield anything here - the connection is already closed
-        # Yielding after GeneratorExit causes RuntimeError
-        raise  # Re-raise to properly close the generator
+        raise
 
     except Exception as e:
-        logger.error(f"Error during LangGraph Supervisor streaming: {e}", exc_info=True)
-        # Add error message to accumulated response
-        error_msg = f"\n\n[Error: {str(e)}]"
-        accumulated_response.append(error_msg)
+        logger.error(f"Error during Gemini chat streaming: {e}", exc_info=True)
+        accumulated_response.append(f"\n\n[Error: {str(e)}]")
 
         try:
             yield _format_sse_event("error", {"message": f"An error occurred during the stream: {str(e)}"})
         except (BrokenPipeError, ConnectionResetError, GeneratorExit):
-            # Connection already closed, can't send error message
             logger.debug("Unable to send error message - connection closed")
 
     finally:
         # Fallback: Save AI response to database if not already saved
-        # This runs only if an error occurred before the normal save point
         if session_id and accumulated_response and not db_save_successful:
             try:
                 complete_response = ''.join(accumulated_response)
                 chat_service = get_chat_history_service()
                 chat_service.add_message(session_id, "model", complete_response)
-                logger.warning(f"Fallback save: AI response saved to session {session_id} after error (length: {len(complete_response)} chars)")
+                logger.warning(f"Fallback save: AI response saved to session {session_id} after error")
             except Exception as e:
                 logger.error(f"Fallback save failed for session {session_id}: {e}", exc_info=True)
 
@@ -406,7 +213,7 @@ agent_bp = Blueprint('agent', __name__)
 @agent_bp.route('/api/agent/chat', methods=['POST'])
 @validate()
 def chat_with_agent(body: AgentChatRequest):
-    """Chat with AI agent using multi-agent supervisor architecture with Server-Sent Events."""
+    """Chat with AI agent using simple Gemini API with Server-Sent Events."""
     try:
         # Input validation
         if not body.message or not body.message.strip():
@@ -416,12 +223,11 @@ def chat_with_agent(body: AgentChatRequest):
             raise ValueError(f"Message is too long (maximum {MAX_MESSAGE_LENGTH} characters)")
 
         session_id = body.session_id if hasattr(body, 'session_id') else None
-        logger.info(f"Processing agent chat request - Message length: {len(body.message)}, History entries: {len(body.history or [])}, Session ID: {session_id}")
-        logger.debug(f"Message preview: {body.message[:100]}{'...' if len(body.message) > 100 else ''}")
+        logger.info(f"Processing chat request - Message length: {len(body.message)}, History entries: {len(body.history or [])}, Session ID: {session_id}")
 
-        # Use LangGraph Supervisor multi-agent system
+        # Use simple Gemini chat
         return Response(
-            stream_with_context(_create_supervisor_stream(body.message, body.history or [], session_id)),
+            stream_with_context(_create_simple_chat_stream(body.message, body.history or [], session_id)),
             content_type='text/event-stream'
         )
 
@@ -436,60 +242,5 @@ def chat_with_agent(body: AgentChatRequest):
         logger.error(f"Unexpected error in agent chat endpoint: {e}", exc_info=True)
         return jsonify({
             'success': False,
-            'error': 'An internal server error occurred in the agent. Please contact support if this persists.'
-        }), 500
-
-
-@agent_bp.route('/api/agent/execute-confirmed-action', methods=['POST'])
-@validate()
-def execute_confirmed_action(body: ExecuteConfirmedActionRequest):
-    """Execute a confirmed destructive action requested by AI agent."""
-    try:
-        logger.info(f"Processing confirmed action execution - Action type: {body.action_type}")
-
-        # Handle different action types
-        if body.action_type == AgentActionType.delete_calculation:
-            # Validate that calculation_id is provided
-            if not body.calculation_id:
-                raise ValueError("calculation_id is required for delete_calculation action")
-
-            logger.info(f"Executing confirmed deletion for calculation: {body.calculation_id}")
-
-            # Execute the confirmed deletion using the internal function
-            result = _execute_confirmed_deletion(body.calculation_id)
-
-            if result['success']:
-                logger.info(f"Deletion successful: {result['message']}")
-                return jsonify({
-                    'success': True,
-                    'data': {
-                        'message': result['message'],
-                        'action_type': 'delete_calculation',
-                        'calculation_id': result['calculation_id']
-                    }
-                }), 200
-            else:
-                logger.warning(f"Deletion failed: {result['message']}")
-                return jsonify({
-                    'success': False,
-                    'error': result['message']
-                }), 400
-
-        else:
-            # Unknown action type
-            logger.warning(f"Unknown action type requested: {body.action_type}")
-            raise ValueError(f"Unknown action type: {body.action_type}")
-
-    except ValueError as e:
-        logger.warning(f"Validation error in execute confirmed action: {e}")
-        return jsonify({
-            'success': False,
-            'error': f'Invalid input: {str(e)}'
-        }), 400
-
-    except Exception as e:
-        logger.error(f"Unexpected error in execute confirmed action endpoint: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred while executing the action. Please contact support if this persists.'
+            'error': 'An internal server error occurred. Please check your API key settings.'
         }), 500

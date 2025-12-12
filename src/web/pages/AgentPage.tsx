@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { streamChatWithAgent, executeConfirmedAgentAction } from '../apiClient';
+import { streamChatWithAgent } from '../apiClient';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAgentStore, ChatHistory, AgentStatus } from '../store/agentStore';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
@@ -13,15 +13,6 @@ import {
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { ChatMessage } from '../components/ChatMessage';
 import styles from './AgentPage.module.css';
-
-// 確認リクエストの型定義
-type ConfirmationRequest = {
-  requires_confirmation: boolean;
-  action: string;
-  calculation_id: string;
-  calculation_name: string;
-  message: string;
-};
 
 export const AgentPage = React.memo(() => {
   // Zustandストアから会話履歴とエージェントステータスを取得
@@ -71,163 +62,9 @@ export const AgentPage = React.memo(() => {
   // 前回のセッションIDを追跡（競合状態を回避）
   const prevSessionIdRef = useRef<string | null>(null);
 
-  // Confirmation modal state
-  const [confirmationRequest, setConfirmationRequest] =
-    useState<ConfirmationRequest | null>(null);
-  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
-  const [isExecutingAction, setIsExecutingAction] = useState(false);
-
   // New chat confirmation modal state
   const [isNewChatConfirmationOpen, setIsNewChatConfirmationOpen] =
     useState(false);
-
-  // Parse confirmation request from AI message
-  const parseConfirmationRequest = useCallback(
-    (text: string): ConfirmationRequest | null => {
-      try {
-        // Try to extract JSON from markdown code blocks first (```json ... ```)
-        const jsonBlockRegex = /```json\s*(\{[\s\S]*?\})\s*```/;
-        const jsonBlockMatch = text.match(jsonBlockRegex);
-        if (jsonBlockMatch?.[1]) {
-          const parsed = JSON.parse(jsonBlockMatch[1]);
-          if (
-            parsed.requires_confirmation === true &&
-            parsed.action &&
-            parsed.calculation_id
-          ) {
-            return parsed as ConfirmationRequest;
-          }
-        }
-
-        // Try to extract plain JSON object (more robust pattern)
-        // This pattern finds JSON objects that contain "requires_confirmation": true
-        // and handles multi-line structures with nested content
-        const jsonPatternRegex =
-          /\{[^{}]*"requires_confirmation"\s*:\s*true[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
-        const matches = text.match(jsonPatternRegex);
-
-        if (matches) {
-          // Try to parse each match
-          for (const match of matches) {
-            try {
-              const parsed = JSON.parse(match);
-              if (
-                parsed.requires_confirmation === true &&
-                parsed.action &&
-                parsed.calculation_id
-              ) {
-                return parsed as ConfirmationRequest;
-              }
-            } catch (parseError) {
-              continue;
-            }
-          }
-        }
-
-        // Try to find JSON object with a more lenient approach
-        // Find all { ... } blocks and try to parse them
-        const allJsonRegex = /\{(?:[^{}]|\{[^{}]*\})*\}/g;
-        const allMatches = text.match(allJsonRegex);
-
-        if (allMatches) {
-          for (const match of allMatches) {
-            try {
-              const parsed = JSON.parse(match);
-              if (
-                parsed.requires_confirmation === true &&
-                parsed.action &&
-                parsed.calculation_id
-              ) {
-                return parsed as ConfirmationRequest;
-              }
-            } catch (parseError) {
-              // Silently skip invalid JSON
-              continue;
-            }
-          }
-        }
-
-        return null;
-      } catch (e) {
-        console.error(
-          '[ConfirmationParser] Error parsing confirmation request:',
-          e
-        );
-        return null;
-      }
-    },
-    []
-  );
-
-  // Handle confirmation modal confirm action
-  const handleConfirmAction = useCallback(async () => {
-    if (!confirmationRequest) return;
-
-    setIsExecutingAction(true);
-    try {
-      const result = await executeConfirmedAgentAction(
-        confirmationRequest.action as 'delete_calculation',
-        confirmationRequest.calculation_id
-      );
-
-      // Close modal
-      setIsConfirmationModalOpen(false);
-      setConfirmationRequest(null);
-
-      // Show success notification
-      addNotification({
-        type: 'success',
-        title: 'Action Completed',
-        message: result.message || 'The action was completed successfully.',
-        autoClose: true,
-        duration: 5000,
-      });
-
-      // Add AI response to history
-      const successMessage: ChatHistory = {
-        role: 'model',
-        parts: [
-          { text: `✅ ${result.message || 'Action completed successfully.'}` },
-        ],
-      };
-      addMessage(successMessage);
-    } catch (err: any) {
-      // Show error notification
-      addNotification({
-        type: 'error',
-        title: 'Action Failed',
-        message: err.message || 'Failed to execute the action.',
-        autoClose: false,
-        duration: 0,
-      });
-
-      // Add error message to history
-      const errorMessage: ChatHistory = {
-        role: 'model',
-        parts: [
-          {
-            text: `❌ Failed to execute action: ${err.message || 'Unknown error'}`,
-          },
-        ],
-      };
-      addMessage(errorMessage);
-    } finally {
-      setIsExecutingAction(false);
-    }
-  }, [confirmationRequest, addNotification]);
-
-  // Handle confirmation modal cancel action
-  const handleCancelAction = useCallback(() => {
-    setIsConfirmationModalOpen(false);
-    setConfirmationRequest(null);
-
-    // Add cancellation message to history
-    const cancelMessage: ChatHistory = {
-      role: 'model',
-      parts: [{ text: '❌ Action cancelled by user.' }],
-    };
-    addMessage(cancelMessage);
-  }, [addMessage]);
 
   // Load session detail when activeSessionId changes
   // This effect handles three scenarios:
@@ -579,15 +416,6 @@ export const AgentPage = React.memo(() => {
             updateMessage(lastIndex, {
               isStreaming: false,
             });
-
-            // Check for confirmation request in the final message
-            const messageText = lastMessage.parts[0]?.text || '';
-            const confirmation = parseConfirmationRequest(messageText);
-            if (confirmation) {
-              // Show confirmation modal
-              setConfirmationRequest(confirmation);
-              setIsConfirmationModalOpen(true);
-            }
           }
 
           // AI応答がデータベースに保存された後、セッション詳細とセッション一覧のキャッシュを無効化
@@ -649,7 +477,6 @@ export const AgentPage = React.memo(() => {
     createChatSession,
     activeSessionId,
     setActiveSessionId,
-    parseConfirmationRequest,
   ]);
 
   // Enterで送信（Shift+Enterで改行）
@@ -804,12 +631,7 @@ export const AgentPage = React.memo(() => {
 
   // エージェント表示名を取得
   const getAgentDisplayName = (agent: string) => {
-    const names: Record<string, string> = {
-      supervisor: 'Supervisor',
-      quantum_calculation_worker: 'Quantum Calculation Worker',
-      research_expert: 'Research Expert',
-    };
-    return names[agent] || agent;
+    return 'AI Assistant';
   };
 
   return (
@@ -945,18 +767,10 @@ export const AgentPage = React.memo(() => {
         )}
       </div>
 
-      {/* エージェントステータス表示 */}
+      {/* AIステータス表示 */}
       {currentAgentStatus.agent && currentAgentStatus.status !== 'idle' && (
         <div className={styles.agentStatusBar}>
           <div className={styles.statusIndicator}>
-            {currentAgentStatus.status === 'running' && (
-              <>
-                <div className={styles.spinner} />
-                <span>
-                  {getAgentDisplayName(currentAgentStatus.agent)}が動作中...
-                </span>
-              </>
-            )}
             {currentAgentStatus.status === 'responding' && (
               <>
                 <div className={styles.typingDots}>
@@ -964,7 +778,7 @@ export const AgentPage = React.memo(() => {
                   <div className={styles.typingDot}></div>
                   <div className={styles.typingDot}></div>
                 </div>
-                <span>Supervisorが応答を生成中...</span>
+                <span>AI Assistantが応答を生成中...</span>
               </>
             )}
           </div>
@@ -1026,20 +840,6 @@ export const AgentPage = React.memo(() => {
           )}
         </button>
       </div>
-
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={isConfirmationModalOpen}
-        title="Confirm Destructive Action"
-        message={
-          confirmationRequest?.message || 'Are you sure you want to proceed?'
-        }
-        confirmButtonText="Confirm"
-        cancelButtonText="Cancel"
-        onConfirm={handleConfirmAction}
-        onCancel={handleCancelAction}
-        isLoading={isExecutingAction}
-      />
 
       {/* New Chat Confirmation Modal */}
       <ConfirmationModal

@@ -43,11 +43,6 @@ export type StartCalculationResponse = StartCalculationResponseData;
 
 // Agent API types
 type AgentChatRequest = components['schemas']['AgentChatRequest'];
-type AgentChatResponse = components['schemas']['AgentChatResponse'];
-type ExecuteConfirmedActionRequest =
-  components['schemas']['ExecuteConfirmedActionRequest'];
-type ExecuteConfirmedActionResponse =
-  components['schemas']['ExecuteConfirmedActionResponse'];
 
 // Chat History API types
 type ChatSessionSummary = components['schemas']['ChatSessionSummary'];
@@ -483,20 +478,7 @@ export const getSystemResourceStatus = (): Promise<SystemResourceResponse> => {
 };
 
 /**
- * Chat with AI agent for molecular analysis and assistance
- */
-export const chatWithAgent = (
-  message: string,
-  history: AgentChatRequest['history']
-): Promise<AgentChatResponse['data']> => {
-  return request<AgentChatResponse['data']>('/api/agent/chat', {
-    method: 'POST',
-    body: JSON.stringify({ message, history }),
-  });
-};
-
-/**
- * Stream chat with AI agent for molecular analysis and assistance using Server-Sent Events
+ * Stream chat with AI agent using Server-Sent Events
  */
 export const streamChatWithAgent = (
   message: string,
@@ -624,38 +606,6 @@ export const streamChatWithAgent = (
   })();
 
   return () => ctrl.abort(); // Return a function to abort the stream
-};
-
-/**
- * Execute a confirmed destructive action requested by the AI agent
- */
-export const executeConfirmedAgentAction = (
-  actionType: ExecuteConfirmedActionRequest['action_type'],
-  calculationId: string
-): Promise<ExecuteConfirmedActionResponse['data']> => {
-  if (!calculationId || calculationId.trim() === '') {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        '/api/agent/execute-confirmed-action',
-        null,
-        false
-      )
-    );
-  }
-
-  return request<ExecuteConfirmedActionResponse['data']>(
-    '/api/agent/execute-confirmed-action',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        action_type: actionType,
-        calculation_id: calculationId,
-      }),
-    }
-  );
 };
 
 // --- Chat History API Functions ---

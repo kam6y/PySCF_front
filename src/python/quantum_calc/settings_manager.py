@@ -56,7 +56,6 @@ class SettingsManager:
             calculations_directory=default_calc_dir,
             timezone="UTC",
             gemini_api_key=None,
-            tavily_api_key=None,
             research_email="pyscf-research-agent@example.com"
         )
     

@@ -402,12 +402,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Chat with AI agent
-         * @description Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+         * Chat with AI assistant
+         * @description Send a message to the AI assistant and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
          *
          *     SSE Event Types:
          *     - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
-         *     - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+         *     - `agent_status`: AI status update - `{"type": "agent_status", "payload": {"status": "responding", "agent": "chat"}}`
          *     - `done`: Stream completion - `{"type": "done"}`
          *     - `error`: Error occurred - `{"type": "error", "payload": {"message": "..."}}`
          *
@@ -443,11 +443,6 @@ export interface components {
          * @enum {string}
          */
         CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting" | "pausing" | "paused";
-        /**
-         * @description Type of agent action requiring confirmation
-         * @enum {string}
-         */
-        AgentActionType: "delete_calculation";
         PubChemSearchRequest: {
             /** @description Search query for PubChem */
             query: string;
@@ -1358,11 +1353,6 @@ export interface components {
              */
             gemini_api_key?: string | null;
             /**
-             * @description Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
-             * @example null
-             */
-            tavily_api_key?: string | null;
-            /**
              * @description Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
              * @example pyscf-research-agent@example.com
              */
@@ -1936,22 +1926,6 @@ export interface components {
             data: {
                 /** @description Response message from the AI agent */
                 reply: string;
-            };
-        };
-        ExecuteConfirmedActionRequest: {
-            action_type: components["schemas"]["AgentActionType"];
-            /** @description ID of the calculation to perform the action on */
-            calculation_id: string;
-        };
-        ExecuteConfirmedActionResponse: {
-            /** @example true */
-            success: boolean;
-            data: {
-                /** @description Result message */
-                message: string;
-                action_type?: components["schemas"]["AgentActionType"];
-                /** @description ID of the affected calculation */
-                calculation_id?: string;
             };
         };
         ChatMessage: {
@@ -3160,7 +3134,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Server error during agent processing */
+            /** @description Server error during AI processing */
             500: {
                 headers: {
                     [name: string]: unknown;

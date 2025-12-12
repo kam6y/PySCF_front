@@ -128,7 +128,6 @@ export const CalculationResultsPage = ({
     }
   }, [processedData]);
 
-
   // Show loading state
   if (isLoadingDetails) {
     return (

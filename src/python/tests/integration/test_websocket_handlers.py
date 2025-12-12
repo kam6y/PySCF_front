@@ -34,7 +34,6 @@ class TestJoinCalculationWebSocket:
             calculations_directory=app.config['CALCULATIONS_DIR'],  # Use test directory
             timezone=Timezone.UTC,
             gemini_api_key=None,
-            tavily_api_key=None,
             research_email=None
         )
         mocker.patch('quantum_calc.get_current_settings', return_value=mock_settings)

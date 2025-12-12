@@ -938,17 +938,17 @@ paths:
 
   /api/agent/chat:
     post:
-      summary: Chat with AI agent
+      summary: Chat with AI assistant
       description: >
-        Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE).
-        The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+        Send a message to the AI assistant and receive a streaming response using Server-Sent Events (SSE).
+        The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
 
 
         SSE Event Types:
 
         - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
 
-        - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+        - `agent_status`: AI status update - `{"type": "agent_status", "payload": {"status": "responding", "agent": "chat"}}`
 
         - `done`: Stream completion - `{"type": "done"}`
 
@@ -972,13 +972,9 @@ paths:
                 type: string
                 description: >
                   Server-Sent Events stream where each event contains JSON data.
-                  Event types include 'chunk' (text data), 'agent_status' (agent execution status), 'error' (error message), and 'done' (stream completion).
+                  Event types include 'chunk' (text data), 'agent_status' (AI status), 'error' (error message), and 'done' (stream completion).
                 example: |
-                  data: {"type": "agent_status", "payload": {"status": "running", "agent": "research_expert"}}
-
-                  data: {"type": "agent_status", "payload": {"status": "completed", "agent": "research_expert"}}
-
-                  data: {"type": "agent_status", "payload": {"status": "responding", "agent": "supervisor"}}
+                  data: {"type": "agent_status", "payload": {"status": "responding", "agent": "chat"}}
 
                   data: {"type": "chunk", "payload": {"text": "Hello, "}}
 
@@ -994,7 +990,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Server error during agent processing
+          description: Server error during AI processing
           content:
             application/json:
               schema:
@@ -1023,10 +1019,6 @@ components:
       enum: [pending, running, completed, error, waiting, pausing, paused]
       description: Status of a calculation
 
-    AgentActionType:
-      type: string
-      enum: [delete_calculation]
-      description: Type of agent action requiring confirmation
 
     # Request Models
     PubChemSearchRequest:
@@ -2495,11 +2487,6 @@ components:
           nullable: true
           description: Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
           example: null
-        tavily_api_key:
-          type: string
-          nullable: true
-          description: Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
-          example: null
         research_email:
           type: string
           nullable: true
@@ -3181,35 +3168,6 @@ components:
               type: string
               description: Response message from the AI agent
 
-    ExecuteConfirmedActionRequest:
-      type: object
-      required: [action_type, calculation_id]
-      properties:
-        action_type:
-          $ref: '#/components/schemas/AgentActionType'
-        calculation_id:
-          type: string
-          description: ID of the calculation to perform the action on
-
-    ExecuteConfirmedActionResponse:
-      type: object
-      required: [success, data]
-      properties:
-        success:
-          type: boolean
-          example: true
-        data:
-          type: object
-          required: [message]
-          properties:
-            message:
-              type: string
-              description: Result message
-            action_type:
-              $ref: '#/components/schemas/AgentActionType'
-            calculation_id:
-              type: string
-              description: ID of the affected calculation
 
     # Chat History Schemas
     ChatMessage:
