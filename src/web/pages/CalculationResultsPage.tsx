@@ -128,22 +128,6 @@ export const CalculationResultsPage = ({
     }
   }, [processedData]);
 
-  // Helper function to determine structure section description
-  const getStructureDescription = useCallback((): string => {
-    if (!processedData) return '';
-
-    const { parameters } = processedData;
-
-    switch (parameters.calculation_method) {
-      case 'HF':
-        return 'Geometry optimized using Hartree-Fock method';
-      case 'MP2':
-        return 'Geometry optimized using MP2 method';
-      case 'DFT':
-      default:
-        return 'Geometry optimized using DFT method';
-    }
-  }, [processedData]);
 
   // Show loading state
   if (isLoadingDetails) {
@@ -488,10 +472,6 @@ export const CalculationResultsPage = ({
             <div className={styles.structureContentWrapper}>
               {/* Left Column: Description, Molecular Info, and XYZ Coordinates */}
               <div className={styles.structureLeftColumn}>
-                <div className={styles.sectionDescription}>
-                  {getStructureDescription()}
-                </div>
-
                 {/* Frequency Quality Indicators */}
                 {results.frequency_analysis_performed &&
                   results.imaginary_frequencies_count != null &&
