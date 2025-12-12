@@ -362,8 +362,8 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 
 3.  **自動環境構築スクリプトを実行:**
     このコマンドは、conda環境の作成と必要なPythonパッケージのインストールを自動で行います。
-    ```bashnpm run setup-env
-    
+    ```bash
+    npm run setup-env
     ```
 
 4.  **環境を検証 (推奨):**
