@@ -71,7 +71,7 @@ info:
     
     See the `/api/quantum/supported-parameters` endpoint for runtime parameter constraints and method defaults.
     
-  version: 0.4.0
+  version: 0.1.6-beta
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
