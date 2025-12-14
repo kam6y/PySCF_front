@@ -227,6 +227,12 @@ class TestCalculationWorkflowSync:
         assert final_status in ['completed', 'error'], \
             f"Calculation did not complete within {max_wait}s. Final status: {final_status}"
 
+        # CRITICAL FIX: Mock is_running to return False after completion
+        # This ensures the process manager recognizes the calculation is no longer running
+        from quantum_calc.process_manager import get_process_manager
+        pm = get_process_manager()
+        mocker.patch.object(pm, 'is_running', return_value=False)
+
         # ACT
         response_delete = client.delete(f'/api/quantum/calculations/{calc_id}')
 

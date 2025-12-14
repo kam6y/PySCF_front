@@ -103,23 +103,28 @@ class TestAgentChatAPI:
         mock_settings_service.return_value.get_settings.return_value = {
             'gemini_api_key': 'test-api-key'
         }
-        
-        # Mock Gemini model
-        mock_genai = mocker.patch('api.agent.genai')
+
+        # Mock Gemini model by injecting into sys.modules
+        # This ensures the import statement inside _create_simple_chat_stream gets the mock
+        mock_genai = mocker.MagicMock()
         mock_model = mocker.MagicMock()
         mock_chat = mocker.MagicMock()
         mock_response = mocker.MagicMock()
-        
+
         # Configure mock response chunks
         mock_chunk1 = mocker.MagicMock()
         mock_chunk1.text = "Hello"
         mock_chunk2 = mocker.MagicMock()
         mock_chunk2.text = " World"
         mock_response.__iter__ = lambda self: iter([mock_chunk1, mock_chunk2])
-        
+
         mock_chat.send_message.return_value = mock_response
         mock_model.start_chat.return_value = mock_chat
         mock_genai.GenerativeModel.return_value = mock_model
+        mock_genai.configure = mocker.MagicMock()  # Mock the configure function
+
+        # Inject mock into sys.modules so import statement gets the mock
+        mocker.patch.dict('sys.modules', {'google.generativeai': mock_genai})
 
         # ACT
         response = client.post('/api/agent/chat', json={
