@@ -483,7 +483,7 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         // Zoom behavior with translation limits
         const zoom = d3
           .zoom<SVGSVGElement, unknown>()
-          .scaleExtent([1, 100])
+          .scaleExtent([1, 200])
           .translateExtent([
             [0, 0],
             [DIAGRAM_CONFIG.width, DIAGRAM_CONFIG.height],
