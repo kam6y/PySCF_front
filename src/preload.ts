@@ -2,19 +2,44 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
+// URLパラメータからポート番号を取得
+const urlParams = new URLSearchParams(window.location.search);
+const flaskPortParam = urlParams.get('flask_port');
+const flaskPort = flaskPortParam ? parseInt(flaskPortParam, 10) : null;
+
+// 認証トークンはIPC経由で受信（セキュリティのためURLパラメータを使用しない）
+// Promise化: トークンが届くまで待機
+let authTokenResolve: ((value: string | null) => void) | null = null;
+const authTokenPromise = new Promise<string | null>(resolve => {
+  authTokenResolve = resolve;
+});
+
+// メインプロセスから認証トークンを受信
+ipcRenderer.once('auth-token', (_event, token: string) => {
+  console.log('[Preload] Auth token received via IPC');
+  // Promiseを解決して待機中の処理を再開
+  if (authTokenResolve) {
+    authTokenResolve(token);
+  }
+});
+
+console.log(`[Preload] Flask port from URL: ${flaskPort}`);
+
+// 検証: ポート番号が有効な範囲かチェック
+const isValidPort = flaskPort && flaskPort > 0 && flaskPort < 65536;
+if (!isValidPort) {
+  console.error(`[Preload] Invalid Flask port: ${flaskPort}`);
+}
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  // We can also expose variables, not just functions
-  onSetFlaskPort: (callback: (port: number) => void) => {
-    const handler = (_event: any, port: number) => callback(port);
-    ipcRenderer.on('set-flask-port', handler);
-    // Return a cleanup function
-    return () => {
-      ipcRenderer.removeListener('set-flask-port', handler);
-    };
-  },
-  getFlaskPort: () => ipcRenderer.invoke('get-flask-port'),
+  // URLパラメータから取得したポート番号を公開
+  flaskPort: isValidPort ? flaskPort : null,
+  // 認証トークンを非同期で取得（トークンが届くまで待機）
+  getAuthToken: () => authTokenPromise,
+
+  // Electron API methods
   openExternalUrl: (url: string) =>
     ipcRenderer.invoke('open-external-url', url),
   showAboutDialog: () => ipcRenderer.invoke('show-about-dialog'),

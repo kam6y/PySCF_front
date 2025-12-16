@@ -68,7 +68,54 @@ class CCSDCalculator(BaseCalculator):
         return 'CCSD(T)' if self.calculate_ccsd_t else 'CCSD'
     
     # ===== Template Method Pattern Implementation =====
-    
+
+    def _extract_ccsd_diagnostics(self) -> Dict[str, Any]:
+        """
+        Extract CCSD diagnostic indicators.
+
+        T1 diagnostic: Indicates the reliability of single-reference methods
+                      T1 > 0.02 suggests multi-reference character
+        D1 diagnostic: Alternative diagnostic based on density matrix
+        D2 diagnostic: Diagnostic based on T2 amplitudes
+        """
+        diagnostics = {}
+
+        if not hasattr(self, 'ccsd') or self.ccsd is None:
+            logger.warning("CCSD object not available for diagnostics extraction")
+            return diagnostics
+
+        try:
+            # T1 diagnostic - most important indicator
+            if hasattr(self.ccsd, 'get_t1_diagnostic') and callable(self.ccsd.get_t1_diagnostic):
+                t1_diag = self.ccsd.get_t1_diagnostic()
+                diagnostics['ccsd_t1_diagnostic'] = float(t1_diag)
+                logger.info(f"CCSD T1 diagnostic: {diagnostics['ccsd_t1_diagnostic']:.6f}")
+
+                # Interpret T1 diagnostic
+                if t1_diag > 0.02:
+                    logger.warning(f"T1 diagnostic ({t1_diag:.6f}) > 0.02: Multi-reference character detected - single-reference CCSD may be unreliable")
+                else:
+                    logger.info(f"T1 diagnostic ({t1_diag:.6f}) <= 0.02: Single-reference CCSD is appropriate")
+
+            # D1 diagnostic
+            if hasattr(self.ccsd, 'get_d1_diagnostic') and callable(self.ccsd.get_d1_diagnostic):
+                d1_diag = self.ccsd.get_d1_diagnostic()
+                diagnostics['ccsd_d1_diagnostic'] = float(d1_diag)
+                logger.info(f"CCSD D1 diagnostic: {diagnostics['ccsd_d1_diagnostic']:.6f}")
+
+            # D2 diagnostic
+            if hasattr(self.ccsd, 'get_d2_diagnostic') and callable(self.ccsd.get_d2_diagnostic):
+                d2_diag = self.ccsd.get_d2_diagnostic()
+                diagnostics['ccsd_d2_diagnostic'] = float(d2_diag)
+                logger.info(f"CCSD D2 diagnostic: {diagnostics['ccsd_d2_diagnostic']:.6f}")
+
+            logger.info("CCSD diagnostics extraction completed")
+
+        except Exception as e:
+            logger.warning(f"Failed to extract CCSD diagnostics: {e}")
+
+        return diagnostics
+
     def _perform_specific_calculation(self, base_energy: float) -> Dict[str, Any]:
         """Perform CCSD-specific calculation after HF."""
         # 安全にベースHFエネルギーを変換
@@ -78,55 +125,55 @@ class CCSDCalculator(BaseCalculator):
             hf_energy_float = float(base_energy)
         except (ValueError, TypeError) as e:
             raise CalculationError(f"Failed to convert HF energy to float: {e}")
-        
+
         logger.info(f"HF energy: {hf_energy_float} Hartree")
-        
+
         # CCSD calculation
         logger.info("Starting CCSD calculation...")
-        
+
         # Create CCSD object based on HF reference
         self.ccsd = cc.CCSD(self.mf)
-        
+
         # Apply frozen core if requested
         if getattr(self, 'frozen_core', True):
             # Automatically set frozen core orbitals
             self.ccsd.set_frozen()
             logger.info("Using frozen core approximation")
-        
+
         # Run CCSD calculation
         ccsd_energy, t1, t2 = self.ccsd.kernel()
-        
+
         # Check CCSD convergence
         if not self.ccsd.converged:
             raise ConvergenceError("CCSD calculation failed to converge")
-        
+
         # Get CCSD results
         ccsd_corr_energy = self.ccsd.e_corr
         ccsd_total_energy = self.ccsd.e_tot
-        
+
         logger.info("CCSD calculation completed successfully.")
         logger.info(f"CCSD correlation energy: {ccsd_corr_energy} Hartree")
         logger.info(f"CCSD total energy: {ccsd_total_energy} Hartree")
-        
+
         # CCSD(T) calculation if requested
         ccsd_t_correction = 0.0
         ccsd_t_total_energy = ccsd_total_energy
-        
+
         if self.calculate_ccsd_t:
             logger.info("Starting CCSD(T) perturbative triples correction...")
             ccsd_t_correction = self.ccsd.ccsd_t()
             ccsd_t_total_energy = ccsd_total_energy + ccsd_t_correction
-            
+
             logger.info("CCSD(T) calculation completed successfully.")
             logger.info(f"CCSD(T) triples correction: {ccsd_t_correction} Hartree")
             logger.info(f"CCSD(T) total energy: {ccsd_t_total_energy} Hartree")
-        
+
         # 安全にCCSDエネルギーを変換
         if ccsd_corr_energy is None:
             raise CalculationError("CCSD correlation energy is None - calculation may have failed")
         if ccsd_total_energy is None:
             raise CalculationError("CCSD total energy is None - calculation may have failed")
-        
+
         try:
             ccsd_corr_energy_float = float(ccsd_corr_energy)
             ccsd_total_energy_float = float(ccsd_total_energy)
@@ -134,21 +181,29 @@ class CCSDCalculator(BaseCalculator):
             ccsd_t_total_energy_float = float(ccsd_t_total_energy)
         except (ValueError, TypeError) as e:
             raise CalculationError(f"Failed to convert CCSD energies to float: {e}")
-        
+
         results = {
             'hf_energy': hf_energy_float,
             'ccsd_correlation_energy': ccsd_corr_energy_float,
             'scf_energy': ccsd_t_total_energy_float if self.calculate_ccsd_t else ccsd_total_energy_float,  # Use CCSD(T) energy if calculated
             'ccsd_total_energy': ccsd_total_energy_float
         }
-        
+
         # Add CCSD(T) specific results if calculated
         if self.calculate_ccsd_t:
             results.update({
                 'ccsd_t_correction': ccsd_t_correction_float,
                 'ccsd_t_total_energy': ccsd_t_total_energy_float
             })
-        
+
+        # Add common additional properties (from base calculator)
+        common_props = self._extract_common_additional_properties()
+        results.update(common_props)
+
+        # Add CCSD diagnostic indicators
+        ccsd_diag = self._extract_ccsd_diagnostics()
+        results.update(ccsd_diag)
+
         return results
     
     def _create_scf_method(self, mol):

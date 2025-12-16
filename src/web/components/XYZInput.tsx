@@ -101,12 +101,12 @@ H   0.000000  -0.763239  -0.477047
           <>
             {validationResult.isValid ? (
               <div className={`${styles.validationMessage} ${styles.valid}`}>
-                ✅ Valid XYZ data - {validationResult.data?.numAtoms} atoms
+                Valid XYZ data - {validationResult.data?.numAtoms} atoms
                 detected
               </div>
             ) : (
               <div className={`${styles.validationMessage} ${styles.invalid}`}>
-                ❌ {validationResult.error}
+                {validationResult.error}
               </div>
             )}
           </>

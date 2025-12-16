@@ -31,7 +31,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     number | undefined
   >(undefined);
   const [geminiApiKey, setGeminiApiKey] = useState<string>('');
-  const [tavilyApiKey, setTavilyApiKey] = useState<string>('');
   const [calculationsDirectory, setCalculationsDirectory] =
     useState<string>('');
   const [timezone, setTimezone] = useState<Timezone>('UTC');
@@ -41,7 +40,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     maxCpuUtilization?: number;
     maxMemoryUtilization?: number;
     geminiApiKey?: string;
-    tavilyApiKey?: string;
     calculationsDirectory?: string;
     timezone?: Timezone;
   }>({});
@@ -72,7 +70,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           ? maxMemoryUtilizationValue
           : DEFAULT_MAX_MEMORY_UTILIZATION,
         geminiApiKey: settings.gemini_api_key || '',
-        tavilyApiKey: settings.tavily_api_key || '',
         calculationsDirectory: settings.calculations_directory || '',
         timezone: settings.timezone || 'UTC',
       };
@@ -85,7 +82,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxCpuUtilization(newValues.maxCpuUtilization);
       setMaxMemoryUtilization(newValues.maxMemoryUtilization);
       setGeminiApiKey(newValues.geminiApiKey);
-      setTavilyApiKey(newValues.tavilyApiKey);
       setCalculationsDirectory(newValues.calculationsDirectory);
       setTimezone(newValues.timezone);
       setOriginalValues(newValues);
@@ -112,7 +108,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         calculations_directory: calculationsDirectory,
         timezone: timezone,
         gemini_api_key: geminiApiKey || null,
-        tavily_api_key: tavilyApiKey || null,
       });
 
       const newValues = {
@@ -120,7 +115,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         maxCpuUtilization,
         maxMemoryUtilization,
         geminiApiKey,
-        tavilyApiKey,
         calculationsDirectory,
         timezone,
       };
@@ -132,7 +126,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setMaxCpuUtilization(originalValues.maxCpuUtilization);
       setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
       setGeminiApiKey(originalValues.geminiApiKey || '');
-      setTavilyApiKey(originalValues.tavilyApiKey || '');
       setCalculationsDirectory(originalValues.calculationsDirectory || '');
       setTimezone(originalValues.timezone || 'UTC');
     }
@@ -143,7 +136,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setMaxCpuUtilization(originalValues.maxCpuUtilization);
     setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
     setGeminiApiKey(originalValues.geminiApiKey || '');
-    setTavilyApiKey(originalValues.tavilyApiKey || '');
     setCalculationsDirectory(originalValues.calculationsDirectory || '');
     setTimezone(originalValues.timezone || 'UTC');
   };
@@ -177,7 +169,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const currentMemory =
       maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
     const currentGeminiApiKey = geminiApiKey;
-    const currentTavilyApiKey = tavilyApiKey;
     const currentCalculationsDirectory = calculationsDirectory;
     const currentTimezone = timezone;
 
@@ -188,7 +179,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const originalMemory =
       originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
     const originalGeminiApiKey = originalValues.geminiApiKey || '';
-    const originalTavilyApiKey = originalValues.tavilyApiKey || '';
     const originalCalculationsDirectory =
       originalValues.calculationsDirectory || '';
     const originalTimezone = originalValues.timezone || 'UTC';
@@ -197,7 +187,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
     const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
     const geminiApiKeyChanged = currentGeminiApiKey !== originalGeminiApiKey;
-    const tavilyApiKeyChanged = currentTavilyApiKey !== originalTavilyApiKey;
     const calculationsDirectoryChanged =
       currentCalculationsDirectory !== originalCalculationsDirectory;
     const timezoneChanged = currentTimezone !== originalTimezone;
@@ -207,7 +196,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       cpuChanged ||
       memoryChanged ||
       geminiApiKeyChanged ||
-      tavilyApiKeyChanged ||
       calculationsDirectoryChanged ||
       timezoneChanged;
 
@@ -219,21 +207,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           currentCpu,
           currentMemory,
           currentGeminiApiKey,
-          currentTavilyApiKey,
         },
         original: {
           originalParallel,
           originalCpu,
           originalMemory,
           originalGeminiApiKey,
-          originalTavilyApiKey,
         },
         changes: {
           parallelChanged,
           cpuChanged,
           memoryChanged,
           geminiApiKeyChanged,
-          tavilyApiKeyChanged,
         },
         hasChanges,
       });
@@ -245,14 +230,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     maxCpuUtilization,
     maxMemoryUtilization,
     geminiApiKey,
-    tavilyApiKey,
     calculationsDirectory,
     timezone,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
     originalValues?.maxMemoryUtilization,
     originalValues?.geminiApiKey,
-    originalValues?.tavilyApiKey,
     originalValues?.calculationsDirectory,
     originalValues?.timezone,
   ]);
@@ -542,52 +525,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   ) : (
                     <span className={styles.statusNotConfigured}>
                       ⚠ API Key Not Set
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.settingItem}>
-            <div className={styles.settingLabel}>
-              <label htmlFor="tavilyApiKey">Tavily API Key</label>
-              <p className={styles.settingHelp}>
-                API key for Tavily web search to enable Deep Research
-                functionality. Used by the research agent to search the latest
-                information on the web. Leave empty to disable web search (arXiv
-                and PubMed will still work).
-              </p>
-            </div>
-
-            <div className={styles.settingControl}>
-              <div className={styles.textInputContainer}>
-                <input
-                  id="tavilyApiKey"
-                  type="password"
-                  placeholder="Enter your Tavily API key..."
-                  value={tavilyApiKey}
-                  onChange={e => {
-                    const newValue = e.target.value;
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: tavilyApiKey changed (length)',
-                        newValue.length
-                      );
-                    }
-                    setTavilyApiKey(newValue);
-                  }}
-                  className={styles.textInput}
-                  disabled={isUpdating}
-                />
-                <div className={styles.inputStatus}>
-                  {tavilyApiKey ? (
-                    <span className={styles.statusConfigured}>
-                      ✓ API Key Configured
-                    </span>
-                  ) : (
-                    <span className={styles.statusNotConfigured}>
-                      ⚠ API Key Not Set (Web search disabled)
                     </span>
                   )}
                 </div>

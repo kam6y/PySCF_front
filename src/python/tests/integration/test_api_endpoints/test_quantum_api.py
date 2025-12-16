@@ -152,6 +152,61 @@ class TestCalculationSubmissionAPI:
         data = response.get_json()
         assert data['success'] is False
 
+    def test_dft_rejects_casci_parameters(self, client, mocker, sample_h2_xyz):
+        """
+        GIVEN DFT calculation with CASCI-specific parameters (ncas, nelecas)
+        WHEN POST /api/quantum/calculate is called
+        THEN 400 Bad Request is returned with parameter applicability error
+        """
+        # ARRANGE
+        invalid_params = {
+            "name": "Test DFT with invalid params",
+            "xyz": sample_h2_xyz,
+            "calculation_method": "DFT",
+            "basis_function": "sto-3g",
+            "exchange_correlation": "b3lyp",
+            "ncas": 4,  # Not applicable to DFT
+            "nelecas": 4  # Not applicable to DFT
+        }
+
+        # ACT
+        response = client.post('/api/quantum/calculate', json=invalid_params)
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        # Check for error in either 'error' or 'validation_error' field
+        error_message = data.get('error', data.get('validation_error', '')).lower()
+        assert 'ncas' in error_message or 'not applicable' in error_message
+
+    def test_tddft_rejects_optimize_geometry_true(self, client, mocker, sample_h2_xyz):
+        """
+        GIVEN TDDFT calculation with optimize_geometry=True (disabled parameter)
+        WHEN POST /api/quantum/calculate is called
+        THEN 400 Bad Request is returned with Pydantic validation error
+        """
+        # ARRANGE
+        invalid_params = {
+            "name": "Test TDDFT with invalid params",
+            "xyz": sample_h2_xyz,
+            "calculation_method": "TDDFT",
+            "basis_function": "sto-3g",
+            "exchange_correlation": "b3lyp",
+            "tddft_nstates": 10,
+            "optimize_geometry": True  # Disabled for TDDFT
+        }
+
+        # ACT
+        response = client.post('/api/quantum/calculate', json=invalid_params)
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        # Pydantic validation error format
+        assert 'validation_error' in data
+        assert 'optimize_geometry' in str(data['validation_error']).lower()
+
 
 class TestCalculationListAPI:
     """Integration tests for GET /api/quantum/calculations endpoint."""
@@ -351,50 +406,6 @@ class TestCalculationDeletionAPI:
 
         # ACT
         response = client.delete(f'/api/quantum/calculations/{calc_id}')
-
-        # ASSERT
-        assert response.status_code == 404
-
-
-class TestCalculationCancellationAPI:
-    """Integration tests for POST /api/quantum/calculations/<id>/cancel endpoint."""
-
-    def test_cancel_calculation_success(self, client, mocker):
-        """
-        GIVEN calculation is running
-        WHEN POST /api/quantum/calculations/<id>/cancel is called
-        THEN 200 OK is returned with cancellation confirmation
-        """
-        # ARRANGE
-        calc_id = 'calc-123'
-        mock_result = {
-            'calculation_id': calc_id,
-            'message': f'Calculation "{calc_id}" has been cancelled successfully'
-        }
-        mock_service = mocker.patch('api.quantum.get_quantum_service')
-        mock_service.return_value.cancel_calculation.return_value = mock_result
-
-        # ACT
-        response = client.post(f'/api/quantum/calculations/{calc_id}/cancel')
-
-        # ASSERT
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['success'] is True
-
-    def test_cancel_calculation_not_found(self, client, mocker):
-        """
-        GIVEN calculation does not exist
-        WHEN POST /api/quantum/calculations/<id>/cancel is called
-        THEN 404 Not Found is returned
-        """
-        # ARRANGE
-        calc_id = 'nonexistent-calc'
-        mock_service = mocker.patch('api.quantum.get_quantum_service')
-        mock_service.return_value.cancel_calculation.side_effect = NotFoundError(f"Calculation {calc_id} not found")
-
-        # ACT
-        response = client.post(f'/api/quantum/calculations/{calc_id}/cancel')
 
         # ASSERT
         assert response.status_code == 404

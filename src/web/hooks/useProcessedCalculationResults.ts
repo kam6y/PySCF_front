@@ -75,6 +75,10 @@ export const useProcessedCalculationResults = (
 
     const shouldShowVibrationalSection = results.frequency_analysis_performed;
 
+    // Energetics section is always shown for completed calculations
+    // (all calculations have at least SCF energy)
+    const shouldShowEnergeticsSection = true;
+
     return {
       results,
       parameters,
@@ -85,6 +89,7 @@ export const useProcessedCalculationResults = (
       shouldShowTDDFTSection,
       shouldShowCCSDSection,
       shouldShowVibrationalSection,
+      shouldShowEnergeticsSection,
     };
   }, [activeCalculation]);
 };

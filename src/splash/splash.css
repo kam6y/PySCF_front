@@ -1,0 +1,174 @@
+/* フォント読み込み */
+@font-face {
+  font-family: 'ADLaM Display';
+  src: url('../assets/fonts/ADLaMDisplay-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* 全体のリセット */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* スプラッシュコンテナ */
+.splash-container {
+  width: 600px;
+  height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: 40px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* フェードインアニメーション */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* フェードアウトアニメーション */
+.splash-container.fade-out {
+  animation: fadeOut 0.3s ease-in forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* タイトル */
+.splash-title {
+  font-family: 'ADLaM Display', sans-serif;
+  font-size: 32px;
+  color: #50d4f5;
+  margin-bottom: 40px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+/* メインコンテンツエリア */
+.splash-content {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* ステージメッセージ */
+.stage-message {
+  font-size: 16px;
+  color: #333;
+  text-align: center;
+  font-weight: 500;
+  min-height: 24px;
+}
+
+/* プログレスバーコンテナ */
+.progress-container {
+  width: 100%;
+  padding: 0 20px;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* インデターミネートプログレスバー */
+.progress-bar-fill {
+  position: absolute;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, #50d4f5, #22b9e7);
+  border-radius: 4px;
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+/* 詳細メッセージ */
+.detail-message {
+  font-size: 12px;
+  color: #999;
+  text-align: center;
+  min-height: 18px;
+}
+
+/* エラーコンテナ */
+.error-container {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 30px;
+  background-color: #fff5f5;
+  border-radius: 8px;
+  border: 2px solid #dc3545;
+  animation: slideIn 0.3s ease-out;
+}
+
+.error-icon {
+  font-size: 48px;
+}
+
+.error-message {
+  font-size: 16px;
+  color: #dc3545;
+  text-align: center;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.error-info {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+/* エラー表示時はメインコンテンツを非表示 */
+.splash-container.error-mode .splash-content {
+  display: none;
+}

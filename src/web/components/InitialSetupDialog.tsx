@@ -41,7 +41,7 @@ export const InitialSetupDialog: React.FC<InitialSetupDialogProps> = ({
     <div className={styles.overlay}>
       <div className={styles.dialog}>
         <div className={styles.header}>
-          <h2>Welcome to PySCF Native App</h2>
+          <h2>Welcome to PySCF_front</h2>
         </div>
 
         <div className={styles.content}>

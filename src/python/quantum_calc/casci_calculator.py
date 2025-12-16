@@ -150,7 +150,11 @@ class CASCICalculator(BaseCalculator):
             'enhanced_ci_analysis': enhanced_ci_analysis
         }
         results.update(casci_results)
-        
+
+        # Add common additional properties (from base calculator)
+        common_props = self._extract_common_additional_properties()
+        results.update(common_props)
+
         logger.info(f"CASCI calculation completed with enhanced analysis. Energy: {casci_energy_float:.6f} hartree")
         return results
     

@@ -268,7 +268,7 @@ class CalculationFileManager:
             if self.file_exists(calc_dir, 'parameters.json'):
                 return 'pending', None
             return 'error', None
-        
+
         try:
             with open(status_file, 'r') as f:
                 status_data = json.load(f)
@@ -277,6 +277,120 @@ class CalculationFileManager:
                 return status, waiting_reason
         except (json.JSONDecodeError, OSError):
             return 'pending', None
+
+    def save_pause_state(self, calc_dir: str, pause_info: Dict[str, Any]) -> None:
+        """
+        Save pause state to JSON file.
+
+        Args:
+            calc_dir: Calculation directory path
+            pause_info: Dictionary containing pause state information
+        """
+        pause_file = Path(calc_dir) / "pause_state.json"
+        pause_data = {
+            'paused_at': datetime.now().isoformat(),
+            **pause_info
+        }
+
+        try:
+            with open(pause_file, 'w') as f:
+                json.dump(pause_data, f, indent=2)
+            logger.debug(f"Saved pause state to {pause_file}")
+        except Exception as e:
+            logger.error(f"Failed to save pause state: {e}")
+
+    def load_pause_state(self, calc_dir: str) -> Optional[Dict[str, Any]]:
+        """
+        Load pause state from JSON file.
+
+        Args:
+            calc_dir: Calculation directory path
+
+        Returns:
+            Dictionary containing pause state, or None if not found
+        """
+        pause_file = Path(calc_dir) / "pause_state.json"
+        if not pause_file.exists():
+            return None
+
+        try:
+            with open(pause_file, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error(f"Failed to load pause state: {e}")
+            return None
+
+    def delete_pause_state(self, calc_dir: str) -> None:
+        """
+        Delete pause state file after successful resume.
+
+        Args:
+            calc_dir: Calculation directory path
+        """
+        pause_file = Path(calc_dir) / "pause_state.json"
+        try:
+            if pause_file.exists():
+                pause_file.unlink()
+                logger.debug(f"Deleted pause state file: {pause_file}")
+        except Exception as e:
+            logger.error(f"Failed to delete pause state: {e}")
+
+    def save_geometry_trajectory_step(self, calc_dir: str, step: int, geometry: str) -> None:
+        """
+        Append geometry to optimization trajectory file.
+
+        Args:
+            calc_dir: Calculation directory path
+            step: Optimization step number
+            geometry: XYZ format geometry string
+        """
+        trajectory_file = Path(calc_dir) / "geom_opt_trajectory.xyz"
+
+        try:
+            # Append to trajectory file with step number comment
+            with open(trajectory_file, 'a') as f:
+                f.write(f"# Step {step}\n")
+                f.write(geometry)
+                if not geometry.endswith('\n'):
+                    f.write('\n')
+            logger.debug(f"Saved geometry step {step} to trajectory")
+        except Exception as e:
+            logger.error(f"Failed to save geometry trajectory step: {e}")
+
+    def load_last_geometry(self, calc_dir: str) -> Optional[str]:
+        """
+        Load the last geometry from trajectory file.
+
+        Args:
+            calc_dir: Calculation directory path
+
+        Returns:
+            XYZ format geometry string, or None if not found
+        """
+        trajectory_file = Path(calc_dir) / "geom_opt_trajectory.xyz"
+        if not trajectory_file.exists():
+            return None
+
+        try:
+            with open(trajectory_file, 'r') as f:
+                content = f.read()
+
+            # Split by step comments and get the last one
+            steps = content.split('# Step ')
+            if len(steps) < 2:
+                return None
+
+            # Get the last step's geometry
+            last_step = steps[-1]
+            # Remove the step number line
+            lines = last_step.split('\n', 1)
+            if len(lines) < 2:
+                return None
+
+            return lines[1].strip()
+        except Exception as e:
+            logger.error(f"Failed to load last geometry: {e}")
+            return None
 
     def _parse_cube_filename(self, filename: str) -> Optional[tuple[int, int]]:
         """

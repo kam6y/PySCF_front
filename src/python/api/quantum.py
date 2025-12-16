@@ -9,7 +9,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 from flask_pydantic import validate
 
-from services import get_quantum_service, ServiceError
+from services import get_quantum_service, ServiceError, ValidationError
 from generated_models import QuantumCalculationRequest, CalculationUpdateRequest
 
 # Set up logging
@@ -50,60 +50,82 @@ def get_supported_parameters():
 
 
 @quantum_bp.route('/api/quantum/calculate', methods=['POST'])
-@validate()
-def quantum_calculate(body: QuantumCalculationRequest):
+def quantum_calculate():
     """
     Starts a quantum chemistry calculation in the background.
     Immediately returns a calculation ID to track the job.
     """
     try:
         quantum_service = get_quantum_service()
-        
-        # Extract enum values and build parameters
+
+        # Get raw JSON data before Pydantic validation
+        raw_data = request.get_json()
+        if not raw_data:
+            return jsonify({
+                'success': False,
+                'error': 'Request body is required'
+            }), 400
+
+        # Extract calculation method for early validation
+        calculation_method = raw_data.get('calculation_method')
+        if not calculation_method:
+            return jsonify({
+                'success': False,
+                'error': 'calculation_method is required'
+            }), 400
+
+        # Validate parameter applicability BEFORE Pydantic validation
+        # This ensures we catch inapplicable parameters that Pydantic would ignore
+        from quantum_calc.method_defaults import validate_parameters_for_method
+        is_valid, applicability_error = validate_parameters_for_method(
+            calculation_method,
+            raw_data
+        )
+        if not is_valid:
+            logger.warning(f"Parameter applicability check failed: {applicability_error}")
+            return jsonify({
+                'success': False,
+                'validation_error': applicability_error
+            }), 400
+
+        # Now validate with Pydantic
+        try:
+            body = QuantumCalculationRequest.model_validate(raw_data)
+        except Exception as e:
+            logger.warning(f"Pydantic validation failed: {e}")
+            return jsonify({
+                'success': False,
+                'validation_error': str(e)
+            }), 400
+
+        # Extract enum values helper function
         def get_enum_value(field_value):
             if hasattr(field_value, 'value'):
                 return field_value.value
             return field_value
-        
-        calculation_method = get_enum_value(body.calculation_method)
-        
-        parameters = {
-            'calculation_method': calculation_method,
-            'basis_function': body.basis_function,
-            'charges': body.charges,
-            'spin': body.spin,
-            'solvent_method': get_enum_value(body.solvent_method),
-            'solvent': body.solvent,
-            'xyz': body.xyz,
-            'name': body.name,
-            'cpu_cores': body.cpu_cores,
-            'memory_mb': body.memory_mb,
-            'created_at': datetime.now().isoformat(),
-            'optimize_geometry': body.optimize_geometry,
-            'tddft_nstates': body.tddft_nstates,
-            'tddft_method': get_enum_value(body.tddft_method) if body.tddft_method else 'TDDFT',
-            'tddft_analyze_nto': body.tddft_analyze_nto,
-            'ncas': body.ncas,
-            'nelecas': body.nelecas,
-            'max_cycle_macro': body.max_cycle_macro,
-            'max_cycle_micro': body.max_cycle_micro,
-            'natorb': body.natorb,
-            'conv_tol': body.conv_tol,
-            'conv_tol_grad': body.conv_tol_grad,
-            'ketcher_data': body.ketcher_data
-        }
 
-        # Add exchange_correlation only for DFT methods
-        if calculation_method != 'HF':
-            parameters['exchange_correlation'] = body.exchange_correlation
+        # Handle Pydantic RootModel[Union[...]] structure
+        # Access .root attribute if present (discriminated union from OpenAPI)
+        if hasattr(body, 'root'):
+            validated_model = body.root
         else:
-            parameters['exchange_correlation'] = None
-        
-        # Call service layer
+            validated_model = body
+
+        # Pydanticモデルを辞書に変換
+        parameters = validated_model.model_dump(exclude_none=False, mode='python')
+
+        # Enum値を文字列に変換
+        for key, value in list(parameters.items()):
+            parameters[key] = get_enum_value(value)
+
+        # タイムスタンプを追加
+        parameters['created_at'] = datetime.now().isoformat()
+
+        # Call service layer (also validates parameters for defense-in-depth and AI agent calls)
         result = quantum_service.start_calculation(parameters)
-        
+
         return jsonify({'success': True, 'data': {'calculation': result}}), 202
-    
+
     except ServiceError as e:
         logger.error(f"Service error starting calculation: {e}")
         return jsonify({'success': False, 'error': e.message}), e.status_code
@@ -226,25 +248,53 @@ def update_calculation(calculation_id, body: CalculationUpdateRequest):
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/cancel', methods=['POST'])
-def cancel_calculation(calculation_id):
-    """Cancel a running calculation."""
+@quantum_bp.route('/api/quantum/calculations/<calculation_id>/pause', methods=['POST'])
+def pause_calculation(calculation_id):
+    """Pause a running calculation."""
     try:
         quantum_service = get_quantum_service()
-        
+
         # Call service layer
-        result = quantum_service.cancel_calculation(calculation_id)
-        
+        result = quantum_service.pause_calculation(calculation_id)
+
         return jsonify({
             'success': True,
             'data': result
-        })
-            
+        }), 202
+
+    except ValidationError as e:
+        logger.error(f"Validation error pausing calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': e.message}), 400
     except ServiceError as e:
-        logger.error(f"Service error cancelling calculation {calculation_id}: {e}")
+        logger.error(f"Service error pausing calculation {calculation_id}: {e}")
         return jsonify({'success': False, 'error': e.message}), e.status_code
     except Exception as e:
-        logger.error(f"Unexpected error cancelling calculation {calculation_id}: {e}", exc_info=True)
+        logger.error(f"Unexpected error pausing calculation {calculation_id}: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+
+
+@quantum_bp.route('/api/quantum/calculations/<calculation_id>/resume', methods=['POST'])
+def resume_calculation(calculation_id):
+    """Resume a paused calculation."""
+    try:
+        quantum_service = get_quantum_service()
+
+        # Call service layer
+        result = quantum_service.resume_calculation(calculation_id)
+
+        return jsonify({
+            'success': True,
+            'data': result
+        }), 202
+
+    except ValidationError as e:
+        logger.error(f"Validation error resuming calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': e.message}), 400
+    except ServiceError as e:
+        logger.error(f"Service error resuming calculation {calculation_id}: {e}")
+        return jsonify({'success': False, 'error': e.message}), e.status_code
+    except Exception as e:
+        logger.error(f"Unexpected error resuming calculation {calculation_id}: {e}", exc_info=True)
         return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
 

@@ -139,7 +139,7 @@ npm run package
 
 The packaging process creates platform-specific installers in the `dist/` directory:
 -   `PySCF_front-darwin-arm64.dmg` (For macOS)
--   `PySCF_front-win32-x64.exe` (For Windows)
+
 -   `PySCF_front-linux-x86_64.AppImage` (For Linux)
 
 ### Building for Linux on Windows
@@ -224,6 +224,63 @@ npm run package:linux
 The built AppImage will be available in the `dist/` directory.
 
 **Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, PyInstaller, and electron-builder) in the Linux environment.
+
+---
+
+## Development Tools
+
+### API Documentation (Swagger UI)
+
+The application provides interactive API documentation via Swagger UI, available **in development mode only**.
+
+**Access URL:**
+```
+http://127.0.0.1:5000/api-docs/
+```
+
+**Features:**
+- Browse all API endpoints with detailed request/response schemas
+- Test endpoints directly in the browser with "Try it out" functionality
+- View comprehensive documentation generated from the OpenAPI specification
+- Search and filter endpoints
+
+**Availability:**
+- ✅ **Development mode** (`npm run dev`): Swagger UI is accessible
+- ❌ **Packaged builds**: Swagger UI is not included (development tool only)
+
+**Note:** Swagger UI is automatically enabled when running the development server and uses the OpenAPI specification from [src/api-spec/openapi.yaml](src/api-spec/openapi.yaml).
+
+### Codebase Visualization (uitnize)
+
+The `uitnize` script generates a comprehensive text file containing the entire codebase structure and contents, useful for sharing context with AI assistants or documentation purposes.
+
+**Usage:**
+```bash
+# Scan entire project
+npm run uitnize
+
+# Scan specific directory
+./scripts/uitnize.sh src/python
+./scripts/uitnize.sh config
+```
+
+**Output:**
+- Creates `code.txt` in the project root directory
+- Includes directory tree structure (using `tree` command)
+- Contains all file contents with line numbers
+- Automatically excludes build artifacts, dependencies, and generated files
+
+**Requirements:**
+- Install `tree` command for better directory visualization:
+  ```bash
+  # macOS
+  brew install tree
+
+  # Ubuntu/Debian
+  sudo apt-get install tree
+  ```
+
+**Recommendation:** For large projects, scan specific directories instead of the entire project to keep the output manageable.
 
 ---
 
@@ -376,8 +433,65 @@ npm run package
 
 `dist/`ディレクトリに各OS用のインストーラーが生成されます。
 -   `PySCF_front-darwin-arm64.dmg` (macOS)
--   `PySCF_front-win32-x64.exe` (Windows)
+
 -   `PySCF_front-linux-x86_64.AppImage` (Linux)
+
+## 開発ツール
+
+### API仕様書 (Swagger UI)
+
+開発環境限定で、Swagger UIによるインタラクティブなAPI仕様書を提供しています。
+
+**アクセスURL:**
+```
+http://127.0.0.1:5000/api-docs/
+```
+
+**機能:**
+- すべてのAPIエンドポイントの詳細なリクエスト/レスポンススキーマの表示
+- 「Try it out」機能でブラウザから直接エンドポイントをテスト可能
+- OpenAPI仕様書から自動生成された包括的なドキュメント
+- エンドポイントの検索・フィルタリング
+
+**利用可能環境:**
+- ✅ **開発モード** (`npm run dev`): Swagger UIにアクセス可能
+- ❌ **パッケージ版**: Swagger UIは含まれません（開発ツールのみ）
+
+**注記:** Swagger UIは開発サーバー起動時に自動的に有効化され、[src/api-spec/openapi.yaml](src/api-spec/openapi.yaml)のOpenAPI仕様を使用します。
+
+### コードベース可視化 (uitnize)
+
+`uitnize`スクリプトは、コードベース全体の構造と内容を包括的なテキストファイルとして生成します。AIアシスタントへのコンテキスト共有やドキュメント作成に便利です。
+
+**使用方法:**
+```bash
+# プロジェクト全体をスキャン
+npm run uitnize
+
+# 特定ディレクトリのみスキャン
+./scripts/uitnize.sh src/python
+./scripts/uitnize.sh config
+```
+
+**出力内容:**
+- プロジェクトルートに`code.txt`を生成
+- ディレクトリツリー構造を表示（`tree`コマンド使用）
+- 全ファイルの内容を行番号付きで出力
+- ビルド成果物、依存関係、生成ファイルは自動除外
+
+**必要な準備:**
+- より見やすいディレクトリ表示のため、`tree`コマンドをインストールすることを推奨:
+  ```bash
+  # macOS
+  brew install tree
+
+  # Ubuntu/Debian
+  sudo apt-get install tree
+  ```
+
+**推奨:** 大規模プロジェクトでは、プロジェクト全体ではなく特定のディレクトリをスキャンすることで、出力を管理しやすいサイズに保つことができます。
+
+---
 
 ## トラブルシューティング
 

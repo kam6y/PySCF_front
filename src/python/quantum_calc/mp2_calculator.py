@@ -54,7 +54,33 @@ class MP2Calculator(BaseCalculator):
         return 'MP2'
     
     # ===== Template Method Pattern Implementation =====
-    
+
+    def _extract_mp2_correlation_components(self) -> Dict[str, Any]:
+        """Extract MP2-specific correlation energy components."""
+        properties = {}
+
+        if not hasattr(self, 'mp2') or self.mp2 is None:
+            logger.warning("MP2 object not available for correlation component extraction")
+            return properties
+
+        try:
+            # Extract same-spin and opposite-spin correlation energies
+            # These components are important for understanding the nature of electron correlation
+            if hasattr(self.mp2, 'e_corr_ss') and self.mp2.e_corr_ss is not None:
+                properties['mp2_same_spin_correlation'] = float(self.mp2.e_corr_ss)
+                logger.info(f"MP2 same-spin correlation: {properties['mp2_same_spin_correlation']:.6f} hartree")
+
+            if hasattr(self.mp2, 'e_corr_os') and self.mp2.e_corr_os is not None:
+                properties['mp2_opposite_spin_correlation'] = float(self.mp2.e_corr_os)
+                logger.info(f"MP2 opposite-spin correlation: {properties['mp2_opposite_spin_correlation']:.6f} hartree")
+
+            logger.info("MP2 correlation component extraction completed")
+
+        except Exception as e:
+            logger.warning(f"Failed to extract MP2 correlation components: {e}")
+
+        return properties
+
     def _perform_specific_calculation(self, base_energy: float) -> Dict[str, Any]:
         """Perform MP2-specific calculation after HF."""
         # 安全にベースHFエネルギーを変換
@@ -64,47 +90,57 @@ class MP2Calculator(BaseCalculator):
             hf_energy_float = float(base_energy)
         except (ValueError, TypeError) as e:
             raise CalculationError(f"Failed to convert HF energy to float: {e}")
-        
+
         logger.info(f"HF energy: {hf_energy_float} Hartree")
-        
+
         # MP2 calculation
         logger.info("Starting MP2 calculation...")
-        
+
         # Create MP2 object based on HF reference
         self.mp2 = mp.MP2(self.mf)
-        
+
         # Run MP2 calculation
         self.mp2.kernel()
-        
+
         # Get MP2 results
         if not hasattr(self.mp2, 'e_corr') or self.mp2.e_corr is None:
             raise CalculationError("MP2 calculation failed: correlation energy not available")
-        
+
         mp2_corr_energy = self.mp2.e_corr
         mp2_total_energy = self.mp2.e_tot
-        
+
         logger.info("MP2 calculation completed successfully.")
         logger.info(f"MP2 correlation energy: {mp2_corr_energy} Hartree")
         logger.info(f"MP2 total energy: {mp2_total_energy} Hartree")
-        
+
         # 安全にMP2エネルギーを変換
         if mp2_corr_energy is None:
             raise CalculationError("MP2 correlation energy is None - calculation may have failed")
         if mp2_total_energy is None:
             raise CalculationError("MP2 total energy is None - calculation may have failed")
-        
+
         try:
             mp2_corr_energy_float = float(mp2_corr_energy)
             mp2_total_energy_float = float(mp2_total_energy)
         except (ValueError, TypeError) as e:
             raise CalculationError(f"Failed to convert MP2 energies to float: {e}")
-        
-        return {
+
+        results = {
             'hf_energy': hf_energy_float,
             'mp2_correlation_energy': mp2_corr_energy_float,
             'scf_energy': mp2_total_energy_float,  # For consistency with other calculators
             'mp2_total_energy': mp2_total_energy_float
         }
+
+        # Add common additional properties (from base calculator)
+        common_props = self._extract_common_additional_properties()
+        results.update(common_props)
+
+        # Add MP2-specific correlation components
+        mp2_props = self._extract_mp2_correlation_components()
+        results.update(mp2_props)
+
+        return results
     
     def _create_scf_method(self, mol):
         """Create HF method object for MP2 reference (RHF/UHF)."""

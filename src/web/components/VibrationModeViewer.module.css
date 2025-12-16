@@ -1,0 +1,245 @@
+/* Container */
+.container {
+  display: block;
+}
+
+.noDataMessage {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-size: 14px;
+}
+
+/* Flex wrapper for side-by-side layout */
+.vibrationFlexWrapper {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-top: 28px;
+}
+
+/* Left Column: Peak Information List */
+.peakListColumn {
+  width: 45%;
+  min-width: 0;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.peakListColumn h3 {
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+.peakTitle {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 6px 0;
+}
+
+.peakMetadata {
+  font-size: 12px;
+  color: #6b7280;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.separator {
+  color: #d1d5db;
+}
+
+/* Peak Table Content */
+.peakTableContent {
+  min-width: 0;
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Right Column: Vibration Mode Visualization */
+.vibrationViewerColumn {
+  min-width: 0;
+  width: 55%;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.vibrationViewerColumn h3 {
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+/* Section Description */
+.sectionDescription {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #50D4F5;
+  flex-shrink: 0;
+}
+
+/* Viewer Header */
+.viewerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Clear Button */
+.clearButton {
+  padding: 4px 8px;
+  border: 1px solid #dc2626;
+  border-radius: 4px;
+  background: #dc2626;
+  color: white;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: background-color 0.2s ease;
+}
+
+.clearButton:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+/* Molecule Viewer Container */
+.moleculeViewerContainer {
+  position: relative;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  height: 500px;
+  width: 100%;
+}
+
+.irSpectrumMoleculeViewer {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* Placeholder */
+.placeholder {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.placeholder p {
+  margin: 0;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  border: 1px dashed #ddd;
+}
+
+/* Peaks Table Wrapper */
+.peaksTableWrapper {
+  overflow-y: auto;
+  height: 500px;
+  border-radius: 4px;
+  border: none;
+  margin: 0;
+  background-color: #ffffff;
+}
+
+/* Peaks Table */
+.peaksTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: white;
+}
+
+.peaksTable thead {
+  background: #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.peaksTable th {
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #e5e7eb;
+}
+
+.peaksTable td {
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  font-family: monospace;
+}
+
+.peaksTable td:first-child {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.peaksTable td:nth-child(2) {
+  color: #059669;
+}
+
+.peaksTable td:last-child {
+  color: #6b7280;
+}
+
+.peaksTable tbody tr {
+  transition: background 0.2s ease;
+}
+
+.peaksTable tbody tr:hover {
+  background: #f3f4f6;
+}
+
+.peaksTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Clickable and selected row styles */
+.clickableRow {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.clickableRow:hover {
+  background-color: #f3f4f6 !important;
+}
+
+.selectedRow {
+  background-color: #bbdefb !important;
+  border-left: 3px solid #2196f3;
+}

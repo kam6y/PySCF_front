@@ -3,7 +3,7 @@ import os
 import sys
 import signal
 import atexit
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from pydantic import ValidationError
@@ -72,6 +72,41 @@ def create_app(server_port: int = None, test_config: dict = None):
     # This establishes app.config as the single source of truth for configuration
     configure_flask_app(app, server_config, server_port)
 
+    # Security: Authentication Middleware
+    # Verify X-Auth-Token header against the token provided by Electron
+    auth_token = os.getenv('PYSCF_AUTH_TOKEN')
+    
+    @app.before_request
+    def verify_auth_token():
+        """
+        Verify authentication token for all requests.
+        Skips verification for OPTIONS requests (CORS preflight) and TESTING mode.
+        """
+        # Skip auth for OPTIONS requests to allow CORS preflight
+        if request.method == 'OPTIONS':
+            return None
+
+        # If no auth token is configured (e.g. during dev without Electron),
+        # we might want to skip auth or warn.
+        # For security, we enforce it if the env var is present.
+        if auth_token:
+            client_token = request.headers.get('X-Auth-Token')
+            if not client_token or client_token != auth_token:
+                logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
+                return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        else:
+            # Skip auth for test environment (only if not simulating production)
+            if app.config.get('TESTING') and os.getenv('PYSCF_ENV') != 'production':
+                return None
+
+            # In production, this should be an error.
+            # In standalone dev, we might allow it but log a warning.
+            if not app.debug and not os.getenv('PYSCF_ENV') == 'development':
+                 logger.warning("Unauthorized access attempt: Missing authentication token in production mode")
+                 return jsonify({'success': False, 'error': 'Unauthorized: Missing authentication token'}), 401
+
+            logger.warning("Running without authentication token in debug/development mode!")
+
     # Apply test configuration if provided
     if test_config is not None:
         app.config.update(test_config)
@@ -94,20 +129,25 @@ def create_app(server_port: int = None, test_config: dict = None):
     register_blueprints(app)
     logger.info("Registered all API blueprints")
 
-    # Register WebSocket handlers and get immediate notification function
-    websocket_funcs = register_websocket_handlers(socketio)
+    # Register WebSocket handlers
+    register_websocket_handlers(socketio)
     logger.info("Registered all WebSocket handlers")
-    
-    # Store the immediate notification function globally for other modules to use
-    app.send_immediate_websocket_notification = websocket_funcs['send_immediate_websocket_notification']
-    
-    # Initialize process manager with WebSocket notification callback
+
+    # Bind SocketIO to NotificationService
+    from services.notification_service import (
+        bind_notification_service,
+        get_notification_service
+    )
+    bind_notification_service(socketio)
+
+    # Initialize process manager with NotificationService callback
     from quantum_calc import initialize_process_manager_with_callback
     try:
+        notification_service = get_notification_service()
         initialize_process_manager_with_callback(
-            notification_callback=websocket_funcs['send_immediate_websocket_notification']
+            notification_callback=notification_service.send_calculation_update
         )
-        logger.info("Process manager initialized with WebSocket notification callback")
+        logger.info("Process manager initialized with NotificationService callback")
     except Exception as e:
         logger.error(f"Failed to initialize process manager with callback: {e}")
         # Continue anyway - process manager will work without notifications
@@ -135,70 +175,25 @@ def create_app(server_port: int = None, test_config: dict = None):
         KNOWN ISSUE & WORKAROUND:
         When WebSocket connections close, the close frame (binary data) is sometimes
         misinterpreted as an HTTP request by Werkzeug/Flask-SocketIO, resulting in
-        400 Bad Request errors with messages like "Invalid HTTP method" or garbled
-        binary data in the error description.
+        400 Bad Request errors.
         
         This is a known issue in the Flask-SocketIO/Werkzeug stack when using
-        threading async_mode. The issue has been observed across multiple versions
-        and environments (see Flask-SocketIO issues #287, #466, #1417, #1811).
-        
-        ROOT CAUSE:
-        - WebSocket close frames contain binary protocol data
-        - When connection teardown occurs, these frames may be read by HTTP handlers
-        - The binary data fails to parse as valid HTTP, triggering 400 errors
+        threading async_mode.
         
         CURRENT WORKAROUND:
-        This handler detects WebSocket-related errors by examining the error message
-        for known patterns (protocol keywords, binary data indicators) and silently
-        logs them as debug messages rather than warnings to avoid log pollution.
-        
-        FUTURE MONITORING:
-        - Monitor Flask-SocketIO and Werkzeug changelogs for protocol handling fixes
-        - Consider upgrading to newer async modes (eventlet/gevent) if issues persist
-        - Review this workaround when upgrading major versions of dependencies
-        
-        VALIDATION:
-        This approach has been validated as the recommended workaround by the
-        Flask-SocketIO community and is safe as it only affects cosmetic logging,
-        not functionality.
+        We detect if the error occurred on the Socket.IO endpoint path ('/socket.io/').
+        If so, we treat it as a known WebSocket teardown issue and log it at DEBUG level.
         """
-        error_description = str(error).lower()
-        
-        # Comprehensive list of WebSocket protocol error indicators
-        # Based on observed patterns from Flask-SocketIO issues and WebSocket RFC 6455
-        websocket_indicators = [
-            # HTTP method errors (most common)
-            'invalid http method', 'expected get method', 'invalid method',
-            # WebSocket protocol keywords
-            'websocket', 'connection upgrade', 'upgrade required',
-            # Request parsing errors
-            'bad request line', 'malformed request', 'protocol error',
-            # Connection state errors
-            'connection reset', 'connection closed', 'connection aborted',
-            # Encoding errors (binary data misinterpreted as text)
-            'invalid utf-8', 'decode error', 'unicode error'
-        ]
-        
-        # Primary detection: Check for known error message patterns
-        is_websocket_related = any(indicator in error_description for indicator in websocket_indicators)
-        
-        # Secondary detection: Binary data heuristic
-        # WebSocket close frames contain non-printable bytes that appear in error messages
-        if not is_websocket_related:
-            error_str = str(error)
-            non_printable_count = sum(1 for c in error_str if ord(c) < 32 and c not in '\n\r\t')
-            # If error message contains significant binary data, likely a WebSocket frame
-            if non_printable_count > 3:  # Empirically determined threshold
-                is_websocket_related = True
-        
-        if is_websocket_related:
+        # Robust detection: Check if the request is for the Socket.IO endpoint
+        # WebSocket traffic always goes to /socket.io/ (unless configured otherwise)
+        if request.path.startswith('/socket.io/'):
             # WebSocket protocol frame misinterpreted as HTTP - expected behavior
             # Log at debug level to avoid polluting logs with normal connection teardown
-            logger.debug(f"WebSocket close frame detected (expected): {error}")
+            logger.debug(f"WebSocket close frame detected on {request.path} (expected): {error}")
             return '', 400  # Return minimal response
         
         # Genuine HTTP 400 error - log and return proper error response
-        logger.warning(f"Genuine bad HTTP request: {error}")
+        logger.warning(f"Genuine bad HTTP request on {request.path}: {error}")
         return jsonify({'success': False, 'error': 'Bad request.'}), 400
 
     @app.errorhandler(404)

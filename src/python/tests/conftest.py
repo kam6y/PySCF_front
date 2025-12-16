@@ -52,12 +52,19 @@ def app():
         }
     }
 
-    # Create app using Application Factory with test configuration
-    _app = create_app(server_port=5000, test_config=test_config)
+    # Mock environment variables for testing
+    # This ensures consistent behavior in CI and local environments
+    from unittest import mock
 
-    # Establish application context for the test session
-    with _app.app_context():
-        yield _app
+    with mock.patch.dict(os.environ, {
+        'PYSCF_ENV': 'development',
+    }):
+        # Create app using Application Factory with test configuration
+        _app = create_app(server_port=5000, test_config=test_config)
+
+        # Establish application context for the test session
+        with _app.app_context():
+            yield _app
 
     # Cleanup: Shutdown process manager first to prevent "cannot schedule new futures after shutdown" errors
     try:

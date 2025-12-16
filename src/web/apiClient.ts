@@ -16,14 +16,26 @@ import {
   CubeFilesDeleteResponseData,
   SupportedParametersResponseData,
   IRSpectrumResponseData,
+  PauseCalculationResponseData,
+  ResumeCalculationResponseData,
 } from './types/api-types';
 import { components } from './types/generated-api';
 
-let API_BASE_URL = 'http://127.0.0.1:5000'; // Default, will be updated
+// preloadで設定されたポート番号を使用（URLパラメータ経由で取得済み）
+const initialPort = window.electronAPI?.flaskPort;
+
+if (!initialPort) {
+  console.error('[API Client] Flask port not available. Using fallback: 5000');
+  console.error('[API Client] This indicates an initialization failure.');
+}
+
+let API_BASE_URL = `http://127.0.0.1:${initialPort || 5000}`;
+
+console.log(`[API Client] Initialized with port: ${initialPort || 5000}`);
 
 export const setApiBaseUrl = (port: number) => {
   API_BASE_URL = `http://127.0.0.1:${port}`;
-  console.log(`API base URL set to: ${API_BASE_URL}`);
+  console.log(`[API Client] API base URL updated to: ${API_BASE_URL}`);
 };
 
 // Re-export the generated type for backward compatibility
@@ -31,11 +43,6 @@ export type StartCalculationResponse = StartCalculationResponseData;
 
 // Agent API types
 type AgentChatRequest = components['schemas']['AgentChatRequest'];
-type AgentChatResponse = components['schemas']['AgentChatResponse'];
-type ExecuteConfirmedActionRequest =
-  components['schemas']['ExecuteConfirmedActionRequest'];
-type ExecuteConfirmedActionResponse =
-  components['schemas']['ExecuteConfirmedActionResponse'];
 
 // Chat History API types
 type ChatSessionSummary = components['schemas']['ChatSessionSummary'];
@@ -96,47 +103,6 @@ export class ApiError extends Error {
       Error.captureStackTrace(this, ApiError);
     }
   }
-
-  /**
-   * エラーのタイプを判定するヘルパーメソッド
-   */
-  get errorType(): 'network' | 'client' | 'server' | 'unknown' {
-    if (this.isNetworkError) return 'network';
-    if (this.status >= 400 && this.status < 500) return 'client';
-    if (this.status >= 500) return 'server';
-    return 'unknown';
-  }
-
-  /**
-   * ユーザーフレンドリーなエラーメッセージを生成
-   */
-  getUserMessage(): string {
-    switch (this.errorType) {
-      case 'network':
-        return 'A network connection error occurred. Please check your internet connection.';
-      case 'client':
-        if (this.status === 404) {
-          return 'The requested resource was not found.';
-        }
-        if (this.status === 400) {
-          return 'There is an issue with the request. Please check your input.';
-        }
-        if (this.status === 401) {
-          return 'Authentication is required.';
-        }
-        if (this.status === 403) {
-          return 'You do not have permission to access this resource.';
-        }
-        return 'A request error occurred.';
-      case 'server':
-        if (this.status === 503) {
-          return 'The server is temporarily unavailable. Please try again later.';
-        }
-        return 'A server error occurred. Please contact the administrator.';
-      default:
-        return this.message || 'An unknown error occurred.';
-    }
-  }
 }
 
 /**
@@ -149,11 +115,19 @@ const request = async <T>(
   const url = `${API_BASE_URL}${endpoint}`;
 
   try {
+    // トークンが届くまで確実に待機
+    const authToken = await window.electronAPI?.getAuthToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (authToken) {
+      (headers as any)['X-Auth-Token'] = authToken;
+    }
+
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     });
 
@@ -268,6 +242,30 @@ export const deleteCalculation = (
     `/api/quantum/calculations/${id}`,
     {
       method: 'DELETE',
+    }
+  );
+};
+
+export const pauseCalculation = (
+  id: string
+): Promise<PauseCalculationResponseData> => {
+  validateCalculationId(id, `/api/quantum/calculations/${id}/pause`);
+  return request<PauseCalculationResponseData>(
+    `/api/quantum/calculations/${id}/pause`,
+    {
+      method: 'POST',
+    }
+  );
+};
+
+export const resumeCalculation = (
+  id: string
+): Promise<ResumeCalculationResponseData> => {
+  validateCalculationId(id, `/api/quantum/calculations/${id}/resume`);
+  return request<ResumeCalculationResponseData>(
+    `/api/quantum/calculations/${id}/resume`,
+    {
+      method: 'POST',
     }
   );
 };
@@ -480,20 +478,7 @@ export const getSystemResourceStatus = (): Promise<SystemResourceResponse> => {
 };
 
 /**
- * Chat with AI agent for molecular analysis and assistance
- */
-export const chatWithAgent = (
-  message: string,
-  history: AgentChatRequest['history']
-): Promise<AgentChatResponse['data']> => {
-  return request<AgentChatResponse['data']>('/api/agent/chat', {
-    method: 'POST',
-    body: JSON.stringify({ message, history }),
-  });
-};
-
-/**
- * Stream chat with AI agent for molecular analysis and assistance using Server-Sent Events
+ * Stream chat with AI agent using Server-Sent Events
  */
 export const streamChatWithAgent = (
   message: string,
@@ -512,123 +497,115 @@ export const streamChatWithAgent = (
   const ctrl = new AbortController();
   let isStreamClosed = false; // 重複イベント防止フラグ
 
-  fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
-    body: JSON.stringify({ message, history, session_id: sessionId }),
-    signal: ctrl.signal,
-
-    onopen: async response => {
-      if (!response.ok) {
-        const errorText = await response.text();
-        callbacks.onError(
-          new Error(`Failed to connect: ${response.status} ${errorText}`)
-        );
-        ctrl.abort(); // Stop further processing
-      }
-    },
-
-    onmessage(event) {
-      if (isStreamClosed) {
-        return;
+  // 非同期でトークンを取得してからリクエストを開始
+  (async () => {
+    try {
+      // トークンが届くまで確実に待機
+      const authToken = await window.electronAPI?.getAuthToken();
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      };
+      if (authToken) {
+        (headers as any)['X-Auth-Token'] = authToken;
       }
 
-      try {
-        const parsedData = JSON.parse(event.data);
+      fetchEventSource(`${API_BASE_URL}/api/agent/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ message, history, session_id: sessionId }),
+        signal: ctrl.signal,
 
-        if (parsedData.type === 'chunk' && parsedData.payload?.text) {
-          callbacks.onMessage(parsedData.payload.text);
-        } else if (parsedData.type === 'agent_status' && parsedData.payload) {
-          // New event type: Agent status update
-          if (callbacks.onAgentStatus) {
-            callbacks.onAgentStatus(
-              parsedData.payload.status,
-              parsedData.payload.agent
+        onopen: async response => {
+          if (!response.ok) {
+            const errorText = await response.text();
+            callbacks.onError(
+              new Error(`Failed to connect: ${response.status} ${errorText}`)
             );
+            ctrl.abort(); // Stop further processing
           }
-        } else if (parsedData.type === 'done') {
+        },
+
+        onmessage(event) {
+          if (isStreamClosed) {
+            return;
+          }
+
+          try {
+            const parsedData = JSON.parse(event.data);
+
+            if (parsedData.type === 'chunk' && parsedData.payload?.text) {
+              callbacks.onMessage(parsedData.payload.text);
+            } else if (
+              parsedData.type === 'agent_status' &&
+              parsedData.payload
+            ) {
+              // New event type: Agent status update
+              if (callbacks.onAgentStatus) {
+                callbacks.onAgentStatus(
+                  parsedData.payload.status,
+                  parsedData.payload.agent
+                );
+              }
+            } else if (parsedData.type === 'done') {
+              if (!isStreamClosed) {
+                isStreamClosed = true;
+                callbacks.onClose();
+              }
+              ctrl.abort(); // End the connection
+            } else if (parsedData.type === 'error') {
+              if (!isStreamClosed) {
+                isStreamClosed = true;
+                callbacks.onError(
+                  new Error(
+                    parsedData.payload?.message ||
+                      'An unknown stream error occurred.'
+                  )
+                );
+              }
+              ctrl.abort();
+            }
+          } catch (e) {
+            if (!isStreamClosed) {
+              isStreamClosed = true;
+              callbacks.onError(
+                new Error('Failed to parse message from stream.')
+              );
+              ctrl.abort();
+            }
+          }
+        },
+
+        onclose() {
+          // onClose は onmessage の 'done' イベントで既に呼ばれている可能性があるため、
+          // 重複呼び出しを防止
           if (!isStreamClosed) {
             isStreamClosed = true;
             callbacks.onClose();
           }
-          ctrl.abort(); // End the connection
-        } else if (parsedData.type === 'error') {
+        },
+
+        onerror(err) {
           if (!isStreamClosed) {
             isStreamClosed = true;
             callbacks.onError(
-              new Error(
-                parsedData.payload?.message ||
-                  'An unknown stream error occurred.'
-              )
+              err instanceof Error ? err : new Error(String(err))
             );
           }
-          ctrl.abort();
-        }
-      } catch (e) {
-        if (!isStreamClosed) {
-          isStreamClosed = true;
-          callbacks.onError(new Error('Failed to parse message from stream.'));
-          ctrl.abort();
-        }
-      }
-    },
-
-    onclose() {
-      // onClose は onmessage の 'done' イベントで既に呼ばれている可能性があるため、
-      // 重複呼び出しを防止
-      if (!isStreamClosed) {
-        isStreamClosed = true;
-        callbacks.onClose();
-      }
-    },
-
-    onerror(err) {
-      if (!isStreamClosed) {
-        isStreamClosed = true;
-        callbacks.onError(err instanceof Error ? err : new Error(String(err)));
-      }
-      // fetchEventSource の自動リトライを防止するためにエラーを投げる
-      // これにより、エラー時に確実に停止する
-      throw err;
-    },
-  });
+          // fetchEventSource の自動リトライを防止するためにエラーを投げる
+          // これにより、エラー時に確実に停止する
+          throw err;
+        },
+      });
+    } catch (error) {
+      // トークン取得エラーなどの初期化エラー
+      callbacks.onError(
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
+  })();
 
   return () => ctrl.abort(); // Return a function to abort the stream
-};
-
-/**
- * Execute a confirmed destructive action requested by the AI agent
- */
-export const executeConfirmedAgentAction = (
-  actionType: ExecuteConfirmedActionRequest['action_type'],
-  calculationId: string
-): Promise<ExecuteConfirmedActionResponse['data']> => {
-  if (!calculationId || calculationId.trim() === '') {
-    return Promise.reject(
-      new ApiError(
-        'Invalid calculation ID provided.',
-        400,
-        'Bad Request',
-        '/api/agent/execute-confirmed-action',
-        null,
-        false
-      )
-    );
-  }
-
-  return request<ExecuteConfirmedActionResponse['data']>(
-    '/api/agent/execute-confirmed-action',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        action_type: actionType,
-        calculation_id: calculationId,
-      }),
-    }
-  );
 };
 
 // --- Chat History API Functions ---

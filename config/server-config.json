@@ -1,14 +1,7 @@
 {
   "server": {
     "host": "127.0.0.1",
-    "port": {
-      "default": 5000,
-      "auto_detect": true,
-      "range": {
-        "start": 5000,
-        "end": 5100
-      }
-    },
+    "port": 5000,
     "debug": false
   },
   "gunicorn": {
@@ -35,7 +28,7 @@
     "async_mode": "threading",
     "ping_timeout": 60,
     "ping_interval": 25,
-    "allow_unsafe_werkzeug": true,
+    "allow_unsafe_werkzeug": false,
     "logger": true,
     "engineio_logger": false
   },
@@ -82,7 +75,7 @@
     }
   },
   "app_info": {
-    "version": "0.1.5-beta"
+    "version": "0.1.6-beta"
   },
   "external_services": {
     "pubchem_timeout": 30,

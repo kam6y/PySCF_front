@@ -155,12 +155,84 @@ const STATUS_CONFIG = {
     className: styles.statusWaiting,
     color: '#ff9800',
   },
+  pausing: {
+    icon: (
+      <span
+        style={{
+          position: 'relative',
+          display: 'inline-block',
+          width: '20px',
+          height: '20px',
+        }}
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className={styles.animateSpin}
+          style={{ position: 'absolute', top: 0, left: 0 }}
+        >
+          <circle
+            cx="8"
+            cy="8"
+            r="6"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeDasharray="30 8"
+            strokeLinecap="round"
+            fill="none"
+          />
+        </svg>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ position: 'absolute', top: 0, left: 0 }}
+        >
+          <rect x="5" y="5" width="1.5" height="6" fill="currentColor" />
+          <rect x="9.5" y="5" width="1.5" height="6" fill="currentColor" />
+        </svg>
+      </span>
+    ),
+    label: 'Pausing',
+    className: styles.statusPausing,
+    color: '#9c27b0',
+  },
+  paused: {
+    icon: (
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 16 16"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M8 1C4.13401 1 1 4.13401 1 8C1 11.866 4.13401 15 8 15C11.866 15 15 11.866 15 8C15 4.13401 11.866 1 8 1Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          fill="none"
+        />
+        <rect x="5" y="5" width="1.5" height="6" fill="currentColor" />
+        <rect x="9.5" y="5" width="1.5" height="6" fill="currentColor" />
+      </svg>
+    ),
+    label: 'Paused',
+    className: styles.statusPaused,
+    color: '#9c27b0',
+  },
 } as const;
 
 // Status order for grouping
 const STATUS_ORDER: (keyof typeof STATUS_CONFIG)[] = [
   'error',
   'pending',
+  'pausing',
+  'paused',
   'waiting',
   'running',
   'completed',

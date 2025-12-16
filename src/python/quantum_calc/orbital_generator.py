@@ -92,36 +92,96 @@ class MolecularOrbitalGenerator:
         mo_energy = self.mf.mo_energy
         mo_occ = self.mf.mo_occ
         
-        # Handle both RKS/RHF (1D array) and UKS/UHF (2D array) cases
-        if hasattr(mo_energy, 'ndim') and mo_energy.ndim == 2:
+        # Determine if this is an open-shell calculation
+        is_unrestricted = hasattr(mo_energy, 'ndim') and mo_energy.ndim == 2
+        
+        if is_unrestricted:
             # UKS/UHF case: use alpha orbitals for display
-            mo_energy = mo_energy[0]
-            mo_occ = mo_occ[0]
+            # Keep track of both alpha and beta occupancies for proper labeling
+            alpha_energy = mo_energy[0]
+            alpha_occ = mo_occ[0]
+            beta_occ = mo_occ[1]
+            # Total occupancy is sum of alpha and beta (0, 1, or 2)
+            total_occ = alpha_occ + beta_occ
+            mo_energy_display = alpha_energy
+        else:
+            # RKS/RHF case: occupancies are already 0 or 2
+            mo_energy_display = mo_energy
+            total_occ = mo_occ
+            alpha_occ = mo_occ / 2  # For consistent indexing
+            beta_occ = mo_occ / 2
         
-        # Find HOMO and LUMO indices
-        occupied_indices = np.where(mo_occ > 0)[0]
-        homo_idx = occupied_indices[-1] if len(occupied_indices) > 0 else -1
-        lumo_idx = np.where(mo_occ == 0)[0][0] if len(np.where(mo_occ == 0)[0]) > 0 else len(mo_energy)
+        # Find indices for key orbitals
+        # For open-shell: find highest doubly occupied, SOMO(s), and LUMO
+        doubly_occupied_indices = np.where(total_occ >= 2 - 1e-6)[0]
+        singly_occupied_indices = np.where((total_occ > 0 + 1e-6) & (total_occ < 2 - 1e-6))[0]
+        virtual_indices = np.where(total_occ < 1e-6)[0]
         
-        for i, (energy, occ) in enumerate(zip(mo_energy, mo_occ)):
+        # Determine HOMO/SOMO/LUMO
+        has_somo = len(singly_occupied_indices) > 0
+        
+        if has_somo:
+            # Open-shell case with SOMO(s)
+            homo_idx = singly_occupied_indices[-1]  # Highest SOMO is the new "HOMO" equivalent
+            lumo_idx = virtual_indices[0] if len(virtual_indices) > 0 else len(mo_energy_display)
+            # Track the highest doubly occupied orbital (if any)
+            highest_doubly_idx = doubly_occupied_indices[-1] if len(doubly_occupied_indices) > 0 else -1
+        else:
+            # Closed-shell or all doubly occupied
+            occupied_indices = np.where(total_occ > 0)[0]
+            homo_idx = occupied_indices[-1] if len(occupied_indices) > 0 else -1
+            lumo_idx = virtual_indices[0] if len(virtual_indices) > 0 else len(mo_energy_display)
+            highest_doubly_idx = homo_idx
+        
+        for i, energy in enumerate(mo_energy_display):
+            occ = total_occ[i]
+            is_singly_occupied = i in singly_occupied_indices
+            
             # Determine orbital type and label
-            if i < homo_idx - 5:
-                orbital_type = "core"
-                label = f"Core {i}"
-            elif i == homo_idx:
+            if is_singly_occupied:
+                # SOMO (Singly Occupied Molecular Orbital)
+                if len(singly_occupied_indices) == 1:
+                    orbital_type = "homo"  # Use 'homo' type for color coding compatibility
+                    label = "SOMO"
+                else:
+                    # Multiple SOMOs - index them
+                    somo_index = np.where(singly_occupied_indices == i)[0][0]
+                    num_somos = len(singly_occupied_indices)
+                    if somo_index == num_somos - 1:
+                        orbital_type = "homo"
+                        label = "SOMO"  # Highest SOMO
+                    else:
+                        orbital_type = "homo"  # Use 'homo' for color
+                        label = f"SOMO-{num_somos - 1 - somo_index}"
+            elif i == homo_idx and not has_somo:
+                # HOMO in closed-shell system
                 orbital_type = "homo"
                 label = "HOMO"
             elif i == lumo_idx:
                 orbital_type = "lumo"
                 label = "LUMO"
-            elif i < homo_idx:
-                diff = homo_idx - i
+            elif i < (highest_doubly_idx if has_somo else homo_idx) - 5:
+                orbital_type = "core"
+                label = f"Core {i}"
+            elif has_somo and i == highest_doubly_idx:
+                # Highest doubly occupied orbital in open-shell system
+                # Label as HOMO-1 relative to SOMO (which acts as HOMO equivalent)
                 orbital_type = "occupied"
+                diff = singly_occupied_indices[0] - i  # Distance from lowest SOMO
+                label = f"HOMO-{diff}" if diff > 0 else "HOMO"
+            elif i < (singly_occupied_indices[0] if has_somo else homo_idx):
+                # Below SOMO/HOMO region
+                ref_idx = singly_occupied_indices[0] if has_somo else homo_idx
+                diff = ref_idx - i
+                orbital_type = "occupied" if occ > 0 else "core"
                 label = f"HOMO-{diff}"
             elif i > lumo_idx:
                 diff = i - lumo_idx
                 orbital_type = "virtual"
                 label = f"LUMO+{diff}"
+            elif occ > 0:
+                orbital_type = "occupied"
+                label = f"Occupied {i}"
             else:
                 orbital_type = "virtual"
                 label = f"Virtual {i}"

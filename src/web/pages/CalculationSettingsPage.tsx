@@ -3,10 +3,10 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 import styles from './CalculationSettingsPage.module.css';
-import { MoleculeViewerRef } from '../components/MoleculeViewer';
+import { MoleculeViewer } from '../components/MoleculeViewer';
 import { XYZInput } from '../components/XYZInput';
 import { MoleculeViewerSection } from '../components/MoleculeViewerSection';
-import { StyleSpec } from '../../types/3dmol';
+import { StyleSpec, ExtendedStyleSpec } from '../../types/3dmol';
 import {
   QuantumCalculationRequest,
   CalculationInstance,
@@ -15,6 +15,10 @@ import {
 } from '../types/api-types';
 import { searchPubChem, convertSmilesToXyz } from '../apiClient';
 import { useSupportedParameters } from '../hooks/useCalculationQueries';
+import { useMethodDefaults } from '../hooks/useMethodDefaults';
+
+// Helper type to extract all keys from a union type
+type DistributiveKeyOf<T> = T extends any ? keyof T : never;
 
 interface CalculationSettingsPageProps {
   activeCalculation?: CalculationInstance;
@@ -23,6 +27,8 @@ interface CalculationSettingsPageProps {
     params: QuantumCalculationRequest
   ) => Promise<CalculationInstance>;
   onCalculationRename: (id: string, newName: string) => Promise<void>;
+  onCalculationPause: (id: string) => Promise<void>;
+  onCalculationResume: (id: string) => Promise<void>;
   createNewCalculationFromExisting: (
     originalCalc: CalculationInstance,
     newParams: QuantumCalculationRequest
@@ -34,35 +40,14 @@ export const CalculationSettingsPage = ({
   onCalculationUpdate,
   onStartCalculation,
   onCalculationRename,
+  onCalculationPause,
+  onCalculationResume,
   createNewCalculationFromExisting,
 }: CalculationSettingsPageProps) => {
-  // Helper functions for safely getting parameters with defaults
-  const getValidNumberParam = (
-    value: any,
-    defaultValue: number,
-    minValue: number = 0
-  ): number => {
-    return typeof value === 'number' && !isNaN(value) && value >= minValue
-      ? value
-      : defaultValue;
-  };
-
-  const getValidBooleanParam = (value: any, defaultValue: boolean): boolean => {
-    return typeof value === 'boolean' ? value : defaultValue;
-  };
-
-  const getValidFloatParam = (
-    value: any,
-    defaultValue: number,
-    minValue: number = 0
-  ): number => {
-    return typeof value === 'number' && !isNaN(value) && value >= minValue
-      ? value
-      : defaultValue;
-  };
-  const moleculeViewerRef = useRef<MoleculeViewerRef>(null);
   const previousCalculationIdRef = useRef<string | null>(null);
-  const currentStyleRef = useRef<StyleSpec | null>(null);
+  const [currentStyle, setCurrentStyle] = useState<ExtendedStyleSpec | null>(
+    null
+  );
   const [calculationError, setCalculationError] = useState<string | null>(null);
   const [inputMethod, setInputMethod] = useState('pubchem');
   const [pubchemInput, setPubchemInput] = useState('');
@@ -81,6 +66,11 @@ export const CalculationSettingsPage = ({
     error: paramsError,
   } = useSupportedParameters();
 
+  // メソッドデフォルトと制約を取得
+  const { applyMethodDefaults, isParameterDisabled, getParameterConstraint } =
+    useMethodDefaults();
+
+  // Initialize local state when active calculation changes
   useEffect(() => {
     const currentCalculationId = activeCalculation?.id || null;
     const previousCalculationId = previousCalculationIdRef.current;
@@ -94,25 +84,12 @@ export const CalculationSettingsPage = ({
             ''
         );
       }
-
-      const xyz = activeCalculation.parameters?.xyz;
-      if (xyz && xyz.trim() !== '') {
-        // Ensure viewer is initialized before loading molecule
-        setTimeout(() => {
-          moleculeViewerRef.current?.loadXYZ(xyz);
-          // Apply the current style after loading the molecule
-          if (currentStyleRef.current) {
-            setTimeout(() => {
-              moleculeViewerRef.current?.setStyle(currentStyleRef.current!);
-            }, 100); // Small delay to ensure the molecule is fully loaded
-          }
-        }, 0);
-      } else {
-        moleculeViewerRef.current?.clearModels();
+      // Initialize inputs based on calculation data
+      if (activeCalculation.parameters?.xyz) {
+        // setXyzInput was removed as it was unused
       }
     } else {
       setLocalName('');
-      moleculeViewerRef.current?.clearModels();
       setIsEditingName(false);
     }
 
@@ -120,34 +97,29 @@ export const CalculationSettingsPage = ({
   }, [activeCalculation, isEditingName]);
 
   useEffect(() => {
-    moleculeViewerRef.current?.showAxes(showAxes);
-  }, [showAxes, activeCalculation]);
-
-  useEffect(() => {
-    moleculeViewerRef.current?.showAtomCoordinates(showCoordinates);
-  }, [showCoordinates, activeCalculation]);
-
-  useEffect(() => {
     // Re-apply the current style when atomic radii setting changes
     const hasValidMolecule = !!(
       activeCalculation?.parameters?.xyz &&
       activeCalculation.parameters.xyz.trim() !== ''
     );
-    if (currentStyleRef.current && hasValidMolecule) {
-      const style = { ...currentStyleRef.current };
-      if (useAtomicRadii) {
-        (style as any)._useAtomicRadii = true;
-        (style as any)._baseAtomRadius = 0.3;
-      } else {
-        (style as any)._useAtomicRadii = false;
-      }
-      moleculeViewerRef.current?.setStyle(style);
+    if (hasValidMolecule) {
+      setCurrentStyle(prevStyle => {
+        if (!prevStyle) return null;
+        const style = { ...prevStyle };
+        if (useAtomicRadii) {
+          style._useAtomicRadii = true;
+          style._baseAtomRadius = 0.3;
+        } else {
+          style._useAtomicRadii = false;
+        }
+        return style;
+      });
     }
   }, [useAtomicRadii, activeCalculation?.parameters?.xyz]);
 
   const handleParamChange = useCallback(
     (
-      field: keyof QuantumCalculationRequest,
+      field: DistributiveKeyOf<QuantumCalculationRequest>,
       value: string | number | boolean
     ) => {
       if (!activeCalculation || !onCalculationUpdate) return;
@@ -171,7 +143,6 @@ export const CalculationSettingsPage = ({
       const isCompleted =
         activeCalculation.status === 'completed' ||
         activeCalculation.status === 'error';
-      const isParamChange = field !== 'xyz';
       const currentParams = activeCalculation.parameters;
 
       let processedValue = value;
@@ -179,158 +150,38 @@ export const CalculationSettingsPage = ({
         processedValue = '78.36';
       }
 
-      // Adjust defaults when calculation method changes
-      let adjustedParams = { ...currentParams };
+      let updatedParams: QuantumCalculationRequest;
+
+      // When calculation method changes, apply method-specific defaults
       if (field === 'calculation_method') {
-        if (value === 'CCSD' || value === 'CCSD_T') {
-          // CCSD defaults: correlation-consistent basis and higher memory
-          adjustedParams.basis_function = 'cc-pVDZ';
-          adjustedParams.memory_mb = adjustedParams.memory_mb || 4000;
-        } else if (value === 'MP2') {
-          // MP2 defaults: higher memory
-          adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
-        } else if (value === 'TDDFT') {
-          // TDDFT defaults
-          adjustedParams.basis_function =
-            adjustedParams.basis_function || '6-31G(d)';
-          adjustedParams.memory_mb = adjustedParams.memory_mb || 2000;
-          // Initialize TDDFT parameters if not already set
-          (adjustedParams as any).tddft_nstates =
-            (adjustedParams as any).tddft_nstates || 10;
-          (adjustedParams as any).tddft_method =
-            (adjustedParams as any).tddft_method || 'TDDFT';
-          (adjustedParams as any).tddft_analyze_nto =
-            (adjustedParams as any).tddft_analyze_nto !== undefined
-              ? (adjustedParams as any).tddft_analyze_nto
-              : false;
-        } else if (value === 'CASCI' || value === 'CASSCF') {
-          // CASCI/CASSCF defaults
-          adjustedParams.basis_function =
-            adjustedParams.basis_function || '6-31G(d)';
-          adjustedParams.memory_mb = adjustedParams.memory_mb || 3000;
-          // Preserve existing CASCI/CASSCF parameters or use defaults
-          (adjustedParams as any).ncas = getValidNumberParam(
-            (adjustedParams as any).ncas,
-            4,
-            1
-          );
-          (adjustedParams as any).nelecas = getValidNumberParam(
-            (adjustedParams as any).nelecas,
-            4,
-            1
-          );
-          (adjustedParams as any).max_cycle_macro = getValidNumberParam(
-            (adjustedParams as any).max_cycle_macro,
-            50,
-            1
-          );
-          (adjustedParams as any).max_cycle_micro = getValidNumberParam(
-            (adjustedParams as any).max_cycle_micro,
-            3,
-            1
-          );
-          (adjustedParams as any).natorb = getValidBooleanParam(
-            (adjustedParams as any).natorb,
-            true
-          );
-          (adjustedParams as any).conv_tol = getValidFloatParam(
-            (adjustedParams as any).conv_tol,
-            1e-6,
-            1e-12
-          );
-          (adjustedParams as any).conv_tol_grad = getValidFloatParam(
-            (adjustedParams as any).conv_tol_grad,
-            1e-4,
-            1e-8
-          );
-        } else {
-          // DFT/HF defaults
-          adjustedParams.basis_function =
-            adjustedParams.basis_function || '6-31G(d)';
-          adjustedParams.memory_mb = adjustedParams.memory_mb || 2000;
-        }
+        updatedParams = applyMethodDefaults(
+          currentParams,
+          value as string
+        ) as QuantumCalculationRequest;
+      } else {
+        updatedParams = {
+          ...currentParams,
+          [field]: processedValue,
+        } as QuantumCalculationRequest;
       }
 
-      const safeParams: QuantumCalculationRequest & {
-        frozen_core?: boolean;
-      } = {
-        xyz: adjustedParams.xyz || '',
-        calculation_method: adjustedParams.calculation_method || 'DFT',
-        basis_function: adjustedParams.basis_function || '6-31G(d)',
-        exchange_correlation:
-          adjustedParams.calculation_method === 'DFT' ||
-          adjustedParams.calculation_method === 'TDDFT'
-            ? adjustedParams.exchange_correlation || 'B3LYP'
-            : null,
-        charges: adjustedParams.charges || 0,
-        spin: adjustedParams.spin || 0,
-        solvent_method: adjustedParams.solvent_method || 'none',
-        solvent: adjustedParams.solvent || '-',
-        name:
-          (adjustedParams as any).name ||
-          (adjustedParams as any).molecule_name ||
-          'Unnamed Calculation',
-        cpu_cores: adjustedParams.cpu_cores || undefined,
-        memory_mb: adjustedParams.memory_mb || undefined,
-        tddft_nstates:
-          (adjustedParams as any).tddft_nstates !== undefined
-            ? (adjustedParams as any).tddft_nstates
-            : 10,
-        tddft_method: (adjustedParams as any).tddft_method || 'TDDFT',
-        tddft_analyze_nto:
-          (adjustedParams as any).tddft_analyze_nto !== undefined
-            ? (adjustedParams as any).tddft_analyze_nto
-            : false,
-        frozen_core: (adjustedParams as any).frozen_core !== false, // Default to true
-        // CASCI/CASSCF parameters - preserve current values or use defaults
-        ncas: getValidNumberParam((adjustedParams as any).ncas, 4, 1),
-        nelecas: getValidNumberParam((adjustedParams as any).nelecas, 4, 1),
-        max_cycle_macro: getValidNumberParam(
-          (adjustedParams as any).max_cycle_macro,
-          50,
-          1
-        ),
-        max_cycle_micro: getValidNumberParam(
-          (adjustedParams as any).max_cycle_micro,
-          3,
-          1
-        ),
-        natorb: getValidBooleanParam((adjustedParams as any).natorb, true),
-        conv_tol: getValidFloatParam(
-          (adjustedParams as any).conv_tol,
-          1e-6,
-          1e-12
-        ),
-        conv_tol_grad: getValidFloatParam(
-          (adjustedParams as any).conv_tol_grad,
-          1e-4,
-          1e-8
-        ),
-        optimize_geometry: getValidBooleanParam(
-          (adjustedParams as any).optimize_geometry,
-          !(
-            adjustedParams.calculation_method === 'TDDFT' ||
-            adjustedParams.calculation_method === 'CASCI' ||
-            adjustedParams.calculation_method === 'CASSCF' ||
-            adjustedParams.calculation_method === 'CCSD' ||
-            adjustedParams.calculation_method === 'CCSD_T'
-          )
-        ),
-        ketcher_data: (adjustedParams as any).ketcher_data || undefined,
-      };
-
-      if (isCompleted && isParamChange) {
-        const newParams = { ...safeParams, [field]: processedValue };
-        createNewCalculationFromExisting(activeCalculation, newParams);
+      // If calculation is completed/error and we're changing a parameter (not xyz),
+      // create a new calculation from the existing one
+      if (isCompleted && field !== 'xyz') {
+        createNewCalculationFromExisting(activeCalculation, updatedParams);
       } else {
-        const updatedParams = { ...safeParams, [field]: processedValue };
         onCalculationUpdate({
           ...activeCalculation,
           parameters: updatedParams,
         });
       }
     },
-    [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]
+    [
+      activeCalculation,
+      onCalculationUpdate,
+      createNewCalculationFromExisting,
+      applyMethodDefaults,
+    ]
   );
 
   // Calculate hasValidMolecule before early return
@@ -339,15 +190,9 @@ export const CalculationSettingsPage = ({
     activeCalculation.parameters.xyz.trim() !== ''
   );
 
-  const handleStyleChange = useCallback(
-    (style: StyleSpec) => {
-      currentStyleRef.current = style;
-      if (hasValidMolecule) {
-        moleculeViewerRef.current?.setStyle(style);
-      }
-    },
-    [hasValidMolecule]
-  );
+  const handleStyleChange = useCallback((style: StyleSpec) => {
+    setCurrentStyle(style);
+  }, []);
 
   const handleXYZChange = useCallback(
     (xyzData: string, isValid: boolean) => {
@@ -357,78 +202,14 @@ export const CalculationSettingsPage = ({
           activeCalculation.status === 'error';
         const currentParams = activeCalculation.parameters;
 
-        const safeParams: QuantumCalculationRequest & {
-          frozen_core?: boolean;
-        } = {
+        const updatedParams = {
+          ...currentParams,
           xyz: xyzData,
-          calculation_method: currentParams.calculation_method || 'DFT',
-          basis_function: currentParams.basis_function || '6-31G(d)',
-          exchange_correlation:
-            currentParams.calculation_method === 'DFT' ||
-            currentParams.calculation_method === 'TDDFT'
-              ? currentParams.exchange_correlation || 'B3LYP'
-              : null,
-          charges: currentParams.charges || 0,
-          spin: currentParams.spin || 0,
-          solvent_method: currentParams.solvent_method || 'none',
-          solvent: currentParams.solvent || '-',
-          name:
-            (currentParams as any).name ||
-            (currentParams as any).molecule_name ||
-            'Unnamed Calculation',
-          cpu_cores: currentParams.cpu_cores || undefined,
-          memory_mb: currentParams.memory_mb || undefined,
-          tddft_nstates:
-            (currentParams as any).tddft_nstates !== undefined
-              ? (currentParams as any).tddft_nstates
-              : 10,
-          tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-          tddft_analyze_nto:
-            (currentParams as any).tddft_analyze_nto !== undefined
-              ? (currentParams as any).tddft_analyze_nto
-              : false,
-          frozen_core: (currentParams as any).frozen_core !== false, // Default to true
-          // CASCI/CASSCF parameters - preserve current values or use defaults
-          ncas: getValidNumberParam((currentParams as any).ncas, 4, 1),
-          nelecas: getValidNumberParam((currentParams as any).nelecas, 4, 1),
-          max_cycle_macro: getValidNumberParam(
-            (currentParams as any).max_cycle_macro,
-            50,
-            1
-          ),
-          max_cycle_micro: getValidNumberParam(
-            (currentParams as any).max_cycle_micro,
-            3,
-            1
-          ),
-          natorb: getValidBooleanParam((currentParams as any).natorb, true),
-          conv_tol: getValidFloatParam(
-            (currentParams as any).conv_tol,
-            1e-6,
-            1e-12
-          ),
-          conv_tol_grad: getValidFloatParam(
-            (currentParams as any).conv_tol_grad,
-            1e-4,
-            1e-8
-          ),
-          optimize_geometry: getValidBooleanParam(
-            (currentParams as any).optimize_geometry,
-            !(
-              currentParams.calculation_method === 'TDDFT' ||
-              currentParams.calculation_method === 'CASCI' ||
-              currentParams.calculation_method === 'CASSCF' ||
-              currentParams.calculation_method === 'CCSD' ||
-              currentParams.calculation_method === 'CCSD_T'
-            )
-          ),
-          ketcher_data: (currentParams as any).ketcher_data || undefined,
-        };
+        } as QuantumCalculationRequest;
 
         if (isCompleted) {
-          createNewCalculationFromExisting(activeCalculation, safeParams);
+          createNewCalculationFromExisting(activeCalculation, updatedParams);
         } else {
-          const updatedParams = { ...currentParams, xyz: xyzData };
           onCalculationUpdate({
             ...activeCalculation,
             parameters: updatedParams,
@@ -514,72 +295,10 @@ export const CalculationSettingsPage = ({
 
     setCalculationError(null);
 
-    const currentParams = activeCalculation.parameters;
-
-    const finalParams: QuantumCalculationRequest & {
-      frozen_core?: boolean;
-    } = {
-      xyz: currentParams.xyz || '',
-      calculation_method: currentParams.calculation_method || 'DFT',
-      basis_function: currentParams.basis_function || '6-31G(d)',
-      exchange_correlation:
-        currentParams.calculation_method === 'DFT' ||
-        currentParams.calculation_method === 'TDDFT'
-          ? currentParams.exchange_correlation || 'B3LYP'
-          : null,
-      charges: currentParams.charges || 0,
-      spin: currentParams.spin || 0,
-      solvent_method: currentParams.solvent_method || 'none',
-      solvent: currentParams.solvent || '-',
+    const finalParams = {
+      ...activeCalculation.parameters,
       name: moleculeName,
-      cpu_cores: currentParams.cpu_cores || undefined,
-      memory_mb: currentParams.memory_mb || undefined,
-      tddft_nstates:
-        (currentParams as any).tddft_nstates !== undefined
-          ? (currentParams as any).tddft_nstates
-          : 10,
-      tddft_method: (currentParams as any).tddft_method || 'TDDFT',
-      tddft_analyze_nto:
-        (currentParams as any).tddft_analyze_nto !== undefined
-          ? (currentParams as any).tddft_analyze_nto
-          : false,
-      frozen_core: (currentParams as any).frozen_core !== false, // Default to true
-      // CASCI/CASSCF parameters - preserve current values or use defaults
-      ncas: getValidNumberParam((currentParams as any).ncas, 4, 1),
-      nelecas: getValidNumberParam((currentParams as any).nelecas, 4, 1),
-      max_cycle_macro: getValidNumberParam(
-        (currentParams as any).max_cycle_macro,
-        50,
-        1
-      ),
-      max_cycle_micro: getValidNumberParam(
-        (currentParams as any).max_cycle_micro,
-        3,
-        1
-      ),
-      natorb: getValidBooleanParam((currentParams as any).natorb, true),
-      conv_tol: getValidFloatParam(
-        (currentParams as any).conv_tol,
-        1e-6,
-        1e-12
-      ),
-      conv_tol_grad: getValidFloatParam(
-        (currentParams as any).conv_tol_grad,
-        1e-4,
-        1e-8
-      ),
-      optimize_geometry: getValidBooleanParam(
-        (currentParams as any).optimize_geometry,
-        !(
-          currentParams.calculation_method === 'TDDFT' ||
-          currentParams.calculation_method === 'CASCI' ||
-          currentParams.calculation_method === 'CASSCF' ||
-          currentParams.calculation_method === 'CCSD' ||
-          currentParams.calculation_method === 'CCSD_T'
-        )
-      ),
-      ketcher_data: (currentParams as any).ketcher_data || undefined,
-    };
+    } as QuantumCalculationRequest;
 
     try {
       const runningCalculation = await onStartCalculation(finalParams);
@@ -628,74 +347,15 @@ export const CalculationSettingsPage = ({
         activeCalculation.status === 'completed' ||
         activeCalculation.status === 'error';
 
-      const safeParams: QuantumCalculationRequest & {
-        frozen_core?: boolean;
-      } = {
+      const updatedParams = {
+        ...params,
         xyz: data.xyz,
-        calculation_method: params.calculation_method || 'DFT',
-        basis_function: params.basis_function || '6-31G(d)',
-        exchange_correlation:
-          params.calculation_method === 'DFT' ||
-          params.calculation_method === 'TDDFT'
-            ? params.exchange_correlation || 'B3LYP'
-            : null,
-        charges: params.charges || 0,
-        spin: params.spin || 0,
-        solvent_method: params.solvent_method || 'none',
-        solvent: params.solvent || '-',
         name: moleculeName,
-        cpu_cores: params.cpu_cores || undefined,
-        memory_mb: params.memory_mb || undefined,
-        tddft_nstates:
-          (params as any).tddft_nstates !== undefined
-            ? (params as any).tddft_nstates
-            : 10,
-        tddft_method: (params as any).tddft_method || 'TDDFT',
-        tddft_analyze_nto:
-          (params as any).tddft_analyze_nto !== undefined
-            ? (params as any).tddft_analyze_nto
-            : false,
-        frozen_core: (params as any).frozen_core !== false, // Default to true
-        // CASCI/CASSCF parameters - preserve current values or use defaults
-        ncas: getValidNumberParam((params as any).ncas, 4, 1),
-        nelecas: getValidNumberParam((params as any).nelecas, 4, 1),
-        max_cycle_macro: getValidNumberParam(
-          (params as any).max_cycle_macro,
-          50,
-          1
-        ),
-        max_cycle_micro: getValidNumberParam(
-          (params as any).max_cycle_micro,
-          3,
-          1
-        ),
-        natorb: getValidBooleanParam((params as any).natorb, true),
-        conv_tol: getValidFloatParam((params as any).conv_tol, 1e-6, 1e-12),
-        conv_tol_grad: getValidFloatParam(
-          (params as any).conv_tol_grad,
-          1e-4,
-          1e-8
-        ),
-        optimize_geometry: getValidBooleanParam(
-          (params as any).optimize_geometry,
-          !(
-            params.calculation_method === 'TDDFT' ||
-            params.calculation_method === 'CASCI' ||
-            params.calculation_method === 'CASSCF' ||
-            params.calculation_method === 'CCSD' ||
-            params.calculation_method === 'CCSD_T'
-          )
-        ),
-        ketcher_data: (params as any).ketcher_data || undefined,
-      };
+      } as QuantumCalculationRequest;
 
       if (isCompleted) {
-        createNewCalculationFromExisting(activeCalculation, safeParams);
+        createNewCalculationFromExisting(activeCalculation, updatedParams);
       } else {
-        const updatedParams = {
-          ...params,
-          xyz: data.xyz,
-        };
         onCalculationUpdate({
           ...activeCalculation,
           name: moleculeName,
@@ -870,28 +530,50 @@ export const CalculationSettingsPage = ({
                   <span className={styles.memoryUnit}>MB</span>
                 </div>
               </div>
-              <button
-                className={`${styles.startCalculationBtn} ${
-                  calculationStatus === 'completed'
-                    ? styles.completed
-                    : calculationStatus === 'running'
-                      ? styles.running
-                      : calculationStatus === 'waiting'
-                        ? styles.waiting
-                        : calculationStatus === 'error'
-                          ? styles.error
-                          : styles.pending
-                }`}
-                onClick={handleStartCalculation}
-                disabled={
-                  !hasValidMolecule ||
-                  calculationStatus === 'running' ||
-                  calculationStatus === 'waiting' ||
-                  calculationStatus === 'completed'
-                }
-              >
-                {getCalculationButtonText()}
-              </button>
+              {calculationStatus === 'running' ||
+              calculationStatus === 'pausing' ? (
+                <button
+                  className={`${styles.pauseBtn} ${
+                    calculationStatus === 'pausing' ? styles.pausing : ''
+                  }`}
+                  onClick={() => onCalculationPause(activeCalculation!.id)}
+                  disabled={calculationStatus === 'pausing'}
+                >
+                  <span className={styles.pauseIcon}>⏸</span>
+                  {calculationStatus === 'pausing' ? 'Pausing...' : 'Pause'}
+                </button>
+              ) : calculationStatus === 'paused' ? (
+                <button
+                  className={styles.resumeBtn}
+                  onClick={() => onCalculationResume(activeCalculation!.id)}
+                >
+                  <span className={styles.resumeIcon}>▶</span>
+                  Resume
+                </button>
+              ) : calculationStatus === 'waiting' ? (
+                <button
+                  className={`${styles.startCalculationBtn} ${styles.waiting}`}
+                  disabled
+                >
+                  Waiting...
+                </button>
+              ) : (
+                <button
+                  className={`${styles.startCalculationBtn} ${
+                    calculationStatus === 'completed'
+                      ? styles.completed
+                      : calculationStatus === 'error'
+                        ? styles.error
+                        : styles.pending
+                  }`}
+                  onClick={handleStartCalculation}
+                  disabled={
+                    !hasValidMolecule || calculationStatus === 'completed'
+                  }
+                >
+                  {getCalculationButtonText()}
+                </button>
+              )}
             </div>
           </div>
           <div className={styles.calculationColumn}>
@@ -899,11 +581,11 @@ export const CalculationSettingsPage = ({
               <div className={styles.settingRow}>
                 <label>Calculation Method</label>
                 <select
-                  value={params.calculation_method || 'DFT'}
+                  value={params.calculation_method}
                   onChange={e =>
                     handleParamChange('calculation_method', e.target.value)
                   }
-                  disabled={calculationStatus === 'running'}
+                  disabled={calculationStatus === 'running' || isLoadingParams}
                 >
                   {isLoadingParams ? (
                     <option value="">Loading...</option>
@@ -921,11 +603,11 @@ export const CalculationSettingsPage = ({
               <div className={styles.settingRow}>
                 <label>Basis Function</label>
                 <select
-                  value={params.basis_function || '6-31G(d)'}
+                  value={params.basis_function}
                   onChange={e =>
                     handleParamChange('basis_function', e.target.value)
                   }
-                  disabled={calculationStatus === 'running'}
+                  disabled={calculationStatus === 'running' || isLoadingParams}
                 >
                   {isLoadingParams ? (
                     <option value="">Loading...</option>
@@ -948,9 +630,9 @@ export const CalculationSettingsPage = ({
                 </select>
               </div>
               <div className={styles.settingRow}>
-                <label>Exchange-Correlation Functional</label>
+                <label>Exchange Functional</label>
                 <select
-                  value={params.exchange_correlation || 'B3LYP'}
+                  value={params.exchange_correlation || ''}
                   onChange={e =>
                     handleParamChange('exchange_correlation', e.target.value)
                   }
@@ -958,7 +640,9 @@ export const CalculationSettingsPage = ({
                     !(
                       params.calculation_method === 'DFT' ||
                       params.calculation_method === 'TDDFT'
-                    ) || calculationStatus === 'running'
+                    ) ||
+                    calculationStatus === 'running' ||
+                    isLoadingParams
                   }
                 >
                   {isLoadingParams ? (
@@ -1011,41 +695,26 @@ export const CalculationSettingsPage = ({
                 <label>
                   <input
                     type="checkbox"
-                    checked={getValidBooleanParam(
-                      (params as any).optimize_geometry,
-                      !(
-                        params.calculation_method === 'TDDFT' ||
-                        params.calculation_method === 'CASCI' ||
-                        params.calculation_method === 'CASSCF' ||
-                        params.calculation_method === 'CCSD' ||
-                        params.calculation_method === 'CCSD_T'
-                      )
-                    )}
+                    checked={(params as any).optimize_geometry ?? true}
                     onChange={e =>
-                      handleParamChange(
-                        'optimize_geometry' as any,
-                        e.target.checked
-                      )
+                      handleParamChange('optimize_geometry', e.target.checked)
                     }
                     disabled={
                       calculationStatus === 'running' ||
-                      params.calculation_method === 'TDDFT' ||
-                      params.calculation_method === 'CASCI' ||
-                      params.calculation_method === 'CASSCF' ||
-                      params.calculation_method === 'CCSD' ||
-                      params.calculation_method === 'CCSD_T'
+                      isParameterDisabled(
+                        'optimize_geometry',
+                        params.calculation_method || 'DFT'
+                      )
                     }
                   />
-                  Perform Geometry Optimization
+                  Geometry Optimization
                 </label>
-                {(params.calculation_method === 'TDDFT' ||
-                  params.calculation_method === 'CASCI' ||
-                  params.calculation_method === 'CASSCF' ||
-                  params.calculation_method === 'CCSD' ||
-                  params.calculation_method === 'CCSD_T') && (
+                {isParameterDisabled(
+                  'optimize_geometry',
+                  params.calculation_method || 'DFT'
+                ) && (
                   <div className={styles.frozenCoreHelp}>
-                    Geometry optimization is not available for this calculation
-                    method
+                    {getParameterConstraint('optimize_geometry')?.description}
                   </div>
                 )}
               </div>
@@ -1054,13 +723,13 @@ export const CalculationSettingsPage = ({
               params.calculation_method === 'CASSCF') && (
               <section className={styles.calculationSettingsSection}>
                 <div className={styles.settingRow}>
-                  <label>Number of Active Orbitals (ncas)</label>
+                  <label>Number of Active Orbitals</label>
                   <input
                     type="number"
-                    value={getValidNumberParam((params as any).ncas, 4, 1)}
+                    value={(params as any).ncas}
                     onChange={e =>
                       handleParamChange(
-                        'ncas' as any,
+                        'ncas',
                         Math.max(1, Math.min(20, Number(e.target.value)))
                       )
                     }
@@ -1068,17 +737,19 @@ export const CalculationSettingsPage = ({
                     max={20}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   />
                 </div>
                 <div className={styles.settingRow}>
-                  <label>Number of Active Electrons (nelecas)</label>
+                  <label>Number of Active Electrons</label>
                   <input
                     type="number"
-                    value={getValidNumberParam((params as any).nelecas, 4, 1)}
+                    value={(params as any).nelecas}
                     onChange={e =>
                       handleParamChange(
-                        'nelecas' as any,
+                        'nelecas',
                         Math.max(1, Math.min(40, Number(e.target.value)))
                       )
                     }
@@ -1086,32 +757,68 @@ export const CalculationSettingsPage = ({
                     max={40}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   />
                 </div>
                 {params.calculation_method === 'CASSCF' && (
-                  <div className={styles.settingRow}>
-                    <label>CASSCF Max Macro Iterations</label>
-                    <input
-                      type="number"
-                      value={
-                        (params as any).max_cycle_macro !== undefined
-                          ? (params as any).max_cycle_macro
-                          : 50
-                      }
-                      onChange={e =>
-                        handleParamChange(
-                          'max_cycle_macro' as any,
-                          Math.max(1, Math.min(200, Number(e.target.value)))
-                        )
-                      }
-                      min={1}
-                      max={200}
-                      step={1}
-                      className={`${styles.numberInput} ${styles.withSpinner}`}
-                      disabled={calculationStatus === 'running'}
-                    />
-                  </div>
+                  <>
+                    <div className={styles.settingRow}>
+                      <label>Energy Convergence Tolerance</label>
+                      <select
+                        value={(params as any).conv_tol ?? 1e-6}
+                        onChange={e =>
+                          handleParamChange(
+                            'conv_tol',
+                            parseFloat(e.target.value)
+                          )
+                        }
+                        disabled={calculationStatus === 'running'}
+                      >
+                        <option value={1e-5}>1e-5 (loose)</option>
+                        <option value={1e-6}>1e-6 (normal)</option>
+                        <option value={1e-7}>1e-7 (tight)</option>
+                        <option value={1e-8}>1e-8 (very tight)</option>
+                      </select>
+                    </div>
+                    <div className={styles.settingRow}>
+                      <label>Gradient Convergence Tolerance</label>
+                      <select
+                        value={(params as any).conv_tol_grad ?? 1e-4}
+                        onChange={e =>
+                          handleParamChange(
+                            'conv_tol_grad',
+                            parseFloat(e.target.value)
+                          )
+                        }
+                        disabled={calculationStatus === 'running'}
+                      >
+                        <option value={1e-3}>1e-3 (loose)</option>
+                        <option value={1e-4}>1e-4 (normal)</option>
+                        <option value={1e-5}>1e-5 (tight)</option>
+                        <option value={1e-6}>1e-6 (very tight)</option>
+                      </select>
+                    </div>
+                    <div className={styles.settingRow}>
+                      <label>CASSCF Max Macro Iterations</label>
+                      <input
+                        type="number"
+                        value={(params as any).max_cycle_macro}
+                        onChange={e =>
+                          handleParamChange(
+                            'max_cycle_macro',
+                            Math.max(1, Math.min(200, Number(e.target.value)))
+                          )
+                        }
+                        min={1}
+                        max={200}
+                        step={1}
+                        className={`${styles.numberInput} ${styles.withSpinner}`}
+                        disabled={calculationStatus === 'running'}
+                      />
+                    </div>
+                  </>
                 )}
                 <div className={styles.settingRow}>
                   <label>CI Max Micro Iterations</label>
@@ -1124,7 +831,7 @@ export const CalculationSettingsPage = ({
                     }
                     onChange={e =>
                       handleParamChange(
-                        'max_cycle_micro' as any,
+                        'max_cycle_micro',
                         Math.max(1, Math.min(100, Number(e.target.value)))
                       )
                     }
@@ -1141,61 +848,13 @@ export const CalculationSettingsPage = ({
                       type="checkbox"
                       checked={(params as any).natorb !== false}
                       onChange={e =>
-                        handleParamChange('natorb' as any, e.target.checked)
+                        handleParamChange('natorb', e.target.checked)
                       }
                       disabled={calculationStatus === 'running'}
                     />
                     Transform to Natural Orbitals in Active Space
                   </label>
                 </div>
-                {params.calculation_method === 'CASSCF' && (
-                  <>
-                    <div className={styles.settingRow}>
-                      <label>Energy Convergence Tolerance</label>
-                      <select
-                        value={getValidFloatParam(
-                          (params as any).conv_tol,
-                          1e-6,
-                          1e-12
-                        )}
-                        onChange={e =>
-                          handleParamChange(
-                            'conv_tol' as any,
-                            parseFloat(e.target.value)
-                          )
-                        }
-                        disabled={calculationStatus === 'running'}
-                      >
-                        <option value={1e-5}>1e-5 (loose)</option>
-                        <option value={1e-6}>1e-6 (normal)</option>
-                        <option value={1e-7}>1e-7 (tight)</option>
-                        <option value={1e-8}>1e-8 (very tight)</option>
-                      </select>
-                    </div>
-                    <div className={styles.settingRow}>
-                      <label>Gradient Convergence Tolerance</label>
-                      <select
-                        value={getValidFloatParam(
-                          (params as any).conv_tol_grad,
-                          1e-4,
-                          1e-8
-                        )}
-                        onChange={e =>
-                          handleParamChange(
-                            'conv_tol_grad' as any,
-                            parseFloat(e.target.value)
-                          )
-                        }
-                        disabled={calculationStatus === 'running'}
-                      >
-                        <option value={1e-3}>1e-3 (loose)</option>
-                        <option value={1e-4}>1e-4 (normal)</option>
-                        <option value={1e-5}>1e-5 (tight)</option>
-                        <option value={1e-6}>1e-6 (very tight)</option>
-                      </select>
-                    </div>
-                  </>
-                )}
               </section>
             )}
             {params.calculation_method === 'TDDFT' && (
@@ -1204,10 +863,10 @@ export const CalculationSettingsPage = ({
                   <label>Number of Excited States</label>
                   <input
                     type="number"
-                    value={(params as any).tddft_nstates || 10}
+                    value={(params as any).tddft_nstates}
                     onChange={e =>
                       handleParamChange(
-                        'tddft_nstates' as any,
+                        'tddft_nstates',
                         Math.max(1, Math.min(50, Number(e.target.value)))
                       )
                     }
@@ -1215,17 +874,21 @@ export const CalculationSettingsPage = ({
                     max={50}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   />
                 </div>
                 <div className={styles.settingRow}>
                   <label>TDDFT Method</label>
                   <select
-                    value={(params as any).tddft_method || 'TDDFT'}
+                    value={(params as any).tddft_method}
                     onChange={e =>
-                      handleParamChange('tddft_method' as any, e.target.value)
+                      handleParamChange('tddft_method', e.target.value)
                     }
-                    disabled={calculationStatus === 'running'}
+                    disabled={
+                      calculationStatus === 'running' || isLoadingParams
+                    }
                   >
                     {isLoadingParams ? (
                       <option value="">Loading...</option>
@@ -1250,14 +913,11 @@ export const CalculationSettingsPage = ({
                       type="checkbox"
                       checked={(params as any).tddft_analyze_nto || false}
                       onChange={e =>
-                        handleParamChange(
-                          'tddft_analyze_nto' as any,
-                          e.target.checked
-                        )
+                        handleParamChange('tddft_analyze_nto', e.target.checked)
                       }
                       disabled={calculationStatus === 'running'}
                     />
-                    Perform Natural Transition Orbital Analysis
+                    Natural Transition Orbital Analysis
                   </label>
                 </div>
               </section>
@@ -1271,10 +931,7 @@ export const CalculationSettingsPage = ({
                       type="checkbox"
                       checked={(params as any).frozen_core !== false}
                       onChange={e =>
-                        handleParamChange(
-                          'frozen_core' as any,
-                          e.target.checked
-                        )
+                        handleParamChange('frozen_core', e.target.checked)
                       }
                       disabled={calculationStatus === 'running'}
                     />
@@ -1419,8 +1076,9 @@ export const CalculationSettingsPage = ({
           </div>
         </div>
         <MoleculeViewerSection
-          moleculeViewerRef={moleculeViewerRef}
           hasValidMolecule={hasValidMolecule}
+          xyzData={activeCalculation?.parameters?.xyz}
+          currentStyle={currentStyle}
           onStyleChange={handleStyleChange}
           showAxes={showAxes}
           onShowAxesChange={setShowAxes}

@@ -1,12 +1,8 @@
 export interface ElectronAPI {
-  closeWindow: () => Promise<void>;
-  minimizeWindow: () => Promise<void>;
-  maximizeWindow: () => Promise<void>;
-  isWindowMaximized: () => Promise<boolean>;
-  onWindowStateChange: (callback: (isMaximized: boolean) => void) => void;
-  removeAllListeners: (channel: string) => void;
-  onSetFlaskPort: (callback: (port: number) => void) => () => void;
-  getFlaskPort: () => Promise<number | null>;
+  // URLパラメータから取得したFlaskポート番号（preloadで設定）
+  flaskPort: number | null;
+  // IPC経由で受信した認証トークンを取得（トークンが届くまで待機）
+  getAuthToken: () => Promise<string | null>;
   openExternalUrl: (
     url: string
   ) => Promise<{ success: boolean; error?: string }>;

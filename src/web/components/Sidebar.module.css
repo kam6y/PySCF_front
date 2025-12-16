@@ -146,6 +146,10 @@
 }
 
 .sidebarHeader {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
   padding-bottom: 8px;
 }
 
@@ -332,6 +336,16 @@
 .statusWaiting {
   background: #fff3e0;
   color: #e65100;
+}
+
+.statusPausing {
+  background: #f3e5f5;
+  color: #6a1b9a;
+}
+
+.statusPaused {
+  background: #ede7f6;
+  color: #512da8;
 }
 
 .statusUnknown {

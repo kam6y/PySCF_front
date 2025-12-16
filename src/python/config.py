@@ -1,5 +1,5 @@
 """
-Unified configuration management module for PySCF Native App.
+Unified configuration management module for PySCF_front.
 
 This module serves as the single source of truth for all application configuration,
 loading settings from config/server-config.json and providing a unified interface
@@ -151,20 +151,6 @@ class ServerConfig:
             return port_config.get('default', 5000)
         return port_config if isinstance(port_config, int) else 5000
 
-    def is_port_auto_detect_enabled(self) -> bool:
-        """Check if automatic port detection is enabled."""
-        port_config = self.get('server.port', {})
-        if isinstance(port_config, dict):
-            return port_config.get('auto_detect', True)
-        return True
-
-    def get_port_range(self) -> tuple:
-        """Get port range for auto-detection."""
-        port_config = self.get('server.port', {})
-        if isinstance(port_config, dict):
-            port_range = port_config.get('range', {'start': 5000, 'end': 5100})
-            return (port_range.get('start', 5000), port_range.get('end', 5100))
-        return (5000, 5100)
 
     def get_logging_level(self) -> str:
         """Get logging level."""
@@ -184,76 +170,42 @@ class ServerConfig:
         return self._config.copy()
 
 
-def find_available_port(host: str, start_port: int, end_port: int) -> int:
-    """
-    Find an available port within the specified range.
-
-    Args:
-        host: Host address to bind to.
-        start_port: Starting port number.
-        end_port: Ending port number (inclusive).
-
-    Returns:
-        int: Available port number.
-
-    Raises:
-        RuntimeError: If no available port is found in the range.
-    """
-    for port in range(start_port, end_port + 1):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind((host, port))
-                return port
-        except OSError:
-            continue
-    raise RuntimeError(f"No available port found in range {start_port}-{end_port}")
-
-
 def determine_server_port(config: ServerConfig, port_arg: Optional[int] = None,
                          port_env: Optional[str] = None) -> int:
     """
-    Determine the server port based on configuration, arguments, and environment.
+    Determine the server port from environment or arguments.
+
+    Port detection is handled by Electron in production mode.
+    In standalone mode (python app.py), uses command line or default.
 
     Priority order:
-    1. Command line argument (port_arg)
-    2. Environment variable (port_env)
-    3. Auto-detected port (if enabled)
-    4. Default port from configuration
+    1. Command line argument (port_arg) - for `python app.py 5001`
+    2. Environment variable (port_env) - set by Electron (PYSCF_SERVER_PORT)
+    3. Default port from configuration - standalone fallback
 
     Args:
         config: ServerConfig instance.
         port_arg: Port from command line argument.
-        port_env: Port from environment variable.
+        port_env: Port from environment variable (PYSCF_SERVER_PORT).
 
     Returns:
         int: Determined port number.
     """
     # Priority 1: Command line argument
     if port_arg and port_arg > 0:
-        logger.info(f"Using port from command line argument: {port_arg}")
+        logger.info(f"Using port from CLI: {port_arg}")
         return port_arg
 
-    # Priority 2: Environment variable
+    # Priority 2: Environment variable (set by Electron)
     if port_env:
         try:
             port = int(port_env)
-            logger.info(f"Using port from environment variable: {port}")
+            logger.info(f"Using port from Electron: {port}")
             return port
         except (ValueError, TypeError):
-            logger.warning(f"Invalid port in environment variable: {port_env}")
+            logger.warning(f"Invalid port in env: {port_env}")
 
-    # Priority 3: Auto-detection
-    if config.is_port_auto_detect_enabled():
-        start_port, end_port = config.get_port_range()
-        default_port = config.get_default_port()
-        host = config.get_server_host()
-
-        # Start searching from the default port
-        port = find_available_port(host, default_port, end_port)
-        logger.info(f"Auto-detected available port: {port}")
-        return port
-
-    # Priority 4: Default port
+    # Priority 3: Default (standalone fallback)
     default_port = config.get_default_port()
     logger.info(f"Using default port: {default_port}")
     return default_port
@@ -312,103 +264,6 @@ def configure_flask_app(app, config: ServerConfig, server_port: int) -> None:
     logger.info(f"Flask app configured with server port: {server_port}")
 
 
-def get_fallback_config() -> Dict[str, Any]:
-    """
-    Get fallback configuration when config file is not available.
-
-    Returns:
-        Dictionary with default configuration values.
-    """
-    return {
-        "server": {
-            "host": "127.0.0.1",
-            "port": {
-                "default": 5000,
-                "auto_detect": True,
-                "range": {"start": 5000, "end": 5100}
-            },
-            "debug": False
-        },
-        "gunicorn": {
-            "workers": 1,
-            "threads": 4,
-            "worker_class": "sync",
-            "timeout": 0,
-            "keep_alive": 30,
-            "preload_app": False,
-            "access_logfile": None,
-            "log_level": "info"
-        },
-        "socketio": {
-            "cors_allowed_origins": ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"],
-            "async_mode": "threading",
-            "ping_timeout": 60,
-            "ping_interval": 25,
-            "allow_unsafe_werkzeug": True,
-            "logger": True,
-            "engineio_logger": False
-        },
-        "development": {
-            "use_reloader": False,
-            "debug": False,
-            "enable_dev_tools": True
-        },
-        "production": {
-            "use_gunicorn": True,
-            "optimize_performance": True,
-            "enable_logging": True
-        },
-        "quantum_calculations": {
-            "max_concurrent_calculations": "auto",
-            "process_pool_size": "auto",
-            "timeout_calculation": 0,
-            "memory_limit_mb": 0
-        },
-        "quantum_calculation_defaults": {
-            "memory_settings": {
-                "CASCI": 6000,
-                "CASSCF": 6000,
-                "CCSD": 4000,
-                "CCSD_T": 4000,
-                "TDDFT": 4000,
-                "DFT": 2000,
-                "HF": 2000,
-                "MP2": 2000,
-                "default": 2000
-            },
-            "cycle_settings": {
-                "max_cycle": 150,
-                "max_cycle_macro": 50,
-                "max_cycle_micro": 4,
-                "ah_max_cycle": 30
-            },
-            "spectrum_settings": {
-                "ir_frequency_range": [400, 4000],
-                "frequency_threshold": 80.0
-            }
-        },
-        "app_info": {
-            "version": "0.1.5-beta"
-        },
-        "external_services": {
-            "pubchem_timeout": 30,
-            "api_timeout": 30
-        },
-        "logging": {
-            "level": "INFO",
-            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            "enable_access_log": True,
-            "enable_error_log": True
-        },
-        "ai_agent": {
-            "model_name": "gemini-2.5-flash",
-            "max_retries": 3,
-            "retry_delays": [1, 2, 4],
-            "retryable_status_codes": [429, 500, 502, 503, 504]
-        }
-    }
-
-
 # Global configuration instance (lazy-loaded)
 _server_config: Optional[ServerConfig] = None
 
@@ -426,29 +281,7 @@ def get_server_config() -> ServerConfig:
             _server_config = ServerConfig()
             logger.info("Successfully initialized ServerConfig from file")
         except ConfigurationError as e:
-            logger.error(f"Failed to load configuration: {e}")
-            logger.warning("Using fallback configuration")
-
-            # Create a properly initialized ServerConfig with fallback values
-            # This is safer than using __new__ directly
-            try:
-                # Create a temporary config file path
-                import tempfile
-                fallback_config = get_fallback_config()
-
-                # Write fallback config to a temporary file
-                with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                    json.dump(fallback_config, f)
-                    temp_config_path = f.name
-
-                # Initialize ServerConfig with the temporary file
-                _server_config = ServerConfig(config_path=temp_config_path)
-                logger.info(f"Initialized ServerConfig with fallback configuration from {temp_config_path}")
-            except Exception as fallback_error:
-                logger.critical(f"Failed to initialize fallback configuration: {fallback_error}")
-                # Last resort: create minimal config object
-                _server_config = ServerConfig.__new__(ServerConfig)
-                _server_config._config = get_fallback_config()
-                _server_config.config_path = "minimal-fallback"
-                logger.warning("Using minimal fallback configuration (last resort)")
+            logger.critical(f"Failed to load configuration: {e}")
+            # Re-raise the exception to prevent the application from starting with invalid state
+            raise
     return _server_config

@@ -152,6 +152,46 @@ export interface paths {
         patch: operations["patchCalculation"];
         trace?: never;
     };
+    "/api/quantum/calculations/{calculationId}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause a running calculation
+         * @description Safely pause a running calculation after the current SCF iteration completes. The calculation can be resumed later from the checkpoint.
+         */
+        post: operations["pauseCalculation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/calculations/{calculationId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume a paused calculation
+         * @description Resume a paused calculation from its checkpoint file. The calculation will continue from where it was paused.
+         */
+        post: operations["resumeCalculation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quantum/calculations/{calculationId}/orbitals": {
         parameters: {
             query?: never;
@@ -362,12 +402,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Chat with AI agent
-         * @description Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+         * Chat with AI assistant
+         * @description Send a message to the AI assistant and receive a streaming response using Server-Sent Events (SSE). The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
          *
          *     SSE Event Types:
          *     - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
-         *     - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+         *     - `agent_status`: AI status update - `{"type": "agent_status", "payload": {"status": "responding", "agent": "chat"}}`
          *     - `done`: Stream completion - `{"type": "done"}`
          *     - `error`: Error occurred - `{"type": "error", "payload": {"message": "..."}}`
          *
@@ -402,12 +442,7 @@ export interface components {
          * @description Status of a calculation
          * @enum {string}
          */
-        CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting";
-        /**
-         * @description Type of agent action requiring confirmation
-         * @enum {string}
-         */
-        AgentActionType: "delete_calculation";
+        CalculationStatus: "pending" | "running" | "completed" | "error" | "waiting" | "pausing" | "paused";
         PubChemSearchRequest: {
             /** @description Search query for PubChem */
             query: string;
@@ -422,21 +457,12 @@ export interface components {
             /** @description XYZ string to validate */
             xyz: string;
         };
-        QuantumCalculationRequest: {
+        CalculationRequestBase: {
             /** @description XYZ molecular structure data */
             xyz: string;
-            /** @default DFT */
             calculation_method: components["schemas"]["CalculationMethod"];
-            /**
-             * @description Basis set for calculation (e.g., STO-3G, 6-31G(d), 6-31+G(d,p), cc-pVDZ, aug-cc-pVTZ, def2-SVP)
-             * @default 6-31G(d)
-             */
-            basis_function: string;
-            /**
-             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS). Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
-             * @default B3LYP
-             */
-            exchange_correlation: string | null;
+            /** @description Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ) */
+            basis_function?: string;
             /**
              * @description Molecular charge
              * @default 0
@@ -451,14 +477,14 @@ export interface components {
             solvent_method: components["schemas"]["SolventMethod"];
             /**
              * @description Solvent type or custom parameters. Options include:
-             *     - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, nitromethane, methanol, ethanol, acetone, dichloroethane, dichloromethane, tetrahydrofuran, chlorobenzene, chloroform, diethylether, toluene, benzene, 1,4-dioxane, cyclohexane
+             *     - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, etc.
              *     - Custom dielectric constant (numeric value > 1.0)
              *
              * @default -
              */
             solvent: string;
             /**
-             * @description Display name for the calculation instance (distinct from molecule_name which is the chemical name)
+             * @description Display name for the calculation instance
              * @default Unnamed Calculation
              */
             name: string;
@@ -466,67 +492,208 @@ export interface components {
             cpu_cores?: number | null;
             /** @description Memory in MB */
             memory_mb?: number | null;
+            /** @description Ketcher molecule format (JSON) */
+            ketcher_data?: string | null;
+        };
+        DFTCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "DFT";
             /**
-             * @description Number of excited states to calculate (TDDFT only)
+             * @description Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X)
+             * @default B3LYP
+             */
+            exchange_correlation: string;
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Whether to perform geometry optimization
+             * @default true
+             */
+            optimize_geometry: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "DFT";
+        };
+        HFCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "HF";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /** @default true */
+            optimize_geometry: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "HF";
+        };
+        MP2CalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "MP2";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /** @default true */
+            optimize_geometry: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "MP2";
+        };
+        CCSDCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CCSD";
+            /** @default cc-pVDZ */
+            basis_function: string;
+            /**
+             * @description Use frozen core approximation to reduce computational cost
+             * @default true
+             */
+            frozen_core: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "CCSD";
+        };
+        CCSD_TCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CCSD_T";
+            /** @default cc-pVDZ */
+            basis_function: string;
+            /**
+             * @description Use frozen core approximation
+             * @default true
+             */
+            frozen_core: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "CCSD_T";
+        };
+        TDDFTCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "TDDFT";
+            /**
+             * @description Exchange-correlation functional
+             * @default B3LYP
+             */
+            exchange_correlation: string;
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Number of excited states to calculate
              * @default 10
              */
             tddft_nstates: number;
             /**
-             * @description TDDFT calculation method - TDDFT or Tamm-Dancoff approximation
+             * @description TDDFT or Tamm-Dancoff approximation
              * @default TDDFT
              * @enum {string}
              */
             tddft_method: "TDDFT" | "TDA";
             /**
-             * @description Perform Natural Transition Orbital analysis (TDDFT only)
+             * @description Perform Natural Transition Orbital analysis
              * @default false
              */
             tddft_analyze_nto: boolean;
+        } & {
             /**
-             * @description Number of active space orbitals (CASCI/CASSCF only)
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "TDDFT";
+        };
+        CASCICalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CASCI";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Number of active space orbitals
              * @default 4
              */
             ncas: number;
             /**
-             * @description Number of active space electrons (CASCI/CASSCF only)
+             * @description Number of active space electrons
              * @default 4
              */
             nelecas: number;
             /**
-             * @description Maximum CASSCF macro iterations (CASSCF only)
-             * @default 50
-             */
-            max_cycle_macro: number;
-            /**
-             * @description Maximum CI solver micro iterations (CASCI/CASSCF)
+             * @description Maximum CI solver micro iterations
              * @default 3
              */
             max_cycle_micro: number;
             /**
-             * @description Transform to natural orbitals in active space (CASCI/CASSCF only)
+             * @description Transform to natural orbitals in active space
+             * @default true
+             */
+            natorb: boolean;
+        } & {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            calculation_method: "CASCI";
+        };
+        CASSCFCalculationRequest: components["schemas"]["CalculationRequestBase"] & {
+            /** @enum {string} */
+            calculation_method: "CASSCF";
+            /** @default 6-31G(d) */
+            basis_function: string;
+            /**
+             * @description Number of active space orbitals
+             * @default 4
+             */
+            ncas: number;
+            /**
+             * @description Number of active space electrons
+             * @default 4
+             */
+            nelecas: number;
+            /**
+             * @description Maximum CASSCF macro iterations
+             * @default 50
+             */
+            max_cycle_macro: number;
+            /**
+             * @description Maximum CI solver micro iterations
+             * @default 3
+             */
+            max_cycle_micro: number;
+            /**
+             * @description Transform to natural orbitals
              * @default true
              */
             natorb: boolean;
             /**
              * Format: float
-             * @description Energy convergence tolerance (CASSCF only)
+             * @description Energy convergence tolerance
              * @default 0.000001
              */
             conv_tol: number;
             /**
              * Format: float
-             * @description Gradient convergence tolerance (CASSCF only)
+             * @description Gradient convergence tolerance
              * @default 0.0001
              */
             conv_tol_grad: number;
+        } & {
             /**
-             * @description Whether to perform geometry optimization before the main calculation
-             * @default true
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
              */
-            optimize_geometry: boolean;
-            /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
-            ketcher_data?: string | null;
+            calculation_method: "CASSCF";
         };
+        QuantumCalculationRequest: components["schemas"]["DFTCalculationRequest"] | components["schemas"]["HFCalculationRequest"] | components["schemas"]["MP2CalculationRequest"] | components["schemas"]["CCSDCalculationRequest"] | components["schemas"]["CCSD_TCalculationRequest"] | components["schemas"]["TDDFTCalculationRequest"] | components["schemas"]["CASCICalculationRequest"] | components["schemas"]["CASSCFCalculationRequest"];
         CalculationUpdateRequest: {
             /** @description Updated name for the calculation */
             name: string;
@@ -686,6 +853,60 @@ export interface components {
             atom_count?: number;
             /** @description Error message if calculation failed */
             error?: string | null;
+            /** @description Dipole moment X component in Debye */
+            dipole_moment_x_debye?: number | null;
+            /** @description Dipole moment Y component in Debye */
+            dipole_moment_y_debye?: number | null;
+            /** @description Dipole moment Z component in Debye */
+            dipole_moment_z_debye?: number | null;
+            /** @description Total dipole moment magnitude in Debye */
+            dipole_moment_total_debye?: number | null;
+            /** @description Dipole moment X component in atomic units */
+            dipole_moment_x_au?: number | null;
+            /** @description Dipole moment Y component in atomic units */
+            dipole_moment_y_au?: number | null;
+            /** @description Dipole moment Z component in atomic units */
+            dipole_moment_z_au?: number | null;
+            /** @description Total dipole moment magnitude in atomic units */
+            dipole_moment_total_au?: number | null;
+            /** @description HOMO orbital energy in hartree */
+            homo_energy_hartree?: number | null;
+            /** @description HOMO orbital energy in eV */
+            homo_energy_ev?: number | null;
+            /** @description LUMO orbital energy in hartree */
+            lumo_energy_hartree?: number | null;
+            /** @description LUMO orbital energy in eV */
+            lumo_energy_ev?: number | null;
+            /** @description HOMO-LUMO energy gap in hartree */
+            homo_lumo_gap_hartree?: number | null;
+            /** @description HOMO-LUMO energy gap in eV */
+            homo_lumo_gap_ev?: number | null;
+            /** @description Nuclear repulsion energy in hartree */
+            nuclear_repulsion_energy?: number | null;
+            /** @description Electronic energy in hartree */
+            electronic_energy?: number | null;
+            /** @description Total number of basis functions */
+            num_basis_functions?: number | null;
+            /** @description Total number of primitive Gaussian functions */
+            num_primitive_gaussians?: number | null;
+            /** @description Total number of electrons in the molecule */
+            total_electrons?: number | null;
+            /** @description MP2 same-spin correlation energy in hartree */
+            mp2_same_spin_correlation?: number | null;
+            /** @description MP2 opposite-spin correlation energy in hartree */
+            mp2_opposite_spin_correlation?: number | null;
+            /** @description CCSD T1 diagnostic (>0.02 suggests multi-reference character) */
+            ccsd_t1_diagnostic?: number | null;
+            /** @description CCSD D1 diagnostic (alternative diagnostic based on density matrix) */
+            ccsd_d1_diagnostic?: number | null;
+            /** @description CCSD D2 diagnostic (diagnostic based on T2 amplitudes) */
+            ccsd_d2_diagnostic?: number | null;
+            /** @description Number of SCF iterations performed */
+            scf_iterations?: number | null;
+            /** @description Final energy change in SCF convergence */
+            final_energy_change?: number | null;
+            /** @description Final density matrix change in SCF convergence */
+            final_density_change?: number | null;
             /** @description Excitation energies in eV (TDDFT only) */
             excitation_energies?: number[] | null;
             /** @description Excitation wavelengths in nm (TDDFT only) */
@@ -816,6 +1037,25 @@ export interface components {
             error?: string | null;
             /** @description Reason why calculation is waiting (if status is waiting) */
             waitingReason?: string | null;
+            /** @description Whether this calculation can be resumed from a paused state */
+            canResume?: boolean | null;
+            /**
+             * Format: date-time
+             * @description Timestamp when calculation was paused
+             */
+            pausedAt?: string | null;
+            /** @description Information about the paused state for resuming */
+            resumeInfo?: {
+                /** @description Geometry optimization step number when paused */
+                optimization_step?: number;
+                /** @description Whether checkpoint file is available for resume */
+                checkpoint_exists?: boolean;
+                /**
+                 * @description Which phase the calculation was in when paused
+                 * @enum {string}
+                 */
+                calculation_phase?: "geometry_optimization" | "scf_calculation" | "post_scf";
+            } | null;
         };
         CalculationSummary: {
             /** @description Unique calculation ID */
@@ -1009,6 +1249,60 @@ export interface components {
             };
             /** @description Supported TDDFT calculation methods */
             tddft_methods: string[];
+            /** @description Default parameter values for each calculation method */
+            method_defaults: components["schemas"]["MethodDefaultValues"];
+            /** @description Constraints and validation rules for calculation parameters */
+            parameter_constraints: components["schemas"]["ParameterConstraints"];
+        };
+        /** @description Default values for each calculation method (e.g., DFT, CCSD, TDDFT) */
+        MethodDefaultValues: {
+            [key: string]: {
+                /** @description Default basis function for this method */
+                basis_function?: string;
+                /** @description Default memory allocation in megabytes */
+                memory_mb?: number;
+                /** @description Default geometry optimization setting */
+                optimize_geometry?: boolean;
+                /** @description Default frozen core approximation setting (CCSD/CCSD_T) */
+                frozen_core?: boolean;
+                /** @description Default number of excited states (TDDFT) */
+                tddft_nstates?: number;
+                /** @description Default TDDFT method (TDDFT) */
+                tddft_method?: string;
+                /** @description Default NTO analysis setting (TDDFT) */
+                tddft_analyze_nto?: boolean;
+                /** @description Default number of active orbitals (CASCI/CASSCF) */
+                ncas?: number;
+                /** @description Default number of active electrons (CASCI/CASSCF) */
+                nelecas?: number;
+                /** @description Default maximum macro iterations (CASSCF) */
+                max_cycle_macro?: number;
+                /** @description Default maximum micro iterations (CASCI/CASSCF) */
+                max_cycle_micro?: number;
+                /** @description Default natural orbital transformation setting (CASCI/CASSCF) */
+                natorb?: boolean;
+                /** @description Default energy convergence tolerance (CASSCF) */
+                conv_tol?: number;
+                /** @description Default gradient convergence tolerance (CASSCF) */
+                conv_tol_grad?: number;
+            };
+        };
+        /** @description Constraint definition for a calculation parameter */
+        ParameterConstraint: {
+            /** @description Minimum allowed value for this parameter */
+            min?: number;
+            /** @description Maximum allowed value for this parameter */
+            max?: number;
+            /** @description List of calculation methods this parameter applies to */
+            applicable_methods?: string[];
+            /** @description List of calculation methods where this parameter is disabled */
+            disabled_for?: string[];
+            /** @description Human-readable description of the constraint */
+            description?: string;
+        };
+        /** @description Constraints for all calculation parameters (e.g., ncas, optimize_geometry) */
+        ParameterConstraints: {
+            [key: string]: components["schemas"]["ParameterConstraint"];
         };
         SupportedParametersResponse: {
             /** @example true */
@@ -1058,11 +1352,6 @@ export interface components {
              * @example null
              */
             gemini_api_key?: string | null;
-            /**
-             * @description Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
-             * @example null
-             */
-            tavily_api_key?: string | null;
             /**
              * @description Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
              * @example pyscf-research-agent@example.com
@@ -1211,6 +1500,54 @@ export interface components {
             peaks: components["schemas"]["IRPeak"][];
             metadata: components["schemas"]["IRSpectrumMetadata"];
         };
+        AtomDisplacement: {
+            /**
+             * @description Zero-based index of the atom
+             * @example 0
+             */
+            atom_index: number;
+            /**
+             * @description Element symbol
+             * @example C
+             */
+            element: string;
+            /**
+             * Format: float
+             * @description X coordinate of the atom (Angstrom)
+             * @example 0
+             */
+            x: number;
+            /**
+             * Format: float
+             * @description Y coordinate of the atom (Angstrom)
+             * @example 0
+             */
+            y: number;
+            /**
+             * Format: float
+             * @description Z coordinate of the atom (Angstrom)
+             * @example 0
+             */
+            z: number;
+            /**
+             * Format: float
+             * @description X component of displacement vector
+             * @example 0.123
+             */
+            dx: number;
+            /**
+             * Format: float
+             * @description Y component of displacement vector
+             * @example -0.045
+             */
+            dy: number;
+            /**
+             * Format: float
+             * @description Z component of displacement vector
+             * @example 0.078
+             */
+            dz: number;
+        };
         IRPeak: {
             /**
              * Format: float
@@ -1230,6 +1567,8 @@ export interface components {
              * @example 1723.1
              */
             original_frequency_cm: number;
+            /** @description Vibrational mode displacement vectors for 3D visualization */
+            mode_displacements?: components["schemas"]["AtomDisplacement"][] | null;
         };
         IRSpectrumMetadata: {
             /**
@@ -1589,22 +1928,6 @@ export interface components {
                 reply: string;
             };
         };
-        ExecuteConfirmedActionRequest: {
-            action_type: components["schemas"]["AgentActionType"];
-            /** @description ID of the calculation to perform the action on */
-            calculation_id: string;
-        };
-        ExecuteConfirmedActionResponse: {
-            /** @example true */
-            success: boolean;
-            data: {
-                /** @description Result message */
-                message: string;
-                action_type?: components["schemas"]["AgentActionType"];
-                /** @description ID of the affected calculation */
-                calculation_id?: string;
-            };
-        };
         ChatMessage: {
             /**
              * @description Unique message ID (UUID)
@@ -1715,6 +2038,31 @@ export interface components {
                 message: string;
                 /** @description ID of the deleted session */
                 deleted_id: string;
+            };
+        };
+        PauseCalculationResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /**
+                 * @description Confirmation message
+                 * @example Pause request accepted. Calculation will pause after current iteration.
+                 */
+                message: string;
+                /** @description ID of the calculation being paused */
+                calculation_id: string;
+            };
+        };
+        ResumeCalculationResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                /**
+                 * @description Confirmation message
+                 * @example Calculation resumed from checkpoint
+                 */
+                message: string;
+                calculation: components["schemas"]["CalculationInstance"];
             };
         };
     };
@@ -1920,7 +2268,7 @@ export interface operations {
                 /** @description Partial match search in calculation name (case-insensitive) */
                 name_query?: string;
                 /** @description Filter by calculation status */
-                status?: "completed" | "running" | "error" | "waiting" | "pending";
+                status?: "pending" | "running" | "completed" | "error" | "waiting" | "pausing" | "paused";
                 /** @description Filter by calculation method */
                 calculation_method?: "DFT" | "HF" | "MP2" | "CCSD" | "TDDFT" | "CASCI" | "CASSCF";
                 /** @description Filter by basis set (case-insensitive) */
@@ -2082,6 +2430,106 @@ export interface operations {
                 };
             };
             /** @description Failed to update calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    pauseCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pause request accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PauseCalculationResponse"];
+                };
+            };
+            /** @description Calculation is not in a pausable state (not running) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to pause calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    resumeCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resume request accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeCalculationResponse"];
+                };
+            };
+            /** @description Calculation cannot be resumed (not paused, no checkpoint available, etc.) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to resume calculation */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2686,7 +3134,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Server error during agent processing */
+            /** @description Server error during AI processing */
             500: {
                 headers: {
                     [name: string]: unknown;

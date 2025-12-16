@@ -59,9 +59,9 @@ class DFTCalculator(BaseCalculator):
         return 'DFT'
     
     # ===== Template Method Pattern Implementation =====
-    
+
     def _perform_specific_calculation(self, base_energy: float) -> Dict[str, Any]:
-        """Perform DFT-specific calculation (just return SCF energy)."""
+        """Perform DFT-specific calculation (return SCF energy and additional properties)."""
         # 安全にエネルギーを変換
         if base_energy is None:
             raise CalculationError("SCF energy is None - calculation may have failed")
@@ -69,8 +69,14 @@ class DFTCalculator(BaseCalculator):
             scf_energy_float = float(base_energy)
         except (ValueError, TypeError) as e:
             raise CalculationError(f"Failed to convert SCF energy to float: {e}")
-        
-        return {'scf_energy': scf_energy_float}
+
+        results = {'scf_energy': scf_energy_float}
+
+        # Add common additional properties (from base calculator)
+        common_props = self._extract_common_additional_properties()
+        results.update(common_props)
+
+        return results
     
     def _create_scf_method(self, mol):
         """Create DFT method object (RKS/UKS)."""

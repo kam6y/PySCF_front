@@ -131,14 +131,35 @@ export const MullikenChargeViewer: React.FC<MullikenChargeViewerProps> =
               opacity: opacity,
               colorscheme: {
                 prop: 'charge',
-                gradient: 'rwb', // Red (negative) - White (neutral) - Blue (positive)
-                min: -chargeRange,
-                max: chargeRange,
+                gradient: 'rwb', // Red (negative) - White (neutral) - Blue (positive) -> Swapped min/max to invert
+                min: chargeRange,
+                max: -chargeRange,
               },
             },
             {},
             {}
           );
+
+          // Add atom number labels
+          if (atoms && atoms.length > 0) {
+            atoms.forEach((atom, index) => {
+              // Check if atom has valid coordinates
+              if (
+                typeof atom.x === 'number' &&
+                typeof atom.y === 'number' &&
+                typeof atom.z === 'number'
+              ) {
+                viewer.addLabel((index + 1).toString(), {
+                  position: { x: atom.x, y: atom.y, z: atom.z },
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  backgroundOpacity: 0.8,
+                  fontColor: 'black',
+                  fontSize: 12,
+                  inFront: true,
+                });
+              }
+            });
+          }
 
           viewer.zoomTo();
           viewer.render();

@@ -151,14 +151,18 @@ class TDDFTCalculator(BaseCalculator):
                            f"This may indicate convergence issues.")
         
         logger.info(f"TDDFT calculation completed. Found {len(self.mytd.e)} excited states.")
-        
+
         # Analyze TDDFT results
         tddft_results = self._analyze_tddft_results()
-        
+
         # Combine results
         results = {'scf_energy': scf_energy_float}
         results.update(tddft_results)
-        
+
+        # Add common additional properties (from base calculator) - ground state properties
+        common_props = self._extract_common_additional_properties()
+        results.update(common_props)
+
         return results
     
     def _create_scf_method(self, mol):

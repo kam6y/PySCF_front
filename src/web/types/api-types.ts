@@ -41,6 +41,10 @@ export type CalculationUpdateResponse =
   components['schemas']['CalculationUpdateResponse'];
 export type CalculationDeleteResponse =
   components['schemas']['CalculationDeleteResponse'];
+export type PauseCalculationResponse =
+  components['schemas']['PauseCalculationResponse'];
+export type ResumeCalculationResponse =
+  components['schemas']['ResumeCalculationResponse'];
 export type OrbitalsResponse = components['schemas']['OrbitalsResponse'];
 export type OrbitalCubeResponse = components['schemas']['OrbitalCubeResponse'];
 export type CubeFilesListResponse =
@@ -102,6 +106,8 @@ export type CalculationListResponseData = CalculationListResponse['data'];
 export type CalculationDetailsResponseData = CalculationDetailsResponse['data'];
 export type CalculationUpdateResponseData = CalculationUpdateResponse['data'];
 export type CalculationDeleteResponseData = CalculationDeleteResponse['data'];
+export type PauseCalculationResponseData = PauseCalculationResponse['data'];
+export type ResumeCalculationResponseData = ResumeCalculationResponse['data'];
 export type OrbitalsResponseData = OrbitalsResponse['data'];
 export type OrbitalCubeResponseData = OrbitalCubeResponse['data'];
 export type CubeFilesListResponseData = CubeFilesListResponse['data'];

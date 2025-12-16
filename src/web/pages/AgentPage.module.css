@@ -53,7 +53,7 @@
 
 .inputArea {
   display: flex;
-  padding: 16px 20px 0 20px;
+  padding: 16px 20px;
   border-top: 1px solid #e5e7eb;
   background-color: white;
   gap: 12px;

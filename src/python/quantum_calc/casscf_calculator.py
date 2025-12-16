@@ -216,7 +216,11 @@ class CASSCFCalculator(BaseCalculator):
             'enhanced_ci_analysis': enhanced_ci_analysis
         }
         results.update(casscf_results)
-        
+
+        # Add common additional properties (from base calculator)
+        common_props = self._extract_common_additional_properties()
+        results.update(common_props)
+
         logger.info(f"CASSCF calculation completed with enhanced analysis. Energy: {casscf_energy_float:.6f} hartree, Converged: {converged}")
         return results
     
@@ -339,9 +343,12 @@ class CASSCFCalculator(BaseCalculator):
         try:
             # Check if we have rotation information
             if hasattr(self.mycas, 'mo_coeff') and hasattr(self.mf, 'mo_coeff'):
+                # Use self.mf.mol to ensure consistency with the converged calculation
+                mol = self.mf.mol if hasattr(self, 'mf') and self.mf is not None else self.mol
+
                 # Calculate orbital rotation matrix
-                if hasattr(self.mol, 'get_ovlp'):
-                    S = self.mol.get_ovlp()
+                if hasattr(mol, 'get_ovlp'):
+                    S = mol.get_ovlp()
                 else:
                     S = self.mf.get_ovlp()
                 

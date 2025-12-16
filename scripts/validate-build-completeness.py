@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-PySCF Native App - ビルド完了後検証スクリプト
+PySCF_front - ビルド完了後検証スクリプト
 このスクリプトは、ビルド完了後にbundled環境の完全性を検証します
 """
 
@@ -51,9 +51,9 @@ def check_conda_environment(project_root: Path) -> bool:
     
     # 重要なファイルの存在確認 (Windows対応)
     # Windowsの場合、実行ファイルは Scripts ディレクトリ配下にあり、.exe が付く
-    is_windows = os.name == 'nt'
-    bin_dir = "Scripts" if is_windows else "bin"
-    exe_suffix = ".exe" if is_windows else ""
+    # Windows support removed
+    bin_dir = "bin"
+    exe_suffix = ""
 
     required_files = [
         Path(bin_dir) / f"python{exe_suffix}",
@@ -213,7 +213,7 @@ def validate_conda_functionality(project_root: Path) -> bool:
 
 def main() -> None:
     """メイン実行関数"""
-    print(f"{Colors.CYAN}=== PySCF Native App ビルド完全性検証 ==={Colors.NC}")
+    print(f"{Colors.CYAN}=== PySCF_front ビルド完全性検証 ==={Colors.NC}")
     print()
     
     # プロジェクトルートを一度だけ取得

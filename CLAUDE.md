@@ -116,6 +116,15 @@ npm run package:linux:docker
 npm run package:linux
 ```
 
+### Debug Options
+
+```bash
+# Automatically open DevTools for splash window
+DEBUG_SPLASH=true npm run dev
+```
+
+Useful for debugging splash window startup sequence and IPC communication.
+
 ### Building for Linux on Windows
 
 There are two methods for building Linux applications on Windows:
@@ -246,27 +255,75 @@ The built AppImage will be available in the `dist/` directory.
 
     # Complete build test (frontend + backend)
     npm run test:build
-    
+
     # Test Python imports and dependencies
     npm run test:python-build
-    
+
     # Test Gunicorn server locally with unified configuration
     npm run test:gunicorn-local
-    
+
     # Full packaging test (build + package)
     npm run test:run-packaged
-    
-    # --- Manual Python Backend Testing (in a separate terminal) ---
-    cd src/python
-    
-    # Activate conda environment
-    conda activate pyscf-env
-    
-    # Start Flask API server directly
-    python app.py
-    
-    # Run Python backend tests
-    pytest tests/
+
+#### Python Backend Testing
+
+**IMPORTANT:** Always use the conda environment's Python interpreter directly when running tests. Using the system Python (`python` or `python3`) may cause import errors or use the wrong dependencies.
+
+**Find Your Conda Environment Path:**
+```bash
+# macOS/Linux - Common conda locations
+ls ~/miniforge3/envs/pyscf-env/bin/python     # Miniforge
+ls ~/miniconda3/envs/pyscf-env/bin/python     # Miniconda
+ls ~/anaconda3/envs/pyscf-env/bin/python      # Anaconda
+
+# Or use conda to find it
+conda activate pyscf-env
+which python
+```
+
+**Run Tests with Conda Python:**
+```bash
+# Navigate to Python source directory
+cd src/python
+
+# Run all tests
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ -v
+
+# Run specific test file
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py -v
+
+# Run specific test class or function
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py::TestCalculationSubmissionAPI::test_dft_rejects_casci_parameters -xvs
+
+# Run tests with coverage
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ --cov=. --cov-report=html
+
+# Run tests matching a keyword
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ -k "pause_resume" -v
+```
+
+**Alternative: Activate Environment First (Traditional Method):**
+```bash
+# Activate conda environment
+conda activate pyscf-env
+
+# Then you can use 'python' directly
+cd src/python
+python -m pytest tests/ -v
+
+# Start Flask API server for manual testing
+python app.py
+```
+
+**Common pytest Options:**
+- `-v` or `-vv`: Verbose output (show test names and details)
+- `-x`: Stop at first failure
+- `-s`: Show print statements and logging output
+- `--tb=short`: Shorter traceback format
+- `--tb=line`: One-line traceback format
+- `-k "keyword"`: Run tests matching keyword
+- `--lf`: Run only last failed tests
+- `--ff`: Run failures first, then remaining tests
 
 ## Development Workflow
 The `npm run dev` script is the primary command for development. It automatically:
@@ -301,15 +358,12 @@ The single source of truth for the API is `src/api-spec/openapi.yaml`. The `npm 
 * **Python Pydantic Models** (`src/python/generated_models.py`) for type-safe request/response handling in the Flask backend.
 * **TypeScript Type Definitions** (`src/web/types/generated-api.ts`) to keep the frontend API client synchronized with the backend.
 
-### Multi-Agent AI Architecture
-The application features a sophisticated multi-agent AI system powered by LangGraph using a **Supervisor pattern**. This replaces the previous simple router-based architecture.
+### AI Chat Assistant
+The application features a simple AI chat assistant powered by the **Gemini API**. 
 
-* **Supervisor (Coordinator)**: Analyzes user intent and delegates tasks to specialized worker agents. It coordinates complex, multi-step workflows.
-* **Quantum Calculator**: Handles all quantum chemistry calculations, molecular property analysis, orbital visualization, and general chemistry-related queries. Uses a comprehensive set of tools to interact with the PySCF calculation backend.
-* **Literature Surveyor**: Specializes in academic literature search. It can iteratively search multiple sources (arXiv, Tavily, PubMed, etc.), analyze findings, and synthesize comprehensive reports with citations.
-* **Science Analyst**: Handles scientific report generation, data interpretation, and visualization tasks based on calculation results or research findings.
-
-The system uses LangGraph's stateful graph architecture, enabling intelligent task distribution and complex, multi-turn interactions.
+* **Gemini Chat**: Provides conversational assistance for quantum chemistry questions, molecular design guidance, and calculation result interpretation.
+* **Streaming Responses**: Uses Server-Sent Events (SSE) for real-time streaming of AI responses.
+* **Chat History Persistence**: Conversation history is stored in SQLite database for later reference.
 
 ### Electron Structure
 * **Main Process** (`src/main.ts`): Creates the `BrowserWindow`, manages the Python Flask subprocess, and handles application lifecycle events.
@@ -321,17 +375,14 @@ A Flask API server with REST endpoints and a WebSocket interface for:
 
 * **PubChem & SMILES Integration**: Searching and converting molecular structures.
 * **Quantum Chemistry Calculations**: Running various calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF) via PySCF. This now includes geometry optimization and vibrational frequency analysis. Calculations are executed in parallel using a `ProcessPoolExecutor`.
-* **Multi-Agent AI System**: A LangGraph-based system with intelligent routing between specialized agents:
-    * **Supervisor**: Coordinates tasks between specialized agents.
-    * **Quantum Calculator**: Interprets natural language prompts to perform molecular calculations and analysis using a comprehensive toolset.
-    * **Literature Surveyor**: Searches academic databases (arXiv, Tavily, PubMed, etc.) for papers, providing summaries and formatted citations.
-    * **Science Analyst**: Generates reports and interprets data from calculations and research.
+* **AI Chat**: Simple Gemini API-based chat for quantum chemistry assistance.
 * **Molecular Orbital Analysis**: Generating data for visualizing molecular orbitals, including CUBE files and energy level diagrams.
 * **IR Spectrum Generation**: Creating theoretical IR spectra from frequency analysis data.
 * **Dynamic Parameter Loading**: Providing lists of supported basis sets, functionals, and solvents via the `/api/quantum/supported-parameters` endpoint.
 * **Real-time Status Updates**: A WebSocket endpoint pushes status updates to the frontend.
 * **File Management**: Listing, renaming, and deleting calculation data.
 * **Health Check**: An endpoint (`/health`) for startup coordination.
+
 
 ## Core Components & State Management
 The application uses a modern, hook-based state management architecture with a clear separation of concerns, moving complex logic out of `App.tsx` and into reusable hooks.
@@ -413,33 +464,7 @@ This architecture relies on a collection of custom hooks to encapsulate logic:
     │   │   │   └── smiles_converter.py
     │   │   ├── __init__.py
     │   │   ├── agent/
-    │   │   │   ├── __init__.py
-    │   │   │   ├── graph.py
-    │   │   │   ├── literature_surveyor/
-    │   │   │   │   ├── __init__.py
-    │   │   │   │   ├── literature_surveyor_agent.py
-    │   │   │   │   ├── prompts/
-    │   │   │   │   │   ├── analyze_prompt.txt
-    │   │   │   │   │   └── synthesize_prompt.txt
-    │   │   │   │   └── tools.py
-    │   │   │   ├── quantum_calculator/
-    │   │   │   │   ├── __init__.py
-    │   │   │   │   ├── prompts/
-    │   │   │   │   │   └── system_prompt.txt
-    │   │   │   │   ├── quantum_calculator_agent.py
-    │   │   │   │   └── tools.py
-    │   │   │   ├── science_analyst/
-    │   │   │   │   ├── __init__.py
-    │   │   │   │   ├── prompts/
-    │   │   │   │   │   └── system_prompt.txt
-    │   │   │   │   ├── science_analyst_agent.py
-    │   │   │   │   └── tools.py
-    │   │   │   ├── supervisor/
-    │   │   │   │   ├── __init__.py
-    │   │   │   │   ├── prompts/
-    │   │   │   │   │   └── system_prompt.txt
-    │   │   │   │   └── supervisor.py
-    │   │   │   └── utils.py
+    │   │   │   └── __init__.py
     │   │   ├── api/
     │   │   │   ├── __init__.py
     │   │   │   ├── agent.py
@@ -520,13 +545,6 @@ This architecture relies on a collection of custom hooks to encapsulate logic:
     │   │   │   ├── test_fixtures.py
     │   │   │   └── unit/
     │   │   │       ├── __init__.py
-    │   │   │       ├── test_agent/
-    │   │   │       │   ├── __init__.py
-    │   │   │       │   ├── test_dispatcher_graph.py
-    │   │   │       │   ├── test_molecular_agent.py
-    │   │   │       │   ├── test_research_agent.py
-    │   │   │       │   ├── test_research_tools.py
-    │   │   │       │   └── test_tools.py
     │   │   │       ├── test_quantum_calc/
     │   │   │       │   ├── __init__.py
     │   │   │       │   ├── test_dft_calculator.py
@@ -563,8 +581,6 @@ This architecture relies on a collection of custom hooks to encapsulate logic:
     │       │   ├── Header.tsx
     │       │   ├── IRSpectrumViewer.module.css
     │       │   ├── IRSpectrumViewer.tsx
-    │       │   ├── InlineOrbitalViewer.module.css
-    │       │   ├── InlineOrbitalViewer.tsx
     │       │   ├── MolecularOrbitalEnergyDiagram.module.css
     │       │   ├── MolecularOrbitalEnergyDiagram.tsx
     │       │   ├── MolecularOrbitalViewer.module.css

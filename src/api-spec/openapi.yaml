@@ -1,8 +1,77 @@
-openapi: 3.1.1
+openapi: 3.0.3
 info:
-  title: PySCF Native App API
-  description: API for quantum chemistry calculations using PySCF with PubChem and SMILES integration
-  version: 0.1.5-beta
+  title: PySCF_frontlication API
+  description: |
+    Backend API for managing quantum chemistry calculations using PySCF.
+    
+    ## Discriminated Union Pattern for Calculation Requests
+    
+    This API uses **discriminated unions** (also known as tagged unions) to provide type-safe calculation request schemas.
+    Each calculation method (DFT, HF, MP2, CCSD, CCSD(T), TDDFT, CASCI, CASSCF) has its own dedicated schema with 
+    method-specific parameters.
+    
+    ### Design Principles
+    
+    1. **Type Safety**: The `calculation_method` field acts as a discriminator that determines which schema applies
+    2. **Single Source of Truth**: Each method's parameters are defined once in the schema and enforced by backend validation
+    3. **Method-Specific Parameters**: Parameters like `exchange_correlation` (DFT/TDDFT only), `ncas` (CASCI/CASSCF only), 
+       or `frozen_core` (CCSD/CCSD(T) only) are only present in their applicable schemas
+    4. **Explicit Constraints**: Disabled parameters (e.g., `optimize_geometry` for TDDFT) use `enum: [false]` to enforce restrictions
+    
+    ### Schema Structure
+    
+    ```yaml
+    QuantumCalculationRequest:
+      oneOf:
+        - $ref: '#/components/schemas/DFTCalculationRequest'
+        - $ref: '#/components/schemas/HFCalculationRequest'
+        - $ref: '#/components/schemas/MP2CalculationRequest'
+        # ... (all 8 method-specific schemas)
+      discriminator:
+        propertyName: calculation_method
+    ```
+    
+    Each method-specific schema extends `CalculationRequestBase` (common parameters) and adds its own unique parameters.
+    
+    ### Usage Examples
+    
+    **DFT Calculation Request:**
+    ```json
+    {
+      "calculation_method": "DFT",
+      "xyz": "H 0 0 0\nH 0 0 0.74",
+      "exchange_correlation": "B3LYP",
+      "basis_function": "6-31G(d)",
+      "optimize_geometry": true,
+      "charges": 0,
+      "spin": 0
+    }
+    ```
+    
+    **CASCI Calculation Request:**
+    ```json
+    {
+      "calculation_method": "CASCI",
+      "xyz": "O 0 0 0\nH 0.757 0.586 0\nH -0.757 0.586 0",
+      "basis_function": "6-31G(d)",
+      "ncas": 6,
+      "nelecas": 8,
+      "optimize_geometry": false,
+      "charges": 0,
+      "spin": 0
+    }
+    ```
+    
+    ### Backend Validation
+    
+    The backend enforces parameter applicability:
+    - ✅ Accepts: DFT request with `exchange_correlation`
+    - ❌ Rejects: DFT request with `ncas` (only valid for CASCI/CASSCF)
+    - ❌ Rejects: TDDFT request with `optimize_geometry: true` (disabled for TDDFT)
+    
+    See the `/api/quantum/supported-parameters` endpoint for runtime parameter constraints and method defaults.
+    
+  version: 0.1.6-beta
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
@@ -166,7 +235,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [completed, running, error, waiting, pending]
+            enum: [pending, running, completed, error, waiting, pausing, paused]
           description: Filter by calculation status
         - name: calculation_method
           in: query
@@ -310,6 +379,82 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Failed to delete calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculations/{calculationId}/pause:
+    post:
+      summary: Pause a running calculation
+      description: Safely pause a running calculation after the current SCF iteration completes. The calculation can be resumed later from the checkpoint.
+      operationId: pauseCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Pause request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PauseCalculationResponse'
+        '400':
+          description: Calculation is not in a pausable state (not running)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to pause calculation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculations/{calculationId}/resume:
+    post:
+      summary: Resume a paused calculation
+      description: Resume a paused calculation from its checkpoint file. The calculation will continue from where it was paused.
+      operationId: resumeCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Resume request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeCalculationResponse'
+        '400':
+          description: Calculation cannot be resumed (not paused, no checkpoint available, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Calculation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to resume calculation
           content:
             application/json:
               schema:
@@ -793,17 +938,17 @@ paths:
 
   /api/agent/chat:
     post:
-      summary: Chat with AI agent
+      summary: Chat with AI assistant
       description: >
-        Send a message to the AI agent and receive a streaming response using Server-Sent Events (SSE).
-        The response is a continuous stream of text chunks and status updates that represent the AI's response being generated in real-time.
+        Send a message to the AI assistant and receive a streaming response using Server-Sent Events (SSE).
+        The response is a continuous stream of text chunks that represent the AI's response being generated in real-time.
 
 
         SSE Event Types:
 
         - `chunk`: Text chunk from AI response - `{"type": "chunk", "payload": {"text": "..."}}`
 
-        - `agent_status`: Agent execution status update - `{"type": "agent_status", "payload": {"status": "running|completed|responding", "agent": "quantum_calculation_worker|research_expert|supervisor"}}`
+        - `agent_status`: AI status update - `{"type": "agent_status", "payload": {"status": "responding", "agent": "chat"}}`
 
         - `done`: Stream completion - `{"type": "done"}`
 
@@ -827,13 +972,9 @@ paths:
                 type: string
                 description: >
                   Server-Sent Events stream where each event contains JSON data.
-                  Event types include 'chunk' (text data), 'agent_status' (agent execution status), 'error' (error message), and 'done' (stream completion).
+                  Event types include 'chunk' (text data), 'agent_status' (AI status), 'error' (error message), and 'done' (stream completion).
                 example: |
-                  data: {"type": "agent_status", "payload": {"status": "running", "agent": "research_expert"}}
-
-                  data: {"type": "agent_status", "payload": {"status": "completed", "agent": "research_expert"}}
-
-                  data: {"type": "agent_status", "payload": {"status": "responding", "agent": "supervisor"}}
+                  data: {"type": "agent_status", "payload": {"status": "responding", "agent": "chat"}}
 
                   data: {"type": "chunk", "payload": {"text": "Hello, "}}
 
@@ -849,7 +990,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '500':
-          description: Server error during agent processing
+          description: Server error during AI processing
           content:
             application/json:
               schema:
@@ -875,13 +1016,9 @@ components:
 
     CalculationStatus:
       type: string
-      enum: [pending, running, completed, error, waiting]
+      enum: [pending, running, completed, error, waiting, pausing, paused]
       description: Status of a calculation
 
-    AgentActionType:
-      type: string
-      enum: [delete_calculation]
-      description: Type of agent action requiring confirmation
 
     # Request Models
     PubChemSearchRequest:
@@ -914,9 +1051,10 @@ components:
           minLength: 1
           description: XYZ string to validate
 
-    QuantumCalculationRequest:
+    # Base schema containing parameters common to all calculation methods
+    CalculationRequestBase:
       type: object
-      required: [xyz]
+      required: [xyz, calculation_method]
       properties:
         xyz:
           type: string
@@ -924,16 +1062,9 @@ components:
           description: XYZ molecular structure data
         calculation_method:
           $ref: '#/components/schemas/CalculationMethod'
-          default: DFT
         basis_function:
           type: string
-          default: "6-31G(d)"
-          description: Basis set for calculation (e.g., STO-3G, 6-31G(d), 6-31+G(d,p), cc-pVDZ, aug-cc-pVTZ, def2-SVP)
-        exchange_correlation:
-          type: string
-          default: "B3LYP"
-          nullable: true
-          description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X, CAM-B3LYP, PBE, BLYP, M06, TPSS). Note - This parameter is ignored for HF method as Hartree-Fock calculations do not use exchange-correlation functionals.
+          description: Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ)
         charges:
           type: integer
           minimum: -10
@@ -954,14 +1085,14 @@ components:
           default: "-"
           description: |
             Solvent type or custom parameters. Options include:
-            - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, nitromethane, methanol, ethanol, acetone, dichloroethane, dichloromethane, tetrahydrofuran, chlorobenzene, chloroform, diethylether, toluene, benzene, 1,4-dioxane, cyclohexane
+            - Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, etc.
             - Custom dielectric constant (numeric value > 1.0)
         name:
           type: string
           minLength: 1
           maxLength: 100
           default: "Unnamed Calculation"
-          description: Display name for the calculation instance (distinct from molecule_name which is the chemical name)
+          description: Display name for the calculation instance
         cpu_cores:
           type: integer
           minimum: 1
@@ -974,71 +1105,250 @@ components:
           maximum: 32768
           nullable: true
           description: Memory in MB
-        tddft_nstates:
-          type: integer
-          minimum: 1
-          maximum: 50
-          default: 10
-          description: Number of excited states to calculate (TDDFT only)
-        tddft_method:
-          type: string
-          enum: [TDDFT, TDA]
-          default: TDDFT
-          description: TDDFT calculation method - TDDFT or Tamm-Dancoff approximation
-        tddft_analyze_nto:
-          type: boolean
-          default: false
-          description: Perform Natural Transition Orbital analysis (TDDFT only)
-        ncas:
-          type: integer
-          minimum: 1
-          maximum: 50
-          default: 4
-          description: Number of active space orbitals (CASCI/CASSCF only)
-        nelecas:
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 4
-          description: Number of active space electrons (CASCI/CASSCF only)
-        max_cycle_macro:
-          type: integer
-          minimum: 1
-          maximum: 200
-          default: 50
-          description: Maximum CASSCF macro iterations (CASSCF only)
-        max_cycle_micro:
-          type: integer
-          minimum: 1
-          maximum: 20
-          default: 3
-          description: Maximum CI solver micro iterations (CASCI/CASSCF)
-        natorb:
-          type: boolean
-          default: true
-          description: Transform to natural orbitals in active space (CASCI/CASSCF only)
-        conv_tol:
-          type: number
-          format: float
-          minimum: 1e-12
-          maximum: 1e-3
-          default: 0.000001
-          description: Energy convergence tolerance (CASSCF only)
-        conv_tol_grad:
-          type: number
-          format: float
-          minimum: 1e-8
-          maximum: 1e-2
-          default: 0.0001
-          description: Gradient convergence tolerance (CASSCF only)
-        optimize_geometry:
-          type: boolean
-          default: true
-          description: Whether to perform geometry optimization before the main calculation
         ketcher_data:
           type: string
           nullable: true
-          description: Ketcher molecule format (JSON) for preserving the original drawn structure
+          description: Ketcher molecule format (JSON)
+
+    # DFT-specific calculation request
+    DFTCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [DFT]
+            exchange_correlation:
+              type: string
+              default: "B3LYP"
+              description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X)
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            optimize_geometry:
+              type: boolean
+              default: true
+              description: Whether to perform geometry optimization
+
+    # Hartree-Fock calculation request
+    HFCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [HF]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            optimize_geometry:
+              type: boolean
+              default: true
+
+    # MP2 calculation request
+    MP2CalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [MP2]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            optimize_geometry:
+              type: boolean
+              default: true
+
+    # CCSD calculation request
+    CCSDCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CCSD]
+            basis_function:
+              type: string
+              default: "cc-pVDZ"
+            frozen_core:
+              type: boolean
+              default: true
+              description: Use frozen core approximation to reduce computational cost
+
+    # CCSD(T) calculation request
+    CCSD_TCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CCSD_T]
+            basis_function:
+              type: string
+              default: "cc-pVDZ"
+            frozen_core:
+              type: boolean
+              default: true
+              description: Use frozen core approximation
+
+    # TDDFT calculation request
+    TDDFTCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method]
+          properties:
+            calculation_method:
+              type: string
+              enum: [TDDFT]
+            exchange_correlation:
+              type: string
+              default: "B3LYP"
+              description: Exchange-correlation functional
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            tddft_nstates:
+              type: integer
+              minimum: 1
+              maximum: 50
+              default: 10
+              description: Number of excited states to calculate
+            tddft_method:
+              type: string
+              enum: [TDDFT, TDA]
+              default: TDDFT
+              description: TDDFT or Tamm-Dancoff approximation
+            tddft_analyze_nto:
+              type: boolean
+              default: false
+              description: Perform Natural Transition Orbital analysis
+
+    # CASCI calculation request
+    CASCICalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method, ncas, nelecas]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CASCI]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            ncas:
+              type: integer
+              minimum: 1
+              maximum: 50
+              default: 4
+              description: Number of active space orbitals
+            nelecas:
+              type: integer
+              minimum: 1
+              maximum: 100
+              default: 4
+              description: Number of active space electrons
+            max_cycle_micro:
+              type: integer
+              minimum: 1
+              maximum: 20
+              default: 3
+              description: Maximum CI solver micro iterations
+            natorb:
+              type: boolean
+              default: true
+              description: Transform to natural orbitals in active space
+
+    # CASSCF calculation request
+    CASSCFCalculationRequest:
+      allOf:
+        - $ref: '#/components/schemas/CalculationRequestBase'
+        - type: object
+          required: [calculation_method, ncas, nelecas]
+          properties:
+            calculation_method:
+              type: string
+              enum: [CASSCF]
+            basis_function:
+              type: string
+              default: "6-31G(d)"
+            ncas:
+              type: integer
+              minimum: 1
+              maximum: 50
+              default: 4
+              description: Number of active space orbitals
+            nelecas:
+              type: integer
+              minimum: 1
+              maximum: 100
+              default: 4
+              description: Number of active space electrons
+            max_cycle_macro:
+              type: integer
+              minimum: 1
+              maximum: 200
+              default: 50
+              description: Maximum CASSCF macro iterations
+            max_cycle_micro:
+              type: integer
+              minimum: 1
+              maximum: 20
+              default: 3
+              description: Maximum CI solver micro iterations
+            natorb:
+              type: boolean
+              default: true
+              description: Transform to natural orbitals
+            conv_tol:
+              type: number
+              format: float
+              minimum: 1e-12
+              maximum: 1e-3
+              default: 0.000001
+              description: Energy convergence tolerance
+            conv_tol_grad:
+              type: number
+              format: float
+              minimum: 1e-8
+              maximum: 1e-2
+              default: 0.0001
+              description: Gradient convergence tolerance
+
+    # Discriminated union of all calculation request types
+    QuantumCalculationRequest:
+      oneOf:
+        - $ref: '#/components/schemas/DFTCalculationRequest'
+        - $ref: '#/components/schemas/HFCalculationRequest'
+        - $ref: '#/components/schemas/MP2CalculationRequest'
+        - $ref: '#/components/schemas/CCSDCalculationRequest'
+        - $ref: '#/components/schemas/CCSD_TCalculationRequest'
+        - $ref: '#/components/schemas/TDDFTCalculationRequest'
+        - $ref: '#/components/schemas/CASCICalculationRequest'
+        - $ref: '#/components/schemas/CASSCFCalculationRequest'
+      discriminator:
+        propertyName: calculation_method
+        mapping:
+          DFT: '#/components/schemas/DFTCalculationRequest'
+          HF: '#/components/schemas/HFCalculationRequest'
+          MP2: '#/components/schemas/MP2CalculationRequest'
+          CCSD: '#/components/schemas/CCSDCalculationRequest'
+          CCSD_T: '#/components/schemas/CCSD_TCalculationRequest'
+          TDDFT: '#/components/schemas/TDDFTCalculationRequest'
+          CASCI: '#/components/schemas/CASCICalculationRequest'
+          CASSCF: '#/components/schemas/CASSCFCalculationRequest'
 
     CalculationUpdateRequest:
       type: object
@@ -1308,6 +1618,114 @@ components:
           type: string
           nullable: true
           description: Error message if calculation failed
+        dipole_moment_x_debye:
+          type: number
+          nullable: true
+          description: Dipole moment X component in Debye
+        dipole_moment_y_debye:
+          type: number
+          nullable: true
+          description: Dipole moment Y component in Debye
+        dipole_moment_z_debye:
+          type: number
+          nullable: true
+          description: Dipole moment Z component in Debye
+        dipole_moment_total_debye:
+          type: number
+          nullable: true
+          description: Total dipole moment magnitude in Debye
+        dipole_moment_x_au:
+          type: number
+          nullable: true
+          description: Dipole moment X component in atomic units
+        dipole_moment_y_au:
+          type: number
+          nullable: true
+          description: Dipole moment Y component in atomic units
+        dipole_moment_z_au:
+          type: number
+          nullable: true
+          description: Dipole moment Z component in atomic units
+        dipole_moment_total_au:
+          type: number
+          nullable: true
+          description: Total dipole moment magnitude in atomic units
+        homo_energy_hartree:
+          type: number
+          nullable: true
+          description: HOMO orbital energy in hartree
+        homo_energy_ev:
+          type: number
+          nullable: true
+          description: HOMO orbital energy in eV
+        lumo_energy_hartree:
+          type: number
+          nullable: true
+          description: LUMO orbital energy in hartree
+        lumo_energy_ev:
+          type: number
+          nullable: true
+          description: LUMO orbital energy in eV
+        homo_lumo_gap_hartree:
+          type: number
+          nullable: true
+          description: HOMO-LUMO energy gap in hartree
+        homo_lumo_gap_ev:
+          type: number
+          nullable: true
+          description: HOMO-LUMO energy gap in eV
+        nuclear_repulsion_energy:
+          type: number
+          nullable: true
+          description: Nuclear repulsion energy in hartree
+        electronic_energy:
+          type: number
+          nullable: true
+          description: Electronic energy in hartree
+        num_basis_functions:
+          type: integer
+          nullable: true
+          description: Total number of basis functions
+        num_primitive_gaussians:
+          type: integer
+          nullable: true
+          description: Total number of primitive Gaussian functions
+        total_electrons:
+          type: integer
+          nullable: true
+          description: Total number of electrons in the molecule
+        mp2_same_spin_correlation:
+          type: number
+          nullable: true
+          description: MP2 same-spin correlation energy in hartree
+        mp2_opposite_spin_correlation:
+          type: number
+          nullable: true
+          description: MP2 opposite-spin correlation energy in hartree
+        ccsd_t1_diagnostic:
+          type: number
+          nullable: true
+          description: CCSD T1 diagnostic (>0.02 suggests multi-reference character)
+        ccsd_d1_diagnostic:
+          type: number
+          nullable: true
+          description: CCSD D1 diagnostic (alternative diagnostic based on density matrix)
+        ccsd_d2_diagnostic:
+          type: number
+          nullable: true
+          description: CCSD D2 diagnostic (diagnostic based on T2 amplitudes)
+        scf_iterations:
+          type: integer
+          nullable: true
+          description: Number of SCF iterations performed
+        final_energy_change:
+          type: number
+          nullable: true
+          description: Final energy change in SCF convergence
+        final_density_change:
+          type: number
+          nullable: true
+          description: Final density matrix change in SCF convergence
         excitation_energies:
           type: array
           items:
@@ -1545,6 +1963,30 @@ components:
           type: string
           nullable: true
           description: Reason why calculation is waiting (if status is waiting)
+        canResume:
+          type: boolean
+          nullable: true
+          description: Whether this calculation can be resumed from a paused state
+        pausedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp when calculation was paused
+        resumeInfo:
+          type: object
+          nullable: true
+          description: Information about the paused state for resuming
+          properties:
+            optimization_step:
+              type: integer
+              description: Geometry optimization step number when paused
+            checkpoint_exists:
+              type: boolean
+              description: Whether checkpoint file is available for resume
+            calculation_phase:
+              type: string
+              enum: [geometry_optimization, scf_calculation, post_scf]
+              description: Which phase the calculation was in when paused
 
     CalculationSummary:
       type: object
@@ -1848,7 +2290,7 @@ components:
 
     SupportedParametersData:
       type: object
-      required: [calculation_methods, basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods]
+      required: [calculation_methods, basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods, method_defaults, parameter_constraints]
       properties:
         calculation_methods:
           type: array
@@ -1886,6 +2328,92 @@ components:
           items:
             type: string
           description: Supported TDDFT calculation methods
+        method_defaults:
+          $ref: '#/components/schemas/MethodDefaultValues'
+          description: Default parameter values for each calculation method
+        parameter_constraints:
+          $ref: '#/components/schemas/ParameterConstraints'
+          description: Constraints and validation rules for calculation parameters
+
+    MethodDefaultValues:
+      type: object
+      additionalProperties:
+        type: object
+        description: Default parameter values for a specific calculation method
+        properties:
+          basis_function:
+            type: string
+            description: Default basis function for this method
+          memory_mb:
+            type: integer
+            description: Default memory allocation in megabytes
+          optimize_geometry:
+            type: boolean
+            description: Default geometry optimization setting
+          frozen_core:
+            type: boolean
+            description: Default frozen core approximation setting (CCSD/CCSD_T)
+          tddft_nstates:
+            type: integer
+            description: Default number of excited states (TDDFT)
+          tddft_method:
+            type: string
+            description: Default TDDFT method (TDDFT)
+          tddft_analyze_nto:
+            type: boolean
+            description: Default NTO analysis setting (TDDFT)
+          ncas:
+            type: integer
+            description: Default number of active orbitals (CASCI/CASSCF)
+          nelecas:
+            type: integer
+            description: Default number of active electrons (CASCI/CASSCF)
+          max_cycle_macro:
+            type: integer
+            description: Default maximum macro iterations (CASSCF)
+          max_cycle_micro:
+            type: integer
+            description: Default maximum micro iterations (CASCI/CASSCF)
+          natorb:
+            type: boolean
+            description: Default natural orbital transformation setting (CASCI/CASSCF)
+          conv_tol:
+            type: number
+            description: Default energy convergence tolerance (CASSCF)
+          conv_tol_grad:
+            type: number
+            description: Default gradient convergence tolerance (CASSCF)
+      description: Default values for each calculation method (e.g., DFT, CCSD, TDDFT)
+
+    ParameterConstraint:
+      type: object
+      properties:
+        min:
+          type: number
+          description: Minimum allowed value for this parameter
+        max:
+          type: number
+          description: Maximum allowed value for this parameter
+        applicable_methods:
+          type: array
+          items:
+            type: string
+          description: List of calculation methods this parameter applies to
+        disabled_for:
+          type: array
+          items:
+            type: string
+          description: List of calculation methods where this parameter is disabled
+        description:
+          type: string
+          description: Human-readable description of the constraint
+      description: Constraint definition for a calculation parameter
+
+    ParameterConstraints:
+      type: object
+      additionalProperties:
+        $ref: '#/components/schemas/ParameterConstraint'
+      description: Constraints for all calculation parameters (e.g., ncas, optimize_geometry)
 
     SupportedParametersResponse:
       type: object
@@ -1958,11 +2486,6 @@ components:
           type: string
           nullable: true
           description: Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
-          example: null
-        tavily_api_key:
-          type: string
-          nullable: true
-          description: Tavily API key for Deep Research web search functionality. If not provided, web search will be disabled.
           example: null
         research_email:
           type: string
@@ -2160,6 +2683,49 @@ components:
         metadata:
           $ref: '#/components/schemas/IRSpectrumMetadata'
 
+    AtomDisplacement:
+      type: object
+      required: [atom_index, element, x, y, z, dx, dy, dz]
+      properties:
+        atom_index:
+          type: integer
+          description: Zero-based index of the atom
+          example: 0
+        element:
+          type: string
+          description: Element symbol
+          example: "C"
+        x:
+          type: number
+          format: float
+          description: X coordinate of the atom (Angstrom)
+          example: 0.0
+        y:
+          type: number
+          format: float
+          description: Y coordinate of the atom (Angstrom)
+          example: 0.0
+        z:
+          type: number
+          format: float
+          description: Z coordinate of the atom (Angstrom)
+          example: 0.0
+        dx:
+          type: number
+          format: float
+          description: X component of displacement vector
+          example: 0.123
+        dy:
+          type: number
+          format: float
+          description: Y component of displacement vector
+          example: -0.045
+        dz:
+          type: number
+          format: float
+          description: Z component of displacement vector
+          example: 0.078
+
     IRPeak:
       type: object
       required: [frequency_cm, intensity, original_frequency_cm]
@@ -2179,6 +2745,12 @@ components:
           format: float
           description: Original calculated frequency before scale factor correction (cm⁻¹)
           example: 1723.1
+        mode_displacements:
+          type: array
+          nullable: true
+          description: Vibrational mode displacement vectors for 3D visualization
+          items:
+            $ref: '#/components/schemas/AtomDisplacement'
 
     IRSpectrumMetadata:
       type: object
@@ -2596,35 +3168,6 @@ components:
               type: string
               description: Response message from the AI agent
 
-    ExecuteConfirmedActionRequest:
-      type: object
-      required: [action_type, calculation_id]
-      properties:
-        action_type:
-          $ref: '#/components/schemas/AgentActionType'
-        calculation_id:
-          type: string
-          description: ID of the calculation to perform the action on
-
-    ExecuteConfirmedActionResponse:
-      type: object
-      required: [success, data]
-      properties:
-        success:
-          type: boolean
-          example: true
-        data:
-          type: object
-          required: [message]
-          properties:
-            message:
-              type: string
-              description: Result message
-            action_type:
-              $ref: '#/components/schemas/AgentActionType'
-            calculation_id:
-              type: string
-              description: ID of the affected calculation
 
     # Chat History Schemas
     ChatMessage:
@@ -2789,3 +3332,40 @@ components:
             deleted_id:
               type: string
               description: ID of the deleted session
+
+    PauseCalculationResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message, calculation_id]
+          properties:
+            message:
+              type: string
+              description: Confirmation message
+              example: "Pause request accepted. Calculation will pause after current iteration."
+            calculation_id:
+              type: string
+              description: ID of the calculation being paused
+
+    ResumeCalculationResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [message, calculation]
+          properties:
+            message:
+              type: string
+              description: Confirmation message
+              example: "Calculation resumed from checkpoint"
+            calculation:
+              $ref: '#/components/schemas/CalculationInstance'

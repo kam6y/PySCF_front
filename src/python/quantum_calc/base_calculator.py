@@ -8,6 +8,8 @@ import logging
 from contextlib import contextmanager
 import numpy as np
 from .config_manager import get_memory_for_method, get_max_cycle
+from .exceptions import PauseRequestedException
+from .pause_manager import pause_manager
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +166,7 @@ class BaseCalculator(ABC):
         self.max_cycle = common_params['max_cycle']
         self.solvent_method = common_params['solvent_method']
         self.solvent = common_params['solvent']
-        
+
         # Store spin in results so _create_scf_method can access it
         self.results['spin'] = common_params['spin']
         self.results['charge'] = common_params['charge']
@@ -180,7 +182,10 @@ class BaseCalculator(ABC):
         self.mf.chkfile = self.get_checkpoint_path()
         self.mf.max_cycle = common_params['max_cycle']
 
-        logger.info(f"SCF method setup completed: {self._get_base_method_description()}")
+        # Integrate SCF callback for pause support
+        self.mf.callback = self._scf_callback
+
+        logger.info(f"SCF method setup completed with pause callback: {self._get_base_method_description()}")
     
     def _store_calculation_parameters(self, common_params: Dict[str, Any], 
                                     specific_params: Dict[str, Any], atom_count: int) -> None:
@@ -228,16 +233,16 @@ class BaseCalculator(ABC):
         """Template method for running quantum chemistry calculations."""
         try:
             self._pre_calculation_check()
-            
+
             if self._requires_geometry_optimization():
                 self._perform_geometry_optimization()
-            
+
             self._setup_final_calculation()
             base_energy = self._run_base_scf_calculation()
             self._verify_scf_convergence()
-            
+
             specific_results = self._perform_specific_calculation(base_energy)
-            
+
             if self._requires_orbital_analysis():
                 self._perform_orbital_analysis()
 
@@ -248,24 +253,30 @@ class BaseCalculator(ABC):
                 self._perform_frequency_analysis()
 
             return self._prepare_final_results(specific_results)
-            
+
+        except PauseRequestedException:
+            # Re-raise pause exception without modification
+            # This will be caught by ProcessManager and handled appropriately
+            logger.info("Calculation paused by user request")
+            raise
+
         except Exception as e:
             import traceback
             from .exceptions import CalculationError
-            
+
             # Enhanced error logging for CASCI/CASSCF
             calculation_method = getattr(self, 'calculation_method', 'Unknown')
             logger.error(f"Calculation failed in {calculation_method} run_calculation:")
             logger.error(f"Exception type: {type(e).__name__}")
             logger.error(f"Exception message: '{str(e)}'")
             logger.error(f"Full traceback:\n{traceback.format_exc()}")
-            
+
             # Handle empty error messages specifically for CASCI/CASSCF
             error_message = str(e)
             if not error_message.strip():
                 error_message = f"Unknown error in {calculation_method} calculation (empty error message)"
                 logger.error(f"Empty error message detected, using: {error_message}")
-            
+
             if isinstance(e, (CalculationError,)):
                 raise
             raise CalculationError(f"{calculation_method} calculation failed: {error_message}")
@@ -348,11 +359,13 @@ class BaseCalculator(ABC):
         """Convert optimized geometry to XYZ format string."""
         if not hasattr(self, 'optimized_geometry') or self.optimized_geometry is None:
             return ""
-        if not hasattr(self, 'mol') or self.mol is None:
+        if not hasattr(self, 'mf') or self.mf is None or self.mf.mol is None:
             return ""
-        
-        atom_symbols = [self.mol.atom_symbol(i) for i in range(self.mol.natm)]
-        lines = [str(self.mol.natm)]
+
+        # Use self.mf.mol to ensure consistency with optimized geometry
+        mol = self.mf.mol
+        atom_symbols = [mol.atom_symbol(i) for i in range(mol.natm)]
+        lines = [str(mol.natm)]
         lines.append("Optimized geometry from PySCF calculation")
         
         for i, (symbol, coords) in enumerate(zip(atom_symbols, self.optimized_geometry)):
@@ -362,32 +375,33 @@ class BaseCalculator(ABC):
     
     def _calculate_mulliken_charges(self) -> Optional[List[Dict[str, Any]]]:
         """Calculate Mulliken population analysis charges for each atom."""
-        if not hasattr(self, 'mf') or self.mf is None:
+        if not hasattr(self, 'mf') or self.mf is None or self.mf.mol is None:
             return None
-        if not hasattr(self, 'mol') or self.mol is None:
-            return None
-        
+
+        # Use self.mf.mol to ensure consistency with the converged calculation
+        mol = self.mf.mol
+
         try:
             # Perform Mulliken population analysis
             # This returns (pop, charges) where pop are populations and charges are atomic charges
             pop, charges = self.mf.mulliken_pop()
-            
+
             # Extract charges for each atom
             mulliken_charges = []
-            for i in range(self.mol.natm):
-                atom_symbol = self.mol.atom_symbol(i)
+            for i in range(mol.natm):
+                atom_symbol = mol.atom_symbol(i)
                 # Convert numpy float to Python float for JSON serialization
                 charge = float(charges[i])
-                
+
                 mulliken_charges.append({
                     'atom_index': i,
                     'element': atom_symbol,
                     'charge': charge
                 })
-            
+
             # Verify total charge conservation (should equal molecular charge)
             total_charge = sum(item['charge'] for item in mulliken_charges)
-            expected_charge = float(self.mol.charge)
+            expected_charge = float(mol.charge)
             logger.info(f"Mulliken analysis: calculated total charge = {total_charge:.6f}, expected = {expected_charge:.6f}")
             
             if abs(total_charge - expected_charge) > 0.01:
@@ -455,7 +469,9 @@ class BaseCalculator(ABC):
             'thermal_energy_298K': None,
             'entropy_298K': None,
             'gibbs_free_energy_298K': None,
-            'heat_capacity_298K': None
+            'heat_capacity_298K': None,
+            'normal_modes': None,  # Vibrational mode displacement vectors
+            'molecule_structure': None  # Molecular geometry for mode visualization
         }
         
         try:
@@ -477,35 +493,69 @@ class BaseCalculator(ABC):
             # Step 2: Perform harmonic analysis
             try:
                 logger.info("Performing harmonic analysis...")
-                freq_info = thermo.harmonic_analysis(self.mol, hessian)
+                # Use self.mf.mol to ensure harmonic analysis uses the same geometry as Hessian calculation
+                freq_info = thermo.harmonic_analysis(self.mf.mol, hessian)
                 
                 # Extract frequencies in cm^-1
                 frequencies_au = freq_info['freq_au']
                 frequencies_cm = freq_info['freq_wavenumber']
-                
+                normal_modes = freq_info['norm_mode']  # Shape: (3*natom, nmodes)
+
+                # Get molecular structure for mode visualization
+                # Use self.mf.mol to ensure we get optimized geometry if optimization was performed
+                mol_for_structure = self.mf.mol
+                atom_coords = mol_for_structure.atom_coords()  # Shape: (natom, 3)
+                atom_symbols = [mol_for_structure.atom_symbol(i) for i in range(mol_for_structure.natm)]
+
                 # Filter out low frequencies (below 80 cm^-1 threshold)
                 # and count imaginary frequencies
                 imaginary_count = 0
                 positive_frequencies = []
-                
-                for freq_cm in frequencies_cm:
+                positive_mode_indices = []  # Track which modes correspond to positive frequencies
+
+                for mode_idx, freq_cm in enumerate(frequencies_cm):
                     if freq_cm < 0:
                         # Imaginary frequency (negative eigenvalue)
                         imaginary_count += 1
                     elif freq_cm >= 80.0:  # PySCF default threshold
                         # Real, significant frequency
                         positive_frequencies.append(float(freq_cm))
-                
+                        positive_mode_indices.append(mode_idx)
+
                 logger.info(f"Found {len(positive_frequencies)} positive frequencies (≥80 cm⁻¹)")
                 logger.info(f"Found {imaginary_count} imaginary frequencies")
-                
+
+                # Extract normal modes for positive frequencies
+                # normal_modes shape: (nmodes, 3*natom) - each row is a mode
+                # We need to reshape to (natom, 3) for each mode
+                natom = mol_for_structure.natm
+                formatted_normal_modes = []
+
+                # Debug: Log array shape for troubleshooting
+                logger.debug(f"normal_modes shape: {normal_modes.shape}")
+                logger.debug(f"natom: {natom}, expected mode vector size: {3*natom}")
+
+                for mode_idx in positive_mode_indices:
+                    mode_vector = normal_modes[mode_idx]  # Shape: (3*natom,)
+                    # Reshape to (natom, 3) where each row is [dx, dy, dz] for an atom
+                    mode_vector_reshaped = mode_vector.reshape(natom, 3)
+                    formatted_normal_modes.append(mode_vector_reshaped.tolist())
+
+                # Format molecular structure
+                molecule_structure = {
+                    'symbols': atom_symbols,
+                    'coordinates': atom_coords.tolist()  # Shape: (natom, 3)
+                }
+
                 # Update results with frequency information
                 frequency_results.update({
                     'frequency_analysis_performed': True,
                     'vibrational_frequencies': positive_frequencies,
-                    'imaginary_frequencies_count': imaginary_count
+                    'imaginary_frequencies_count': imaginary_count,
+                    'normal_modes': formatted_normal_modes,  # List of (natom, 3) arrays
+                    'molecule_structure': molecule_structure
                 })
-                
+
                 # Log optimization quality assessment
                 if imaginary_count == 0:
                     logger.info("Geometry optimization successful: no imaginary frequencies detected")
@@ -513,10 +563,72 @@ class BaseCalculator(ABC):
                     logger.warning("One imaginary frequency detected: possible transition state")
                 else:
                     logger.warning(f"Multiple imaginary frequencies ({imaginary_count}) detected: poor optimization")
-                    
+
             except Exception as e:
                 logger.error(f"Harmonic analysis failed: {str(e)}")
                 return frequency_results
+
+            # Step 2.5: Calculate IR intensities
+            try:
+                logger.info("Calculating IR intensities...")
+
+                # Import the appropriate Infrared class based on the method type
+                from pyscf.prop import infrared
+
+                # Determine which Infrared class to use based on mean field type
+                # Check if UHF/UKS (unrestricted) or RHF/RKS (restricted)
+                if hasattr(self.mf, 'mo_occ'):
+                    # Check if mo_occ is a tuple/list (UHF/UKS) or array (RHF/RKS)
+                    is_unrestricted = isinstance(self.mf.mo_occ, (tuple, list))
+                else:
+                    # Fallback: assume restricted
+                    is_unrestricted = False
+
+                # Check if DFT (has xc attribute) or HF
+                is_dft = hasattr(self.mf, 'xc') and self.mf.xc is not None
+
+                # Select the appropriate Infrared class
+                if is_unrestricted:
+                    if is_dft:
+                        logger.info("Using UKS Infrared calculator")
+                        ir_calculator = infrared.uks.Infrared(self.mf)
+                    else:
+                        logger.info("Using UHF Infrared calculator")
+                        ir_calculator = infrared.uhf.Infrared(self.mf)
+                else:
+                    if is_dft:
+                        logger.info("Using RKS Infrared calculator")
+                        ir_calculator = infrared.rks.Infrared(self.mf)
+                    else:
+                        logger.info("Using RHF Infrared calculator")
+                        ir_calculator = infrared.rhf.Infrared(self.mf)
+
+                # Run IR intensity calculation
+                ir_result = ir_calculator.run()
+
+                # Extract IR intensities (units: km/mol)
+                # ir_inten is a 1D array with length equal to number of vibrational modes
+                ir_intensities_all = ir_result.ir_inten
+
+                logger.info(f"IR intensities calculated: {len(ir_intensities_all)} modes total")
+
+                # Extract only the IR intensities corresponding to positive frequencies
+                # positive_mode_indices contains the indices of modes with freq >= 80 cm^-1
+                ir_intensities_filtered = [float(ir_intensities_all[idx]) for idx in positive_mode_indices]
+
+                # Store IR intensities in results
+                frequency_results['ir_intensities'] = ir_intensities_filtered
+
+                logger.info(f"IR intensities extracted for {len(ir_intensities_filtered)} positive frequency modes")
+
+            except ImportError as e:
+                logger.warning(f"IR intensity calculation skipped: pyscf.prop.infrared module not available ({str(e)})")
+                logger.warning("To enable IR intensities, install: pip install git+https://github.com/pyscf/properties")
+                frequency_results['ir_intensities'] = None
+            except Exception as e:
+                logger.warning(f"IR intensity calculation failed: {str(e)}")
+                logger.warning("Continuing without IR intensities - uniform intensities will be used for IR spectrum")
+                frequency_results['ir_intensities'] = None
             
             # Step 3: Calculate thermochemical properties (optional, non-critical)
             try:
@@ -591,12 +703,21 @@ class BaseCalculator(ABC):
     def _perform_geometry_optimization(self) -> None:
         """Perform geometry optimization using geometric_solver."""
         from pyscf.geomopt import geometric_solver
-        
+
         logger.info("Starting geometry optimization...")
-        optimized_mol = geometric_solver.optimize(self.mf)
+
+        # Integrate callback for geometry optimization
+        # Note: geometric_solver.optimize accepts callback parameter
+        try:
+            optimized_mol = geometric_solver.optimize(self.mf, callback=self._geometry_optimization_callback)
+        except TypeError:
+            # Fallback if callback is not supported by this version of PySCF
+            logger.warning("Geometry optimization callback not supported, using standard optimization")
+            optimized_mol = geometric_solver.optimize(self.mf)
+
         self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
         logger.info("Geometry optimization completed")
-        
+
         # Apply coordinate alignment after optimization
         self._align_optimized_geometry()
     
@@ -847,7 +968,128 @@ class BaseCalculator(ABC):
             self.mf.max_cycle = self.max_cycle
         elif 'max_cycle' in self.results:
             self.mf.max_cycle = self.results['max_cycle']
-    
+
+        # Integrate SCF callback for pause support
+        self.mf.callback = self._scf_callback
+
+    # ===== Pause/Resume Support Methods =====
+
+    def _check_pause_requested(self) -> None:
+        """
+        Check if pause has been requested for this calculation.
+
+        Raises:
+            PauseRequestedException: If pause has been requested
+        """
+        # Check flag file in working directory
+        if pause_manager.check_pause_flag_file(self.working_dir):
+            logger.info("Pause requested via flag file, raising PauseRequestedException")
+            raise PauseRequestedException("Calculation paused by user request")
+
+    def _scf_callback(self, envs: Dict[str, Any]) -> bool:
+        """
+        Callback function for SCF iterations.
+
+        This is called after each SCF iteration by PySCF.
+        Checks for pause requests and raises PauseRequestedException if needed.
+
+        Args:
+            envs: Environment dictionary from PySCF containing iteration info
+
+        Returns:
+            False to continue calculation, True to stop (but we use exceptions instead)
+
+        Raises:
+            PauseRequestedException: If pause has been requested
+        """
+        # Check for pause request
+        self._check_pause_requested()
+
+        # Log progress every few iterations
+        if 'cycle' in envs and envs['cycle'] % 5 == 0:
+            logger.debug(f"SCF iteration {envs['cycle']}, checking pause status")
+
+        return False  # Continue calculation
+
+    def _geometry_optimization_callback(self, envs: Dict[str, Any]) -> bool:
+        """
+        Callback function for geometry optimization steps.
+
+        This is called after each geometry optimization step.
+        Saves trajectory and checks for pause requests.
+
+        Args:
+            envs: Environment dictionary from PySCF geometric optimizer
+
+        Returns:
+            False to continue optimization, True to stop (but we use exceptions instead)
+
+        Raises:
+            PauseRequestedException: If pause has been requested
+        """
+        # Check for pause request
+        self._check_pause_requested()
+
+        # Save geometry trajectory step if file_manager is available
+        if hasattr(self, 'file_manager') and hasattr(envs, 'mol'):
+            try:
+                step_num = envs.get('cycle', 0)
+                # Convert current geometry to XYZ string
+                mol = envs['mol']
+                atom_symbols = [mol.atom_symbol(i) for i in range(mol.natm)]
+                coords = mol.atom_coords(unit="ANG")
+
+                lines = [str(mol.natm)]
+                lines.append(f"Optimization step {step_num}")
+                for symbol, coord in zip(atom_symbols, coords):
+                    lines.append(f"{symbol:2s} {coord[0]:12.6f} {coord[1]:12.6f} {coord[2]:12.6f}")
+
+                geometry_xyz = "\n".join(lines)
+                self.file_manager.save_geometry_trajectory_step(self.working_dir, step_num, geometry_xyz)
+                logger.debug(f"Saved geometry trajectory step {step_num}")
+            except Exception as e:
+                logger.warning(f"Failed to save geometry trajectory step: {e}")
+
+        return False  # Continue optimization
+
+    def resume_from_checkpoint(self, pause_state: Optional[Dict[str, Any]] = None) -> None:
+        """
+        Resume calculation from checkpoint file.
+
+        This method configures the SCF calculation to use the checkpoint file
+        as an initial guess, enabling true checkpoint-based resume.
+
+        Args:
+            pause_state: Optional pause state information containing checkpoint details
+        """
+        chk_path = self.get_checkpoint_path()
+
+        if not os.path.exists(chk_path):
+            logger.warning(f"Checkpoint file not found: {chk_path}")
+            logger.info("Will start calculation from scratch")
+            return
+
+        logger.info(f"Resuming calculation from checkpoint: {chk_path}")
+
+        # Configure SCF to use checkpoint file as initial guess
+        if hasattr(self, 'mf') and self.mf is not None:
+            self.mf.init_guess = 'chkfile'
+            self.mf.chkfile = chk_path
+            logger.info("Configured SCF to use checkpoint file as initial guess")
+
+        # If pause state contains geometry trajectory info, load last geometry
+        if pause_state and hasattr(self, 'file_manager'):
+            try:
+                last_geometry = self.file_manager.load_last_geometry(self.working_dir)
+                if last_geometry:
+                    logger.info("Loaded last geometry from trajectory file")
+                    # Parse and set as starting geometry for optimization
+                    atoms = self.parse_xyz(last_geometry)
+                    logger.info(f"Resuming geometry optimization from step with {len(atoms)} atoms")
+                    # The geometry will be used in the next optimization call
+            except Exception as e:
+                logger.warning(f"Failed to load last geometry from trajectory: {e}")
+
     def _run_base_scf_calculation(self) -> float:
         """Run base SCF calculation and return energy."""
         logger.info(f"Running {self._get_base_method_description()} calculation...")
@@ -1272,49 +1514,52 @@ class BaseCalculator(ABC):
             
             # Calculate spin density matrix (alpha - beta)
             spin_dm = dm1a - dm1b
-            
+
+            # Use self.mf.mol to ensure consistency with the converged calculation
+            mol = self.mf.mol if hasattr(self, 'mf') and self.mf is not None else self.mol
+
             # Perform Mulliken population analysis on spin density
-            if hasattr(self.mol, 'get_ovlp'):
-                ovlp = self.mol.get_ovlp()
+            if hasattr(mol, 'get_ovlp'):
+                ovlp = mol.get_ovlp()
             else:
                 ovlp = self.mycas._scf.get_ovlp()
-            
+
             # Mulliken spin populations
             spin_pop = np.einsum('ij,ji->i', spin_dm, ovlp)
-            
+
             # Group by atoms
             atomic_spin_densities = []
             ao_offset = 0
-            
-            for iatom in range(self.mol.natm):
-                atom_symbol = self.mol.atom_symbol(iatom)
-                nao = self.mol.aoslice_by_atom()[iatom][3] - self.mol.aoslice_by_atom()[iatom][2]
-                
+
+            for iatom in range(mol.natm):
+                atom_symbol = mol.atom_symbol(iatom)
+                nao = mol.aoslice_by_atom()[iatom][3] - mol.aoslice_by_atom()[iatom][2]
+
                 # Sum spin populations for this atom
                 atom_spin = float(np.sum(spin_pop[ao_offset:ao_offset + nao]))
-                
+
                 atomic_spin_densities.append({
                     'atom_index': iatom,
                     'element': atom_symbol,
                     'spin_density': atom_spin,
                     'abs_spin_density': abs(atom_spin)
                 })
-                
+
                 ao_offset += nao
-            
+
             # Calculate total spin
             total_spin_density = sum([atom['spin_density'] for atom in atomic_spin_densities])
             total_abs_spin = sum([atom['abs_spin_density'] for atom in atomic_spin_densities])
-            
+
             spin_analysis.update({
                 'atomic_spin_densities': atomic_spin_densities,
                 'total_spin_density': float(total_spin_density),
                 'total_absolute_spin_density': float(total_abs_spin),
-                'expected_spin': float(self.mol.spin)
+                'expected_spin': float(mol.spin)
             })
-            
+
             logger.info(f"Spin density analysis: total = {total_spin_density:.3f}, "
-                       f"expected = {self.mol.spin}, atoms analyzed = {len(atomic_spin_densities)}")
+                       f"expected = {mol.spin}, atoms analyzed = {len(atomic_spin_densities)}")
             
         except Exception as e:
             logger.error(f"Error in Mulliken spin density calculation: {e}")
@@ -1342,11 +1587,14 @@ class BaseCalculator(ABC):
             return {'available': False, 'reason': 'SCF reference orbitals not found'}
         
         overlap_analysis['available'] = True
-        
+
+        # Use self.mf.mol to ensure consistency with the converged calculation
+        mol = self.mf.mol if hasattr(self, 'mf') and self.mf is not None else self.mol
+
         try:
             # Get overlap matrix
-            if hasattr(self.mol, 'get_ovlp'):
-                S = self.mol.get_ovlp()
+            if hasattr(mol, 'get_ovlp'):
+                S = mol.get_ovlp()
             else:
                 S = self.mf.get_ovlp()
             
@@ -1503,5 +1751,116 @@ class BaseCalculator(ABC):
         except Exception as e:
             logger.error(f"Error in enhanced CI coefficient analysis: {e}")
             ci_analysis['error'] = str(e)
-        
+
         return ci_analysis
+
+    # ===== Common Additional Properties Extraction =====
+
+    def _extract_common_additional_properties(self) -> Dict[str, Any]:
+        """
+        Extract common additional properties available for all calculation methods.
+
+        This method provides comprehensive electronic structure information including:
+        - Dipole moment (x, y, z components and total, in Debye and a.u.)
+        - HOMO-LUMO energies and gap (in hartree and eV)
+        - Energy components (nuclear repulsion, electronic energy)
+        - Basis set information (number of basis functions, primitive Gaussians)
+
+        Returns:
+            Dictionary containing all available common properties
+        """
+        properties = {}
+
+        if self.mf is None or self.mf.mol is None:
+            logger.warning("Mean field or molecular object not available for additional properties extraction")
+            return properties
+
+        # Use self.mf.mol to ensure consistency with the converged calculation
+        mol = self.mf.mol
+
+        try:
+            # 1. Dipole Moment (双極子モーメント)
+            try:
+                logger.info("Calculating dipole moment...")
+                # Get dipole moment in both Debye and atomic units
+                dip_debye = self.mf.dip_moment(unit='Debye')  # Returns [x, y, z]
+                dip_au = self.mf.dip_moment(unit='A.U.')
+
+                properties['dipole_moment_x_debye'] = float(dip_debye[0])
+                properties['dipole_moment_y_debye'] = float(dip_debye[1])
+                properties['dipole_moment_z_debye'] = float(dip_debye[2])
+                properties['dipole_moment_total_debye'] = float(np.linalg.norm(dip_debye))
+                properties['dipole_moment_x_au'] = float(dip_au[0])
+                properties['dipole_moment_y_au'] = float(dip_au[1])
+                properties['dipole_moment_z_au'] = float(dip_au[2])
+                properties['dipole_moment_total_au'] = float(np.linalg.norm(dip_au))
+
+                logger.info(f"Dipole moment: {properties['dipole_moment_total_debye']:.4f} Debye")
+            except Exception as e:
+                logger.warning(f"Failed to calculate dipole moment: {e}")
+
+            # 2. HOMO-LUMO Gap and Individual Energies (HOMO-LUMOギャップと個別エネルギー)
+            try:
+                logger.info("Calculating HOMO-LUMO energies and gap...")
+                mo_energy = self.mf.mo_energy
+
+                # Handle both RKS/RHF (1D array) and UKS/UHF (2D array) cases
+                if hasattr(mo_energy, 'ndim') and mo_energy.ndim == 2:
+                    # UKS/UHF case: use alpha orbitals
+                    mo_energy = mo_energy[0]
+
+                homo_idx = self.results.get('homo_index')
+                lumo_idx = self.results.get('lumo_index')
+
+                if homo_idx is not None and lumo_idx is not None:
+                    homo_energy_hartree = float(mo_energy[homo_idx])
+                    lumo_energy_hartree = float(mo_energy[lumo_idx])
+                    gap_hartree = lumo_energy_hartree - homo_energy_hartree
+
+                    # Convert to eV (1 hartree = 27.2114 eV)
+                    HARTREE_TO_EV = 27.2114
+                    properties['homo_energy_hartree'] = homo_energy_hartree
+                    properties['homo_energy_ev'] = homo_energy_hartree * HARTREE_TO_EV
+                    properties['lumo_energy_hartree'] = lumo_energy_hartree
+                    properties['lumo_energy_ev'] = lumo_energy_hartree * HARTREE_TO_EV
+                    properties['homo_lumo_gap_hartree'] = gap_hartree
+                    properties['homo_lumo_gap_ev'] = gap_hartree * HARTREE_TO_EV
+
+                    logger.info(f"HOMO energy: {properties['homo_energy_ev']:.4f} eV")
+                    logger.info(f"LUMO energy: {properties['lumo_energy_ev']:.4f} eV")
+                    logger.info(f"HOMO-LUMO gap: {properties['homo_lumo_gap_ev']:.4f} eV")
+            except Exception as e:
+                logger.warning(f"Failed to calculate HOMO-LUMO energies: {e}")
+
+            # 3. Energy Components (エネルギー成分)
+            try:
+                logger.info("Calculating energy components...")
+                properties['nuclear_repulsion_energy'] = float(self.mf.energy_nuc())
+                e_tot = self.mf.e_tot
+                e_nuc = properties['nuclear_repulsion_energy']
+                properties['electronic_energy'] = float(e_tot - e_nuc)
+
+                logger.info(f"Nuclear repulsion energy: {properties['nuclear_repulsion_energy']:.6f} hartree")
+                logger.info(f"Electronic energy: {properties['electronic_energy']:.6f} hartree")
+            except Exception as e:
+                logger.warning(f"Failed to calculate energy components: {e}")
+
+            # 4. Basis Set Information (基底関数情報)
+            try:
+                logger.info("Extracting basis set information...")
+                properties['num_basis_functions'] = int(mol.nao)
+                properties['num_primitive_gaussians'] = int(mol.npgto_nr())
+                properties['total_electrons'] = int(mol.nelectron)
+
+                logger.info(f"Number of basis functions: {properties['num_basis_functions']}")
+                logger.info(f"Number of primitive Gaussians: {properties['num_primitive_gaussians']}")
+                logger.info(f"Total electrons: {properties['total_electrons']}")
+            except Exception as e:
+                logger.warning(f"Failed to extract basis set information: {e}")
+
+            logger.info("Common additional properties extraction completed")
+
+        except Exception as e:
+            logger.error(f"Failed to extract common additional properties: {e}")
+
+        return properties
