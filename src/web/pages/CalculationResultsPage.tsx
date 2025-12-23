@@ -14,7 +14,7 @@ import { MoleculeViewerSection } from '../components/MoleculeViewerSection';
 import type { components } from '../types/generated-api';
 import {
   IR_SPECTRUM_DEFAULTS,
-  type PartialIRSettings,
+  type IRSettings,
 } from '../utils/irSpectrumConstants';
 
 type IRSpectrumData = components['schemas']['IRSpectrumData'];
@@ -57,7 +57,8 @@ export const CalculationResultsPage = ({
   const [selectedVibrationMode, setSelectedVibrationMode] = useState<
     AtomDisplacement[] | null
   >(null);
-  const [irSettings, setIRSettings] = useState<PartialIRSettings>({
+  const [irSettings, setIRSettings] = useState<IRSettings>({
+    broadening_fwhm: IR_SPECTRUM_DEFAULTS.broadening_fwhm,
     x_min: IR_SPECTRUM_DEFAULTS.x_min,
     x_max: IR_SPECTRUM_DEFAULTS.x_max,
     show_peaks: IR_SPECTRUM_DEFAULTS.show_peaks,
@@ -89,6 +90,7 @@ export const CalculationResultsPage = ({
   const handleSpectrumDataLoaded = useCallback((data: IRSpectrumData) => {
     setIRSpectrumData(data);
     setIRSettings({
+      broadening_fwhm: data.spectrum.metadata.broadening_fwhm_cm,
       x_min: IR_SPECTRUM_DEFAULTS.x_min,
       x_max: IR_SPECTRUM_DEFAULTS.x_max,
       show_peaks: IR_SPECTRUM_DEFAULTS.show_peaks,
@@ -1702,6 +1704,8 @@ export const CalculationResultsPage = ({
                         onError={handleSetError}
                         onSpectrumDataLoaded={handleSpectrumDataLoaded}
                         selectedPeakIndex={selectedIRPeakIndex}
+                        settings={irSettings}
+                        onSettingsChange={setIRSettings}
                       />
                     </LazyViewer>
                   </div>
