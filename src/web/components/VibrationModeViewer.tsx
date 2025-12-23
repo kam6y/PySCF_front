@@ -122,7 +122,10 @@ export const VibrationModeViewer: React.FC<VibrationModeViewerProps> =
               <div className={styles.sectionDescription}>
                 Select a peak to visualize the corresponding vibrational mode.
               </div>
-              {settings.show_peaks && peaks.length > 0 ? (
+              {/* Note: Peak table is always shown regardless of settings.show_peaks.
+                  The show_peaks setting only controls peak markers on the IR spectrum chart,
+                  while this table is essential for selecting vibration modes to visualize. */}
+              {peaks.length > 0 ? (
                 <div className={styles.peaksTableWrapper}>
                   <table className={styles.peaksTable}>
                     <thead>

@@ -334,7 +334,31 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
       <section>
         <div className={styles.settingsPanel}>
           <div className={styles.settingsGrid}>
+            {/* Note: show_peaks only controls peak markers on this chart.
+                The peak table in VibrationModeViewer is always visible for mode selection. */}
             <div className={styles.settingItem}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={settings.show_peaks}
+                  onChange={e => handleShowPeaksToggle(e.target.checked)}
+                />
+                Show peak markers
+              </label>
+            </div>
+            <div className={styles.settingItemInfo}>
+              <label>Peaks Shown:</label>
+              <span className={styles.infoValue}>
+                {visiblePeaksCount}/{metadata.num_peaks_total ?? '--'}
+              </span>
+            </div>
+            <div className={styles.settingItemInfo}>
+              <label>Scale Factor:</label>
+              <span className={styles.infoValue}>
+                {metadata.scale_factor.toFixed(3)}
+              </span>
+            </div>
+            <div className={styles.settingItemCompact}>
               <label>Broadening FWHM (cm⁻¹):</label>
               <input
                 type="number"
@@ -343,10 +367,12 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
                 min={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.min}
                 max={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.max}
                 step={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.step}
-                className={styles.settingInput}
+                className={styles.settingInputCompact}
               />
             </div>
-            <div className={styles.settingItem}>
+          </div>
+          <div className={styles.settingsGridSecondRow}>
+            <div className={styles.settingItemRange}>
               <label>Wavenumber range (cm⁻¹):</label>
               <div className={styles.rangeSlider}>
                 <div className={styles.rangeTrack} />
@@ -380,16 +406,6 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
                 <span>{Math.round(settings.x_max)} cm⁻¹</span>
                 <span>{Math.round(settings.x_min)} cm⁻¹</span>
               </div>
-            </div>
-            <div className={styles.settingItem}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={settings.show_peaks}
-                  onChange={e => handleShowPeaksToggle(e.target.checked)}
-                />
-                Show peak markers
-              </label>
             </div>
           </div>
         </div>
@@ -478,29 +494,6 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
                 })}
             </LineChart>
           </ResponsiveContainer>
-        </div>
-        <div className={styles.metadataSection}>
-          <h4>Analysis Information</h4>
-          <div className={styles.metadataGrid}>
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Scale Factor:</span>
-              <span className={styles.metadataValue}>
-                {metadata.scale_factor.toFixed(3)}
-              </span>
-            </div>
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Broadening FWHM:</span>
-              <span className={styles.metadataValue}>
-                {metadata.broadening_fwhm_cm.toFixed(0)} cm⁻¹
-              </span>
-            </div>
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Peaks Shown:</span>
-              <span className={styles.metadataValue}>
-                {visiblePeaksCount}/{metadata.num_peaks_total ?? '--'}
-              </span>
-            </div>
-          </div>
         </div>
       </section>
     );

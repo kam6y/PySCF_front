@@ -8,9 +8,16 @@
 }
 
 .settingsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.settingsGridSecondRow {
+  display: flex;
+  align-items: center;
+  margin-top: 15px;
 }
 
 .settingItem {
@@ -34,6 +41,68 @@
 }
 
 .settingInput:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Range slider item - takes full width in second row */
+.settingItemRange {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 5px;
+}
+
+.settingItemRange label {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+/* Info display item - compact read-only display */
+.settingItemInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.settingItemInfo label {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.infoValue {
+  color: #0066cc;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+/* Compact input item - smaller width for broadening FWHM */
+.settingItemCompact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.settingItemCompact label {
+  font-weight: 500;
+  color: #333;
+  font-size: 14px;
+}
+
+.settingInputCompact {
+  width: 80px;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.settingInputCompact:focus {
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);

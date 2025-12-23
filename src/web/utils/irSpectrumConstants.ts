@@ -15,8 +15,12 @@ export const IR_SPECTRUM_DEFAULTS = {
   x_min: 400.0,
   /** X軸（波数）の最大値 (cm⁻¹) */
   x_max: 4000.0,
-  /** ピークマーカーの表示/非表示 */
-  show_peaks: true,
+  /**
+   * チャート上のピークマーカーの表示/非表示
+   * 注: この設定はIRスペクトルチャート上のマーカーのみを制御します。
+   * VibrationModeViewerのピークテーブルは常に表示されます（振動モード選択のため）。
+   */
+  show_peaks: false,
 };
 
 /**
