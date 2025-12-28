@@ -1,5 +1,28 @@
-import logging
 import os
+
+# =============================================================================
+# Thread Control: Set default thread count BEFORE importing any numerical libraries
+# =============================================================================
+# OpenBLAS, MKL, and other BLAS/LAPACK libraries read environment variables
+# only at import time. On Linux, they may ignore later changes.
+# Setting these to '1' ensures that when PySCF/NumPy are imported (via quantum_calc),
+# the libraries initialize with a single thread by default.
+# The actual thread count is set per-calculation in the worker process.
+_THREAD_CONTROL_VARS = [
+    'OMP_NUM_THREADS',
+    'MKL_NUM_THREADS',
+    'OPENBLAS_NUM_THREADS',
+    'BLIS_NUM_THREADS',
+    'VECLIB_MAXIMUM_THREADS',
+    'NUMEXPR_NUM_THREADS',
+]
+
+for _var in _THREAD_CONTROL_VARS:
+    if _var not in os.environ:
+        os.environ[_var] = '1'
+# =============================================================================
+
+import logging
 import sys
 import signal
 import atexit

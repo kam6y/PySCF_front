@@ -38,6 +38,35 @@ class QueuedCalculation:
         return self.created_at &lt; other.created_at
 
 
+# ========== Worker Process Initialization ==========
+
+def _worker_initializer():
+    """
+    Initialize worker process environment before any imports.
+
+    This function is called by ProcessPoolExecutor when a new worker process starts,
+    BEFORE the calculation_worker function is executed. It sets thread control
+    environment variables to ensure that BLAS/LAPACK libraries initialize with
+    the default thread count of 1.
+
+    The actual thread count for each calculation is set later in _setup_worker_environment()
+    based on the user's cpu_cores parameter.
+    """
+    import os
+
+    thread_vars = [
+        'OMP_NUM_THREADS',
+        'MKL_NUM_THREADS',
+        'OPENBLAS_NUM_THREADS',
+        'BLIS_NUM_THREADS',
+        'VECLIB_MAXIMUM_THREADS',
+        'NUMEXPR_NUM_THREADS',
+    ]
+
+    for var in thread_vars:
+        os.environ[var] = '1'
+
+
 # ========== Private Helper Functions for calculation_worker ==========
 
 def _setup_worker_environment(parameters: dict, process_logger) -> tuple:
@@ -364,9 +393,10 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
                 process_logger.info(f"Pause state: {pause_state}")
             calculator.resume_from_checkpoint(pause_state)
         
-        # Run calculation with controlled BLAS/LAPACK threading
-        process_logger.info(f"Executing calculation with threadpool_limits(limits={cpu_cores}, user_api='blas')")
-        with threadpool_limits(limits=int(cpu_cores), user_api='blas'):
+        # Run calculation with controlled BLAS/LAPACK/OpenMP threading
+        # Note: Not specifying user_api controls ALL threadpool libraries (blas, openmp, etc.)
+        process_logger.info(f"Executing calculation with threadpool_limits(limits={cpu_cores})")
+        with threadpool_limits(limits=int(cpu_cores)):
             results = calculator.run_calculation()
         
         # Save results and update status to completed
@@ -483,7 +513,8 @@ class CalculationProcessManager:
         try:
             self.executor = ProcessPoolExecutor(
                 max_workers=self.max_workers,
-                mp_context=multiprocessing.get_context('spawn')  # Better cross-platform compatibility
+                mp_context=multiprocessing.get_context('spawn'),  # Better cross-platform compatibility
+                initializer=_worker_initializer  # Set thread env vars before any imports in worker
             )
             logger.info(f"ProcessPoolExecutor created successfully with {self.max_workers} workers")
         except Exception as e:

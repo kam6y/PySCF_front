@@ -4,6 +4,7 @@ import React, {
   useMemo,
   useCallback,
   useRef,
+  useDeferredValue,
 } from 'react';
 import {
   LineChart,
@@ -21,16 +22,21 @@ import type { components } from '../types/generated-api';
 import {
   IR_SPECTRUM_DEFAULTS,
   IR_SPECTRUM_CONSTRAINTS,
+  IR_SPECTRUM_API_RANGE,
+  type IRSettings,
 } from '../utils/irSpectrumConstants';
 
 type IRSpectrumData = components['schemas']['IRSpectrumData'];
 type IRPeak = components['schemas']['IRPeak'];
+type IRSettingsUpdate = Partial<IRSettings>;
 
 interface IRSpectrumChartProps {
   calculationId: string | null;
   onError?: (error: string) => void;
   onSpectrumDataLoaded?: (data: IRSpectrumData) => void;
   selectedPeakIndex?: number | null;
+  settings: IRSettings;
+  onSettingsChange: React.Dispatch<React.SetStateAction<IRSettings>>;
 }
 
 interface ChartDataPoint {
@@ -47,6 +53,18 @@ interface CustomTooltipProps {
   label?: number;
   peaks?: IRPeak[];
 }
+
+/**
+ * Generate evenly spaced tick values for a range
+ */
+const generateTicks = (
+  min: number,
+  max: number,
+  count: number = 11
+): number[] => {
+  const step = (max - min) / (count - 1);
+  return Array.from({ length: count }, (_, i) => Math.round(max - step * i));
+};
 
 const CustomTooltip: React.FC<CustomTooltipProps> = ({
   active,
@@ -78,21 +96,108 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({
 };
 
 export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
-  ({ calculationId, onError, onSpectrumDataLoaded, selectedPeakIndex }) => {
+  ({
+    calculationId,
+    onError,
+    onSpectrumDataLoaded,
+    selectedPeakIndex,
+    settings,
+    onSettingsChange,
+  }) => {
     const [spectrumData, setSpectrumData] = useState<IRSpectrumData | null>(
       null
     );
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [settings, setSettings] = useState(IR_SPECTRUM_DEFAULTS);
     const abortControllerRef = useRef<AbortController | null>(null);
     const isMountedRef = useRef(true);
     const onSpectrumDataLoadedRef = useRef(onSpectrumDataLoaded);
+    const sliderMin = IR_SPECTRUM_CONSTRAINTS.x_min.min;
+    const sliderMax = IR_SPECTRUM_CONSTRAINTS.x_max.max;
+    const sliderStep = IR_SPECTRUM_CONSTRAINTS.x_min.step;
+    const MIN_RANGE_GAP = Math.max(sliderStep, 10);
+
+    // スライダー操作中のパフォーマンス向上のため、x_min/x_maxの更新を遅延
+    const deferredSettings = useDeferredValue(settings);
 
     // Keep ref up to date
     useEffect(() => {
       onSpectrumDataLoadedRef.current = onSpectrumDataLoaded;
     }, [onSpectrumDataLoaded]);
+
+    const updateSettings = useCallback(
+      (updates: IRSettingsUpdate) => {
+        onSettingsChange(prev => ({
+          ...prev,
+          ...updates,
+        }));
+      },
+      [onSettingsChange]
+    );
+
+    const handleShowPeaksToggle = useCallback(
+      (checked: boolean) => {
+        updateSettings({ show_peaks: checked });
+      },
+      [updateSettings]
+    );
+
+    const handleRangeUpdate = useCallback(
+      (type: 'min' | 'max', rawValue: number) => {
+        if (!Number.isFinite(rawValue)) {
+          return;
+        }
+
+        if (type === 'min') {
+          const upperBound = Math.max(
+            sliderMin,
+            settings.x_max - MIN_RANGE_GAP
+          );
+          const nextValue = Math.min(Math.max(rawValue, sliderMin), upperBound);
+          updateSettings({ x_min: nextValue });
+        } else {
+          const lowerBound = Math.min(
+            sliderMax,
+            settings.x_min + MIN_RANGE_GAP
+          );
+          const nextValue = Math.max(Math.min(rawValue, sliderMax), lowerBound);
+          updateSettings({ x_max: nextValue });
+        }
+      },
+      [
+        MIN_RANGE_GAP,
+        settings.x_max,
+        settings.x_min,
+        sliderMax,
+        sliderMin,
+        updateSettings,
+      ]
+    );
+
+    const handleRangeSliderChange = useCallback(
+      (type: 'min' | 'max') => (event: React.ChangeEvent<HTMLInputElement>) => {
+        handleRangeUpdate(type, event.target.valueAsNumber);
+      },
+      [handleRangeUpdate]
+    );
+
+    const handleBroadeningInputChange = useCallback(
+      (event: React.ChangeEvent<HTMLInputElement>) => {
+        const parsed = parseFloat(event.target.value);
+        if (Number.isFinite(parsed)) {
+          const clamped = Math.min(
+            Math.max(parsed, IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.min),
+            IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.max
+          );
+          updateSettings({ broadening_fwhm: clamped });
+        } else {
+          updateSettings({
+            broadening_fwhm: IR_SPECTRUM_DEFAULTS.broadening_fwhm,
+          });
+        }
+      },
+      [updateSettings]
+    );
 
     const fetchIRSpectrum = useCallback(async () => {
       if (!calculationId || !isMountedRef.current) return;
@@ -106,11 +211,13 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
       setError(null);
 
       try {
+        // 常に固定範囲（0-4500 cm⁻¹）でサーバーにリクエスト
+        // ユーザーの設定範囲（settings.x_min/x_max）はクライアント側フィルタリングで適用
         const result = await getIRSpectrum(calculationId, {
           broadening_fwhm: settings.broadening_fwhm,
-          x_min: settings.x_min,
-          x_max: settings.x_max,
-          show_peaks: settings.show_peaks,
+          x_min: IR_SPECTRUM_API_RANGE.x_min,
+          x_max: IR_SPECTRUM_API_RANGE.x_max,
+          show_peaks: true,
         });
 
         if (isMountedRef.current) {
@@ -137,7 +244,7 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
           setIsLoading(false);
         }
       }
-    }, [calculationId, settings, onError]);
+    }, [settings.broadening_fwhm, calculationId, onError]);
 
     useEffect(() => {
       fetchIRSpectrum();
@@ -166,7 +273,10 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
 
       for (let i = 0; i < x_axis.length; i++) {
         const wavenumber = x_axis[i];
-        if (wavenumber >= settings.x_min && wavenumber <= settings.x_max) {
+        if (
+          wavenumber >= deferredSettings.x_min &&
+          wavenumber <= deferredSettings.x_max
+        ) {
           filteredData.push({
             wavenumber,
             intensity: y_axis[i],
@@ -175,7 +285,20 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
       }
 
       return filteredData;
-    }, [spectrumData, settings.x_min, settings.x_max]);
+    }, [spectrumData, deferredSettings.x_min, deferredSettings.x_max]);
+
+    const visiblePeaksCount = useMemo(() => {
+      if (!spectrumData?.spectrum?.peaks) return 0;
+      return spectrumData.spectrum.peaks.filter(
+        peak =>
+          peak.frequency_cm >= deferredSettings.x_min &&
+          peak.frequency_cm <= deferredSettings.x_max
+      ).length;
+    }, [spectrumData, deferredSettings.x_min, deferredSettings.x_max]);
+
+    const sliderRange = Math.max(sliderMax - sliderMin, 1);
+    const minPercent = ((settings.x_min - sliderMin) / sliderRange) * 100;
+    const maxPercent = ((settings.x_max - sliderMin) / sliderRange) * 100;
 
     if (isLoading) {
       return (
@@ -211,72 +334,78 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
       <section>
         <div className={styles.settingsPanel}>
           <div className={styles.settingsGrid}>
-            <div className={styles.settingItem}>
-              <label>Broadening FWHM (cm⁻¹):</label>
-              <input
-                type="number"
-                value={settings.broadening_fwhm}
-                onChange={e =>
-                  setSettings(prev => ({
-                    ...prev,
-                    broadening_fwhm: parseFloat(e.target.value) || 100,
-                  }))
-                }
-                min={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.min}
-                max={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.max}
-                step={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.step}
-                className={styles.settingInput}
-              />
-            </div>
-            <div className={styles.settingItem}>
-              <label>Wavenumber range (cm⁻¹):</label>
-              <div className={styles.rangeInputs}>
-                <input
-                  type="number"
-                  value={settings.x_min}
-                  onChange={e =>
-                    setSettings(prev => ({
-                      ...prev,
-                      x_min: parseFloat(e.target.value) || 400,
-                    }))
-                  }
-                  min={IR_SPECTRUM_CONSTRAINTS.x_min.min}
-                  max={IR_SPECTRUM_CONSTRAINTS.x_min.max}
-                  step={IR_SPECTRUM_CONSTRAINTS.x_min.step}
-                  className={styles.settingInput}
-                  placeholder="Min"
-                />
-                <input
-                  type="number"
-                  value={settings.x_max}
-                  onChange={e =>
-                    setSettings(prev => ({
-                      ...prev,
-                      x_max: parseFloat(e.target.value) || 4000,
-                    }))
-                  }
-                  min={IR_SPECTRUM_CONSTRAINTS.x_max.min}
-                  max={IR_SPECTRUM_CONSTRAINTS.x_max.max}
-                  step={IR_SPECTRUM_CONSTRAINTS.x_max.step}
-                  className={styles.settingInput}
-                  placeholder="Max"
-                />
-              </div>
-            </div>
+            {/* Note: show_peaks only controls peak markers on this chart.
+                The peak table in VibrationModeViewer is always visible for mode selection. */}
             <div className={styles.settingItem}>
               <label>
                 <input
                   type="checkbox"
                   checked={settings.show_peaks}
-                  onChange={e =>
-                    setSettings(prev => ({
-                      ...prev,
-                      show_peaks: e.target.checked,
-                    }))
-                  }
+                  onChange={e => handleShowPeaksToggle(e.target.checked)}
                 />
                 Show peak markers
               </label>
+            </div>
+            <div className={styles.settingItemInfo}>
+              <label>Peaks Shown:</label>
+              <span className={styles.infoValue}>
+                {visiblePeaksCount}/{metadata.num_peaks_total ?? '--'}
+              </span>
+            </div>
+            <div className={styles.settingItemInfo}>
+              <label>Scale Factor:</label>
+              <span className={styles.infoValue}>
+                {metadata.scale_factor.toFixed(3)}
+              </span>
+            </div>
+            <div className={styles.settingItemCompact}>
+              <label>Broadening FWHM (cm⁻¹):</label>
+              <input
+                type="number"
+                value={settings.broadening_fwhm}
+                onChange={handleBroadeningInputChange}
+                min={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.min}
+                max={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.max}
+                step={IR_SPECTRUM_CONSTRAINTS.broadening_fwhm.step}
+                className={styles.settingInputCompact}
+              />
+            </div>
+          </div>
+          <div className={styles.settingsGridSecondRow}>
+            <div className={styles.settingItemRange}>
+              <label>Wavenumber range (cm⁻¹):</label>
+              <div className={styles.rangeSlider}>
+                <div className={styles.rangeTrack} />
+                <div
+                  className={styles.rangeProgress}
+                  style={{
+                    right: `${Math.max(0, Math.min(100, minPercent))}%`,
+                    left: `${Math.max(0, Math.min(100, 100 - maxPercent))}%`,
+                  }}
+                />
+                <input
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={sliderStep}
+                  value={settings.x_min}
+                  onChange={handleRangeSliderChange('min')}
+                  className={styles.rangeInput}
+                />
+                <input
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={sliderStep}
+                  value={settings.x_max}
+                  onChange={handleRangeSliderChange('max')}
+                  className={styles.rangeInput}
+                />
+              </div>
+              <div className={styles.rangeValues}>
+                <span>{Math.round(settings.x_max)} cm⁻¹</span>
+                <span>{Math.round(settings.x_min)} cm⁻¹</span>
+              </div>
             </div>
           </div>
         </div>
@@ -296,41 +425,15 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
                 dataKey="wavenumber"
                 type="number"
                 scale="linear"
-                domain={[settings.x_min, settings.x_max]}
+                domain={[deferredSettings.x_min, deferredSettings.x_max]}
                 reversed={true}
                 tick={{ fontSize: 11 }}
                 tickFormatter={value => Math.round(value).toString()}
-                ticks={[
-                  settings.x_max,
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.1
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.2
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.3
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.4
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.5
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.6
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.7
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.8
-                  ),
-                  Math.round(
-                    settings.x_max - (settings.x_max - settings.x_min) * 0.9
-                  ),
-                  settings.x_min,
-                ]}
+                ticks={generateTicks(
+                  deferredSettings.x_min,
+                  deferredSettings.x_max,
+                  11
+                )}
                 label={{
                   value: 'Wavenumber (cm⁻¹)',
                   position: 'insideBottom',
@@ -369,8 +472,8 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
               {settings.show_peaks &&
                 peaks.map((peak, index) => {
                   if (
-                    peak.frequency_cm >= settings.x_min &&
-                    peak.frequency_cm <= settings.x_max
+                    peak.frequency_cm >= deferredSettings.x_min &&
+                    peak.frequency_cm <= deferredSettings.x_max
                   ) {
                     return (
                       <ReferenceLine
@@ -391,29 +494,6 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
                 })}
             </LineChart>
           </ResponsiveContainer>
-        </div>
-        <div className={styles.metadataSection}>
-          <h4>Analysis Information</h4>
-          <div className={styles.metadataGrid}>
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Scale Factor:</span>
-              <span className={styles.metadataValue}>
-                {metadata.scale_factor.toFixed(3)}
-              </span>
-            </div>
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Broadening FWHM:</span>
-              <span className={styles.metadataValue}>
-                {metadata.broadening_fwhm_cm.toFixed(0)} cm⁻¹
-              </span>
-            </div>
-            <div className={styles.metadataItem}>
-              <span className={styles.metadataLabel}>Peaks Shown:</span>
-              <span className={styles.metadataValue}>
-                {metadata.num_peaks_in_range}/{metadata.num_peaks_total}
-              </span>
-            </div>
-          </div>
         </div>
       </section>
     );

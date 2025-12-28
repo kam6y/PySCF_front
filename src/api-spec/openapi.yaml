@@ -71,7 +71,7 @@ info:
     
     See the `/api/quantum/supported-parameters` endpoint for runtime parameter constraints and method defaults.
     
-  version: 0.1.6-beta
+  version: 0.1.7-beta
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
@@ -658,6 +658,7 @@ paths:
             format: float
             default: 400.0
             minimum: 0.0
+            maximum: 4500.0
         - name: xMax
           in: query
           required: false
@@ -666,7 +667,7 @@ paths:
             type: number
             format: float
             default: 4000.0
-            maximum: 10000.0
+            maximum: 4500.0
         - name: showPeaks
           in: query
           required: false

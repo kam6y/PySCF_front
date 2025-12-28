@@ -250,3 +250,51 @@
 .model:has(.markdown > div) {
   max-width: 85%;
 }
+
+/* === 数式レンダリングスタイル === */
+
+/* インライン数式の基本スタイル */
+.markdown .katex {
+  font-size: 1em;
+  line-height: inherit;
+}
+
+/* ディスプレイ数式（中央揃え、独立した行） */
+.markdown .katex-display {
+  margin: 16px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+/* Webkitブラウザのスクロールバー */
+.markdown .katex-display::-webkit-scrollbar {
+  height: 6px;
+}
+
+.markdown .katex-display::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 3px;
+}
+
+.markdown .katex-display::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.markdown .katex-display::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ストリーミング中のエラー表示を控えめに */
+.markdown .katex-error {
+  background-color: transparent;
+  border: none;
+  color: inherit;
+}
+
+/* コードブロック内の数式の調整 */
+.markdown pre code .katex {
+  background-color: transparent;
+  padding: 0;
+}

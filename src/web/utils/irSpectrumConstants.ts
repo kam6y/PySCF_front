@@ -15,9 +15,26 @@ export const IR_SPECTRUM_DEFAULTS = {
   x_min: 400.0,
   /** X軸（波数）の最大値 (cm⁻¹) */
   x_max: 4000.0,
-  /** ピークマーカーの表示/非表示 */
-  show_peaks: true,
+  /**
+   * チャート上のピークマーカーの表示/非表示
+   * 注: この設定はIRスペクトルチャート上のマーカーのみを制御します。
+   * VibrationModeViewerのピークテーブルは常に表示されます（振動モード選択のため）。
+   */
+  show_peaks: false,
 };
+
+/**
+ * サーバーにリクエストする固定範囲
+ *
+ * ユーザーの設定に関わらず常にこの範囲でデータを取得し、
+ * クライアント側でフィルタリングすることでパフォーマンスを向上させる
+ */
+export const IR_SPECTRUM_API_RANGE = {
+  /** APIリクエストの最小波数 (cm⁻¹) */
+  x_min: 0.0,
+  /** APIリクエストの最大波数 (cm⁻¹) */
+  x_max: 4500.0,
+} as const;
 
 /**
  * IRスペクトル設定の制約条件
@@ -30,18 +47,20 @@ export const IR_SPECTRUM_CONSTRAINTS = {
   },
   x_min: {
     min: 0,
-    max: 10000,
+    max: 4500,
     step: 100,
   },
   x_max: {
     min: 0,
-    max: 10000,
+    max: 4500,
     step: 100,
   },
 } as const;
 
 /**
  * IRスペクトル設定の型定義
+ *
+ * すべてのIR設定を一元管理するための型
  */
 export type IRSettings = {
   broadening_fwhm: number;
@@ -49,11 +68,3 @@ export type IRSettings = {
   x_max: number;
   show_peaks: boolean;
 };
-
-/**
- * 部分的なIR設定の型（VibrationModeViewer と CalculationResultsPage で使用）
- */
-export type PartialIRSettings = Pick<
-  IRSettings,
-  'x_min' | 'x_max' | 'show_peaks'
->;

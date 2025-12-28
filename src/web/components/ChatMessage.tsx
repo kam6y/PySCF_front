@@ -2,6 +2,9 @@ import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import { ChatHistory } from '../store/agentStore';
 import { useNotificationStore } from '../store/notificationStore';
 import styles from './ChatMessage.module.css';
@@ -70,8 +73,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
           {role === 'model' ? (
             <>
               <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[
+                  rehypeHighlight,
+                  [
+                    rehypeKatex,
+                    {
+                      throwOnError: false,
+                      trust: false,
+                      strict: 'warn',
+                    },
+                  ],
+                ]}
                 disallowedElements={['script', 'iframe', 'object', 'embed']}
                 unwrapDisallowed={true}
                 className={styles.markdown}

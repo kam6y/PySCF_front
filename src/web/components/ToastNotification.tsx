@@ -78,6 +78,7 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
   const handleClick = () => {
     if (notification.clickable && notification.calculationId && onNavigate) {
       onNavigate(notification.calculationId);
+      handleClose();
     }
   };
 
