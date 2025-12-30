@@ -18,6 +18,7 @@ from .pubchem_service import PubChemService
 from .smiles_service import SMILESService
 from .settings_service import SettingsService
 from .system_service import SystemService
+from .gpu_service import GPUService
 from .notification_service import (
     NotificationService,
     get_notification_service,
@@ -30,6 +31,7 @@ _pubchem_service = None
 _smiles_service = None
 _settings_service = None
 _system_service = None
+_gpu_service = None
 
 
 def get_quantum_service() -> QuantumService:
@@ -97,6 +99,19 @@ def get_system_service() -> SystemService:
     return _system_service
 
 
+def get_gpu_service() -> GPUService:
+    """
+    Get the singleton GPUService instance.
+
+    Returns:
+        GPUService singleton instance
+    """
+    global _gpu_service
+    if _gpu_service is None:
+        _gpu_service = GPUService()
+    return _gpu_service
+
+
 __all__ = [
     # Exceptions
     'ServiceError',
@@ -111,6 +126,7 @@ __all__ = [
     'SMILESService',
     'SettingsService',
     'SystemService',
+    'GPUService',
     'NotificationService',
     # Singleton getters
     'get_quantum_service',
@@ -118,6 +134,7 @@ __all__ = [
     'get_smiles_service',
     'get_settings_service',
     'get_system_service',
+    'get_gpu_service',
     'get_notification_service',
     'bind_notification_service'
 ]

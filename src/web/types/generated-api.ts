@@ -320,6 +320,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/gpu/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get GPU acceleration status
+         * @description Detect CUDA version, gpu4pyscf installation, and GPU availability on Linux systems
+         */
+        get: operations["getGpuStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gpu/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue gpu4pyscf installation
+         * @description Validates environment and enqueues gpu4pyscf installation in a background worker so the API thread is not blocked
+         */
+        post: operations["enqueueGpu4PyscfInstall"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gpu/install/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get gpu4pyscf installation job status
+         * @description Returns the current state and logs for a gpu4pyscf installation job
+         */
+        get: operations["getGpuInstallJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gpu/install/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel gpu4pyscf installation job
+         * @description Cancels a queued or running gpu4pyscf installation job
+         */
+        post: operations["cancelGpuInstallJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gpu/install/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List gpu4pyscf installation jobs
+         * @description Returns recent gpu4pyscf installation jobs (newest first)
+         */
+        get: operations["listGpuInstallJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/system/resource-status": {
         parameters: {
             query?: never;
@@ -981,6 +1081,11 @@ export interface components {
             gibbs_free_energy_298K?: number | null;
             /** @description Heat capacity at 298.15 K in Hartree/K */
             heat_capacity_298K?: number | null;
+            /**
+             * @description Whether GPU acceleration (gpu4pyscf) was used for this calculation
+             * @example false
+             */
+            gpu_acceleration_enabled?: boolean | null;
             /** @description CASCI energy in Hartree (CASCI only) */
             casci_energy?: number | null;
             /** @description CASSCF energy in Hartree (CASSCF only) */
@@ -1357,12 +1462,165 @@ export interface components {
              * @example pyscf-research-agent@example.com
              */
             research_email?: string | null;
+            /**
+             * @description Enable GPU-accelerated calculations on Linux when gpu4pyscf is available
+             * @default false
+             */
+            gpu_acceleration_enabled: boolean;
+            /**
+             * @description Preferred gpu4pyscf package variant matching the detected CUDA toolkit (e.g., gpu4pyscf-cu12)
+             * @example null
+             */
+            gpu_preferred_package?: string | null;
+        };
+        GpuDevice: {
+            /**
+             * @description GPU model name
+             * @example NVIDIA A100
+             */
+            name?: string;
+            /**
+             * @description Total GPU memory in MB
+             * @example 40960
+             */
+            memory_mb?: number | null;
+        };
+        GpuStatus: {
+            /**
+             * @description Host platform (e.g., Linux, Darwin)
+             * @example Linux
+             */
+            platform: string;
+            /**
+             * @description Whether GPU acceleration is supported on this platform (Linux only)
+             * @example true
+             */
+            gpu_supported_platform: boolean;
+            /**
+             * @description Whether an NVIDIA GPU was detected
+             * @example true
+             */
+            has_nvidia_gpu: boolean;
+            /**
+             * @description Detected CUDA version from nvidia-smi or nvcc
+             * @example 12.2
+             */
+            cuda_version?: string | null;
+            /**
+             * @description Detected NVIDIA driver version
+             * @example 550.54.14
+             */
+            driver_version?: string | null;
+            /** @description List of detected GPU devices */
+            detected_gpus?: components["schemas"]["GpuDevice"][];
+            /**
+             * @description Whether gpu4pyscf can be imported in the current environment
+             * @example false
+             */
+            gpu4pyscf_installed: boolean;
+            /**
+             * @description Installed gpu4pyscf package version (if available)
+             * @example 0.5.0
+             */
+            gpu4pyscf_version?: string | null;
+            /**
+             * @description Name of the installed gpu4pyscf package variant (if any)
+             * @example gpu4pyscf-cu12
+             */
+            installed_package?: string | null;
+            /**
+             * @description Recommended gpu4pyscf package for the detected CUDA version
+             * @example gpu4pyscf-cu12
+             */
+            recommended_package?: string | null;
+            /**
+             * @description High-level GPU readiness status
+             * @example ready
+             * @enum {string}
+             */
+            status: "ready" | "not_installed" | "missing_cuda" | "missing_gpu" | "unsupported_platform" | "error";
+            /** @description Human-readable status or error message */
+            message?: string | null;
+            /**
+             * Format: date-time
+             * @description ISO8601 timestamp of last GPU status refresh
+             */
+            last_checked?: string | null;
+            /** @description Diagnostic logs from detection or installation */
+            logs?: string[] | null;
+        };
+        GpuInstallRequest: {
+            /**
+             * @description gpu4pyscf package name to install. Defaults to recommended CUDA-specific package when omitted.
+             * @example gpu4pyscf-cu12
+             */
+            package?: string;
+            /**
+             * @description Enable GPU acceleration after successful installation
+             * @default true
+             */
+            enable_gpu: boolean;
+        };
+        /**
+         * @description Status of a gpu4pyscf installation job
+         * @enum {string}
+         */
+        GpuInstallJobStatus: "queued" | "running" | "succeeded" | "failed" | "canceled";
+        GpuInstallJob: {
+            /** @description Unique job identifier */
+            job_id: string;
+            /** @description gpu4pyscf package name to install */
+            package: string;
+            /** @description Whether GPU acceleration should be enabled after successful install */
+            enable_gpu: boolean;
+            status: components["schemas"]["GpuInstallJobStatus"];
+            /** @description Error message if the job failed or was canceled */
+            error?: string | null;
+            /** @description Logs from the install attempt */
+            logs?: string[] | null;
+            /**
+             * Format: date-time
+             * @description Job creation time
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When the install started
+             */
+            started_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When the install finished
+             */
+            completed_at?: string | null;
+            result_status?: components["schemas"]["GpuStatus"];
+        };
+        GpuInstallJobResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                job: components["schemas"]["GpuInstallJob"];
+            };
+        };
+        GpuInstallJobListResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                jobs: components["schemas"]["GpuInstallJob"][];
+            };
         };
         SettingsResponse: {
             /** @example true */
             success: boolean;
             data: {
                 settings: components["schemas"]["AppSettings"];
+            };
+        };
+        GpuStatusResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                status: components["schemas"]["GpuStatus"];
             };
         };
         SettingsUpdateRequest: components["schemas"]["AppSettings"];
@@ -1960,7 +2218,7 @@ export interface components {
             id: string;
             /**
              * @description Session name/title
-             * @example 水分子のDFT計算
+             * @example DFT calculation for a water molecule
              */
             name: string;
             /**
@@ -2000,7 +2258,7 @@ export interface components {
         CreateChatSessionRequest: {
             /**
              * @description Session name/title
-             * @default 新しいチャット
+             * @default New chat
              */
             name: string;
         };
@@ -2865,6 +3123,191 @@ export interface operations {
                 };
             };
             /** @description Failed to update settings */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getGpuStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description GPU status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GpuStatusResponse"];
+                };
+            };
+            /** @description Failed to retrieve GPU status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    enqueueGpu4PyscfInstall: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GpuInstallRequest"];
+            };
+        };
+        responses: {
+            /** @description gpu4pyscf installation job queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GpuInstallJobResponse"];
+                };
+            };
+            /** @description Invalid request, unsupported platform, or disallowed package */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to install gpu4pyscf */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getGpuInstallJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job status retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GpuInstallJobResponse"];
+                };
+            };
+            /** @description Job not found or invalid ID */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to retrieve job status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    cancelGpuInstallJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job canceled (or already completed) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GpuInstallJobResponse"];
+                };
+            };
+            /** @description Job not found or cannot be canceled */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to cancel installation job */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listGpuInstallJobs: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated list of statuses to filter by (queued,running,succeeded,failed,canceled) */
+                status?: string;
+                /** @description Maximum number of jobs to return (default 50, max 200) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Job list retrieved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GpuInstallJobListResponse"];
+                };
+            };
+            /** @description Failed to list installation jobs */
             500: {
                 headers: {
                     [name: string]: unknown;

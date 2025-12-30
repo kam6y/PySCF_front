@@ -34,7 +34,9 @@ class TestJoinCalculationWebSocket:
             calculations_directory=app.config['CALCULATIONS_DIR'],  # Use test directory
             timezone=Timezone.UTC,
             gemini_api_key=None,
-            research_email=None
+            research_email=None,
+            gpu_acceleration_enabled=False,
+            gpu_preferred_package=None
         )
         mocker.patch('quantum_calc.get_current_settings', return_value=mock_settings)
 

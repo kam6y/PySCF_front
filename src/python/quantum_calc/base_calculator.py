@@ -17,11 +17,12 @@ logger = logging.getLogger(__name__)
 class BaseCalculator(ABC):
     """Abstract base class for quantum chemistry calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(self, working_dir: Optional[str] = None, optimize_geometry: bool = True, use_gpu: bool = False):
         """Initialize calculator with optional working directory and geometry optimization flag."""
         self.working_dir = working_dir or tempfile.mkdtemp(prefix="pyscf_calc_")
         self.results: Dict[str, Any] = {}
         self.optimize_geometry = optimize_geometry
+        self.use_gpu = use_gpu
         
     def parse_xyz(self, xyz_string: str) -> List[List]:
         """Parse XYZ format string into atom list."""
@@ -199,7 +200,8 @@ class BaseCalculator(ABC):
             'solvent_method': common_params['solvent_method'],
             'solvent': common_params['solvent'],
             'atom_count': atom_count,
-            'method': self._get_method_description()
+            'method': self._get_method_description(),
+            'gpu_acceleration_enabled': bool(self.use_gpu)
         })
         
         # Store calculation-specific parameters

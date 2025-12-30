@@ -19,12 +19,12 @@ logger = logging.getLogger(__name__)
 class HFCalculator(BaseCalculator):
     """HF calculator using PySCF for structure optimization and orbital analysis."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True, use_gpu: bool = False):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry)
+        super().__init__(working_dir, optimize_geometry, use_gpu)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None
         self.optimized_geometry: Optional[np.ndarray] = None
@@ -76,6 +76,18 @@ class HFCalculator(BaseCalculator):
         """Create HF method object (RHF/UHF)."""
         spin = self.results.get('spin', 0)
         
+        if self.use_gpu:
+            from quantum_calc.gpu_manager import get_gpu_manager
+
+            gpu_manager = get_gpu_manager()
+            mf_gpu, error = gpu_manager.try_create_gpu_hf(self.mol, spin)
+            if mf_gpu is not None:
+                logger.info("Using gpu4pyscf HF backend")
+                return mf_gpu
+
+            logger.warning(f"Falling back to CPU HF backend: {error}")
+            self.use_gpu = False
+
         if spin == 0:
             mf = scf.RHF(mol)
             logger.info("Using Restricted Hartree-Fock (RHF) for closed-shell system")

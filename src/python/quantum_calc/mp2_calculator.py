@@ -19,12 +19,12 @@ logger = logging.getLogger(__name__)
 class MP2Calculator(BaseCalculator):
     """MP2 calculator using PySCF for structure optimization and MP2 energy calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True, use_gpu: bool = False):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry)
+        super().__init__(working_dir, optimize_geometry, use_gpu)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None
         self.mp2: Optional[mp.MP2] = None
