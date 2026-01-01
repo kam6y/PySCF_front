@@ -20,12 +20,12 @@ logger = logging.getLogger(__name__)
 class DFTCalculator(BaseCalculator):
     """DFT calculator using PySCF for structure optimization and orbital analysis."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True, use_gpu: bool = False):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry, use_gpu)
+        super().__init__(working_dir, optimize_geometry)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[dft.RKS] = None
         self.optimized_geometry: Optional[np.ndarray] = None
@@ -82,18 +82,6 @@ class DFTCalculator(BaseCalculator):
         """Create DFT method object (RKS/UKS)."""
         spin = self.results.get('spin', 0)
         
-        if self.use_gpu:
-            from quantum_calc.gpu_manager import get_gpu_manager
-
-            gpu_manager = get_gpu_manager()
-            mf_gpu, error = gpu_manager.try_create_gpu_dft(self.mol, spin, self.xc_functional)
-            if mf_gpu is not None:
-                logger.info("Using gpu4pyscf DFT backend")
-                return mf_gpu
-
-            logger.warning(f"Falling back to CPU DFT backend: {error}")
-            self.use_gpu = False
-
         if spin == 0:
             mf = dft.RKS(mol)
             logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell system")

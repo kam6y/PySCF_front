@@ -1,382 +1,695 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-**IMPORTANT**: Your partner is Japanese, so please always report in Japanese.
+This file provides guidance to Claude when working with code in this repository. Your partner is Japanese, so please always report in Japanese.
 
 ## Project Overview
+This is PySCF_front, an Electron-based desktop application for molecular visualization and quantum chemistry calculations. The app provides a React-based UI for inputting XYZ molecular coordinates, retrieving molecular structures from PubChem and SMILES strings, and visualizing 3D molecular structures using 3Dmol.js. The backend is a Python Flask server that handles all chemical computations and data management using libraries like PySCF and RDKit.
 
-PySCF_front is an Electron + React (TypeScript) + Python (Flask) desktop application for molecular visualization and quantum chemistry calculations. It uses PySCF and RDKit for computations, 3Dmol.js for visualization.
+The application supports various quantum chemistry calculation methods, including DFT, Hartree-Fock (HF), MP2, CCSD, TDDFT, CASCI, and CASSCF. It also features geometry optimization, vibrational frequency analysis with IR spectrum visualization, and advanced analysis like Molecular Orbitals (MO) and Natural Transition Orbitals (NTO) for TDDFT. A recent addition is an AI-powered molecular agent that can perform tasks based on natural language prompts. It dynamically loads supported parameters (basis sets, functionals, etc.) from the backend.
 
-**Key Features:**
-- Quantum chemistry calculations: DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF
-- Geometry optimization and vibrational frequency analysis
-- Molecular orbital and NTO visualization
-- PubChem/SMILES molecular structure retrieval
-- AI chat assistant (Gemini API) for quantum chemistry
-
-**API-First Development**: `src/api-spec/openapi.yaml` is the single source of truth. Run `npm run codegen` to generate TypeScript types and Python Pydantic models.
+A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend. The application uses WebSockets for real-time status updates of running calculations, providing a more efficient and responsive user experience than a polling-based system.
 
 ## Development Philosophy
+This is a development-stage application. Backward compatibility is not a concern, and breaking changes should be made freely in favor of better design and simpler code. When refactoring or improving the codebase:
 
-This is a development-stage application. **Backward compatibility is not a concern.** Prioritize simplicity over compatibility, make breaking changes confidently, and clean up legacy code when better alternatives exist.
+* Prioritize simplicity over compatibility - Remove deprecated patterns and complex fallback logic.
+* Make breaking changes confidently - Don't hesitate to change APIs, data structures, or file formats.
+* Clean up legacy code - Remove old implementations when better alternatives are available.
+* Focus on the best solution - Don't compromise design quality for compatibility with older versions.
+
+This approach allows for rapid iteration and prevents technical debt accumulation during the development phase.
+
+## AI Development Guidelines
+When working with external libraries, frameworks, or implementing new features, Claude should ALWAYS:
+
+### Verify Current API Documentation First
+
+Before writing any code that uses external libraries (LangChain, LangGraph, Flask, React, etc.), ALWAYS use Web Search and Context7 tools to verify the current API:
+
+    1. Use WebSearch to find recent updates and breaking changes (e.g., "langgraph 2025 API changes")
+    2. Use Context7 to fetch the latest official documentation for the specific library
+    3. Check for deprecated parameters or methods in the current version
+
+### Mandatory Checks
+* API parameter names and signatures (they change frequently!)
+* Deprecated methods or parameters
+* New recommended patterns or best practices
+* Breaking changes in recent versions
+
+### Example Workflow
+
+When implementing a feature with LangGraph:
+
+    1. WebSearch: "langgraph stream messages 2025" to find recent changes
+    2. Context7: Fetch /langchain-ai/langgraph docs for "create_react_agent parameters"
+    3. Verify the exact parameter names (e.g., prompt vs messages_modifier vs stateModifier)
+    4. Write code using the verified, current API
+
+### Why This Matters
+
+Libraries like LangChain and LangGraph update frequently, and parameters/methods get renamed or deprecated. Using outdated APIs leads to runtime errors that could have been avoided. Always verify before coding.
 
 ## Development Commands
+### Initial Setup
+#### Conda Environment (Required)
+This project requires a conda environment for development. The application features automated environment setup and verification tools, and uses a unified server configuration system for consistent behavior across development and production environments.
 
-### Quick Start
+#### Quick Setup (Recommended)
+
+    # Install Node.js dependencies
+    npm install
+    
+    # Automated environment setup (handles all conda setup)
+    npm run setup-env
+    
+    # Verify environment health
+    npm run verify-env
+    
+    # Verify build tools
+    npm run verify-build-env
+    
+    # Check server configuration
+    npm run debug:config
+
+#### Manual Setup
+
+    # Install Node.js dependencies
+    npm install
+    
+    # Install Miniforge (if not already installed)
+    # Example for macOS ARM:
+    curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-MacOSX-arm64.sh"
+    bash Miniforge3-MacOSX-arm64.sh -b
+
+    # Initialize conda (or use: conda init)
+    CONDA_BASE=$(conda info --base)
+    source "$CONDA_BASE/etc/profile.d/conda.sh"
+
+    # Create conda environment from environment.yml (includes all dependencies)
+    conda env create -f .github/environment.yml
+    
+    # Activate the environment
+    conda activate pyscf-env
+    
+    # Verify the setup
+    npm run verify-env
+
+Note: The conda environment setup is mandatory. The application will show an error dialog if the conda environment is not properly configured.
+
+### Development Commands
+
 ```bash
-npm install                    # Install Node.js dependencies
-npm run setup-env              # Automated conda environment setup
-npm run verify-env             # Verify environment health
-conda activate pyscf-env && npm run dev  # Run development mode
-```
-
-### Essential Commands
-```bash
-npm run dev                    # Development mode (hot reload + Python backend)
-npm run build                  # Production build
-npm run package                # Package for distribution
-npm run codegen                # Generate types from OpenAPI spec
-npm run format                 # Format code with Prettier
-```
-
-### Python Testing
-**IMPORTANT:** Always use the conda environment's Python interpreter.
-
-```bash
-cd src/python
+# Activate conda environment
 conda activate pyscf-env
 
+# Development mode (generates code, builds, and runs Electron with hot reload + Python backend)
+npm run dev
+
+# Production build (generates code, builds frontend and creates Python executable)
+npm run build
+
+# Package application for distribution (includes production build)
+npm run package
+
+# Package Linux application using Docker (Recommended for Windows)
+npm run package:linux:docker
+
+# Package Linux application using WSL
+npm run package:linux
+```
+
+### Debug Options
+
+```bash
+# Automatically open DevTools for splash window
+DEBUG_SPLASH=true npm run dev
+```
+
+Useful for debugging splash window startup sequence and IPC communication.
+
+### Building for Linux on Windows
+
+There are two methods for building Linux applications on Windows:
+
+#### Method 1: Using Docker (Recommended)
+
+This is the simplest method, requiring only Docker Desktop with WSL2 backend.
+
+**Prerequisites:**
+- Docker Desktop installed and running
+- WSL2 enabled
+
+**Build Command:**
+```bash
+# Build Docker image and create Linux package (one command)
+npm run package:linux:docker
+```
+
+This command automatically:
+1. Builds a Docker image with all necessary dependencies
+2. Runs the build inside a Linux container
+3. Outputs the AppImage to the `dist/` directory on your host machine
+
+**Advanced Usage:**
+```bash
+# Build Docker image only
+npm run docker:build
+
+# Run build with existing image (faster for subsequent builds)
+npm run docker:package
+```
+
+#### Method 2: Using WSL Directly
+
+For more control, you can build directly in WSL (Windows Subsystem for Linux):
+
+**Prerequisites**
+1. **WSL2** installed with a Linux distribution (Ubuntu recommended)
+2. **Miniforge** installed in WSL environment
+3. **Node.js** installed in WSL environment
+
+#### Setup in WSL
+```bash
+# Access WSL
+wsl
+
+# Install Miniforge in WSL
+curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
+bash Miniforge3-Linux-x86_64.sh -b
+
+# Initialize conda
+CONDA_BASE=$(conda info --base)
+source "$CONDA_BASE/etc/profile.d/conda.sh"
+
+# Navigate to your project directory (example)
+cd /mnt/c/Users/YOUR_USERNAME/Documents/PySCF_front
+
+# Install Node.js dependencies
+npm install
+
+# Create conda environment from environment.yml
+conda env create -f .github/environment.yml
+
+# Activate the environment
+conda activate pyscf-env
+
+# Verify the setup
+npm run verify-env
+```
+
+#### Building Linux Application
+```bash
+# In WSL, with pyscf-env activated
+conda activate pyscf-env
+
+# Build and package for Linux
+npm run package:linux
+```
+
+The built AppImage will be available in the `dist/` directory.
+
+**Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, PyInstaller, and electron-builder) in the Linux environment.
+
+### Individual Commands
+#### Environment Management
+
+    # Automated environment setup (conda + dependencies)
+    npm run setup-env
+    
+    # Verify environment health and dependencies
+    npm run verify-env
+    
+    # Verify build tools (conda-pack, Gunicorn)
+    npm run verify-build-env
+    
+    # Debug server configuration
+    npm run debug:config
+
+#### Build Commands
+
+    # Clean build directory
+    npm run clean
+    
+    # Generate TypeScript types and Python models from OpenAPI spec
+    npm run codegen
+    
+    # Build frontend with webpack in development mode
+    npm run dev:webpack
+    
+    # Start Electron (requires dist files to exist)
+    npm run dev:electron
+    
+    # Package conda environment for distribution
+    npm run build:conda-pack
+    
+    # Validate build completeness (after build)
+    npm run validate-build
+
+#### Code Formatting
+
+    # Format all source code (using Prettier)
+    npm run format
+    
+    # Check if code is properly formatted
+    npm run format:check
+
+#### Testing and Validation Commands
+
+    # Complete build test (frontend + backend)
+    npm run test:build
+
+    # Test Python imports and dependencies
+    npm run test:python-build
+
+    # Test Gunicorn server locally with unified configuration
+    npm run test:gunicorn-local
+
+    # Full packaging test (build + package)
+    npm run test:run-packaged
+
+#### Python Backend Testing
+
+**IMPORTANT:** Always use the conda environment's Python interpreter directly when running tests. Using the system Python (`python` or `python3`) may cause import errors or use the wrong dependencies.
+
+**Find Your Conda Environment Path:**
+```bash
+# macOS/Linux - Common conda locations
+ls ~/miniforge3/envs/pyscf-env/bin/python     # Miniforge
+ls ~/miniconda3/envs/pyscf-env/bin/python     # Miniconda
+ls ~/anaconda3/envs/pyscf-env/bin/python      # Anaconda
+
+# Or use conda to find it
+conda activate pyscf-env
+which python
+```
+
+**Run Tests with Conda Python:**
+```bash
+# Navigate to Python source directory
+cd src/python
+
 # Run all tests
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ -v
+
+# Run specific test file
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py -v
+
+# Run specific test class or function
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py::TestCalculationSubmissionAPI::test_dft_rejects_casci_parameters -xvs
+
+# Run tests with coverage
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ --cov=. --cov-report=html
+
+# Run tests matching a keyword
+~/miniforge3/envs/pyscf-env/bin/python -m pytest tests/ -k "pause_resume" -v
+```
+
+**Alternative: Activate Environment First (Traditional Method):**
+```bash
+# Activate conda environment
+conda activate pyscf-env
+
+# Then you can use 'python' directly
+cd src/python
 python -m pytest tests/ -v
 
-# Run specific test
-python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py -v
-
-# Run specific test function
-python -m pytest tests/integration/test_api_endpoints/test_quantum_api.py::TestCalculationSubmissionAPI::test_dft_rejects_casci_parameters -xvs
-
-# Run tests matching keyword
-python -m pytest tests/ -k "pause_resume" -v
+# Start Flask API server for manual testing
+python app.py
 ```
+
+**Common pytest Options:**
+- `-v` or `-vv`: Verbose output (show test names and details)
+- `-x`: Stop at first failure
+- `-s`: Show print statements and logging output
+- `--tb=short`: Shorter traceback format
+- `--tb=line`: One-line traceback format
+- `-k "keyword"`: Run tests matching keyword
+- `--lf`: Run only last failed tests
+- `--ff`: Run failures first, then remaining tests
+
+## Development Workflow
+The `npm run dev` script is the primary command for development. It automatically:
+
+* **Generates Code**: Runs `npm run codegen` to generate TypeScript types and Python Pydantic models from `src/api-spec/openapi.yaml`. This ensures the frontend and backend are always in sync with the API specification.
+* **Cleans**: Cleans the `dist/` directory.
+* **Builds Frontend**: Builds the frontend code (main process, preload script, and renderer) using Webpack in watch mode.
+* **Starts Backend**: Starts the Python Flask server as a subprocess from within the Electron main process using the unified Gunicorn-based execution system.
+* **Starts Electron**: Starts the Electron application using `electronmon`, which watches the `dist/` directory for changes and automatically restarts the app.
+
+## Unified Server Configuration System
+The application uses a configuration-driven approach with `config/server-config.json` to ensure consistent behavior across development and production environments.
+
+* Server settings: Host, port, and auto-detection.
+* Gunicorn configuration: Workers, threads, and timeout settings.
+* SocketIO settings: CORS, async mode, and timeouts.
+* Logging configuration.
+
+**Unified Execution Environment**: Both development and production environments now use Gunicorn as the WSGI server, eliminating "works in dev but not in production" problems.
+
+The Electron main process (`src/main.ts`) launches the Python Flask server using a simplified environment detection strategy:
+
+1.  **Bundled conda environment** (packaged apps): Uses the conda-pack packaged environment at `process.resourcesPath/conda_env/bin/python`.
+2.  **Development conda environment**: Detects the `pyscf-env` using environment variables or conda commands.
+
+A robust health check system pings the `/health` endpoint. If the server fails to start, it provides context-specific error messages.
 
 ## Architecture Overview
+### API-First Development with OpenAPI
+The single source of truth for the API is `src/api-spec/openapi.yaml`. The `npm run codegen` command uses this file to generate:
 
-### Three-Layer Structure
-```
-Electron Main Process (src/main.ts)
-    ↓ spawns
-Python Flask/Gunicorn Backend (src/python/)
-    ↓ serves
-React Frontend (src/web/) via BrowserWindow
-```
+* **Python Pydantic Models** (`src/python/generated_models.py`) for type-safe request/response handling in the Flask backend.
+* **TypeScript Type Definitions** (`src/web/types/generated-api.ts`) to keep the frontend API client synchronized with the backend.
 
-### Code Generation (API-First)
-- **OpenAPI spec**: `src/api-spec/openapi.yaml`
-- **Generated Python models**: `src/python/generated_models.py`
-- **Generated TypeScript types**: `src/web/types/generated-api.ts`
+### AI Chat Assistant
+The application features a simple AI chat assistant powered by the **Gemini API**. 
 
-### Frontend State Management
-- **TanStack Query**: Server-side state (API data, caching)
-- **Zustand stores** (`src/web/store/`): UI state
-  - `calculationStore.ts`: Active calculation ID, staged calculation
-  - `uiStore.ts`: Sidebar visibility, current page, modals
-  - `notificationStore.ts`: Toast notifications
+* **Gemini Chat**: Provides conversational assistance for quantum chemistry questions, molecular design guidance, and calculation result interpretation.
+* **Streaming Responses**: Uses Server-Sent Events (SSE) for real-time streaming of AI responses.
+* **Chat History Persistence**: Conversation history is stored in SQLite database for later reference.
+
+### Electron Structure
+* **Main Process** (`src/main.ts`): Creates the `BrowserWindow`, manages the Python Flask subprocess, and handles application lifecycle events.
+* **Preload Script** (`src/preload.ts`): Securely exposes specific Electron APIs to the renderer process.
+* **Renderer Process** (`src/web/`): The React (TypeScript) application that provides the user interface.
+
+### Python Backend (`src/python/`)
+A Flask API server with REST endpoints and a WebSocket interface for:
+
+* **PubChem & SMILES Integration**: Searching and converting molecular structures.
+* **Quantum Chemistry Calculations**: Running various calculations (DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF) via PySCF. This now includes geometry optimization and vibrational frequency analysis. Calculations are executed in parallel using a `ProcessPoolExecutor`.
+* **AI Chat**: Simple Gemini API-based chat for quantum chemistry assistance.
+* **Molecular Orbital Analysis**: Generating data for visualizing molecular orbitals, including CUBE files and energy level diagrams.
+* **IR Spectrum Generation**: Creating theoretical IR spectra from frequency analysis data.
+* **Dynamic Parameter Loading**: Providing lists of supported basis sets, functionals, and solvents via the `/api/quantum/supported-parameters` endpoint.
+* **Real-time Status Updates**: A WebSocket endpoint pushes status updates to the frontend.
+* **File Management**: Listing, renaming, and deleting calculation data.
+* **Health Check**: An endpoint (`/health`) for startup coordination.
+
+
+## Core Components & State Management
+The application uses a modern, hook-based state management architecture with a clear separation of concerns, moving complex logic out of `App.tsx` and into reusable hooks.
+
+### State Management Architecture:
+
+* **TanStack Query**: Manages all server-side state, including API data fetching, caching, and synchronization.
+* **Zustand**: Manages global UI state.
+    * `agentStore.ts`: Manages AI agent state, such as which agent is active.
+    * `calculationStore.ts`: Manages `activeCalculationId` and `stagedCalculation` (for new calculation workflows).
+    * `chatHistoryStore.ts`: Manages the state for the chat history sidebar and sessions.
+    * `notificationStore.ts`: Manages global toast notifications for user feedback.
+    * `uiStore.ts`: Manages UI state like sidebar visibility (instances vs. chats), current page, and modals.
 
 ### Key Hooks (`src/web/hooks/`)
-- `useActiveCalculation`: Unified active calculation state
-- `useCalculationQueries`: TanStack Query definitions for quantum API
-- `useUnifiedWebSocket`: Real-time updates via WebSocket
+This architecture relies on a collection of custom hooks to encapsulate logic:
 
-### Python Backend Structure (`src/python/`)
-- `api/`: Flask route handlers (blueprints)
-- `services/`: Business logic layer
-- `quantum_calc/`: PySCF calculation implementations
-- `websocket/handlers.py`: Real-time status updates
+* **useActiveCalculation**: (Replaces `useCalculationData`) Derives the currently active calculation state. It intelligently selects between a staged (new) calculation, detailed data fetched from the server, or a fallback, providing a unified `activeCalculation` object to the UI.
+* **useActiveCalculationId**: Manages the currently selected `activeCalculationId`.
+* **useAppSettings**: Hook for fetching and mutating application settings.
+* **useAppState**: A central hook that combines UI and calculation state from Zustand stores for simplified access in `App.tsx`.
+* **useCalculationActions**: Encapsulates mutation actions (start, rename, delete) for calculations.
+* **useCalculationOperations**: (New) Encapsulates complex calculation-related logic and state derivations.
+* **useCalculationQueries**: Contains all TanStack Query definitions (`useQuery`, `useMutation`) for the quantum calculation API.
+* **useChatHistoryQueries**: (New) Contains all TanStack Query definitions for the chat history API.
+* **useUnifiedWebSocket**: A dedicated hook that establishes a WebSocket connection for both global updates and the active calculation, updating the TanStack Query cache in real-time.
+
+### State Flow Example (Starting a Calculation)
+
+1.  User clicks the "Start Calculation" button.
+2.  The `handleStartCalculation` function from the `useCalculationActions` hook is called. It uses the `useStartCalculation` mutation.
+3.  The Flask backend (POST `/api/quantum/calculate`) receives the request, creates a directory, saves initial parameters, sets the status to `running`, and submits the job to a `ProcessPoolExecutor`. It returns a `202 Accepted` response with the new `CalculationInstance` data.
+4.  The `useStartCalculation` mutation's `onSuccess` callback invalidates the `calculations` query cache, triggering a refetch.
+5.  The `useCalculationStore` clears any staged data, and sets the new `activeCalculationId`.
+6.  The `useUnifiedWebSocket` hook detects the `running` status of the new active calculation and opens a WebSocket connection.
+7.  The Flask backend's WebSocket handler monitors `status.json`. As the worker process updates the file (e.g., to `completed` or `error`), the handler pushes the complete, updated `CalculationInstance` data to the client.
+8.  The `onUpdate` callback in `useUnifiedWebSocket` receives the new data and directly updates the TanStack Query cache using `queryClient.setQueryData()`, triggering re-renders in all components using that data.
 
 ## File Structure
     .
+    ├── .github/
+    │   ├── environment.yml
+    │   └── workflows/
+    │       ├── ci.yml
+    │       └── release.yml
+    ├── .gitignore
+    ├── .prettierignore
+    ├── .prettierrc
     ├── CLAUDE.md
-    ├── Dockerfile
     ├── LICENSE
     ├── PySCF_front_view.png
     ├── README.md
-    ├── code.txt
-    ├── config
+    ├── TESTING_IMPLEMENTATION_SUMMARY.md
+    ├── config/
     │   └── server-config.json
-    ├── data
-    │   ├── chat_history.db
-    │   └── settings.json
+    ├── data/
+    │   └── .gitkeep
     ├── package-lock.json
     ├── package.json
-    ├── pyscf_front_api.spec
-    ├── scripts
-    │   ├── build-conda-pack.sh
-    │   ├── build-python-linux.sh
-    │   ├── bump-version.js
-    │   ├── cleanup-artifacts.sh
-    │   ├── docker-build-linux.js
-    │   ├── docker-run.js
-    │   ├── setup-environment.sh
-    │   ├── test-python-standalone.js
-    │   ├── uitnize.sh
-    │   ├── validate-build-completeness.py
-    │   └── verify-environment.py
-    ├── src
-    │   ├── api-spec
-    │   │   └── openapi.yaml
-    │   ├── assets
-    │   │   ├── fonts
-    │   │   │   └── ADLaMDisplay-Regular.ttf
-    │   │   └── icon
-    │   │       ├── linux
-    │   │       │   └── icon.png
-    │   │       └── mac
-    │   │           └── Pyscf_front.icns
-    │   ├── main
-    │   │   ├── config.ts
-    │   │   ├── ipc.ts
-    │   │   ├── menu.ts
-    │   │   ├── port-manager.ts
-    │   │   ├── python-env.ts
-    │   │   ├── python-server.ts
-    │   │   ├── splash-window-manager.ts
-    │   │   └── window-manager.ts
-    │   ├── main.ts
-    │   ├── preload.ts
-    │   ├── python
-    │   │   ├── SMILES
-    │   │   │   ├── __init__.py
-    │   │   │   └── smiles_converter.py
-    │   │   ├── __init__.py
-    │   │   ├── agent
-    │   │   │   └── __init__.py
-    │   │   ├── api
-    │   │   │   ├── __init__.py
-    │   │   │   ├── agent.py
-    │   │   │   ├── chat_history.py
-    │   │   │   ├── gpu.py
-    │   │   │   ├── health.py
-    │   │   │   ├── pubchem.py
-    │   │   │   ├── quantum.py
-    │   │   │   ├── settings.py
-    │   │   │   ├── smiles.py
-    │   │   │   ├── swagger_ui.py
-    │   │   │   └── system.py
-    │   │   ├── app.py
-    │   │   ├── config.py
-    │   │   ├── data
-    │   │   │   ├── __init__.py
-    │   │   │   ├── scale_factors.py
-    │   │   │   └── solvent_properties.py
-    │   │   ├── database
-    │   │   │   ├── __init__.py
-    │   │   │   └── chat_history.py
-    │   │   ├── generated_models.py
-    │   │   ├── pubchem
-    │   │   │   ├── __init__.py
-    │   │   │   ├── client.py
-    │   │   │   └── parser.py
-    │   │   ├── pyscf_front_api.spec
-    │   │   ├── pytest.ini
-    │   │   ├── quantum_calc
-    │   │   │   ├── __init__.py
-    │   │   │   ├── base_calculator.py
-    │   │   │   ├── casci_calculator.py
-    │   │   │   ├── casscf_calculator.py
-    │   │   │   ├── ccsd_calculator.py
-    │   │   │   ├── config_manager.py
-    │   │   │   ├── dft_calculator.py
-    │   │   │   ├── exceptions.py
-    │   │   │   ├── file_manager.py
-    │   │   │   ├── file_watcher.py
-    │   │   │   ├── gpu_manager.py
-    │   │   │   ├── hf_calculator.py
-    │   │   │   ├── ir_spectrum.py
-    │   │   │   ├── method_defaults.py
-    │   │   │   ├── mp2_calculator.py
-    │   │   │   ├── orbital_generator.py
-    │   │   │   ├── pause_manager.py
-    │   │   │   ├── process_manager.py
-    │   │   │   ├── resource_manager.py
-    │   │   │   ├── settings_manager.py
-    │   │   │   ├── solvent_effects.py
-    │   │   │   ├── supported_parameters.py
-    │   │   │   └── tddft_calculator.py
-    │   │   ├── services
-    │   │   │   ├── __init__.py
-    │   │   │   ├── chat_history_service.py
-    │   │   │   ├── exceptions.py
-    │   │   │   ├── gpu_service.py
-    │   │   │   ├── notification_service.py
-    │   │   │   ├── pubchem_service.py
-    │   │   │   ├── quantum_service.py
-    │   │   │   ├── settings_service.py
-    │   │   │   ├── smiles_service.py
-    │   │   │   └── system_service.py
-    │   │   ├── tests
-    │   │   │   ├── E2E_TEST_SCENARIOS.md
-    │   │   │   ├── README.md
-    │   │   │   ├── TESTING_IMPLEMENTATION_SUMMARY.md
-    │   │   │   ├── __init__.py
-    │   │   │   ├── conftest.py
-    │   │   │   ├── data
-    │   │   │   │   ├── README.md
-    │   │   │   │   ├── __init__.py
-    │   │   │   │   ├── mock_pubchem_response.json
-    │   │   │   │   ├── sample_h2.xyz
-    │   │   │   │   └── sample_water.xyz
-    │   │   │   ├── integration
-    │   │   │   │   ├── __init__.py
-    │   │   │   │   ├── test_api_endpoints
-    │   │   │   │   │   ├── __init__.py
-    │   │   │   │   │   ├── test_agent_api.py
-    │   │   │   │   │   ├── test_health_api.py
-    │   │   │   │   │   ├── test_pubchem_api.py
-    │   │   │   │   │   ├── test_quantum_api.py
-    │   │   │   │   │   └── test_smiles_api.py
-    │   │   │   │   ├── test_auth_production.py
-    │   │   │   │   ├── test_auth_security.py
-    │   │   │   │   ├── test_calculation_workflow.py
-    │   │   │   │   ├── test_pause_resume_workflow.py
-    │   │   │   │   └── test_websocket_handlers.py
-    │   │   │   ├── test_fixtures.py
-    │   │   │   └── unit
-    │   │   │       ├── __init__.py
-    │   │   │       ├── test_quantum_calc
-    │   │   │       │   ├── __init__.py
-    │   │   │       │   ├── test_dft_calculator.py
-    │   │   │       │   ├── test_hf_calculator.py
-    │   │   │       │   └── test_method_defaults.py
-    │   │   │       └── test_services
-    │   │   │           ├── __init__.py
-    │   │   │           ├── test_pubchem_service.py
-    │   │   │           ├── test_quantum_service.py
-    │   │   │           └── test_smiles_service.py
-    │   │   └── websocket
-    │   │       ├── __init__.py
-    │   │       └── handlers.py
-    │   ├── splash
-    │   │   ├── preload.ts
-    │   │   ├── splash.css
-    │   │   ├── splash.html
-    │   │   └── splash.ts
-    │   ├── types
-    │   │   ├── 3dmol.d.ts
-    │   │   ├── css-modules.d.ts
-    │   │   ├── electron.d.ts
-    │   │   ├── ketcher.d.ts
-    │   │   └── splash.d.ts
-    │   └── web
-    │       ├── App.css
-    │       ├── App.module.css
-    │       ├── App.tsx
-    │       ├── apiClient.ts
-    │       ├── components
-    │       │   ├── AIAgentSwitch.module.css
-    │       │   ├── AIAgentSwitch.tsx
-    │       │   ├── CIAnalysisViewer.module.css
-    │       │   ├── CIAnalysisViewer.tsx
-    │       │   ├── ChatHistoryList.module.css
-    │       │   ├── ChatHistoryList.tsx
-    │       │   ├── ChatMessage.module.css
-    │       │   ├── ChatMessage.tsx
-    │       │   ├── ConfirmationModal.module.css
-    │       │   ├── ConfirmationModal.tsx
-    │       │   ├── DropdownMenu.module.css
-    │       │   ├── DropdownMenu.tsx
-    │       │   ├── Header.module.css
-    │       │   ├── Header.tsx
-    │       │   ├── IRSpectrumChart.module.css
-    │       │   ├── IRSpectrumChart.tsx
-    │       │   ├── InitialSetupDialog.module.css
-    │       │   ├── InitialSetupDialog.tsx
-    │       │   ├── LazyViewer.tsx
-    │       │   ├── MolecularOrbitalEnergyDiagram.module.css
-    │       │   ├── MolecularOrbitalEnergyDiagram.tsx
-    │       │   ├── MolecularOrbitalViewer.module.css
-    │       │   ├── MolecularOrbitalViewer.tsx
-    │       │   ├── MoleculeViewer.module.css
-    │       │   ├── MoleculeViewer.tsx
-    │       │   ├── MoleculeViewerSection.module.css
-    │       │   ├── MoleculeViewerSection.tsx
-    │       │   ├── MullikenChargeViewer.module.css
-    │       │   ├── MullikenChargeViewer.tsx
-    │       │   ├── Sidebar.module.css
-    │       │   ├── Sidebar.tsx
-    │       │   ├── StyleControls.module.css
-    │       │   ├── StyleControls.tsx
-    │       │   ├── ToastContainer.module.css
-    │       │   ├── ToastContainer.tsx
-    │       │   ├── ToastNotification.module.css
-    │       │   ├── ToastNotification.tsx
-    │       │   ├── VibrationModeViewer.module.css
-    │       │   ├── VibrationModeViewer.tsx
-    │       │   ├── XYZInput.module.css
-    │       │   └── XYZInput.tsx
-    │       ├── data
-    │       │   └── atomicRadii.ts
-    │       ├── hooks
-    │       │   ├── index.ts
-    │       │   ├── useActiveCalculation.ts
-    │       │   ├── useActiveCalculationId.ts
-    │       │   ├── useAppSettings.ts
-    │       │   ├── useAppState.ts
-    │       │   ├── useCalculationActions.ts
-    │       │   ├── useCalculationData.ts
-    │       │   ├── useCalculationOperations.ts
-    │       │   ├── useCalculationQueries.ts
-    │       │   ├── useChatHistoryQueries.ts
-    │       │   ├── useMethodDefaults.ts
-    │       │   ├── useProcessedCalculationResults.ts
-    │       │   └── useUnifiedWebSocket.ts
-    │       ├── index.html
-    │       ├── index.tsx
-    │       ├── pages
-    │       │   ├── AgentPage.module.css
-    │       │   ├── AgentPage.tsx
-    │       │   ├── CalculationResultsPage.module.css
-    │       │   ├── CalculationResultsPage.tsx
-    │       │   ├── CalculationSettingsPage.module.css
-    │       │   ├── CalculationSettingsPage.tsx
-    │       │   ├── DrawMoleculePage.module.css
-    │       │   ├── DrawMoleculePage.tsx
-    │       │   ├── SettingsPage.module.css
-    │       │   └── SettingsPage.tsx
-    │       ├── store
-    │       │   ├── agentStore.ts
-    │       │   ├── calculationStore.ts
-    │       │   ├── chatHistoryStore.ts
-    │       │   ├── notificationStore.ts
-    │       │   └── uiStore.ts
-    │       ├── types
-    │       │   ├── api-types.ts
-    │       │   └── generated-api.ts
-    │       └── utils
-    │           ├── dateFormatter.ts
-    │           ├── errorHandler.ts
-    │           ├── irSpectrumConstants.ts
-    │           └── xyzParser.ts
+    ├── scripts/
+    │   ├── setup-environment.sh
+    │   ├── test-python-standalone.js
+    │   ├── validate-build-completeness.py
+    │   └── verify-environment.py
+    ├── src/
+    │   ├── api-spec/
+    │   │   └── openapi.yaml
+    │   ├── assets/
+    │   │   ├── fonts/
+    │   │   │   └── ADLaMDisplay-Regular.ttf
+    │   │   └── icon/
+    │   │       └── mac/
+    │   │           └── Pyscf_front.icns
+    │   ├── main.ts
+    │   ├── preload.ts
+    │   ├── python/
+    │   │   ├── SMILES/
+    │   │   │   ├── __init__.py
+    │   │   │   └── smiles_converter.py
+    │   │   ├── __init__.py
+    │   │   ├── agent/
+    │   │   │   └── __init__.py
+    │   │   ├── api/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── agent.py
+    │   │   │   ├── chat_history.py
+    │   │   │   ├── health.py
+    │   │   │   ├── pubchem.py
+    │   │   │   ├── quantum.py
+    │   │   │   ├── settings.py
+    │   │   │   ├── smiles.py
+    │   │   │   └── system.py
+    │   │   ├── app.py
+    │   │   ├── config.py
+    │   │   ├── data/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── scale_factors.py
+    │   │   │   └── solvent_properties.py
+    │   │   ├── database/
+    │   │   │   ├── __init__.py
+    │   │   │   └── chat_history.py
+    │   │   ├── generated_models.py
+    │   │   ├── pubchem/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── client.py
+    │   │   │   └── parser.py
+    │   │   ├── pytest.ini
+    │   │   ├── quantum_calc/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── base_calculator.py
+    │   │   │   ├── casci_calculator.py
+    │   │   │   ├── casscf_calculator.py
+    │   │   │   ├── ccsd_calculator.py
+    │   │   │   ├── config_manager.py
+    │   │   │   ├── dft_calculator.py
+    │   │   │   ├── exceptions.py
+    │   │   │   ├── file_manager.py
+    │   │   │   ├── file_watcher.py
+    │   │   │   ├── hf_calculator.py
+    │   │   │   ├── ir_spectrum.py
+    │   │   │   ├── mp2_calculator.py
+    │   │   │   ├── orbital_generator.py
+    │   │   │   ├── process_manager.py
+    │   │   │   ├── resource_manager.py
+    │   │   │   ├── settings_manager.py
+    │   │   │   ├── solvent_effects.py
+    │   │   │   ├── supported_parameters.py
+    │   │   │   └── tddft_calculator.py
+    │   │   ├── services/
+    │   │   │   ├── __init__.py
+    │   │   │   ├── chat_history_service.py
+    │   │   │   ├── exceptions.py
+    │   │   │   ├── pubchem_service.py
+    │   │   │   ├── quantum_service.py
+    │   │   │   ├── settings_service.py
+    │   │   │   ├── smiles_service.py
+    │   │   │   └── system_service.py
+    │   │   ├── tests/
+    │   │   │   ├── E2E_TEST_SCENARIOS.md
+    │   │   │   ├── README.md
+    │   │   │   ├── __init__.py
+    │   │   │   ├── conftest.py
+    │   │   │   ├── data/
+    │   │   │   │   ├── README.md
+    │   │   │   │   ├── __init__.py
+    │   │   │   │   ├── mock_pubchem_response.json
+    │   │   │   │   ├── sample_h2.xyz
+    │   │   │   │   └── sample_water.xyz
+    │   │   │   ├── integration/
+    │   │   │   │   ├── __init__.py
+    │   │   │   │   ├── test_api_endpoints/
+    │   │   │   │   │   ├── __init__.py
+    │   │   │   │   │   ├── test_agent_api.py
+    │   │   │   │   │   ├── test_health_api.py
+    │   │   │   │   │   ├── test_pubchem_api.py
+    │   │   │   │   │   ├── test_quantum_api.py
+    │   │   │   │   │   └── test_smiles_api.py
+    │   │   │   │   ├── test_calculation_workflow.py
+    │   │   │   │   └── test_websocket_handlers.py
+    │   │   │   ├── test_fixtures.py
+    │   │   │   └── unit/
+    │   │   │       ├── __init__.py
+    │   │   │       ├── test_quantum_calc/
+    │   │   │       │   ├── __init__.py
+    │   │   │       │   ├── test_dft_calculator.py
+    │   │   │       │   └── test_hf_calculator.py
+    │   │   │       └── test_services/
+    │   │   │           ├── __init__.py
+    │   │   │           ├── test_pubchem_service.py
+    │   │   │           ├── test_quantum_service.py
+    │   │   │           └── test_smiles_service.py
+    │   │   └── websocket/
+    │   │       ├── __init__.py
+    │   │       └── handlers.py
+    │   ├── types/
+    │   │   ├── 3dmol.d.ts
+    │   │   ├── css-modules.d.ts
+    │   │   └── electron.d.ts
+    │   └── web/
+    │       ├── App.css
+    │       ├── App.module.css
+    │       ├── App.tsx
+    │       ├── apiClient.ts
+    │       ├── components/
+    │       │   ├── AIAgentSwitch.module.css
+    │       │   ├── AIAgentSwitch.tsx
+    │       │   ├── CIAnalysisViewer.module.css
+    │       │   ├── CIAnalysisViewer.tsx
+    │       │   ├── ChatHistoryList.module.css
+    │       │   ├── ChatHistoryList.tsx
+    │       │   ├── ConfirmationModal.module.css
+    │       │   ├── ConfirmationModal.tsx
+    │       │   ├── DropdownMenu.module.css
+    │       │   ├── DropdownMenu.tsx
+    │       │   ├── Header.module.css
+    │       │   ├── Header.tsx
+    │       │   ├── IRSpectrumViewer.module.css
+    │       │   ├── IRSpectrumViewer.tsx
+    │       │   ├── MolecularOrbitalEnergyDiagram.module.css
+    │       │   ├── MolecularOrbitalEnergyDiagram.tsx
+    │       │   ├── MolecularOrbitalViewer.module.css
+    │       │   ├── MolecularOrbitalViewer.tsx
+    │       │   ├── MoleculeViewer.module.css
+    │       │   ├── MoleculeViewer.tsx
+    │       │   ├── MoleculeViewerSection.module.css
+    │       │   ├── MoleculeViewerSection.tsx
+    │       │   ├── Sidebar.module.css
+    │       │   ├── Sidebar.tsx
+    │       │   ├── StyleControls.module.css
+    │       │   ├── StyleControls.tsx
+    │       │   ├── ToastContainer.module.css
+    │       │   ├── ToastContainer.tsx
+    │       │   ├── ToastNotification.module.css
+    │       │   ├── ToastNotification.tsx
+    │       │   ├── XYZInput.module.css
+    │       │   └── XYZInput.tsx
+    │       ├── data/
+    │       │   └── atomicRadii.ts
+    │       ├── hooks/
+    │       │   ├── index.ts
+    │       │   ├── useActiveCalculation.ts
+    │       │   ├── useActiveCalculationId.ts
+    │       │   ├── useAppSettings.ts
+    │       │   ├── useAppState.ts
+    │       │   ├── useCalculationActions.ts
+    │       │   ├── useCalculationData.ts
+    │       │   ├── useCalculationOperations.ts
+    │       │   ├── useCalculationQueries.ts
+    │       │   ├── useChatHistoryQueries.ts
+    │       │   └── useUnifiedWebSocket.ts
+    │       ├── index.html
+    │       ├── index.tsx
+    │       ├── pages/
+    │       │   ├── AgentPage.module.css
+    │       │   ├── AgentPage.tsx
+    │       │   ├── CalculationResultsPage.module.css
+    │       │   ├── CalculationResultsPage.tsx
+    │       │   ├── CalculationSettingsPage.module.css
+    │       │   ├── CalculationSettingsPage.tsx
+    │       │   ├── DrawMoleculePage.module.css
+    │       │   ├── SettingsPage.module.css
+    │       │   └── SettingsPage.tsx
+    │       ├── store/
+    │       │   ├── agentStore.ts
+    │       │   ├── calculationStore.ts
+    │       │   ├── chatHistoryStore.ts
+    │       │   ├── notificationStore.ts
+    │       │   └── uiStore.ts
+    │       ├── types/
+    │       │   ├── api-types.ts
+    │       │   └── generated-api.ts
+    │       └── utils/
+    │           └── xyzParser.ts
+    ├── test_agent_integration.py
     ├── tsconfig.json
     └── webpack.config.ts
 
-## Key Concepts
+## Key API Endpoints
+* `GET /health`: Health check endpoint.
+* `POST /api/pubchem/search`: Search PubChem.
+* `POST /api/smiles/convert`: Convert a SMILES string to XYZ.
+* `POST /api/pubchem/validate`: Validate an XYZ format string.
+* `POST /api/agent/chat`: Chat with the multi-agent AI system (streams responses via Server-Sent Events). The system automatically routes queries to the appropriate specialist agent (Quantum Calculator, Literature Surveyor, etc.).
+* `GET /api/quantum/supported-parameters`: Get lists of supported calculation methods, basis sets, functionals, etc.
+* `POST /api/quantum/calculate`: Asynchronously starts a quantum chemistry calculation.
+* `GET /api/quantum/calculations`: Lists all saved calculations.
+* `GET /api/quantum/calculations/<id>`: Gets detailed results for a specific calculation.
+* `PATCH /api/quantum/calculations/<id>`: Updates a calculation's metadata (e.g., renames it).
+* `DELETE /api/quantum/calculations/<id>`: Deletes a calculation.
+* `POST /api/quantum/calculations/<id>/cancel`: Cancels a running calculation.
+* `GET /api/quantum/calculations/<id>/orbitals`: Get molecular orbital information.
+* `GET /api/quantum/calculations/<id>/orbitals/{orbitalIndex}/cube`: Generate and retrieve a CUBE file for a specific orbital.
+* `GET /api/quantum/calculations/<id>/orbitals/cube-files`: List all generated CUBE files for a calculation.
+* `DELETE /api/quantum/calculations/<id>/orbitals/cube-files`: Delete generated CUBE files (all or by index).
+* `GET /api/quantum/calculations/<id>/ir-spectrum`: Generate an IR spectrum for a calculation.
+* `GET /api/settings`: Get application settings.
+* `PUT /api/settings`: Update application settings.
+* `GET /api/system/resource-status`: Get system resource status.
+* `GET /api/chat-history/sessions`: Get all chat sessions.
+* `POST /api/chat-history/sessions`: Create a new chat session.
+* `GET /api/chat-history/sessions/<id>`: Get a specific chat session with messages.
+* `PATCH /api/chat-history/sessions/<id>`: Update a chat session's metadata (e.g., rename).
+* `DELETE /api/chat-history/sessions/<id>`: Delete a chat session.
+* `WS /ws/calculations/<id>`: WebSocket endpoint for real-time status updates.
 
-### API Endpoints
-See `src/api-spec/openapi.yaml` for complete API documentation. In development mode, Swagger UI is available at `http://127.0.0.1:5000/api-docs/`.
+## Parallel Processing Architecture
+The application uses a `ProcessPoolExecutor`-based system for quantum chemistry calculations to achieve true multiprocessing parallelism.
 
-### Parallel Processing
-Quantum calculations use `ProcessPoolExecutor` for true multiprocessing (bypasses Python GIL). See `quantum_calc/process_manager.py`.
+* **Process Pool Management**: The `CalculationProcessManager` class manages a pool of worker processes, allowing multiple calculations to run simultaneously.
+* **Worker Process Isolation**: Each calculation runs in a separate Python process, eliminating the Global Interpreter Lock (GIL) limitation.
+* **Resource Management**: The process pool starts on demand and shuts down cleanly when the Flask server terminates.
 
-### Spin Multiplicity (PySCF Convention)
-PySCF uses `spin` = number of unpaired electrons (2S), NOT the traditional 2S+1 notation:
-- Singlet: `spin=0`
-- Doublet: `spin=1`
-- Triplet: `spin=2`
+## Spin Multiplicity Notes
+PySCF uses the `spin` attribute to specify the number of unpaired electrons (2S), which differs from the traditional quantum chemistry notation of 2S+1.
 
-### Server Configuration
-`config/server-config.json` controls server behavior (Gunicorn workers, threads, timeouts). Both development and production use Gunicorn for consistency.
+* **Singlet state** (closed-shell): `spin=0`
+* **Doublet state** (1 unpaired electron): `spin=1`
+* **Triplet state** (2 unpaired electrons): `spin=2`
 
 ## Troubleshooting
+### Environment Setup Issues
+* **Automated Diagnosis**: Always start with environment verification: `npm run verify-env`. This command provides comprehensive diagnostic information.
+* **Environment Detection Failures**: If detection fails, use `npm run setup-env` or set the `CONDA_ENV_PATH` environment variable.
+* **Build Tool Issues**: If `npm run verify-build-env` fails, ensure `conda-pack` and `gunicorn` are installed in the active `pyscf-env` environment.
 
-Run `npm run verify-env` for automated environment diagnosis. If detection fails, use `npm run setup-env` or set the `CONDA_ENV_PATH` environment variable.
+### Development Server Issues
+The unified Gunicorn-based server reduces environment-specific issues. Most behavior is controlled by `config/server-config.json`. Use `npm run debug:config` to verify server settings. The server automatically finds free ports.
+
+### Build and Packaging Issues
+The build system includes pre- and post-build verification steps (`verify-env`, `verify-build-env`, `validate-build`). A failure in these steps indicates an issue with the conda environment or the server configuration.

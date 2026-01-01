@@ -56,9 +56,7 @@ class SettingsManager:
             calculations_directory=default_calc_dir,
             timezone="UTC",
             gemini_api_key=None,
-            research_email="pyscf-research-agent@example.com",
-            gpu_acceleration_enabled=False,
-            gpu_preferred_package=None
+            research_email="pyscf-research-agent@example.com"
         )
     
     def load_settings(self) -> AppSettings:

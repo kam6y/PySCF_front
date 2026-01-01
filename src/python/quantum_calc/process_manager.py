@@ -177,8 +177,7 @@ def _import_calculator_classes(process_logger):
 
 
 def _create_calculator_instance(calculation_method: str, parameters: dict, 
-                                calc_dir: str, calculator_classes: dict, process_logger,
-                                use_gpu: bool = False):
+                                calc_dir: str, calculator_classes: dict, process_logger):
     """Create and return appropriate calculator instance."""
     optimize_geometry = parameters.get('optimize_geometry', True)
     molecule_name = parameters['name']
@@ -199,8 +198,7 @@ def _create_calculator_instance(calculation_method: str, parameters: dict,
         working_dir=calc_dir,
         keep_files=True,
         molecule_name=molecule_name,
-        optimize_geometry=optimize_geometry,
-        use_gpu=use_gpu
+        optimize_geometry=optimize_geometry
     )
 
 
@@ -348,40 +346,12 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     settings = get_current_settings()
     file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
     calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
-
-    # Determine GPU usage based on settings and environment
-    use_gpu = False
-    gpu_reason = "GPU acceleration disabled in settings."
-    gpu_status_summary = None
-    try:
-        if getattr(settings, 'gpu_acceleration_enabled', False):
-            from quantum_calc.gpu_manager import get_gpu_manager
-
-            gpu_manager = get_gpu_manager()
-            can_use, reason, gpu_status = gpu_manager.should_use_gpu_for_method(
-                calculation_method
-            )
-            gpu_status_summary = gpu_status
-            use_gpu = can_use
-            gpu_reason = reason
-        else:
-            gpu_reason = "GPU acceleration disabled in application settings."
-    except Exception as gpu_error:
-        gpu_reason = f"GPU readiness check failed: {gpu_error}"
-        process_logger.warning(gpu_reason)
     
     try:
         # Update status to running
         file_manager.save_calculation_status(calc_dir, 'running')
         process_logger.info(f"Starting calculation {calculation_id} in process {os.getpid()}")
         process_logger.info(f"Using {cpu_cores} CPU cores and {memory_mb} MB memory")
-        if use_gpu:
-            process_logger.info(
-                f"GPU acceleration enabled (CUDA {getattr(gpu_status_summary, 'cuda_version', 'unknown')}, "
-                f"package={getattr(gpu_status_summary, 'installed_package', None) or getattr(gpu_status_summary, 'recommended_package', None) or 'auto'})"
-            )
-        else:
-            process_logger.info(f"GPU acceleration disabled: {gpu_reason}")
         
         # Log detected threadpool libraries for debugging
         try:
@@ -406,8 +376,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         
         # Create calculator instance
         calculator = _create_calculator_instance(
-            calculation_method, parameters, calc_dir, calculator_classes, process_logger,
-            use_gpu=use_gpu
+            calculation_method, parameters, calc_dir, calculator_classes, process_logger
         )
 
         # Parse XYZ and setup calculation

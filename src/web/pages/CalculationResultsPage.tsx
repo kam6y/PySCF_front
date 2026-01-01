@@ -212,7 +212,6 @@ export const CalculationResultsPage = ({
   }
 
   const { results, parameters } = processedData;
-  const gpuAcceleration = results.gpu_acceleration_enabled;
   const completedAt = activeCalculation.updatedAt;
 
   return (
@@ -237,16 +236,6 @@ export const CalculationResultsPage = ({
                   <span className={styles.label}>Calculation Method:</span>
                   <span className={styles.value}>
                     {parameters.calculation_method}
-                  </span>
-                </div>
-                <div className={styles.infoRow}>
-                  <span className={styles.label}>Compute Backend:</span>
-                  <span className={styles.value}>
-                    {gpuAcceleration === undefined
-                      ? 'N/A'
-                      : gpuAcceleration
-                      ? 'GPU (gpu4pyscf)'
-                      : 'CPU'}
                   </span>
                 </div>
                 <div className={styles.infoRow}>

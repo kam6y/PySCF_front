@@ -14,7 +14,6 @@ from .process_manager import CalculationProcessManager, get_process_manager, ini
 from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
 from .supported_parameters import get_all_supported_parameters
 from .settings_manager import SettingsManager, get_settings_manager, get_current_settings, update_app_settings
-from .gpu_manager import GPUManager, get_gpu_manager
 
 __all__ = [
     'BaseCalculator',
@@ -47,7 +46,5 @@ __all__ = [
     'SettingsManager',
     'get_settings_manager',
     'get_current_settings',
-    'update_app_settings',
-    'GPUManager',
-    'get_gpu_manager'
+    'update_app_settings'
 ]

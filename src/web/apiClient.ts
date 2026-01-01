@@ -61,13 +61,6 @@ type UpdateChatSessionRequest =
 // Settings API types
 type AppSettings = components['schemas']['AppSettings'];
 type SettingsResponse = components['schemas']['SettingsResponse'];
-type GpuStatusResponse = components['schemas']['GpuStatusResponse'];
-type GpuInstallRequest = components['schemas']['GpuInstallRequest'];
-type GpuStatus = components['schemas']['GpuStatus'];
-type GpuInstallJobResponse = components['schemas']['GpuInstallJobResponse'];
-type GpuInstallJobListResponse =
-  components['schemas']['GpuInstallJobListResponse'];
-type GpuInstallJob = components['schemas']['GpuInstallJob'];
 
 // System resource API types
 type SystemResourceResponse = components['schemas']['SystemResourceResponse'];
@@ -157,7 +150,7 @@ const request = async <T>(
     if (!response.ok || !apiResponse.success) {
       const errorMessage =
         apiResponse.error ||
-        `HTTP error: ${response.status} ${response.statusText}`;
+        `HTTPエラー: ${response.status} ${response.statusText}`;
 
       throw new ApiError(
         errorMessage,
@@ -473,69 +466,6 @@ export const updateSettings = (
     method: 'PUT',
     body: JSON.stringify(settings),
   });
-};
-
-/**
- * Get GPU status (Linux + NVIDIA detection)
- */
-export const getGpuStatus = (): Promise<GpuStatusResponse['data']> => {
-  return request<GpuStatusResponse['data']>('/api/gpu/status', {
-    method: 'GET',
-  });
-};
-
-/**
- * Enqueue gpu4pyscf install for detected CUDA toolkit
- */
-export const installGpu = (
-  payload: GpuInstallRequest
-): Promise<GpuInstallJob> => {
-  return request<GpuInstallJobResponse['data']>('/api/gpu/install', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }).then(response => response.job);
-};
-
-/**
- * Get gpu4pyscf install job status
- */
-export const getGpuInstallJob = (jobId: string): Promise<GpuInstallJob> => {
-  return request<GpuInstallJobResponse['data']>(`/api/gpu/install/${jobId}`, {
-    method: 'GET',
-  }).then(response => response.job);
-};
-
-/**
- * Cancel gpu4pyscf install job
- */
-export const cancelGpuInstallJob = (jobId: string): Promise<GpuInstallJob> => {
-  return request<GpuInstallJobResponse['data']>(
-    `/api/gpu/install/${jobId}/cancel`,
-    {
-      method: 'POST',
-    }
-  ).then(response => response.job);
-};
-
-/**
- * List recent gpu4pyscf install jobs (newest first)
- */
-export const listGpuInstallJobs = (
-  params?: { status?: string; limit?: number }
-): Promise<GpuInstallJob[]> => {
-  const query = new URLSearchParams();
-  if (params?.status) {
-    query.set('status', params.status);
-  }
-  if (params?.limit) {
-    query.set('limit', params.limit.toString());
-  }
-  const qs = query.toString();
-  const endpoint = `/api/gpu/install/jobs${qs ? `?${qs}` : ''}`;
-
-  return request<GpuInstallJobListResponse['data']>(endpoint, {
-    method: 'GET',
-  }).then(response => response.jobs);
 };
 
 /**

@@ -18,12 +18,12 @@ logger = logging.getLogger(__name__)
 class TDDFTCalculator(BaseCalculator):
     """TDDFT calculator using PySCF for excited state calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False, use_gpu: bool = False):
+    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
         self.file_manager = CalculationFileManager()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry, use_gpu)
+        super().__init__(working_dir, optimize_geometry)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[dft.RKS] = None  # Can be either RKS or UKS
         self.mytd: Optional[tddft.TDDFT] = None
@@ -85,26 +85,13 @@ class TDDFTCalculator(BaseCalculator):
         logger.info("Starting TDDFT calculation...")
         nstates = getattr(self, 'tddft_nstates', 10)
         tddft_method = getattr(self, 'tddft_method', 'TDDFT')
-
-        if self.use_gpu:
-            from quantum_calc.gpu_manager import get_gpu_manager
-
-            gpu_manager = get_gpu_manager()
-            td_gpu, error = gpu_manager.try_create_gpu_tddft(self.mf, tddft_method)
-            if td_gpu is not None:
-                self.mytd = td_gpu
-                logger.info("Using gpu4pyscf TDDFT backend")
-            else:
-                logger.warning(f"Falling back to CPU TDDFT backend: {error}")
-                self.use_gpu = False
-
-        if self.mytd is None:
-            if tddft_method == 'TDA':
-                # Tamm-Dancoff approximation
-                self.mytd = tdscf.TDA(self.mf)
-            else:
-                # Full TDDFT
-                self.mytd = tddft.TDDFT(self.mf)
+        
+        if tddft_method == 'TDA':
+            # Tamm-Dancoff approximation
+            self.mytd = tdscf.TDA(self.mf)
+        else:
+            # Full TDDFT
+            self.mytd = tddft.TDDFT(self.mf)
         
         self.mytd.nstates = nstates
         
@@ -181,18 +168,6 @@ class TDDFTCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create DFT method object for TDDFT ground state (RKS/UKS)."""
         spin = self.results.get('spin', 0)
-
-        if self.use_gpu:
-            from quantum_calc.gpu_manager import get_gpu_manager
-
-            gpu_manager = get_gpu_manager()
-            mf_gpu, error = gpu_manager.try_create_gpu_dft(self.mol, spin, self.xc_functional)
-            if mf_gpu is not None:
-                logger.info("Using gpu4pyscf DFT backend for TDDFT ground state")
-                return mf_gpu
-
-            logger.warning(f"Falling back to CPU TDDFT ground state: {error}")
-            self.use_gpu = False
         
         if spin == 0:
             mf = dft.RKS(mol)

@@ -42,9 +42,6 @@ TREE_IGNORE="node_modules|dist|build|out|release|python_dist|__pycache__|.pytest
         ! -path "*/.serena/*" \
         ! -path "*/.git/*" \
         ! -path "*/conda_env/*" \
-        ! -name "*.DS_Store" \
-        ! -name "*.log" \
-        ! -name "*/htmlcov" \
         | sort
     fi
   fi

@@ -1,22 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppSettings } from '../hooks';
-import { TIMEZONE_GROUPS, getTimezoneLabel } from '../utils/dateFormatter';
-import type { components } from '../types/generated-api';
 import {
-  cancelGpuInstallJob,
-  getGpuInstallJob,
-  getGpuStatus,
-  installGpu,
-  listGpuInstallJobs,
-} from '../apiClient';
+  TIMEZONE_LABELS,
+  TIMEZONE_GROUPS,
+  getTimezoneLabel,
+} from '../utils/dateFormatter';
+import type { components } from '../types/generated-api';
 import styles from './SettingsPage.module.css';
 
 // Type for timezone from generated API types
 type Timezone = components['schemas']['AppSettings']['timezone'];
-type GpuStatus = components['schemas']['GpuStatus'];
-type GpuInstallRequest = components['schemas']['GpuInstallRequest'];
-type GpuInstallJob = components['schemas']['GpuInstallJob'];
 
 // Default values constants
 const DEFAULT_MAX_PARALLEL_INSTANCES = 4;
@@ -41,14 +34,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [calculationsDirectory, setCalculationsDirectory] =
     useState<string>('');
   const [timezone, setTimezone] = useState<Timezone>('UTC');
-  const [gpuEnabled, setGpuEnabled] = useState<boolean>(false);
-  const [gpuPreferredPackage, setGpuPreferredPackage] = useState<string>('');
-  const [activeInstallJobId, setActiveInstallJobId] = useState<string | null>(
-    null
-  );
-  const [lastInstallJob, setLastInstallJob] = useState<GpuInstallJob | null>(
-    null
-  );
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
@@ -57,83 +42,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     geminiApiKey?: string;
     calculationsDirectory?: string;
     timezone?: Timezone;
-    gpuEnabled?: boolean;
-    gpuPreferredPackage?: string;
   }>({});
 
-  const {
-    settings,
-    isLoading,
-    isUpdating,
-    error,
-    updateSettingsAsync,
-    refetch: refetchSettings,
-  } = useAppSettings();
-
-  const isMacOS = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    return /Macintosh|Mac OS X/.test(navigator.userAgent);
-  }, []);
-
-  const {
-    data: gpuStatusData,
-    isFetching: isFetchingGpuStatus,
-    refetch: refetchGpuStatus,
-    error: gpuStatusError,
-  } = useQuery<GpuStatus>({
-    queryKey: ['gpu-status'],
-    queryFn: () => getGpuStatus().then(response => response.status),
-    refetchOnWindowFocus: false,
-  });
-
-  const {
-    data: installJobData,
-  } = useQuery<GpuInstallJob>({
-    queryKey: ['gpu-install-job', activeInstallJobId],
-    queryFn: () => getGpuInstallJob(activeInstallJobId!),
-    enabled: !!activeInstallJobId,
-    refetchOnWindowFocus: false,
-    refetchInterval: activeInstallJobId ? 2000 : false,
-  });
-
-  const {
-    data: installJobList,
-    refetch: refetchInstallJobList,
-    isFetching: isFetchingInstallJobList,
-    error: installJobListError,
-  } = useQuery<GpuInstallJob[]>({
-    queryKey: ['gpu-install-jobs'],
-    queryFn: () => listGpuInstallJobs(),
-    refetchOnWindowFocus: false,
-    refetchInterval: activeInstallJobId ? false : 10000,
-  });
-
-  const installGpuMutation = useMutation<GpuInstallJob, unknown, GpuInstallRequest>({
-    mutationFn: (payload: GpuInstallRequest) => installGpu(payload),
-    onSuccess: async job => {
-      setActiveInstallJobId(job.job_id);
-      setLastInstallJob(job);
-      await refetchInstallJobList();
-      await refetchGpuStatus();
-    },
-    onError: error => {
-      console.error('Failed to install gpu4pyscf:', error);
-    },
-  });
-
-  const cancelInstallJobMutation = useMutation<GpuInstallJob, unknown, string>({
-    mutationFn: (jobId: string) => cancelGpuInstallJob(jobId),
-    onSuccess: async job => {
-      setLastInstallJob(job);
-      setActiveInstallJobId(null);
-      await refetchGpuStatus();
-      await refetchSettings();
-      await refetchInstallJobList();
-    },
-    onError: error => {
-      console.error('Failed to cancel gpu4pyscf install job:', error);
-    },
-  });
+  const { settings, isLoading, isUpdating, error, updateSettings } =
+    useAppSettings();
 
   // Update local state when settings are loaded
   useEffect(() => {
@@ -160,8 +72,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         geminiApiKey: settings.gemini_api_key || '',
         calculationsDirectory: settings.calculations_directory || '',
         timezone: settings.timezone || 'UTC',
-        gpuEnabled: settings.gpu_acceleration_enabled ?? false,
-        gpuPreferredPackage: settings.gpu_preferred_package || '',
       };
 
       if (process.env.NODE_ENV === 'development') {
@@ -174,8 +84,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setGeminiApiKey(newValues.geminiApiKey);
       setCalculationsDirectory(newValues.calculationsDirectory);
       setTimezone(newValues.timezone);
-      setGpuEnabled(newValues.gpuEnabled);
-      setGpuPreferredPackage(newValues.gpuPreferredPackage);
       setOriginalValues(newValues);
 
       if (process.env.NODE_ENV === 'development') {
@@ -186,59 +94,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     }
   }, [settings]);
 
-  useEffect(() => {
-    if (installJobData) {
-      setLastInstallJob(installJobData);
-      const status = installJobData.status;
-      const isTerminal =
-        status === 'succeeded' ||
-        status === 'failed' ||
-        status === 'canceled';
-
-      if (isTerminal) {
-        setActiveInstallJobId(null);
-        const result = installJobData.result_status;
-        if (result?.status === 'ready') {
-          setGpuEnabled(true);
-          setGpuPreferredPackage(
-            result.installed_package || result.recommended_package || ''
-          );
-        }
-        refetchGpuStatus();
-        refetchSettings();
-        refetchInstallJobList();
-      }
-    }
-  }, [installJobData, refetchGpuStatus, refetchSettings, refetchInstallJobList]);
-
-  useEffect(() => {
-    if (!installJobList || installJobList.length === 0) {
-      setLastInstallJob(null);
-      if (activeInstallJobId) {
-        setActiveInstallJobId(null);
-      }
-      return;
-    }
-
-    const inProgress = installJobList.find(
-      job => job.status === 'queued' || job.status === 'running'
-    );
-    const newest = installJobList[0];
-
-    setLastInstallJob(inProgress || newest);
-
-    const activeJobExists = activeInstallJobId
-      ? installJobList.some(job => job.job_id === activeInstallJobId)
-      : false;
-
-    if (!activeJobExists && inProgress) {
-      setActiveInstallJobId(inProgress.job_id);
-    }
-  }, [installJobList, activeInstallJobId]);
-
   const handleSave = async () => {
     try {
-      const payload = {
+      updateSettings({
         max_parallel_instances:
           maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
         max_cpu_utilization_percent:
@@ -250,10 +108,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         calculations_directory: calculationsDirectory,
         timezone: timezone,
         gemini_api_key: geminiApiKey || null,
-        gpu_acceleration_enabled: gpuEnabled,
-        gpu_preferred_package: gpuPreferredPackage || null,
-      };
-      await updateSettingsAsync(payload);
+      });
 
       const newValues = {
         maxParallelInstances,
@@ -262,8 +117,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         geminiApiKey,
         calculationsDirectory,
         timezone,
-        gpuEnabled,
-        gpuPreferredPackage,
       };
       setOriginalValues(newValues);
     } catch (error) {
@@ -275,8 +128,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setGeminiApiKey(originalValues.geminiApiKey || '');
       setCalculationsDirectory(originalValues.calculationsDirectory || '');
       setTimezone(originalValues.timezone || 'UTC');
-      setGpuEnabled(originalValues.gpuEnabled ?? false);
-      setGpuPreferredPackage(originalValues.gpuPreferredPackage || '');
     }
   };
 
@@ -287,8 +138,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setGeminiApiKey(originalValues.geminiApiKey || '');
     setCalculationsDirectory(originalValues.calculationsDirectory || '');
     setTimezone(originalValues.timezone || 'UTC');
-    setGpuEnabled(originalValues.gpuEnabled ?? false);
-    setGpuPreferredPackage(originalValues.gpuPreferredPackage || '');
   };
 
   const handleSelectFolder = async () => {
@@ -307,139 +156,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     }
   };
 
-  const handleInstallGpu = () => {
-    const packageName =
-      gpuPreferredPackage ||
-      gpuStatusData?.recommended_package ||
-      'gpu4pyscf';
-
-    installGpuMutation.mutate({
-      package: packageName,
-      enable_gpu: true,
-    });
-  };
-
-  const handleCancelInstall = () => {
-    if (!activeInstallJobId) return;
-    cancelInstallJobMutation.mutate(activeInstallJobId);
-  };
-
-  const gpuStatus = gpuStatusData;
-  const gpuStatusReady = gpuStatus?.status === 'ready';
-  const canInstallGpu =
-    !!gpuStatus &&
-    gpuStatus.gpu_supported_platform &&
-    gpuStatus.has_nvidia_gpu;
-  const currentInstallJob = installJobData || lastInstallJob;
-  const installJobStatus = currentInstallJob?.status;
-  const installJobInProgress =
-    installJobStatus === 'queued' || installJobStatus === 'running';
-  const gpuStatusLabel = useMemo(() => {
-    if (isFetchingGpuStatus) {
-      return 'Checking status...';
-    }
-    if (!gpuStatus) {
-      return 'Not fetched';
-    }
-    switch (gpuStatus.status) {
-      case 'ready':
-        return 'Ready';
-      case 'not_installed':
-        return 'gpu4pyscf not installed';
-      case 'missing_cuda':
-        return 'CUDA not detected';
-      case 'missing_gpu':
-        return 'GPU not detected';
-      case 'unsupported_platform':
-        return 'Linux only';
-      default:
-        return 'GPU error';
-    }
-  }, [gpuStatus, isFetchingGpuStatus]);
-
-  const gpuBadgeClass = useMemo(() => {
-    const base = styles.statusBadge;
-    if (!gpuStatus || isFetchingGpuStatus) {
-      return base;
-    }
-    if (gpuStatus.status === 'ready') {
-      return `${base} ${styles.statusReady}`;
-    }
-    if (
-      gpuStatus.status === 'not_installed' ||
-      gpuStatus.status === 'missing_cuda' ||
-      gpuStatus.status === 'missing_gpu' ||
-      gpuStatus.status === 'unsupported_platform'
-    ) {
-      return `${base} ${styles.statusWarning}`;
-    }
-    return `${base} ${styles.statusError}`;
-  }, [gpuStatus, isFetchingGpuStatus]);
-
-  const installJobStatusLabel = useMemo(() => {
-    if (!currentInstallJob) return null;
-    switch (currentInstallJob.status) {
-      case 'queued':
-        return 'Queued';
-      case 'running':
-        return 'Installing';
-      case 'succeeded':
-        return 'Completed';
-      case 'failed':
-        return 'Failed';
-      case 'canceled':
-        return 'Canceled';
-      default:
-        return currentInstallJob.status;
-    }
-  }, [currentInstallJob]);
-
-  const recommendedPackage =
-    gpuStatus?.recommended_package ||
-    currentInstallJob?.result_status?.recommended_package ||
-    gpuPreferredPackage ||
-    'gpu4pyscf';
-  const detectedGpuNames =
-    gpuStatus?.detected_gpus
-      ?.map(gpu => gpu?.name)
-      .filter(Boolean)
-      .join(', ') || 'Not detected';
-  const gpuMessage =
-    gpuStatus?.message ||
-    'On Linux with an NVIDIA GPU, install the gpu4pyscf package that matches your CUDA version to use it.';
-  const gpuErrorText = useMemo(() => {
-    if (gpuStatusError) {
-      if (gpuStatusError instanceof Error) return gpuStatusError.message;
-      if (typeof gpuStatusError === 'string') return gpuStatusError;
-    }
-    if (installGpuMutation.error) {
-      if (installGpuMutation.error instanceof Error)
-        return installGpuMutation.error.message;
-      if (typeof installGpuMutation.error === 'string')
-        return installGpuMutation.error;
-    }
-    if (installJobListError) {
-      if (installJobListError instanceof Error) return installJobListError.message;
-      if (typeof installJobListError === 'string') return installJobListError;
-    }
-    if (cancelInstallJobMutation.error) {
-      if (cancelInstallJobMutation.error instanceof Error)
-        return cancelInstallJobMutation.error.message;
-      if (typeof cancelInstallJobMutation.error === 'string')
-        return cancelInstallJobMutation.error;
-    }
-    if (currentInstallJob?.error) {
-      return currentInstallJob.error;
-    }
-    return null;
-  }, [
-    gpuStatusError,
-    installGpuMutation.error,
-    installJobListError,
-    cancelInstallJobMutation.error,
-    currentInstallJob?.error,
-  ]);
-
   const hasUnsavedChanges = useMemo(() => {
     // Return false if settings haven't been loaded yet
     if (!originalValues || Object.keys(originalValues).length === 0) {
@@ -455,8 +171,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const currentGeminiApiKey = geminiApiKey;
     const currentCalculationsDirectory = calculationsDirectory;
     const currentTimezone = timezone;
-    const currentGpuEnabled = gpuEnabled;
-    const currentGpuPreferred = gpuPreferredPackage;
 
     const originalParallel =
       originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
@@ -468,8 +182,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const originalCalculationsDirectory =
       originalValues.calculationsDirectory || '';
     const originalTimezone = originalValues.timezone || 'UTC';
-    const originalGpuEnabled = originalValues.gpuEnabled ?? false;
-    const originalGpuPreferred = originalValues.gpuPreferredPackage || '';
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
@@ -478,8 +190,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const calculationsDirectoryChanged =
       currentCalculationsDirectory !== originalCalculationsDirectory;
     const timezoneChanged = currentTimezone !== originalTimezone;
-    const gpuEnabledChanged = currentGpuEnabled !== originalGpuEnabled;
-    const gpuPreferredChanged = currentGpuPreferred !== originalGpuPreferred;
 
     const hasChanges =
       parallelChanged ||
@@ -487,9 +197,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       memoryChanged ||
       geminiApiKeyChanged ||
       calculationsDirectoryChanged ||
-      timezoneChanged ||
-      gpuEnabledChanged ||
-      gpuPreferredChanged;
+      timezoneChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
@@ -524,16 +232,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     geminiApiKey,
     calculationsDirectory,
     timezone,
-    gpuEnabled,
-    gpuPreferredPackage,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
     originalValues?.maxMemoryUtilization,
     originalValues?.geminiApiKey,
     originalValues?.calculationsDirectory,
     originalValues?.timezone,
-    originalValues?.gpuEnabled,
-    originalValues?.gpuPreferredPackage,
   ]);
 
   if (isLoading) {
@@ -778,150 +482,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </div>
           )}
-        </div>
-
-        <div className={styles.settingsSection}>
-          <h3>GPU Acceleration (Linux + NVIDIA)</h3>
-
-          <div className={styles.settingItem}>
-            <div className={styles.settingLabel}>
-              <label>GPU computations with gpu4pyscf</label>
-              <p className={styles.settingHelp}>
-                On Linux, install the gpu4pyscf package matching your CUDA version to accelerate HF/DFT/TDDFT calculations on NVIDIA GPUs.
-              </p>
-            </div>
-
-            <div className={styles.settingControl}>
-              {isMacOS ? (
-                <>
-                  <div className={styles.gpuStatusRow}>
-                    <span className={`${styles.statusBadge} ${styles.statusWarning}`}>
-                      Linux only
-                    </span>
-                  </div>
-                  <p className={styles.settingHelp}>
-                    GPU acceleration is supported only on Linux.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className={styles.gpuStatusRow}>
-                    <span className={gpuBadgeClass}>{gpuStatusLabel}</span>
-                    <div className={styles.gpuButtons}>
-                      <button
-                        onClick={() => {
-                          refetchGpuStatus();
-                          refetchInstallJobList();
-                        }}
-                        className={styles.refreshButton}
-                        disabled={isFetchingGpuStatus || isFetchingInstallJobList}
-                      >
-                        {isFetchingGpuStatus || isFetchingInstallJobList
-                          ? 'Rescanning...'
-                          : 'Rescan status'}
-                      </button>
-                      <button
-                        onClick={handleInstallGpu}
-                        className={styles.installGpuButton}
-                        disabled={
-                          installGpuMutation.isPending ||
-                          !canInstallGpu ||
-                          isFetchingGpuStatus ||
-                          installJobInProgress
-                        }
-                      >
-                        {installGpuMutation.isPending
-                          ? 'Submitting job...'
-                          : installJobInProgress
-                          ? 'Installation in progress'
-                          : 'Install recommended gpu4pyscf and enable'}
-                      </button>
-                      {installJobInProgress && (
-                        <button
-                          onClick={handleCancelInstall}
-                          className={styles.cancelInstallButton}
-                          disabled={cancelInstallJobMutation.isPending}
-                        >
-                          {cancelInstallJobMutation.isPending
-                            ? 'Canceling...'
-                            : 'Cancel installation'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {currentInstallJob && (
-                    <p className={styles.settingHelp}>
-                      Install job {currentInstallJob.job_id} :{' '}
-                      {installJobStatusLabel || 'Fetching status'}
-                    </p>
-                  )}
-
-                  <p className={styles.settingHelp}>{gpuMessage}</p>
-
-                  {gpuErrorText && (
-                    <div className={styles.warningBox}>
-                      <span className={styles.warningIcon}>⚠</span>
-                      <span className={styles.warningText}>{gpuErrorText}</span>
-                    </div>
-                  )}
-
-                  <div className={styles.gpuDetailGrid}>
-                    <div className={styles.gpuDetailItem}>
-                      <div className={styles.infoLabel}>CUDA version</div>
-                      <div className={styles.infoValue}>
-                        {gpuStatus?.cuda_version || 'Not detected'}
-                      </div>
-                    </div>
-                    <div className={styles.gpuDetailItem}>
-                      <div className={styles.infoLabel}>Driver</div>
-                      <div className={styles.infoValue}>
-                        {gpuStatus?.driver_version || 'Not detected'}
-                      </div>
-                    </div>
-                    <div className={styles.gpuDetailItem}>
-                      <div className={styles.infoLabel}>GPU</div>
-                      <div className={styles.infoValue}>{detectedGpuNames}</div>
-                    </div>
-                    <div className={styles.gpuDetailItem}>
-                      <div className={styles.infoLabel}>Recommended package</div>
-                      <div className={styles.infoValue}>{recommendedPackage}</div>
-                    </div>
-                    <div className={styles.gpuDetailItem}>
-                      <div className={styles.infoLabel}>Installed</div>
-                      <div className={styles.infoValue}>
-                        {gpuStatus?.installed_package || 'Not installed'}
-                      </div>
-                    </div>
-                    <div className={styles.gpuDetailItem}>
-                      <div className={styles.infoLabel}>Configured package</div>
-                      <div className={styles.infoValue}>
-                        {gpuPreferredPackage || 'Not configured'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.checkboxRow}>
-                    <input
-                      id="gpuEnabled"
-                      type="checkbox"
-                      checked={gpuEnabled}
-                      disabled={!gpuStatusReady && !gpuEnabled}
-                      onChange={e => setGpuEnabled(e.target.checked)}
-                    />
-                    <label htmlFor="gpuEnabled">
-                      Use GPU acceleration for HF/DFT/TDDFT (Linux only)
-                    </label>
-                  </div>
-                  <p className={styles.settingHelp}>
-                    {gpuStatusReady
-                      ? 'Saving will run HF/DFT/TDDFT calculations through gpu4pyscf.'
-                      : 'Available when Linux + NVIDIA GPU + CUDA are detected.'}
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
         </div>
 
         <div className={styles.settingsSection}>
