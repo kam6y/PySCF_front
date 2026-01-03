@@ -286,10 +286,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       return null;
     }
 
-    if (!gpuStatus.is_linux) {
-      return 'GPU4PySCF is supported on Linux only.';
-    }
-
     if (!gpuStatus.cuda_detected) {
       const detail = gpuStatus.cuda_detection_message
         ? ` (${gpuStatus.cuda_detection_message})`
@@ -601,83 +597,87 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                         {gpuStatus?.is_linux ? 'Linux' : 'Unsupported'}
                       </span>
                     </div>
-                    <div className={styles.gpuStatusItem}>
-                      <span className={styles.infoLabel}>CUDA Toolkit</span>
-                      <span className={styles.infoValue}>
-                        {gpuStatus?.cuda_version
-                          ? `CUDA ${gpuStatus.cuda_version}`
-                          : 'Not detected'}
-                      </span>
-                    </div>
-                    <div className={styles.gpuStatusItem}>
-                      <span className={styles.infoLabel}>CUDA Support</span>
-                      <span
-                        className={`${styles.gpuStatusBadge} ${
-                          gpuStatus?.cuda_supported
-                            ? styles.gpuStatusBadgeSuccess
-                            : styles.gpuStatusBadgeWarning
-                        }`}
-                      >
-                        {gpuStatus?.cuda_supported
-                          ? 'Supported'
-                          : 'Unsupported'}
-                      </span>
-                    </div>
-                    <div className={styles.gpuStatusItem}>
-                      <span className={styles.infoLabel}>GPU4PySCF</span>
-                      <span
-                        className={`${styles.gpuStatusBadge} ${
-                          gpuStatus?.gpu4pyscf_installed
-                            ? styles.gpuStatusBadgeSuccess
-                            : styles.gpuStatusBadgeWarning
-                        }`}
-                      >
-                        {gpuStatus?.gpu4pyscf_installed
-                          ? `Installed${gpuStatus.gpu4pyscf_version ? ` v${gpuStatus.gpu4pyscf_version}` : ''}`
-                          : 'Not installed'}
-                      </span>
-                    </div>
-                    <div className={styles.gpuStatusItem}>
-                      <span className={styles.infoLabel}>cuTENSOR</span>
-                      <span
-                        className={`${styles.gpuStatusBadge} ${
-                          gpuStatus?.cutensor_installed
-                            ? styles.gpuStatusBadgeSuccess
-                            : styles.gpuStatusBadgeWarning
-                        }`}
-                      >
-                        {gpuStatus?.cutensor_installed
-                          ? `Installed${gpuStatus.cutensor_version ? ` v${gpuStatus.cutensor_version}` : ''}`
-                          : 'Not installed'}
-                      </span>
-                    </div>
-                    <div className={styles.gpuStatusItem}>
-                      <span className={styles.infoLabel}>Recommended</span>
-                      <span className={styles.gpuPackageValue}>
-                        {gpuStatus?.recommended_gpu4pyscf_package ? (
-                          <>
-                            <code>
-                              {gpuStatus.recommended_gpu4pyscf_package}
-                            </code>
-                            {gpuStatus.recommended_cutensor_package && (
+                    {gpuStatus?.is_linux && (
+                      <>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>CUDA Toolkit</span>
+                          <span className={styles.infoValue}>
+                            {gpuStatus?.cuda_version
+                              ? `CUDA ${gpuStatus.cuda_version}`
+                              : 'Not detected'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>CUDA Support</span>
+                          <span
+                            className={`${styles.gpuStatusBadge} ${
+                              gpuStatus?.cuda_supported
+                                ? styles.gpuStatusBadgeSuccess
+                                : styles.gpuStatusBadgeWarning
+                            }`}
+                          >
+                            {gpuStatus?.cuda_supported
+                              ? 'Supported'
+                              : 'Unsupported'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>GPU4PySCF</span>
+                          <span
+                            className={`${styles.gpuStatusBadge} ${
+                              gpuStatus?.gpu4pyscf_installed
+                                ? styles.gpuStatusBadgeSuccess
+                                : styles.gpuStatusBadgeWarning
+                            }`}
+                          >
+                            {gpuStatus?.gpu4pyscf_installed
+                              ? `Installed${gpuStatus.gpu4pyscf_version ? ` v${gpuStatus.gpu4pyscf_version}` : ''}`
+                              : 'Not installed'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>cuTENSOR</span>
+                          <span
+                            className={`${styles.gpuStatusBadge} ${
+                              gpuStatus?.cutensor_installed
+                                ? styles.gpuStatusBadgeSuccess
+                                : styles.gpuStatusBadgeWarning
+                            }`}
+                          >
+                            {gpuStatus?.cutensor_installed
+                              ? `Installed${gpuStatus.cutensor_version ? ` v${gpuStatus.cutensor_version}` : ''}`
+                              : 'Not installed'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>Recommended</span>
+                          <span className={styles.gpuPackageValue}>
+                            {gpuStatus?.recommended_gpu4pyscf_package ? (
                               <>
-                                <span className={styles.gpuPackageDivider}>
-                                  +
-                                </span>
                                 <code>
-                                  {gpuStatus.recommended_cutensor_package}
+                                  {gpuStatus.recommended_gpu4pyscf_package}
                                 </code>
+                                {gpuStatus.recommended_cutensor_package && (
+                                  <>
+                                    <span className={styles.gpuPackageDivider}>
+                                      +
+                                    </span>
+                                    <code>
+                                      {gpuStatus.recommended_cutensor_package}
+                                    </code>
+                                  </>
+                                )}
                               </>
+                            ) : (
+                              'Not available'
                             )}
-                          </>
-                        ) : (
-                          'Not available'
-                        )}
-                      </span>
-                    </div>
+                          </span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {gpuStatusMessage && (
+                  {gpuStatus?.is_linux && gpuStatusMessage && (
                     <div className={styles.gpuNotice}>{gpuStatusMessage}</div>
                   )}
 

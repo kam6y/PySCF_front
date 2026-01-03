@@ -33,6 +33,7 @@
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
+    "my-review": "bash scripts/my-review.sh",
     "test:build": "npm run build && echo 'Build completed successfully. Testing packaged app...'",
     "test:python-build": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && cd src/python && echo \"Testing Python build...\" && python -c \"import app; print(\\\"Python app imports successfully\\\")\"'",
     "test:run-packaged": "npm run build && npm run package && echo 'Package created. Check dist/ directory for distributable files.'",

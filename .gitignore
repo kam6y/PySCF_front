@@ -73,6 +73,7 @@ htmlcov/
 # IDE and Editor configuration
 # IDEやエディタの設定ファイル
 # -----------------------------------------------------------------------------
+AGENTS.md
 .idea/
 .vscode/
 .claude/
