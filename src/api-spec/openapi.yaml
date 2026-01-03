@@ -788,6 +788,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/system/gpu4pyscf-status:
+    get:
+      summary: Get GPU4PySCF status
+      description: Detect CUDA version and GPU4PySCF installation status (Linux only)
+      operationId: getGpu4PyscfStatus
+      responses:
+        '200':
+          description: GPU4PySCF status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gpu4PyscfStatusResponse'
+        '500':
+          description: Failed to retrieve GPU4PySCF status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/system/gpu4pyscf-install:
+    post:
+      summary: Install GPU4PySCF
+      description: Install GPU4PySCF and recommended cuTENSOR for detected CUDA version (Linux only)
+      operationId: installGpu4Pyscf
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Gpu4PyscfInstallRequest'
+      responses:
+        '200':
+          description: GPU4PySCF installed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gpu4PyscfInstallResponse'
+        '403':
+          description: GPU4PySCF installation is only available from the local machine
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid installation request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to install GPU4PySCF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/chat-history/sessions:
     get:
       summary: Get all chat sessions
@@ -1573,6 +1629,9 @@ components:
         converged:
           type: boolean
           description: Whether calculation converged
+        gpu_enabled:
+          type: boolean
+          description: Whether GPU acceleration was used for this calculation
         homo_index:
           type: integer
           description: HOMO orbital index
@@ -2449,6 +2508,11 @@ components:
           maximum: 100.0
           description: Maximum memory utilization percentage for the system
           example: 95.0
+        gpu_acceleration_enabled:
+          type: boolean
+          default: false
+          description: Whether GPU acceleration is enabled for calculations (Linux only)
+          example: false
         system_total_cores:
           type: integer
           minimum: 1
@@ -2636,6 +2700,120 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/SystemResourceSummary'
+
+    Gpu4PyscfStatus:
+      type: object
+      required:
+        - is_linux
+        - cuda_detected
+        - cuda_supported
+        - gpu4pyscf_installed
+        - cutensor_installed
+      properties:
+        is_linux:
+          type: boolean
+          description: Whether the application is running on Linux
+        cuda_detected:
+          type: boolean
+          description: Whether CUDA Toolkit was detected via nvcc
+        cuda_version:
+          type: string
+          nullable: true
+          description: Detected CUDA Toolkit version (major.minor)
+          example: '12.4'
+        cuda_major:
+          type: integer
+          nullable: true
+          description: Detected CUDA major version
+          example: 12
+        cuda_minor:
+          type: integer
+          nullable: true
+          description: Detected CUDA minor version
+          example: 4
+        cuda_supported:
+          type: boolean
+          description: Whether detected CUDA version is supported by GPU4PySCF
+        cuda_detection_message:
+          type: string
+          nullable: true
+          description: Additional message for CUDA detection failures or warnings
+        recommended_gpu4pyscf_package:
+          type: string
+          nullable: true
+          description: Recommended GPU4PySCF package for the detected CUDA version
+          example: gpu4pyscf-cuda12x
+        recommended_cutensor_package:
+          type: string
+          nullable: true
+          description: Recommended cuTENSOR package for the detected CUDA version
+          example: cutensor-cu12
+        gpu4pyscf_installed:
+          type: boolean
+          description: Whether GPU4PySCF is installed
+        gpu4pyscf_version:
+          type: string
+          nullable: true
+          description: Installed GPU4PySCF version
+        cutensor_installed:
+          type: boolean
+          description: Whether cuTENSOR is installed
+        cutensor_version:
+          type: string
+          nullable: true
+          description: Installed cuTENSOR version
+
+    Gpu4PyscfInstallRequest:
+      type: object
+      properties:
+        include_cutensor:
+          type: boolean
+          description: Whether to install cuTENSOR alongside GPU4PySCF
+          default: true
+        force_reinstall:
+          type: boolean
+          description: Force reinstall of GPU4PySCF and cuTENSOR packages
+          default: false
+
+    Gpu4PyscfInstallResult:
+      type: object
+      required: [status, packages, used_user_site, pip_stdout, pip_stderr]
+      properties:
+        status:
+          $ref: '#/components/schemas/Gpu4PyscfStatus'
+        packages:
+          type: array
+          items:
+            type: string
+        used_user_site:
+          type: boolean
+          description: Whether pip installed into the user site-packages directory
+        pip_stdout:
+          type: string
+          description: Tail of pip stdout output
+        pip_stderr:
+          type: string
+          description: Tail of pip stderr output
+
+    Gpu4PyscfStatusResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Gpu4PyscfStatus'
+
+    Gpu4PyscfInstallResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Gpu4PyscfInstallResult'
 
     IRSpectrumResponse:
       type: object

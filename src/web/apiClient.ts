@@ -65,6 +65,10 @@ type SettingsResponse = components['schemas']['SettingsResponse'];
 // System resource API types
 type SystemResourceResponse = components['schemas']['SystemResourceResponse'];
 type SystemResourceSummary = components['schemas']['SystemResourceSummary'];
+type Gpu4PyscfStatusResponse = components['schemas']['Gpu4PyscfStatusResponse'];
+type Gpu4PyscfInstallResponse =
+  components['schemas']['Gpu4PyscfInstallResponse'];
+type Gpu4PyscfInstallRequest = components['schemas']['Gpu4PyscfInstallRequest'];
 
 type ApiResponse<T> = {
   success: boolean;
@@ -475,6 +479,35 @@ export const getSystemResourceStatus = (): Promise<SystemResourceResponse> => {
   return request<SystemResourceResponse>('/api/system/resource-status', {
     method: 'GET',
   });
+};
+
+/**
+ * Get CUDA detection and GPU4PySCF installation status
+ */
+export const getGpu4PyscfStatus = (): Promise<
+  Gpu4PyscfStatusResponse['data']
+> => {
+  return request<Gpu4PyscfStatusResponse['data']>(
+    '/api/system/gpu4pyscf-status',
+    { method: 'GET' }
+  );
+};
+
+/**
+ * Install GPU4PySCF for the detected CUDA version
+ */
+export const installGpu4Pyscf = (
+  payload?: Gpu4PyscfInstallRequest
+): Promise<Gpu4PyscfInstallResponse['data']> => {
+  const options: RequestInit = { method: 'POST' };
+  if (payload && Object.keys(payload).length > 0) {
+    options.body = JSON.stringify(payload);
+  }
+
+  return request<Gpu4PyscfInstallResponse['data']>(
+    '/api/system/gpu4pyscf-install',
+    options
+  );
 };
 
 /**

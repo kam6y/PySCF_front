@@ -340,6 +340,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/gpu4pyscf-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get GPU4PySCF status
+         * @description Detect CUDA version and GPU4PySCF installation status (Linux only)
+         */
+        get: operations["getGpu4PyscfStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/gpu4pyscf-install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install GPU4PySCF
+         * @description Install GPU4PySCF and recommended cuTENSOR for detected CUDA version (Linux only)
+         */
+        post: operations["installGpu4Pyscf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat-history/sessions": {
         parameters: {
             query?: never;
@@ -823,6 +863,8 @@ export interface components {
             scf_energy?: number;
             /** @description Whether calculation converged */
             converged?: boolean;
+            /** @description Whether GPU acceleration was used for this calculation */
+            gpu_enabled?: boolean;
             /** @description HOMO orbital index */
             homo_index?: number;
             /** @description LUMO orbital index */
@@ -1326,6 +1368,12 @@ export interface components {
              */
             max_memory_utilization_percent: number;
             /**
+             * @description Whether GPU acceleration is enabled for calculations (Linux only)
+             * @default false
+             * @example false
+             */
+            gpu_acceleration_enabled: boolean;
+            /**
              * @description Total number of CPU cores in the system (auto-detected)
              * @example 8
              */
@@ -1462,6 +1510,81 @@ export interface components {
             /** @example true */
             success: boolean;
             data: components["schemas"]["SystemResourceSummary"];
+        };
+        Gpu4PyscfStatus: {
+            /** @description Whether the application is running on Linux */
+            is_linux: boolean;
+            /** @description Whether CUDA Toolkit was detected via nvcc */
+            cuda_detected: boolean;
+            /**
+             * @description Detected CUDA Toolkit version (major.minor)
+             * @example 12.4
+             */
+            cuda_version?: string | null;
+            /**
+             * @description Detected CUDA major version
+             * @example 12
+             */
+            cuda_major?: number | null;
+            /**
+             * @description Detected CUDA minor version
+             * @example 4
+             */
+            cuda_minor?: number | null;
+            /** @description Whether detected CUDA version is supported by GPU4PySCF */
+            cuda_supported: boolean;
+            /** @description Additional message for CUDA detection failures or warnings */
+            cuda_detection_message?: string | null;
+            /**
+             * @description Recommended GPU4PySCF package for the detected CUDA version
+             * @example gpu4pyscf-cuda12x
+             */
+            recommended_gpu4pyscf_package?: string | null;
+            /**
+             * @description Recommended cuTENSOR package for the detected CUDA version
+             * @example cutensor-cu12
+             */
+            recommended_cutensor_package?: string | null;
+            /** @description Whether GPU4PySCF is installed */
+            gpu4pyscf_installed: boolean;
+            /** @description Installed GPU4PySCF version */
+            gpu4pyscf_version?: string | null;
+            /** @description Whether cuTENSOR is installed */
+            cutensor_installed: boolean;
+            /** @description Installed cuTENSOR version */
+            cutensor_version?: string | null;
+        };
+        Gpu4PyscfInstallRequest: {
+            /**
+             * @description Whether to install cuTENSOR alongside GPU4PySCF
+             * @default true
+             */
+            include_cutensor: boolean;
+            /**
+             * @description Force reinstall of GPU4PySCF and cuTENSOR packages
+             * @default false
+             */
+            force_reinstall: boolean;
+        };
+        Gpu4PyscfInstallResult: {
+            status: components["schemas"]["Gpu4PyscfStatus"];
+            packages: string[];
+            /** @description Whether pip installed into the user site-packages directory */
+            used_user_site: boolean;
+            /** @description Tail of pip stdout output */
+            pip_stdout: string;
+            /** @description Tail of pip stderr output */
+            pip_stderr: string;
+        };
+        Gpu4PyscfStatusResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Gpu4PyscfStatus"];
+        };
+        Gpu4PyscfInstallResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Gpu4PyscfInstallResult"];
         };
         IRSpectrumResponse: {
             /** @example true */
@@ -2894,6 +3017,86 @@ export interface operations {
                 };
             };
             /** @description Failed to retrieve system resource status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getGpu4PyscfStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description GPU4PySCF status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Gpu4PyscfStatusResponse"];
+                };
+            };
+            /** @description Failed to retrieve GPU4PySCF status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    installGpu4Pyscf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["Gpu4PyscfInstallRequest"];
+            };
+        };
+        responses: {
+            /** @description GPU4PySCF installed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Gpu4PyscfInstallResponse"];
+                };
+            };
+            /** @description Invalid installation request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description GPU4PySCF installation is only available from the local machine */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to install GPU4PySCF */
             500: {
                 headers: {
                     [name: string]: unknown;

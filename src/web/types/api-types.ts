@@ -55,6 +55,15 @@ export type SupportedParametersResponse =
   components['schemas']['SupportedParametersResponse'];
 export type IRSpectrumResponse = components['schemas']['IRSpectrumResponse'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
+export type Gpu4PyscfStatus = components['schemas']['Gpu4PyscfStatus'];
+export type Gpu4PyscfStatusResponse =
+  components['schemas']['Gpu4PyscfStatusResponse'];
+export type Gpu4PyscfInstallRequest =
+  components['schemas']['Gpu4PyscfInstallRequest'];
+export type Gpu4PyscfInstallResult =
+  components['schemas']['Gpu4PyscfInstallResult'];
+export type Gpu4PyscfInstallResponse =
+  components['schemas']['Gpu4PyscfInstallResponse'];
 
 // Data models
 export type CalculationParameters =
@@ -89,6 +98,8 @@ export type Operations = {
   deleteCubeFiles: operations['deleteCubeFiles'];
   getSupportedParameters: operations['getSupportedParameters'];
   getIRSpectrum: operations['getIRSpectrum'];
+  getGpu4PyscfStatus: operations['getGpu4PyscfStatus'];
+  installGpu4Pyscf: operations['installGpu4Pyscf'];
 };
 
 // Response wrapper for API responses
@@ -115,6 +126,8 @@ export type CubeFilesDeleteResponseData = CubeFilesDeleteResponse['data'];
 export type SupportedParametersResponseData =
   SupportedParametersResponse['data'];
 export type IRSpectrumResponseData = IRSpectrumResponse['data'];
+export type Gpu4PyscfStatusResponseData = Gpu4PyscfStatusResponse['data'];
+export type Gpu4PyscfInstallResponseData = Gpu4PyscfInstallResponse['data'];
 
 // Error handling
 export { ApiError };

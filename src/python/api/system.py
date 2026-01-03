@@ -4,8 +4,9 @@ Handles system resource monitoring and diagnostic information.
 """
 
 import logging
+import ipaddress
 from datetime import datetime
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from services import get_system_service, ServiceError
 from generated_models import SystemResourceSummary, SystemResourceInfo, ResourceConstraints, AllocatedResources
@@ -15,6 +16,20 @@ logger = logging.getLogger(__name__)
 
 # Create system blueprint
 system_bp = Blueprint('system', __name__)
+
+
+def _is_loopback_address(address: str) -> bool:
+    if not address:
+        return False
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        return ip.ipv4_mapped.is_loopback
+    return False
 
 
 @system_bp.route('/api/system/resource-status', methods=['GET'])
@@ -70,6 +85,69 @@ def get_system_resource_status():
         }), e.status_code
     except Exception as e:
         logger.error(f"Failed to retrieve system resource status: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'An internal server error occurred.'
+        }), 500
+
+
+@system_bp.route('/api/system/gpu4pyscf-status', methods=['GET'])
+def get_gpu4pyscf_status():
+    """Get CUDA detection and GPU4PySCF installation status."""
+    try:
+        system_service = get_system_service()
+        status = system_service.get_gpu4pyscf_status()
+        return jsonify({
+            'success': True,
+            'data': status
+        })
+    except ServiceError as e:
+        logger.error(f"Service error retrieving GPU4PySCF status: {e}")
+        return jsonify({
+            'success': False,
+            'error': e.message
+        }), e.status_code
+    except Exception as e:
+        logger.error(f"Failed to retrieve GPU4PySCF status: {e}", exc_info=True)
+        return jsonify({
+            'success': False,
+            'error': 'An internal server error occurred.'
+        }), 500
+
+
+@system_bp.route('/api/system/gpu4pyscf-install', methods=['POST'])
+def install_gpu4pyscf():
+    """Install GPU4PySCF and recommended cuTENSOR for the detected CUDA version."""
+    try:
+        client_address = request.remote_addr
+        if not _is_loopback_address(client_address):
+            logger.warning(
+                f"Blocked non-local GPU4PySCF install request from {client_address}"
+            )
+            return jsonify({
+                'success': False,
+                'error': 'GPU4PySCF installation is only available from the local machine.'
+            }), 403
+        system_service = get_system_service()
+        payload = request.get_json(silent=True) or {}
+        include_cutensor = bool(payload.get('include_cutensor', True))
+        force_reinstall = bool(payload.get('force_reinstall', False))
+        result = system_service.install_gpu4pyscf(
+            include_cutensor=include_cutensor,
+            force_reinstall=force_reinstall
+        )
+        return jsonify({
+            'success': True,
+            'data': result
+        })
+    except ServiceError as e:
+        logger.error(f"Service error installing GPU4PySCF: {e}")
+        return jsonify({
+            'success': False,
+            'error': e.message
+        }), e.status_code
+    except Exception as e:
+        logger.error(f"Failed to install GPU4PySCF: {e}", exc_info=True)
         return jsonify({
             'success': False,
             'error': 'An internal server error occurred.'

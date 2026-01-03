@@ -1,6 +1,6 @@
 // src/web/pages/CalculationSettingsPage.tsx
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 
 import styles from './CalculationSettingsPage.module.css';
 import { MoleculeViewer } from '../components/MoleculeViewer';
@@ -15,6 +15,7 @@ import {
 } from '../types/api-types';
 import { searchPubChem, convertSmilesToXyz } from '../apiClient';
 import { useSupportedParameters } from '../hooks/useCalculationQueries';
+import { useAppSettings, useGpu4PyscfStatus } from '../hooks';
 import { useMethodDefaults } from '../hooks/useMethodDefaults';
 
 // Helper type to extract all keys from a union type
@@ -69,6 +70,12 @@ export const CalculationSettingsPage = ({
   // メソッドデフォルトと制約を取得
   const { applyMethodDefaults, isParameterDisabled, getParameterConstraint } =
     useMethodDefaults();
+
+  const { settings: appSettings } = useAppSettings();
+  const { data: gpuStatus } = useGpu4PyscfStatus();
+  const isGpuAccelerationEnabled =
+    appSettings?.gpu_acceleration_enabled ?? false;
+  const gpuCapableMethods = useMemo(() => new Set(['HF', 'DFT', 'TDDFT']), []);
 
   // Initialize local state when active calculation changes
   useEffect(() => {
@@ -319,6 +326,16 @@ export const CalculationSettingsPage = ({
   }
 
   const { parameters: params, status: calculationStatus } = activeCalculation;
+  const selectedMethod = params.calculation_method || 'DFT';
+  const isGpuCapableMethod = gpuCapableMethods.has(selectedMethod);
+  const isGpuReady =
+    !!gpuStatus &&
+    gpuStatus.is_linux &&
+    gpuStatus.cuda_detected &&
+    gpuStatus.cuda_supported &&
+    gpuStatus.gpu4pyscf_installed;
+  const showCpuSettings =
+    !isGpuAccelerationEnabled || !isGpuCapableMethod || !isGpuReady;
   const xyzInputValue = params.xyz || '';
 
   const handleXYZConvert = async () => {
@@ -464,72 +481,76 @@ export const CalculationSettingsPage = ({
               )}
             </div>
             <div className={styles.computationSettings}>
-              <div className={styles.cpuSetting}>
-                <label>CPU Cores</label>
-                <div className={styles.cpuInputContainer}>
-                  <input
-                    type="number"
-                    value={params.cpu_cores || 1}
-                    onChange={e =>
-                      handleParamChange(
-                        'cpu_cores',
-                        Math.max(1, Number(e.target.value))
-                      )
-                    }
-                    min="1"
-                    max="32"
-                    className={styles.cpuCoresInput}
-                    disabled={calculationStatus === 'running'}
-                  />
-                  <div className={styles.spinnerArrows}>
-                    <button
-                      type="button"
-                      className={`${styles.spinnerBtn} ${styles.up}`}
-                      onClick={() =>
-                        handleParamChange(
-                          'cpu_cores',
-                          Math.min(32, (params.cpu_cores || 1) + 1)
-                        )
-                      }
-                      disabled={calculationStatus === 'running'}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      className={`${styles.spinnerBtn} ${styles.down}`}
-                      onClick={() =>
-                        handleParamChange(
-                          'cpu_cores',
-                          Math.max(1, (params.cpu_cores || 1) - 1)
-                        )
-                      }
-                      disabled={calculationStatus === 'running'}
-                    >
-                      ▼
-                    </button>
+              {showCpuSettings && (
+                <>
+                  <div className={styles.cpuSetting}>
+                    <label>CPU Cores</label>
+                    <div className={styles.cpuInputContainer}>
+                      <input
+                        type="number"
+                        value={params.cpu_cores || 1}
+                        onChange={e =>
+                          handleParamChange(
+                            'cpu_cores',
+                            Math.max(1, Number(e.target.value))
+                          )
+                        }
+                        min="1"
+                        max="32"
+                        className={styles.cpuCoresInput}
+                        disabled={calculationStatus === 'running'}
+                      />
+                      <div className={styles.spinnerArrows}>
+                        <button
+                          type="button"
+                          className={`${styles.spinnerBtn} ${styles.up}`}
+                          onClick={() =>
+                            handleParamChange(
+                              'cpu_cores',
+                              Math.min(32, (params.cpu_cores || 1) + 1)
+                            )
+                          }
+                          disabled={calculationStatus === 'running'}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.spinnerBtn} ${styles.down}`}
+                          onClick={() =>
+                            handleParamChange(
+                              'cpu_cores',
+                              Math.max(1, (params.cpu_cores || 1) - 1)
+                            )
+                          }
+                          disabled={calculationStatus === 'running'}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className={styles.memorySetting}>
-                <label>Memory Usage</label>
-                <div className={styles.memoryInputContainer}>
-                  <input
-                    type="number"
-                    value={params.memory_mb || 2000}
-                    onChange={e =>
-                      handleParamChange(
-                        'memory_mb',
-                        Math.max(128, Number(e.target.value))
-                      )
-                    }
-                    min="128"
-                    className={styles.memoryValueInput}
-                    disabled={calculationStatus === 'running'}
-                  />
-                  <span className={styles.memoryUnit}>MB</span>
-                </div>
-              </div>
+                  <div className={styles.memorySetting}>
+                    <label>Memory Usage</label>
+                    <div className={styles.memoryInputContainer}>
+                      <input
+                        type="number"
+                        value={params.memory_mb || 2000}
+                        onChange={e =>
+                          handleParamChange(
+                            'memory_mb',
+                            Math.max(128, Number(e.target.value))
+                          )
+                        }
+                        min="128"
+                        className={styles.memoryValueInput}
+                        disabled={calculationStatus === 'running'}
+                      />
+                      <span className={styles.memoryUnit}>MB</span>
+                    </div>
+                  </div>
+                </>
+              )}
               {calculationStatus === 'running' ||
               calculationStatus === 'pausing' ? (
                 <button

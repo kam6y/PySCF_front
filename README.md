@@ -19,6 +19,7 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
     -   **Molecular Agent**: Assists with quantum chemistry calculations and molecular analysis using natural language.
     -   **Research Agent**: Searches arXiv for relevant academic papers and provides summaries with PDF links.
     -   **Intelligent Routing**: Automatically routes queries to the appropriate specialist agent based on user intent.
+-   **GPU Acceleration (Linux)**: Accelerate DFT, HF, and TDDFT calculations using GPU4PySCF on NVIDIA GPUs. Install directly from the Settings page with automatic CUDA detection.
 -   **Automated Environment Setup**: Set up the complete development environment with a single command (`npm run setup-env`).
 -   **Environment Validation**: Automatically verify Python dependencies and environment health (`npm run verify-env`).
 -   **Unified Execution Environment**: Uses a Gunicorn-based server for both development and production to eliminate environment-specific issues.
@@ -29,7 +30,7 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
 ## Tech Stack
 
 -   **Frontend**: React, TypeScript, TanStack Query, Zustand
--   **Backend**: Python, Flask, Gunicorn, PySCF, RDKit
+-   **Backend**: Python, Flask, Gunicorn, PySCF, RDKit, GPU4PySCF (optional, Linux)
 -   **Desktop Framework**: Electron
 -   **Build Tools**: Webpack, Electron Builder, conda-pack
 -   **Package Management**: npm (Node.js), conda (Python)
@@ -327,6 +328,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     -   **分子エージェント:** 自然言語を使用して量子化学計算と分子解析をサポート。
     -   **リサーチエージェント:** arXivから関連論文を検索し、PDFリンク付きの要約を提供。
     -   **知的ルーティング:** ユーザーの質問内容に基づいて、適切な専門エージェントに自動的にルーティング。
+-   **GPUアクセラレーション (Linux):** GPU4PySCFを使用してDFT、HF、TDDFT計算をNVIDIA GPUで高速化。設定ページからCUDA自動検出とワンクリックインストールが可能。
 -   **自動環境構築:** ワンコマンドで開発環境をセットアップできます（`npm run setup-env`）。
 -   **環境検証機能:** Python依存関係と環境の健全性を自動チェックします（`npm run verify-env`）。
 -   **統一実行環境:** 開発・本番環境で同一のGunicornベースサーバーを使用し、環境差異問題を解決。
@@ -335,7 +337,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 ## 技術スタック
 
 -   **フロントエンド:** React, TypeScript, TanStack Query, Zustand
--   **バックエンド:** Python, Flask, Gunicorn, PySCF, RDKit
+-   **バックエンド:** Python, Flask, Gunicorn, PySCF, RDKit, GPU4PySCF (オプション、Linux)
 -   **デスクトップフレームワーク:** Electron
 -   **ビルドツール:** Webpack, Electron Builder, conda-pack
 -   **パッケージ管理:** npm (Node.js), conda (Python)

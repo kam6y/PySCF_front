@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useAppSettings } from '../hooks';
+import { useAppSettings, useGpu4Pyscf } from '../hooks';
 import {
   TIMEZONE_LABELS,
   TIMEZONE_GROUPS,
@@ -35,6 +35,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     useState<string>('');
   const [timezone, setTimezone] = useState<Timezone>('UTC');
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
+  const [gpuAccelerationEnabled, setGpuAccelerationEnabled] =
+    useState<boolean>(false);
   const [originalValues, setOriginalValues] = useState<{
     maxParallelInstances?: number;
     maxCpuUtilization?: number;
@@ -42,10 +44,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     geminiApiKey?: string;
     calculationsDirectory?: string;
     timezone?: Timezone;
+    gpuAccelerationEnabled?: boolean;
   }>({});
 
   const { settings, isLoading, isUpdating, error, updateSettings } =
     useAppSettings();
+  const {
+    status: gpuStatus,
+    isLoading: isGpuStatusLoading,
+    isFetching: isGpuStatusFetching,
+    isInstalling: isGpuInstalling,
+    error: gpuError,
+    installGpu4Pyscf,
+    refetch: refetchGpuStatus,
+  } = useGpu4Pyscf();
 
   // Update local state when settings are loaded
   useEffect(() => {
@@ -72,6 +84,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         geminiApiKey: settings.gemini_api_key || '',
         calculationsDirectory: settings.calculations_directory || '',
         timezone: settings.timezone || 'UTC',
+        gpuAccelerationEnabled: settings.gpu_acceleration_enabled ?? false,
       };
 
       if (process.env.NODE_ENV === 'development') {
@@ -84,6 +97,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setGeminiApiKey(newValues.geminiApiKey);
       setCalculationsDirectory(newValues.calculationsDirectory);
       setTimezone(newValues.timezone);
+      setGpuAccelerationEnabled(newValues.gpuAccelerationEnabled ?? false);
       setOriginalValues(newValues);
 
       if (process.env.NODE_ENV === 'development') {
@@ -103,6 +117,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION,
         max_memory_utilization_percent:
           maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
+        gpu_acceleration_enabled: gpuAccelerationEnabled,
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
         calculations_directory: calculationsDirectory,
@@ -117,6 +132,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         geminiApiKey,
         calculationsDirectory,
         timezone,
+        gpuAccelerationEnabled,
       };
       setOriginalValues(newValues);
     } catch (error) {
@@ -128,6 +144,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       setGeminiApiKey(originalValues.geminiApiKey || '');
       setCalculationsDirectory(originalValues.calculationsDirectory || '');
       setTimezone(originalValues.timezone || 'UTC');
+      setGpuAccelerationEnabled(originalValues.gpuAccelerationEnabled ?? false);
     }
   };
 
@@ -138,6 +155,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setGeminiApiKey(originalValues.geminiApiKey || '');
     setCalculationsDirectory(originalValues.calculationsDirectory || '');
     setTimezone(originalValues.timezone || 'UTC');
+    setGpuAccelerationEnabled(originalValues.gpuAccelerationEnabled ?? false);
   };
 
   const handleSelectFolder = async () => {
@@ -171,6 +189,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const currentGeminiApiKey = geminiApiKey;
     const currentCalculationsDirectory = calculationsDirectory;
     const currentTimezone = timezone;
+    const currentGpuEnabled = gpuAccelerationEnabled ?? false;
 
     const originalParallel =
       originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
@@ -182,6 +201,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const originalCalculationsDirectory =
       originalValues.calculationsDirectory || '';
     const originalTimezone = originalValues.timezone || 'UTC';
+    const originalGpuEnabled = originalValues.gpuAccelerationEnabled ?? false;
 
     const parallelChanged = currentParallel !== originalParallel;
     const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
@@ -190,6 +210,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     const calculationsDirectoryChanged =
       currentCalculationsDirectory !== originalCalculationsDirectory;
     const timezoneChanged = currentTimezone !== originalTimezone;
+    const gpuEnabledChanged = currentGpuEnabled !== originalGpuEnabled;
 
     const hasChanges =
       parallelChanged ||
@@ -197,7 +218,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       memoryChanged ||
       geminiApiKeyChanged ||
       calculationsDirectoryChanged ||
-      timezoneChanged;
+      timezoneChanged ||
+      gpuEnabledChanged;
 
     // Debug logging in development
     if (process.env.NODE_ENV === 'development') {
@@ -219,6 +241,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
           cpuChanged,
           memoryChanged,
           geminiApiKeyChanged,
+          gpuEnabledChanged,
         },
         hasChanges,
       });
@@ -232,13 +255,61 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     geminiApiKey,
     calculationsDirectory,
     timezone,
+    gpuAccelerationEnabled,
     originalValues?.maxParallelInstances,
     originalValues?.maxCpuUtilization,
     originalValues?.maxMemoryUtilization,
     originalValues?.geminiApiKey,
     originalValues?.calculationsDirectory,
     originalValues?.timezone,
+    originalValues?.gpuAccelerationEnabled,
   ]);
+
+  const gpuInstallLabel = useMemo(() => {
+    if (!gpuStatus) {
+      return 'Install GPU4PySCF';
+    }
+    return gpuStatus.gpu4pyscf_installed
+      ? 'Reinstall GPU4PySCF'
+      : 'Install GPU4PySCF';
+  }, [gpuStatus]);
+
+  const canEnableGpuAcceleration = Boolean(
+    gpuStatus?.gpu4pyscf_installed &&
+      gpuStatus?.is_linux &&
+      gpuStatus?.cuda_detected &&
+      gpuStatus?.cuda_supported
+  );
+
+  const gpuStatusMessage = useMemo(() => {
+    if (!gpuStatus) {
+      return null;
+    }
+
+    if (!gpuStatus.is_linux) {
+      return 'GPU4PySCF is supported on Linux only.';
+    }
+
+    if (!gpuStatus.cuda_detected) {
+      const detail = gpuStatus.cuda_detection_message
+        ? ` (${gpuStatus.cuda_detection_message})`
+        : '';
+      return `CUDA Toolkit not detected. Install CUDA 11/12/13 and ensure nvcc is in PATH.${detail}`;
+    }
+
+    if (!gpuStatus.cuda_supported) {
+      const detail = gpuStatus.cuda_detection_message
+        ? ` (${gpuStatus.cuda_detection_message})`
+        : '';
+      return `Detected CUDA ${gpuStatus.cuda_version || 'unknown'} is not supported. Supported versions: 11.x, 12.x, 13.x.${detail}`;
+    }
+
+    if (gpuStatus.gpu4pyscf_installed) {
+      return 'GPU4PySCF is installed. You can reinstall if needed.';
+    }
+
+    return 'CUDA detected. Install GPU4PySCF to enable GPU acceleration.';
+  }, [gpuStatus]);
 
   if (isLoading) {
     return (
@@ -482,6 +553,181 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               </div>
             </div>
           )}
+        </div>
+
+        <div className={styles.settingsSection}>
+          <div className={styles.sectionHeader}>
+            <h3>GPU Acceleration (Linux)</h3>
+            <label className={styles.gpuToggle}>
+              <input
+                type="checkbox"
+                checked={gpuAccelerationEnabled}
+                onChange={event =>
+                  setGpuAccelerationEnabled(event.target.checked)
+                }
+                disabled={
+                  isUpdating ||
+                  isGpuStatusLoading ||
+                  (!canEnableGpuAcceleration && !gpuAccelerationEnabled)
+                }
+              />
+              <span className={styles.gpuToggleTrack}></span>
+              <span className={styles.gpuToggleLabel}>Enabled</span>
+            </label>
+          </div>
+
+          <div className={styles.settingItem}>
+            <div className={styles.settingLabel}>
+              <label>GPU4PySCF Installation</label>
+              <p className={styles.settingHelp}>
+                Detects CUDA Toolkit via <code>nvcc --version</code> and
+                installs the matching GPU4PySCF package. cuTENSOR is strongly
+                recommended and will be installed together.
+              </p>
+            </div>
+
+            <div className={styles.settingControl}>
+              {isGpuStatusLoading ? (
+                <div className={styles.inlineStatus}>
+                  <div className={styles.inlineSpinner}></div>
+                  <span>Detecting CUDA environment...</span>
+                </div>
+              ) : (
+                <>
+                  <div className={styles.gpuStatusGrid}>
+                    <div className={styles.gpuStatusItem}>
+                      <span className={styles.infoLabel}>Platform</span>
+                      <span className={styles.infoValue}>
+                        {gpuStatus?.is_linux ? 'Linux' : 'Unsupported'}
+                      </span>
+                    </div>
+                    <div className={styles.gpuStatusItem}>
+                      <span className={styles.infoLabel}>CUDA Toolkit</span>
+                      <span className={styles.infoValue}>
+                        {gpuStatus?.cuda_version
+                          ? `CUDA ${gpuStatus.cuda_version}`
+                          : 'Not detected'}
+                      </span>
+                    </div>
+                    <div className={styles.gpuStatusItem}>
+                      <span className={styles.infoLabel}>CUDA Support</span>
+                      <span
+                        className={`${styles.gpuStatusBadge} ${
+                          gpuStatus?.cuda_supported
+                            ? styles.gpuStatusBadgeSuccess
+                            : styles.gpuStatusBadgeWarning
+                        }`}
+                      >
+                        {gpuStatus?.cuda_supported
+                          ? 'Supported'
+                          : 'Unsupported'}
+                      </span>
+                    </div>
+                    <div className={styles.gpuStatusItem}>
+                      <span className={styles.infoLabel}>GPU4PySCF</span>
+                      <span
+                        className={`${styles.gpuStatusBadge} ${
+                          gpuStatus?.gpu4pyscf_installed
+                            ? styles.gpuStatusBadgeSuccess
+                            : styles.gpuStatusBadgeWarning
+                        }`}
+                      >
+                        {gpuStatus?.gpu4pyscf_installed
+                          ? `Installed${gpuStatus.gpu4pyscf_version ? ` v${gpuStatus.gpu4pyscf_version}` : ''}`
+                          : 'Not installed'}
+                      </span>
+                    </div>
+                    <div className={styles.gpuStatusItem}>
+                      <span className={styles.infoLabel}>cuTENSOR</span>
+                      <span
+                        className={`${styles.gpuStatusBadge} ${
+                          gpuStatus?.cutensor_installed
+                            ? styles.gpuStatusBadgeSuccess
+                            : styles.gpuStatusBadgeWarning
+                        }`}
+                      >
+                        {gpuStatus?.cutensor_installed
+                          ? `Installed${gpuStatus.cutensor_version ? ` v${gpuStatus.cutensor_version}` : ''}`
+                          : 'Not installed'}
+                      </span>
+                    </div>
+                    <div className={styles.gpuStatusItem}>
+                      <span className={styles.infoLabel}>Recommended</span>
+                      <span className={styles.gpuPackageValue}>
+                        {gpuStatus?.recommended_gpu4pyscf_package ? (
+                          <>
+                            <code>
+                              {gpuStatus.recommended_gpu4pyscf_package}
+                            </code>
+                            {gpuStatus.recommended_cutensor_package && (
+                              <>
+                                <span className={styles.gpuPackageDivider}>
+                                  +
+                                </span>
+                                <code>
+                                  {gpuStatus.recommended_cutensor_package}
+                                </code>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          'Not available'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {gpuStatusMessage && (
+                    <div className={styles.gpuNotice}>{gpuStatusMessage}</div>
+                  )}
+
+                  {gpuError && (
+                    <div className={styles.gpuErrorBox}>
+                      {gpuError instanceof Error
+                        ? gpuError.message
+                        : 'Failed to retrieve GPU status.'}
+                    </div>
+                  )}
+
+                  <div className={styles.gpuActionRow}>
+                    <button
+                      className={styles.gpuActionButton}
+                      onClick={() =>
+                        installGpu4Pyscf({
+                          include_cutensor: true,
+                          force_reinstall: Boolean(
+                            gpuStatus?.gpu4pyscf_installed
+                          ),
+                        })
+                      }
+                      disabled={
+                        isGpuInstalling ||
+                        isGpuStatusFetching ||
+                        !gpuStatus?.is_linux ||
+                        !gpuStatus?.cuda_supported
+                      }
+                    >
+                      {isGpuInstalling ? (
+                        <>
+                          <div className={styles.buttonSpinner}></div>
+                          Installing...
+                        </>
+                      ) : (
+                        gpuInstallLabel
+                      )}
+                    </button>
+                    <button
+                      className={styles.gpuSecondaryButton}
+                      onClick={() => refetchGpuStatus()}
+                      disabled={isGpuStatusFetching || isGpuInstalling}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className={styles.settingsSection}>

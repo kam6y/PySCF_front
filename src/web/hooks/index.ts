@@ -21,6 +21,13 @@ export {
   useUpdateSettings,
 } from './useAppSettings';
 
+// GPU4PySCF hooks
+export {
+  useGpu4Pyscf,
+  useGpu4PyscfStatus,
+  useInstallGpu4Pyscf,
+} from './useGpu4Pyscf';
+
 // 互換性のため残存（非推奨）
 export { useCalculationOperations } from './useCalculationOperations';
 export type { CalculationOperations } from './useCalculationOperations';

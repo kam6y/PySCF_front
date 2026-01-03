@@ -81,17 +81,31 @@ class DFTCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create DFT method object (RKS/UKS)."""
         spin = self.results.get('spin', 0)
-        
+        if self._is_gpu4pyscf_available():
+            try:
+                from gpu4pyscf import dft as gpu_dft
+                if spin == 0:
+                    mf = gpu_dft.RKS(mol, xc=self.xc_functional)
+                    logger.info("Using GPU4PySCF RKS for closed-shell system")
+                else:
+                    mf = gpu_dft.UKS(mol, xc=self.xc_functional)
+                    logger.info("Using GPU4PySCF UKS for open-shell system")
+                self.gpu_enabled = True
+                return mf
+            except Exception as exc:
+                logger.warning(f"GPU4PySCF DFT setup failed, falling back to CPU: {exc}")
+                self.gpu_enabled = False
+
         if spin == 0:
             mf = dft.RKS(mol)
             logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell system")
         else:
             mf = dft.UKS(mol)
             logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell system")
-        
+
         # Set XC functional
         mf.xc = self.xc_functional
-        
+        self.gpu_enabled = False
         return mf
     
     def _apply_solvent_effects(self, mf):

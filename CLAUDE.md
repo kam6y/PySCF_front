@@ -5,6 +5,8 @@ This is PySCF_front, an Electron-based desktop application for molecular visuali
 
 The application supports various quantum chemistry calculation methods, including DFT, Hartree-Fock (HF), MP2, CCSD, TDDFT, CASCI, and CASSCF. It also features geometry optimization, vibrational frequency analysis with IR spectrum visualization, and advanced analysis like Molecular Orbitals (MO) and Natural Transition Orbitals (NTO) for TDDFT. A recent addition is an AI-powered molecular agent that can perform tasks based on natural language prompts. It dynamically loads supported parameters (basis sets, functionals, etc.) from the backend.
 
+**GPU Acceleration**: On Linux systems with NVIDIA GPUs and CUDA Toolkit installed, the application supports GPU-accelerated calculations via GPU4PySCF. This can significantly speed up DFT, HF, and TDDFT calculations. GPU4PySCF can be installed directly from the Settings page.
+
 A key feature of this project is its API-first development approach, using an OpenAPI specification as the single source of truth for the API contract between the frontend and backend. The application uses WebSockets for real-time status updates of running calculations, providing a more efficient and responsive user experience than a polling-based system.
 
 ## Development Philosophy
@@ -382,6 +384,7 @@ A Flask API server with REST endpoints and a WebSocket interface for:
 * **Real-time Status Updates**: A WebSocket endpoint pushes status updates to the frontend.
 * **File Management**: Listing, renaming, and deleting calculation data.
 * **Health Check**: An endpoint (`/health`) for startup coordination.
+* **GPU Acceleration**: On Linux, supports GPU4PySCF for accelerated DFT/HF/TDDFT calculations. Includes CUDA detection and automatic package installation.
 
 
 ## Core Components & State Management
@@ -409,6 +412,7 @@ This architecture relies on a collection of custom hooks to encapsulate logic:
 * **useCalculationQueries**: Contains all TanStack Query definitions (`useQuery`, `useMutation`) for the quantum calculation API.
 * **useChatHistoryQueries**: (New) Contains all TanStack Query definitions for the chat history API.
 * **useUnifiedWebSocket**: A dedicated hook that establishes a WebSocket connection for both global updates and the active calculation, updating the TanStack Query cache in real-time.
+* **useGpu4Pyscf**: Hook for managing GPU4PySCF status detection and installation. Provides CUDA detection, GPU4PySCF/cuTENSOR installation status, and installation functionality.
 
 ### State Flow Example (Starting a Calculation)
 
@@ -612,6 +616,7 @@ This architecture relies on a collection of custom hooks to encapsulate logic:
     │       │   ├── useCalculationOperations.ts
     │       │   ├── useCalculationQueries.ts
     │       │   ├── useChatHistoryQueries.ts
+    │       │   ├── useGpu4Pyscf.ts
     │       │   └── useUnifiedWebSocket.ts
     │       ├── index.html
     │       ├── index.tsx
@@ -661,6 +666,8 @@ This architecture relies on a collection of custom hooks to encapsulate logic:
 * `GET /api/settings`: Get application settings.
 * `PUT /api/settings`: Update application settings.
 * `GET /api/system/resource-status`: Get system resource status.
+* `GET /api/system/gpu4pyscf-status`: Get CUDA detection and GPU4PySCF installation status (Linux only).
+* `POST /api/system/gpu4pyscf-install`: Install GPU4PySCF and cuTENSOR for the detected CUDA version (Linux only, local requests only).
 * `GET /api/chat-history/sessions`: Get all chat sessions.
 * `POST /api/chat-history/sessions`: Create a new chat session.
 * `GET /api/chat-history/sessions/<id>`: Get a specific chat session with messages.
@@ -693,3 +700,36 @@ The unified Gunicorn-based server reduces environment-specific issues. Most beha
 
 ### Build and Packaging Issues
 The build system includes pre- and post-build verification steps (`verify-env`, `verify-build-env`, `validate-build`). A failure in these steps indicates an issue with the conda environment or the server configuration.
+
+## GPU Acceleration (Linux Only)
+The application supports GPU-accelerated quantum chemistry calculations via GPU4PySCF on Linux systems with NVIDIA GPUs.
+
+### Requirements
+* **Linux operating system** (GPU4PySCF is not available on macOS or Windows)
+* **NVIDIA GPU** with CUDA support
+* **CUDA Toolkit 11.x or 12.x** installed with `nvcc` in PATH
+
+### Supported Calculation Methods
+* DFT (RKS/UKS)
+* HF (RHF/UHF)
+* TDDFT (TDA/full TDDFT)
+
+### How It Works
+1. **CUDA Detection**: The application detects CUDA Toolkit via `nvcc --version`
+2. **Package Installation**: GPU4PySCF and cuTENSOR can be installed from Settings page
+3. **Automatic Fallback**: If GPU4PySCF is unavailable or fails, calculations automatically fall back to CPU
+4. **Results Tracking**: Calculation results include `gpu_enabled` flag indicating whether GPU was used
+
+### Configuration
+* Enable/disable GPU acceleration in Settings → GPU Acceleration
+* The setting is stored in `AppSettings.gpu_acceleration_enabled`
+* When enabled, DFT/HF/TDDFT calculators will attempt to use GPU4PySCF
+
+### API Endpoints
+* `GET /api/system/gpu4pyscf-status`: Returns CUDA detection status, installed packages, and recommended packages
+* `POST /api/system/gpu4pyscf-install`: Installs GPU4PySCF and cuTENSOR (local requests only for security)
+
+### Technical Notes
+* GPU4PySCF returns cupy arrays; the calculators automatically convert these to numpy arrays
+* The `BaseCalculator` class provides `_to_numpy()` and `_as_numpy_array()` helper methods for this conversion
+* Installation is restricted to loopback addresses (127.0.0.1, ::1) for security

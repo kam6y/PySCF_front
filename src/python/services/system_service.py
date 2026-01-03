@@ -10,19 +10,371 @@ import os
 import sys
 import json
 import multiprocessing
+import re
+import importlib
+import shutil
+import site
+import subprocess
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional, Tuple, List
+from importlib import metadata, util
 
 from quantum_calc import get_process_manager, get_current_settings
 from quantum_calc.resource_manager import get_resource_manager
 from quantum_calc.file_manager import CalculationFileManager
-from .exceptions import ServiceError
+from .exceptions import ServiceError, ValidationError
 
 logger = logging.getLogger(__name__)
+
+PIP_INSTALL_TIMEOUT_SECONDS = 30 * 60
+CUDA_DETECTION_TIMEOUT_SECONDS = 5
+
+CUDA_PACKAGE_MAP = {
+    11: ("gpu4pyscf-cuda11x", "cutensor-cu11"),
+    12: ("gpu4pyscf-cuda12x", "cutensor-cu12"),
+    13: ("gpu4pyscf-cuda13x", "cutensor-cu13"),
+}
+CUPY_CUTENSOR_RECOMMENDED_BY_CUDA = {
+    11: [
+        ("13.4.1", "2.2.0"),
+        ("13.3.0", "2.0.2"),
+    ],
+    12: [
+        ("13.4.1", "2.2.0"),
+        ("13.3.0", "2.0.2"),
+    ],
+}
+LIBXC_VERSION_BY_CUDA = {
+    11: "0.5",
+    12: "0.5",
+    13: "0.7",
+}
 
 
 class SystemService:
     """Service for system resource monitoring and diagnostics."""
+
+    def _detect_cuda_version(self) -> Tuple[Optional[str], Optional[int], Optional[int], Optional[str]]:
+        if shutil.which("nvcc") is None:
+            return None, None, None, "nvcc command not found"
+
+        try:
+            result = subprocess.run(
+                ["nvcc", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=CUDA_DETECTION_TIMEOUT_SECONDS
+            )
+            output = (result.stdout or "") + "\n" + (result.stderr or "")
+        except subprocess.TimeoutExpired:
+            return (
+                None,
+                None,
+                None,
+                f"nvcc --version timed out after {CUDA_DETECTION_TIMEOUT_SECONDS} seconds"
+            )
+
+        if result.returncode != 0:
+            message = (result.stderr or result.stdout or "nvcc command failed").strip()
+            return None, None, None, message
+
+        match = re.search(r"release\s+(\d+)\.(\d+)", output)
+        if not match:
+            match = re.search(r"V(\d+)\.(\d+)", output)
+        if not match:
+            return None, None, None, "Unable to parse CUDA version from nvcc output"
+
+        major = int(match.group(1))
+        minor = int(match.group(2))
+        return f"{major}.{minor}", major, minor, None
+
+    def _get_distribution_version(self, names: List[str]) -> Optional[str]:
+        for name in names:
+            try:
+                return metadata.version(name)
+            except metadata.PackageNotFoundError:
+                continue
+        return None
+
+    def _is_module_available(self, module_name: str) -> bool:
+        importlib.invalidate_caches()
+        if site.ENABLE_USER_SITE:
+            try:
+                user_site = site.getusersitepackages()
+            except Exception:
+                user_site = None
+            if user_site and user_site not in sys.path:
+                sys.path.append(user_site)
+        if util.find_spec(module_name) is None:
+            return False
+        try:
+            __import__(module_name)
+        except Exception:
+            return False
+        return True
+
+    def _is_site_writable(self) -> bool:
+        try:
+            site_packages = site.getsitepackages()
+        except Exception:
+            site_packages = []
+
+        for path in site_packages:
+            if path and os.path.isdir(path) and os.access(path, os.W_OK):
+                return True
+        return False
+
+    def _truncate_output(self, output: Optional[str], limit: int = 4000) -> str:
+        if not output:
+            return ""
+        if len(output) <= limit:
+            return output
+        return output[-limit:]
+
+    def _get_recommended_pairs(self, cuda_major: int) -> List[Tuple[str, str]]:
+        return CUPY_CUTENSOR_RECOMMENDED_BY_CUDA.get(cuda_major, [])
+
+    def _get_libxc_requirement(self, cuda_major: int) -> str:
+        cuda_suffix = f"{cuda_major}x"
+        version = LIBXC_VERSION_BY_CUDA.get(cuda_major)
+        if version:
+            return f"gpu4pyscf-libxc-cuda{cuda_suffix}=={version}"
+        return f"gpu4pyscf-libxc-cuda{cuda_suffix}"
+
+    def _run_pip_install(
+        self,
+        packages: List[str],
+        use_user_site: bool,
+        extra_args: Optional[List[str]] = None
+    ) -> Tuple[bool, str, str]:
+        pip_command = [sys.executable, "-m", "pip", "install", "--no-cache-dir", "--prefer-binary"]
+        if extra_args:
+            pip_command.extend(extra_args)
+        if use_user_site:
+            pip_command.append("--user")
+        pip_command.extend(packages)
+
+        try:
+            result = subprocess.run(
+                pip_command,
+                capture_output=True,
+                text=True,
+                timeout=PIP_INSTALL_TIMEOUT_SECONDS
+            )
+            stdout_tail = self._truncate_output(result.stdout)
+            stderr_tail = self._truncate_output(result.stderr)
+            return result.returncode == 0, stdout_tail, stderr_tail
+        except subprocess.TimeoutExpired as exc:
+            stdout_tail = self._truncate_output(exc.stdout)
+            stderr_tail = self._truncate_output(exc.stderr)
+            timeout_message = (
+                f"pip install timed out after {PIP_INSTALL_TIMEOUT_SECONDS} seconds"
+            )
+            if stderr_tail:
+                stderr_tail = f"{timeout_message}\n{stderr_tail}"
+            else:
+                stderr_tail = timeout_message
+            return False, stdout_tail, stderr_tail
+
+    def _build_pip_args(self, force_reinstall: bool, no_deps: bool = False) -> List[str]:
+        args = ["--upgrade"]
+        if force_reinstall:
+            args.append("--force-reinstall")
+        if no_deps:
+            args.append("--no-deps")
+        return args
+
+    def _build_dependency_candidates(
+        self,
+        cuda_major: int,
+        include_cutensor: bool
+    ) -> List[List[str]]:
+        cuda_suffix = f"{cuda_major}x"
+        libxc_requirement = self._get_libxc_requirement(cuda_major)
+        candidates: List[List[str]] = []
+
+        for cupy_version, cutensor_version in self._get_recommended_pairs(cuda_major):
+            deps = [
+                f"cupy-cuda{cuda_suffix}=={cupy_version}",
+                libxc_requirement,
+            ]
+            if include_cutensor:
+                deps.append(f"cutensor-cu{cuda_major}=={cutensor_version}")
+            candidates.append(deps)
+
+        deps_latest = [
+            f"cupy-cuda{cuda_suffix}",
+            libxc_requirement,
+        ]
+        if include_cutensor:
+            deps_latest.append(f"cutensor-cu{cuda_major}")
+        candidates.append(deps_latest)
+
+        return candidates
+
+    def _install_dependency_first(
+        self,
+        gpu4pyscf_package: str,
+        dependency_candidates: List[List[str]],
+        use_user_site: bool,
+        force_reinstall: bool
+    ) -> Tuple[bool, List[str], str, str]:
+        combined_stdout: List[str] = []
+        combined_stderr: List[str] = []
+
+        for dependency_packages in dependency_candidates:
+            logger.info(f"Installing GPU4PySCF dependencies: {dependency_packages}")
+            for use_no_deps in (False, True):
+                attempt_stdout: List[str] = []
+                attempt_stderr: List[str] = []
+                dep_args = self._build_pip_args(force_reinstall, no_deps=use_no_deps)
+                ok, stdout_tail, stderr_tail = self._run_pip_install(
+                    dependency_packages,
+                    use_user_site,
+                    extra_args=dep_args
+                )
+                if stdout_tail:
+                    attempt_stdout.append(stdout_tail)
+                if stderr_tail:
+                    attempt_stderr.append(stderr_tail)
+                if not ok:
+                    combined_stdout.extend(attempt_stdout)
+                    combined_stderr.extend(attempt_stderr)
+                    continue
+
+                gpu_args = self._build_pip_args(force_reinstall, no_deps=True)
+                ok_gpu, gpu_stdout, gpu_stderr = self._run_pip_install(
+                    [gpu4pyscf_package],
+                    use_user_site,
+                    extra_args=gpu_args
+                )
+                if gpu_stdout:
+                    attempt_stdout.append(gpu_stdout)
+                if gpu_stderr:
+                    attempt_stderr.append(gpu_stderr)
+                if ok_gpu:
+                    return True, dependency_packages + [gpu4pyscf_package], "\n\n".join(attempt_stdout), "\n\n".join(attempt_stderr)
+
+                combined_stdout.extend(attempt_stdout)
+                combined_stderr.extend(attempt_stderr)
+
+        return False, [], "\n\n".join(combined_stdout), "\n\n".join(combined_stderr)
+
+    def get_gpu4pyscf_status(self) -> Dict[str, Any]:
+        is_linux = sys.platform.startswith("linux")
+        cuda_version = None
+        cuda_major = None
+        cuda_minor = None
+        detection_message = None
+
+        if is_linux:
+            cuda_version, cuda_major, cuda_minor, detection_message = self._detect_cuda_version()
+        else:
+            detection_message = "GPU4PySCF is supported on Linux only"
+
+        cuda_detected = cuda_version is not None
+        cuda_supported = cuda_major in CUDA_PACKAGE_MAP if cuda_major is not None else False
+
+        recommended_gpu4pyscf = None
+        recommended_cutensor = None
+        if cuda_supported:
+            recommended_gpu4pyscf, recommended_cutensor = CUDA_PACKAGE_MAP[cuda_major]
+        elif cuda_detected:
+            detection_message = detection_message or (
+                f"Unsupported CUDA version {cuda_version}. Supported versions: 11.x, 12.x, 13.x"
+            )
+
+        gpu4pyscf_installed = self._is_module_available("gpu4pyscf")
+        cutensor_installed = self._is_module_available("cutensor")
+
+        gpu4pyscf_version = (
+            self._get_distribution_version(
+                ["gpu4pyscf-cuda13x", "gpu4pyscf-cuda12x", "gpu4pyscf-cuda11x", "gpu4pyscf"]
+            )
+            if gpu4pyscf_installed
+            else None
+        )
+        cutensor_version = (
+            self._get_distribution_version(
+                ["cutensor-cu13", "cutensor-cu12", "cutensor-cu11", "cutensor"]
+            )
+            if cutensor_installed
+            else None
+        )
+
+        return {
+            "is_linux": is_linux,
+            "cuda_detected": cuda_detected,
+            "cuda_version": cuda_version,
+            "cuda_major": cuda_major,
+            "cuda_minor": cuda_minor,
+            "cuda_supported": cuda_supported,
+            "cuda_detection_message": detection_message,
+            "recommended_gpu4pyscf_package": recommended_gpu4pyscf,
+            "recommended_cutensor_package": recommended_cutensor,
+            "gpu4pyscf_installed": gpu4pyscf_installed,
+            "gpu4pyscf_version": gpu4pyscf_version,
+            "cutensor_installed": cutensor_installed,
+            "cutensor_version": cutensor_version,
+        }
+
+    def install_gpu4pyscf(
+        self,
+        include_cutensor: bool = True,
+        force_reinstall: bool = False
+    ) -> Dict[str, Any]:
+        if not sys.platform.startswith("linux"):
+            raise ValidationError("GPU4PySCF installation is supported on Linux only.")
+
+        cuda_version, cuda_major, cuda_minor, detection_message = self._detect_cuda_version()
+        if cuda_version is None or cuda_major is None:
+            raise ValidationError(f"CUDA toolkit not detected: {detection_message}")
+
+        if cuda_major not in CUDA_PACKAGE_MAP:
+            raise ValidationError(
+                f"Unsupported CUDA version {cuda_version}. Supported versions: 11.x, 12.x, 13.x"
+            )
+
+        gpu4pyscf_package, cutensor_package = CUDA_PACKAGE_MAP[cuda_major]
+        packages = [gpu4pyscf_package]
+        if include_cutensor:
+            packages.append(cutensor_package)
+
+        logger.info(f"Installing GPU4PySCF packages: {packages} (CUDA {cuda_version})")
+
+        use_user_site = not self._is_site_writable()
+        if use_user_site and not site.ENABLE_USER_SITE:
+            raise ValidationError(
+                "User site-packages is disabled; cannot install GPU4PySCF without a writable "
+                "site-packages directory. Enable user site-packages or install into a writable "
+                "environment."
+            )
+        dependency_candidates = self._build_dependency_candidates(
+            cuda_major,
+            include_cutensor
+        )
+        ok, installed_packages, stdout_tail, stderr_tail = self._install_dependency_first(
+            gpu4pyscf_package,
+            dependency_candidates,
+            use_user_site,
+            force_reinstall
+        )
+
+        if not ok:
+            error_message = stderr_tail or stdout_tail or "pip install failed"
+            if stdout_tail and stderr_tail:
+                error_message = f"{error_message}\n\nFallback details:\n{stdout_tail}\n\n{stderr_tail}"
+            raise ServiceError(f"pip install failed: {error_message}")
+
+        status = self.get_gpu4pyscf_status()
+
+        return {
+            "status": status,
+            "packages": installed_packages,
+            "used_user_site": use_user_site,
+            "pip_stdout": stdout_tail,
+            "pip_stderr": stderr_tail,
+        }
     
     def get_resource_status(self) -> Dict[str, Any]:
         """

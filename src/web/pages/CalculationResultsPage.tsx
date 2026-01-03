@@ -213,6 +213,7 @@ export const CalculationResultsPage = ({
 
   const { results, parameters } = processedData;
   const completedAt = activeCalculation.updatedAt;
+  const computeDeviceLabel = results.gpu_enabled ? 'GPU' : 'CPU';
 
   return (
     <div className={styles.pageContainer}>
@@ -237,6 +238,10 @@ export const CalculationResultsPage = ({
                   <span className={styles.value}>
                     {parameters.calculation_method}
                   </span>
+                </div>
+                <div className={styles.infoRow}>
+                  <span className={styles.label}>Compute Device:</span>
+                  <span className={styles.value}>{computeDeviceLabel}</span>
                 </div>
                 <div className={styles.infoRow}>
                   <span className={styles.label}>Completed At:</span>
@@ -2207,20 +2212,23 @@ export const CalculationResultsPage = ({
           )}
 
           {/* Calculation Parameters */}
-          <div className={styles.technicalSubsection}>
-            <h3>Calculation Parameters</h3>
-            <div className={styles.parametersGrid}>
-              <div>
-                <strong>CPU Cores:</strong> {parameters.cpu_cores || 'Default'}
-              </div>
-              <div>
-                <strong>Memory:</strong>{' '}
-                {parameters.memory_mb
-                  ? `${parameters.memory_mb} MB`
-                  : 'Default'}
+          {!results.gpu_enabled && (
+            <div className={styles.technicalSubsection}>
+              <h3>Calculation Parameters</h3>
+              <div className={styles.parametersGrid}>
+                <div>
+                  <strong>CPU Cores:</strong>{' '}
+                  {parameters.cpu_cores || 'Default'}
+                </div>
+                <div>
+                  <strong>Memory:</strong>{' '}
+                  {parameters.memory_mb
+                    ? `${parameters.memory_mb} MB`
+                    : 'Default'}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Checkpoint File Information */}
           <div className={styles.technicalSubsection}>

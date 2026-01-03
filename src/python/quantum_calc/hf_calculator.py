@@ -75,14 +75,28 @@ class HFCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create HF method object (RHF/UHF)."""
         spin = self.results.get('spin', 0)
-        
+        if self._is_gpu4pyscf_available():
+            try:
+                from gpu4pyscf import scf as gpu_scf
+                if spin == 0:
+                    mf = gpu_scf.RHF(mol)
+                    logger.info("Using GPU4PySCF RHF for closed-shell system")
+                else:
+                    mf = gpu_scf.UHF(mol)
+                    logger.info("Using GPU4PySCF UHF for open-shell system")
+                self.gpu_enabled = True
+                return mf
+            except Exception as exc:
+                logger.warning(f"GPU4PySCF HF setup failed, falling back to CPU: {exc}")
+                self.gpu_enabled = False
+
         if spin == 0:
             mf = scf.RHF(mol)
             logger.info("Using Restricted Hartree-Fock (RHF) for closed-shell system")
         else:
             mf = scf.UHF(mol)
             logger.info("Using Unrestricted Hartree-Fock (UHF) for open-shell system")
-        
+        self.gpu_enabled = False
         return mf
     
     def _apply_solvent_effects(self, mf):

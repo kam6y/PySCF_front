@@ -5,7 +5,12 @@ from typing import Dict, Any, Optional, List, Tuple
 import os
 import tempfile
 import logging
+import sys
+import re
+import shutil
+import subprocess
 from contextlib import contextmanager
+from importlib import util
 import numpy as np
 from .config_manager import get_memory_for_method, get_max_cycle
 from .exceptions import PauseRequestedException
@@ -22,6 +27,83 @@ class BaseCalculator(ABC):
         self.working_dir = working_dir or tempfile.mkdtemp(prefix="pyscf_calc_")
         self.results: Dict[str, Any] = {}
         self.optimize_geometry = optimize_geometry
+        self.gpu_enabled = False
+        self._gpu4pyscf_available: Optional[bool] = None
+        self._cuda_supported: Optional[bool] = None
+
+    def _is_gpu_acceleration_enabled(self) -> bool:
+        """Check whether GPU acceleration is enabled in app settings."""
+        try:
+            from .settings_manager import get_current_settings
+            settings = get_current_settings()
+            return bool(getattr(settings, "gpu_acceleration_enabled", False))
+        except Exception:
+            return False
+
+    def _is_gpu4pyscf_available(self) -> bool:
+        """Check whether GPU4PySCF is available on this system."""
+        if not self._is_gpu_acceleration_enabled():
+            return False
+        if self._gpu4pyscf_available is None:
+            if not sys.platform.startswith("linux"):
+                self._gpu4pyscf_available = False
+            else:
+                self._gpu4pyscf_available = (
+                    self._is_cuda_supported() and util.find_spec("gpu4pyscf") is not None
+                )
+        return self._gpu4pyscf_available
+
+    def _is_cuda_supported(self) -> bool:
+        """Check whether a supported CUDA Toolkit is available (via nvcc)."""
+        if self._cuda_supported is None:
+            if not sys.platform.startswith("linux"):
+                self._cuda_supported = False
+                return self._cuda_supported
+            if shutil.which("nvcc") is None:
+                self._cuda_supported = False
+                return self._cuda_supported
+            try:
+                result = subprocess.run(
+                    ["nvcc", "--version"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+            except subprocess.TimeoutExpired:
+                self._cuda_supported = False
+                return self._cuda_supported
+            if result.returncode != 0:
+                self._cuda_supported = False
+                return self._cuda_supported
+            output = (result.stdout or "") + "\n" + (result.stderr or "")
+            match = re.search(r"release\s+(\d+)\.(\d+)", output) or re.search(r"V(\d+)\.(\d+)", output)
+            if not match:
+                self._cuda_supported = False
+                return self._cuda_supported
+            major = int(match.group(1))
+            self._cuda_supported = major in {11, 12, 13}
+        return self._cuda_supported
+
+    def _to_numpy(self, value: Any) -> Any:
+        """Convert cupy arrays to numpy arrays if needed."""
+        if value is None:
+            return None
+        try:
+            import cupy as cp
+        except Exception:
+            return value
+        if isinstance(value, cp.ndarray):
+            return cp.asnumpy(value)
+        if isinstance(value, (list, tuple)):
+            return type(value)(self._to_numpy(item) for item in value)
+        return value
+
+    def _as_numpy_array(self, value: Any) -> Any:
+        """Normalize array-like values to numpy arrays when possible."""
+        value = self._to_numpy(value)
+        if isinstance(value, (list, tuple)):
+            return np.asarray(value)
+        return value
         
     def parse_xyz(self, xyz_string: str) -> List[List]:
         """Parse XYZ format string into atom list."""
@@ -310,7 +392,7 @@ class BaseCalculator(ABC):
             raise CalculationError("Orbital occupations not available")
         
         # Handle both RKS/RHF (1D array) and UKS/UHF (2D array) cases
-        mo_occ = self.mf.mo_occ
+        mo_occ = self._as_numpy_array(self.mf.mo_occ)
         if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
             # UKS/UHF case: use alpha orbitals
             mo_occ = mo_occ[0]
@@ -334,26 +416,16 @@ class BaseCalculator(ABC):
         if not hasattr(self, 'mf') or self.mf is None or self.mf.mo_occ is None:
             return 0
         
-        mo_occ = self.mf.mo_occ
-        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
-            # UKS/UHF case: count both alpha and beta orbitals
-            return int(np.sum(mo_occ > 0))
-        else:
-            # RKS/RHF case: simple sum
-            return int(np.sum(mo_occ > 0))
+        mo_occ = self._as_numpy_array(self.mf.mo_occ)
+        return int(np.sum(mo_occ > 0))
     
     def _count_virtual_orbitals(self) -> int:
         """Count the number of virtual orbitals."""
         if not hasattr(self, 'mf') or self.mf is None or self.mf.mo_occ is None:
             return 0
         
-        mo_occ = self.mf.mo_occ
-        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
-            # UKS/UHF case: count both alpha and beta orbitals
-            return int(np.sum(mo_occ == 0))
-        else:
-            # RKS/RHF case: simple sum
-            return int(np.sum(mo_occ == 0))
+        mo_occ = self._as_numpy_array(self.mf.mo_occ)
+        return int(np.sum(mo_occ == 0))
     
     def _geometry_to_xyz_string(self) -> str:
         """Convert optimized geometry to XYZ format string."""
@@ -385,6 +457,7 @@ class BaseCalculator(ABC):
             # Perform Mulliken population analysis
             # This returns (pop, charges) where pop are populations and charges are atomic charges
             pop, charges = self.mf.mulliken_pop()
+            charges = self._as_numpy_array(charges)
 
             # Extract charges for each atom
             mulliken_charges = []
@@ -578,8 +651,10 @@ class BaseCalculator(ABC):
                 # Determine which Infrared class to use based on mean field type
                 # Check if UHF/UKS (unrestricted) or RHF/RKS (restricted)
                 if hasattr(self.mf, 'mo_occ'):
-                    # Check if mo_occ is a tuple/list (UHF/UKS) or array (RHF/RKS)
-                    is_unrestricted = isinstance(self.mf.mo_occ, (tuple, list))
+                    mo_occ = self._as_numpy_array(self.mf.mo_occ)
+                    is_unrestricted = isinstance(self.mf.mo_occ, (tuple, list)) or (
+                        hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2
+                    )
                 else:
                     # Fallback: assume restricted
                     is_unrestricted = False
@@ -1157,7 +1232,8 @@ class BaseCalculator(ABC):
             'checkpoint_file': chk_path,
             'checkpoint_exists': os.path.exists(chk_path),
             'working_directory': self.working_dir,
-            'optimized_geometry': self._geometry_to_xyz_string()
+            'optimized_geometry': self._geometry_to_xyz_string(),
+            'gpu_enabled': bool(self.gpu_enabled)
         })
         
         # Save files if requested
@@ -1783,8 +1859,8 @@ class BaseCalculator(ABC):
             try:
                 logger.info("Calculating dipole moment...")
                 # Get dipole moment in both Debye and atomic units
-                dip_debye = self.mf.dip_moment(unit='Debye')  # Returns [x, y, z]
-                dip_au = self.mf.dip_moment(unit='A.U.')
+                dip_debye = np.asarray(self._to_numpy(self.mf.dip_moment(unit='Debye')))
+                dip_au = np.asarray(self._to_numpy(self.mf.dip_moment(unit='A.U.')))
 
                 properties['dipole_moment_x_debye'] = float(dip_debye[0])
                 properties['dipole_moment_y_debye'] = float(dip_debye[1])
@@ -1802,7 +1878,7 @@ class BaseCalculator(ABC):
             # 2. HOMO-LUMO Gap and Individual Energies (HOMO-LUMOギャップと個別エネルギー)
             try:
                 logger.info("Calculating HOMO-LUMO energies and gap...")
-                mo_energy = self.mf.mo_energy
+                mo_energy = self._as_numpy_array(self.mf.mo_energy)
 
                 # Handle both RKS/RHF (1D array) and UKS/UHF (2D array) cases
                 if hasattr(mo_energy, 'ndim') and mo_energy.ndim == 2:
@@ -1836,7 +1912,7 @@ class BaseCalculator(ABC):
             try:
                 logger.info("Calculating energy components...")
                 properties['nuclear_repulsion_energy'] = float(self.mf.energy_nuc())
-                e_tot = self.mf.e_tot
+                e_tot = self._to_numpy(self.mf.e_tot)
                 e_nuc = properties['nuclear_repulsion_energy']
                 properties['electronic_energy'] = float(e_tot - e_nuc)
 
