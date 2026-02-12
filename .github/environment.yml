@@ -27,6 +27,7 @@ dependencies:
   - pytest-cov=6.0.0
   - pip=25.2
   # Environment packaging for distribution
+  - setuptools
   - conda-pack=0.8.1
   - pip:
     # PySCF extensions
