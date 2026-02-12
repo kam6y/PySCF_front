@@ -19,25 +19,44 @@ def get_supported_basis_functions() -> Dict[str, List[str]]:
     return {
         'Minimal': [
             'STO-3G',
-            '3-21G'
+            'STO-6G',
+            'MINAO'
         ],
         'Pople Style': [
+            '3-21G',
+            '4-31G',
             '6-31G',
             '6-31G(d)',
+            '6-31G(d,p)',
+            '6-31+G(d)',
             '6-31+G(d,p)',
+            '6-31++G(d,p)',
+            '6-311G',
+            '6-311G(d)',
             '6-311G(d,p)',
+            '6-311+G(d)',
+            '6-311+G(d,p)',
             '6-311++G(d,p)'
         ],
         'Correlation Consistent': [
             'cc-pVDZ',
             'cc-pVTZ',
             'cc-pVQZ',
+            'cc-pV5Z',
             'aug-cc-pVDZ',
-            'aug-cc-pVTZ'
+            'aug-cc-pVTZ',
+            'aug-cc-pVQZ',
+            'aug-cc-pV5Z'
         ],
         'def2': [
             'def2-SVP',
-            'def2-TZVP'
+            'def2-SVPD',
+            'def2-TZVP',
+            'def2-TZVPP',
+            'def2-TZVPD',
+            'def2-QZVP',
+            'def2-QZVPP',
+            'def2-QZVPD'
         ]
     }
 
@@ -45,23 +64,43 @@ def get_supported_basis_functions() -> Dict[str, List[str]]:
 def get_supported_exchange_correlation() -> Dict[str, List[str]]:
     """Get supported exchange-correlation functionals grouped by category."""
     return {
-        'Hybrid': [
-            'B3LYP',
-            'PBE0',
-            'M06-2X',
-            'CAM-B3LYP',
-            'wB97XD'
+        'LDA': [
+            'SVWN'
         ],
         'GGA': [
             'PBE',
             'BLYP',
             'BP86',
-            'PW91'
+            'PW91',
+            'revPBE',
+            'PBEsol',
+            'RPBE',
+            'OLYP',
+            'BPBE'
         ],
         'Meta-GGA': [
-            'M06',
             'M06-L',
-            'TPSS'
+            'TPSS',
+            'revTPSS',
+            'SCAN',
+            'rSCAN',
+            'r2SCAN'
+        ],
+        'Hybrid (GGA)': [
+            'B3LYP',
+            'B3PW91',
+            'PBE0',
+            'B3P86',
+            'O3LYP'
+        ],
+        'Hybrid (Meta-GGA)': [
+            'M06',
+            'M06-2X',
+            'TPSSh'
+        ],
+        'Range-separated Hybrid': [
+            'CAM-B3LYP',
+            'wB97XD'
         ]
     }
 
