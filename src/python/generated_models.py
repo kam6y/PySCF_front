@@ -406,9 +406,6 @@ class MajorTransition(BaseModel):
     oscillator_strength: Optional[float] = Field(
         None, description='Oscillator strength'
     )
-    dominant_transition: Optional[str] = Field(
-        None, description='Main orbital transition (e.g., HOMO -> LUMO)'
-    )
 
 
 class NtoPair(BaseModel):

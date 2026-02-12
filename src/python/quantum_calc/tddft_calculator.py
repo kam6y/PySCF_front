@@ -422,60 +422,15 @@ class TDDFTCalculator(BaseCalculator):
         
         for i, (energy, wavelength) in enumerate(zip(energies, wavelengths)):
             osc_strength = oscillator_strengths[i] if i < len(oscillator_strengths) else 0.0
-            
-            # Determine dominant transition type based on energy and oscillator strength
-            dominant_transition = self._identify_transition_type(energy, osc_strength)
-            
+
             major_transitions.append({
                 'state': i + 1,
                 'energy': energy,
                 'wavelength': wavelength,
-                'oscillator_strength': osc_strength,
-                'dominant_transition': dominant_transition
+                'oscillator_strength': osc_strength
             })
         
         return major_transitions
-    
-    def _identify_transition_type(self, energy_ev: float, osc_strength: float) -> str:
-        """
-        Identify the likely transition type based on wavelength and oscillator strength.
-        """
-        # Convert energy to wavelength (nm)
-        wavelength_nm = 1239.84 / energy_ev if energy_ev > 0 else float('inf')
-        
-        # High energy transitions (UV-C region)
-        if wavelength_nm < 200:
-            return "σ→σ*/n→σ* transition"
-        
-        # UV-B and UV-A region analysis
-        elif wavelength_nm < 280:
-            # UV-C to UV-B boundary - likely σ→π* or very high energy π→π*
-            if osc_strength > 0.1:
-                return "π→π* transition (high energy)"
-            else:
-                return "n→σ*/σ→π* transition"
-        
-        elif wavelength_nm < 350:
-            # UV-B region - characteristic of n→π* and some π→π* transitions
-            if osc_strength > 0.01:
-                return "π→π* transition"
-            else:
-                return "n→π* transition (forbidden)"
-        
-        elif wavelength_nm < 400:
-            # UV-A region - primarily π→π* transitions in conjugated systems
-            if osc_strength > 0.01:
-                return "π→π* transition (conjugated)"
-            else:
-                return "n→π* transition (weak)"
-        
-        elif wavelength_nm < 700:
-            # Visible region - extended conjugation π→π*
-            return "π→π* transition (extended conjugation)"
-        
-        else:
-            # Near-IR region - very low energy transitions
-            return "Low energy transition (>700 nm)"
     
     
     def _analyze_natural_transition_orbitals(self, excitation_energies: List[float]) -> List[Dict[str, Any]]:

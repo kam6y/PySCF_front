@@ -1825,7 +1825,6 @@ export const CalculationResultsPage = ({
                         <th className={styles.rightAlign}>Energy (eV)</th>
                         <th className={styles.rightAlign}>Wavelength (nm)</th>
                         <th className={styles.rightAlign}>Osc. Strength</th>
-                        <th>Transition Type (estimation)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1835,7 +1834,6 @@ export const CalculationResultsPage = ({
                             results.excitation_wavelengths?.[index];
                           const oscStrength =
                             results.oscillator_strengths?.[index];
-                          const transition = results.major_transitions?.[index];
 
                           return (
                             <tr key={index}>
@@ -1856,9 +1854,6 @@ export const CalculationResultsPage = ({
                                 {oscStrength !== undefined
                                   ? oscStrength.toFixed(6)
                                   : 'N/A'}
-                              </td>
-                              <td>
-                                {transition?.dominant_transition || 'Unknown'}
                               </td>
                             </tr>
                           );

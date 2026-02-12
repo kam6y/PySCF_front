@@ -971,8 +971,6 @@ export interface components {
                 wavelength?: number;
                 /** @description Oscillator strength */
                 oscillator_strength?: number;
-                /** @description Main orbital transition (e.g., HOMO -> LUMO) */
-                dominant_transition?: string;
             }[] | null;
             /** @description Natural Transition Orbital analysis results (TDDFT only) */
             nto_analysis?: {

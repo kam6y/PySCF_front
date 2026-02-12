@@ -1834,9 +1834,6 @@ components:
               oscillator_strength:
                 type: number
                 description: Oscillator strength
-              dominant_transition:
-                type: string
-                description: Main orbital transition (e.g., HOMO -> LUMO)
           nullable: true
           description: Major orbital transitions (TDDFT only)
         nto_analysis:
