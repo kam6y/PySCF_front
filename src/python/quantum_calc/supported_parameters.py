@@ -151,9 +151,8 @@ def get_supported_tddft_methods() -> List[str]:
 def validate_basis_function(basis: str) -> bool:
     """Validate if a basis function is supported by PySCF."""
     try:
-        # Create a simple test molecule
         mol = gto.Mole()
-        mol.atom = 'H 0 0 0'
+        mol.atom = 'H 0 0 0; H 0 0 0.74'
         mol.basis = basis
         mol.build(verbose=0)
         return True
@@ -165,14 +164,16 @@ def validate_basis_function(basis: str) -> bool:
 def validate_exchange_correlation(xc: str) -> bool:
     """Validate if an exchange-correlation functional is supported by PySCF."""
     try:
-        # Create a simple test molecule and DFT object
         mol = gto.Mole()
-        mol.atom = 'H 0 0 0'
+        mol.atom = 'H 0 0 0; H 0 0 0.74'
         mol.basis = 'sto-3g'
         mol.build(verbose=0)
-        
+
         mf = dft.RKS(mol)
         mf.xc = xc
+        mf.max_cycle = 1
+        mf.verbose = 0
+        mf.kernel()
         return True
     except Exception as e:
         logger.debug(f"Exchange-correlation functional {xc} not supported: {e}")

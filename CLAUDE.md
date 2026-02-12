@@ -1,4 +1,5 @@
 # Claude Code運用ガイド（司令塔専用）
+Your partner is Japanese, so please speak and report in Japanese.
 
 ## 位置づけ
 - 実装・仕様の規約は `AGENTS.md` を一次参照とし、Claude は最初に必ず読む。
