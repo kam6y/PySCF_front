@@ -8,6 +8,7 @@ PySCF_front - 環境検証スクリプト
 
 import sys
 import importlib
+import importlib.metadata
 import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
@@ -51,6 +52,33 @@ def check_python_version() -> bool:
         log_error(f"Python {version_str} - Python 3.10+ が必要です")
         return False
 
+def _get_package_version(package_name: str) -> str:
+    """パッケージのバージョンを取得する（importlib.metadata を優先）"""
+    # import名とdistribution名の対応表
+    dist_name_map = {
+        'pyscf': 'pyscf',
+        'rdkit': 'rdkit',
+        'geometric': 'geometric',
+        'flask': 'flask',
+        'flask_cors': 'flask-cors',
+        'flask_sock': 'flask-sock',
+        'pydantic': 'pydantic',
+        'gevent': 'gevent',
+        'requests': 'requests',
+    }
+    dist_name = dist_name_map.get(package_name, package_name.replace('_', '-'))
+    try:
+        return importlib.metadata.version(dist_name)
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    # フォールバック: モジュール属性から取得
+    try:
+        module = importlib.import_module(package_name)
+        return getattr(module, '__version__', 'バージョン不明')
+    except ImportError:
+        return 'バージョン不明'
+
+
 def check_required_packages() -> bool:
     """必須パッケージの存在確認"""
     required_packages = [
@@ -63,22 +91,35 @@ def check_required_packages() -> bool:
         ('pydantic', 'Pydantic - データバリデーション'),
         ('gevent', 'Gevent - 非同期処理'),
         ('requests', 'Requests - HTTP クライアント'),
+    ]
+
+    # 開発専用パッケージ（CI必須ではない）
+    optional_packages = [
         ('conda_pack', 'conda-pack - 環境パッケージ化'),
         ('datamodel_code_generator', 'datamodel-code-generator - コード生成'),
     ]
-    
+
     log_info("必須パッケージをチェック中...")
     all_available = True
-    
+
     for package_name, description in required_packages:
         try:
-            module = importlib.import_module(package_name)
-            version = getattr(module, '__version__', 'バージョン不明')
+            importlib.import_module(package_name)
+            version = _get_package_version(package_name)
             log_success(f"{description}: {version} ✓")
         except ImportError:
             log_error(f"{description}: インストールされていません ✗")
             all_available = False
-    
+
+    log_info("オプショナルパッケージをチェック中...")
+    for package_name, description in optional_packages:
+        try:
+            importlib.import_module(package_name)
+            version = _get_package_version(package_name)
+            log_success(f"{description}: {version} ✓")
+        except ImportError:
+            log_warning(f"{description}: インストールされていません（オプショナル）")
+
     return all_available
 
 def check_pyscf_functionality() -> bool:
