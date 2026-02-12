@@ -278,6 +278,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/quantum/status:
+    get:
+      summary: Get calculation system status
+      description: Get current process pool and host system status for quantum calculations
+      operationId: getCalculationStatus
+      responses:
+        '200':
+          description: Calculation system status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationStatusResponse'
+        '503':
+          description: Process manager temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get calculation system status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /api/quantum/calculations/{calculationId}:
     get:
       summary: Get calculation details
@@ -310,7 +335,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    patch:
+    put:
       summary: Update calculation metadata
       description: Update calculation name and other metadata
       operationId: patchCalculation
@@ -601,7 +626,7 @@ paths:
           description: Unique calculation ID
           schema:
             type: string
-        - name: orbitalIndex
+        - name: orbital_index
           in: query
           required: false
           description: Specific orbital index to delete (if not provided, deletes all)
@@ -639,7 +664,7 @@ paths:
           description: Unique calculation ID
           schema:
             type: string
-        - name: broadeningFwhm
+        - name: broadening_fwhm
           in: query
           required: false
           description: Full width at half maximum for Lorentzian broadening in cm⁻¹
@@ -649,7 +674,7 @@ paths:
             default: 100.0
             minimum: 0.1
             maximum: 1000.0
-        - name: xMin
+        - name: x_min
           in: query
           required: false
           description: Minimum wavenumber for spectrum range in cm⁻¹
@@ -659,7 +684,7 @@ paths:
             default: 400.0
             minimum: 0.0
             maximum: 4500.0
-        - name: xMax
+        - name: x_max
           in: query
           required: false
           description: Maximum wavenumber for spectrum range in cm⁻¹
@@ -668,7 +693,7 @@ paths:
             format: float
             default: 4000.0
             maximum: 4500.0
-        - name: showPeaks
+        - name: show_peaks
           in: query
           required: false
           description: Whether to mark individual peaks in the plot
@@ -2102,6 +2127,43 @@ components:
             count:
               type: integer
               description: Number of calculations
+
+    CalculationStatusResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [process_pool, system]
+          properties:
+            process_pool:
+              type: object
+              required: [max_workers, active_calculations, active_count, is_shutdown]
+              properties:
+                max_workers:
+                  type: integer
+                  minimum: 1
+                active_calculations:
+                  type: array
+                  description: Currently active calculation IDs
+                  items:
+                    type: string
+                active_count:
+                  type: integer
+                  minimum: 0
+                is_shutdown:
+                  type: boolean
+            system:
+              type: object
+              required: [cpu_count]
+              properties:
+                cpu_count:
+                  type: integer
+                  nullable: true
+                  description: Number of CPU cores available on host machine
 
     CalculationDetailsResponse:
       type: object

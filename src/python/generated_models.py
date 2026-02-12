@@ -511,30 +511,55 @@ class CalculationListResponse(BaseModel):
     data: Data4
 
 
+class ProcessPool(BaseModel):
+    max_workers: int = Field(..., ge=1)
+    active_calculations: List[str] = Field(
+        ..., description='Currently active calculation IDs'
+    )
+    active_count: int = Field(..., ge=0)
+    is_shutdown: bool
+
+
+class System(BaseModel):
+    cpu_count: int = Field(
+        ..., description='Number of CPU cores available on host machine'
+    )
+
+
+class Data5(BaseModel):
+    process_pool: ProcessPool
+    system: System
+
+
+class CalculationStatusResponse(BaseModel):
+    success: bool = Field(..., examples=[True])
+    data: Data5
+
+
 class Files(BaseModel):
     checkpoint_exists: bool
     parameters_file_exists: bool
     results_file_exists: bool
 
 
-class Data6(BaseModel):
+class Data7(BaseModel):
     message: str = Field(..., examples=['Calculation renamed successfully.'])
     name: str = Field(..., description='Updated calculation name')
 
 
 class CalculationUpdateResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data6
+    data: Data7
 
 
-class Data7(BaseModel):
+class Data8(BaseModel):
     message: str = Field(..., examples=['Calculation deleted successfully'])
     deleted_id: str = Field(..., description='ID of deleted calculation')
 
 
 class CalculationDeleteResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data7
+    data: Data8
 
 
 class OrbitalType(Enum):
@@ -562,7 +587,7 @@ class OrbitalInfo(BaseModel):
     )
 
 
-class Data8(BaseModel):
+class Data9(BaseModel):
     orbitals: List[OrbitalInfo] = Field(
         ..., description='List of all molecular orbitals'
     )
@@ -575,7 +600,7 @@ class Data8(BaseModel):
 
 class OrbitalsResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data8
+    data: Data9
 
 
 class GenerationParams(BaseModel):
@@ -589,7 +614,7 @@ class GenerationParams(BaseModel):
     file_size_kb: Optional[float] = Field(None, description='Generated file size in KB')
 
 
-class Data9(BaseModel):
+class Data10(BaseModel):
     cube_data: str = Field(..., description='CUBE file content as string')
     orbital_info: OrbitalInfo
     generation_params: GenerationParams
@@ -603,7 +628,7 @@ class Data9(BaseModel):
 
 class OrbitalCubeResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data9
+    data: Data10
 
 
 class CubeFile(BaseModel):
@@ -615,7 +640,7 @@ class CubeFile(BaseModel):
     modified: AwareDatetime = Field(..., description='Last modified timestamp')
 
 
-class Data10(BaseModel):
+class Data11(BaseModel):
     calculation_id: str = Field(..., description='ID of the calculation')
     cube_files: List[CubeFile] = Field(..., description='List of CUBE files')
     total_files: int = Field(..., description='Total number of CUBE files')
@@ -624,10 +649,10 @@ class Data10(BaseModel):
 
 class CubeFilesListResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data10
+    data: Data11
 
 
-class Data11(BaseModel):
+class Data12(BaseModel):
     calculation_id: str = Field(..., description='ID of the calculation')
     orbital_index: Optional[int] = Field(
         None, description='Orbital index that was deleted (if specific)'
@@ -638,7 +663,7 @@ class Data11(BaseModel):
 
 class CubeFilesDeleteResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data11
+    data: Data12
 
 
 class SolventOption(BaseModel):
@@ -821,13 +846,13 @@ class AppSettings(BaseModel):
     )
 
 
-class Data12(BaseModel):
+class Data13(BaseModel):
     settings: AppSettings
 
 
 class SettingsResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data12
+    data: Data13
 
 
 class SettingsUpdateRequest(RootModel[AppSettings]):
@@ -1396,13 +1421,13 @@ class AgentChatRequest(BaseModel):
     )
 
 
-class Data13(BaseModel):
+class Data14(BaseModel):
     reply: str = Field(..., description='Response message from the AI agent')
 
 
 class AgentChatResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data13
+    data: Data14
 
 
 class Role1(Enum):
@@ -1472,23 +1497,23 @@ class UpdateChatSessionRequest(BaseModel):
     )
 
 
-class Data14(BaseModel):
+class Data15(BaseModel):
     sessions: List[ChatSessionSummary] = Field(..., description='List of chat sessions')
     total_count: int = Field(..., description='Total number of sessions', ge=0)
 
 
 class ChatHistoryListResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data14
+    data: Data15
 
 
-class Data15(BaseModel):
+class Data16(BaseModel):
     session: ChatSession
 
 
 class ChatSessionResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data15
+    data: Data16
 
 
 class ChatSessionDetailResponse(BaseModel):
@@ -1496,17 +1521,17 @@ class ChatSessionDetailResponse(BaseModel):
     data: ChatSessionDetail
 
 
-class Data16(BaseModel):
+class Data17(BaseModel):
     message: str = Field(..., description='Deletion confirmation message')
     deleted_id: str = Field(..., description='ID of the deleted session')
 
 
 class ChatSessionDeleteResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data16
+    data: Data17
 
 
-class Data17(BaseModel):
+class Data18(BaseModel):
     message: str = Field(
         ...,
         description='Confirmation message',
@@ -1519,7 +1544,7 @@ class Data17(BaseModel):
 
 class PauseCalculationResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data17
+    data: Data18
 
 
 class CalculationResults(BaseModel):
@@ -1763,14 +1788,14 @@ class StartCalculationResponse(BaseModel):
     data: Data3
 
 
-class Data5(BaseModel):
+class Data6(BaseModel):
     calculation: CalculationInstance
     files: Files
 
 
 class CalculationDetailsResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data5
+    data: Data6
 
 
 class SupportedParametersData(BaseModel):
@@ -1823,7 +1848,7 @@ class IRSpectrumDetails(BaseModel):
     metadata: IRSpectrumMetadata
 
 
-class Data18(BaseModel):
+class Data19(BaseModel):
     message: str = Field(
         ...,
         description='Confirmation message',
@@ -1834,7 +1859,7 @@ class Data18(BaseModel):
 
 class ResumeCalculationResponse(BaseModel):
     success: bool = Field(..., examples=[True])
-    data: Data18
+    data: Data19
 
 
 class IRSpectrumData(BaseModel):

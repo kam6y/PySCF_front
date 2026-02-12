@@ -283,8 +283,6 @@ export const DrawMoleculePage: React.FC = () => {
     }
   };
 
-
-
   // ステータスメッセージの生成
   const getStatusMessage = () => {
     if (!activeCalculation) return null;
@@ -315,7 +313,7 @@ export const DrawMoleculePage: React.FC = () => {
 
         {/* アクションボタン */}
         <div className={styles.actionsContainer}>
-<button
+          <button
             className={styles.convertButton}
             onClick={handleConvertToXyz}
             disabled={isConverting || !canEdit}

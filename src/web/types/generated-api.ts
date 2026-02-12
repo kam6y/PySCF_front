@@ -124,6 +124,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quantum/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get calculation system status
+         * @description Get current process pool and host system status for quantum calculations
+         */
+        get: operations["getCalculationStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quantum/calculations/{calculationId}": {
         parameters: {
             query?: never;
@@ -136,7 +156,11 @@ export interface paths {
          * @description Get detailed information about a specific calculation
          */
         get: operations["getCalculationDetails"];
-        put?: never;
+        /**
+         * Update calculation metadata
+         * @description Update calculation name and other metadata
+         */
+        put: operations["patchCalculation"];
         post?: never;
         /**
          * Delete calculation
@@ -145,11 +169,7 @@ export interface paths {
         delete: operations["deleteCalculation"];
         options?: never;
         head?: never;
-        /**
-         * Update calculation metadata
-         * @description Update calculation name and other metadata
-         */
-        patch: operations["patchCalculation"];
+        patch?: never;
         trace?: never;
     };
     "/api/quantum/calculations/{calculationId}/pause": {
@@ -1126,6 +1146,23 @@ export interface components {
                 calculations: components["schemas"]["CalculationSummary"][];
                 /** @description Number of calculations */
                 count: number;
+            };
+        };
+        CalculationStatusResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                process_pool: {
+                    max_workers: number;
+                    /** @description Currently active calculation IDs */
+                    active_calculations: string[];
+                    active_count: number;
+                    is_shutdown: boolean;
+                };
+                system: {
+                    /** @description Number of CPU cores available on host machine */
+                    cpu_count: number | null;
+                };
             };
         };
         CalculationDetailsResponse: {
@@ -2425,6 +2462,44 @@ export interface operations {
             };
         };
     };
+    getCalculationStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculation system status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationStatusResponse"];
+                };
+            };
+            /** @description Failed to get calculation system status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Process manager temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     getCalculationDetails: {
         parameters: {
             query?: never;
@@ -2456,47 +2531,6 @@ export interface operations {
                 };
             };
             /** @description Failed to get calculation details */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    deleteCalculation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Unique calculation ID */
-                calculationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Calculation deleted successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalculationDeleteResponse"];
-                };
-            };
-            /** @description Calculation not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to delete calculation */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2551,6 +2585,47 @@ export interface operations {
                 };
             };
             /** @description Failed to update calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    deleteCalculation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Unique calculation ID */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculation deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationDeleteResponse"];
+                };
+            };
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete calculation */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2797,7 +2872,7 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Specific orbital index to delete (if not provided, deletes all) */
-                orbitalIndex?: number;
+                orbital_index?: number;
             };
             header?: never;
             path: {
@@ -2841,13 +2916,13 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Full width at half maximum for Lorentzian broadening in cm⁻¹ */
-                broadeningFwhm?: number;
+                broadening_fwhm?: number;
                 /** @description Minimum wavenumber for spectrum range in cm⁻¹ */
-                xMin?: number;
+                x_min?: number;
                 /** @description Maximum wavenumber for spectrum range in cm⁻¹ */
-                xMax?: number;
+                x_max?: number;
                 /** @description Whether to mark individual peaks in the plot */
-                showPeaks?: boolean;
+                show_peaks?: boolean;
             };
             header?: never;
             path: {
