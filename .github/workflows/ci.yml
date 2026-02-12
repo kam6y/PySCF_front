@@ -91,6 +91,8 @@ jobs:
         npm run build:webpack
 
         # Build conda-pack (CI version - without conda.sh sourcing)
+        # Ensure setuptools is available (conda-pack requires pkg_resources)
+        pip install setuptools
         rm -rf conda_env
         conda-pack -o conda_env.tar.gz
         mkdir -p conda_env
