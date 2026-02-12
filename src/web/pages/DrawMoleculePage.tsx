@@ -283,24 +283,7 @@ export const DrawMoleculePage: React.FC = () => {
     }
   };
 
-  // 分子をクリア
-  const handleClearMolecule = async () => {
-    if (!ketcherInstanceRef.current) return;
 
-    try {
-      await ketcherInstanceRef.current.setMolecule('');
-      setConvertError(null);
-      addNotification({
-        type: 'info',
-        title: 'Cleared',
-        message: 'Molecule cleared',
-        autoClose: true,
-        duration: 2000,
-      });
-    } catch (error) {
-      console.error('Failed to clear molecule:', error);
-    }
-  };
 
   // ステータスメッセージの生成
   const getStatusMessage = () => {
@@ -328,22 +311,11 @@ export const DrawMoleculePage: React.FC = () => {
       <div className={styles.headerRow}>
         <div className={styles.pageHeader}>
           <h2 className={styles.pageTitle}>Draw Molecule</h2>
-          <p className={styles.pageDescription}>
-            Draw your molecule structure and convert it to XYZ coordinates for
-            quantum calculations
-          </p>
         </div>
 
         {/* アクションボタン */}
         <div className={styles.actionsContainer}>
-          <button
-            className={styles.clearButton}
-            onClick={handleClearMolecule}
-            disabled={isConverting || !canEdit}
-          >
-            Clear Molecule
-          </button>
-          <button
+<button
             className={styles.convertButton}
             onClick={handleConvertToXyz}
             disabled={isConverting || !canEdit}
