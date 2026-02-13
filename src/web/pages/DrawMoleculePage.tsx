@@ -11,6 +11,10 @@ import { useUIStore } from '../store/uiStore';
 import { useCalculationStore } from '../store/calculationStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { useActiveCalculation } from '../hooks/useActiveCalculation';
+import {
+  DEFAULT_CALCULATION_PARAMETERS,
+  STATUS_MESSAGES,
+} from '../constants/calculationDefaults';
 
 // Miewをwindowに設定（Ketcherが3D表示に使用）
 if (typeof window !== 'undefined') {
@@ -64,24 +68,9 @@ export const DrawMoleculePage: React.FC = () => {
     activeCalculation.status === 'error' ||
     activeCalculation.status === 'completed';
 
-  // ページマウント時のログ
-  useEffect(() => {
-    console.log('[DrawMoleculePage] Component mounted/updated', {
-      activeCalculationId: activeCalculation?.id,
-      hasKetcherData: !!activeCalculation?.parameters?.ketcher_data,
-      ketcherDataLength: activeCalculation?.parameters?.ketcher_data?.length,
-      status: activeCalculation?.status,
-    });
-  }, [activeCalculation?.id]);
-
   // Ketcherインスタンスの初期化（メモ化して安定化）
   const handleOnInit = useCallback((ketcher: Ketcher) => {
     ketcherInstanceRef.current = ketcher;
-
-    // デバッグ用にwindowにも設定
-    if (typeof window !== 'undefined') {
-      (window as any).ketcher = ketcher;
-    }
 
     // 少し遅延してから復元（複数回の初期化に対応）
     setTimeout(() => {
@@ -201,33 +190,15 @@ export const DrawMoleculePage: React.FC = () => {
 
         // 新しいIDを生成（新規計算または既存完了計算の編集の場合）
         const newId = isExistingCompleted
-          ? `new-calculation-${Date.now()}`
-          : activeCalculation?.id || `new-calculation-${Date.now()}`;
+          ? `new-calculation-${crypto.randomUUID()}`
+          : activeCalculation?.id || `new-calculation-${crypto.randomUUID()}`;
 
         const moleculeName = smiles.substring(0, 50);
         const calculationName = `Drawn Molecule (${moleculeName}${smiles.length > 50 ? '...' : ''})`;
 
         // 既存の計算パラメータを引き継ぐか、デフォルト値を使用
-        const baseParams = activeCalculation?.parameters || {
-          calculation_method: 'DFT' as const,
-          basis_function: '6-31G(d)',
-          exchange_correlation: 'B3LYP',
-          charges: 0,
-          spin: 0,
-          solvent_method: 'none' as const,
-          solvent: '-',
-          tddft_nstates: 10,
-          tddft_method: 'TDDFT' as const,
-          tddft_analyze_nto: false,
-          ncas: 4,
-          nelecas: 4,
-          max_cycle_macro: 50,
-          max_cycle_micro: 4,
-          natorb: true,
-          conv_tol: 1e-6,
-          conv_tol_grad: 1e-4,
-          optimize_geometry: true,
-        };
+        const baseParams =
+          activeCalculation?.parameters || DEFAULT_CALCULATION_PARAMETERS;
 
         const newCalculation = {
           id: newId,
@@ -283,25 +254,9 @@ export const DrawMoleculePage: React.FC = () => {
     }
   };
 
-  // ステータスメッセージの生成
-  const getStatusMessage = () => {
-    if (!activeCalculation) return null;
-
-    switch (activeCalculation.status) {
-      case 'running':
-        return 'Calculation is running. The molecule structure is read-only.';
-      case 'waiting':
-        return 'Calculation is waiting for resources. The molecule structure is read-only.';
-      case 'completed':
-        return 'Calculation completed. Edit the structure to create a new calculation.';
-      case 'error':
-        return 'Previous calculation had errors. Edit the structure to create a new calculation.';
-      default:
-        return null;
-    }
-  };
-
-  const statusMessage = getStatusMessage();
+  const statusMessage = activeCalculation
+    ? STATUS_MESSAGES[activeCalculation.status] ?? null
+    : null;
 
   return (
     <div className={styles.pageContainer}>

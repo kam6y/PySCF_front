@@ -14,6 +14,53 @@ import { ConfirmationModal } from '../components/ConfirmationModal';
 import { ChatMessage } from '../components/ChatMessage';
 import styles from './AgentPage.module.css';
 
+const samplePrompts = [
+  {
+    text: 'Run a DFT calculation for a water molecule',
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
+      />
+    ),
+  },
+  {
+    text: 'Research the structure of photocatalysts',
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+      />
+    ),
+  },
+  {
+    text: 'Extend absorption wavelength based on benzene ring',
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M13 10V3L4 14h7v7l9-11h-7z"
+      />
+    ),
+  },
+  {
+    text: 'Analyze the latest completed calculation',
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+      />
+    ),
+  },
+];
+
 export const AgentPage = React.memo(() => {
   // Zustandストアから会話履歴とエージェントステータスを取得
   const history = useAgentStore(state => state.history);
@@ -110,7 +157,6 @@ export const AgentPage = React.memo(() => {
     setHistory,
     clearHistory,
     isLoading,
-    queryClient,
   ]);
 
   // Handle new chat confirm (defined first to avoid reference error)
@@ -240,8 +286,6 @@ export const AgentPage = React.memo(() => {
 
   // メッセージ送信のキャンセル処理
   const handleCancelMessage = useCallback(() => {
-    console.log('[AgentPage] Cancelling message send...');
-
     // ストリームを中断
     if (abortStreamRef.current) {
       abortStreamRef.current();
@@ -272,8 +316,6 @@ export const AgentPage = React.memo(() => {
       autoClose: true,
       duration: 3000,
     });
-
-    console.log('[AgentPage] Message send cancelled successfully');
   }, [setAgentStatus, setHistory, addNotification]);
 
   // メッセージ送信処理
@@ -349,7 +391,7 @@ export const AgentPage = React.memo(() => {
     };
 
     // ユニークIDを使用してメッセージを識別
-    const tempMessageId = Date.now();
+    const tempMessageId = crypto.randomUUID();
     const aiPlaceholder: ChatHistory = {
       role: 'model',
       parts: [{ text: '' }],
@@ -509,54 +551,6 @@ export const AgentPage = React.memo(() => {
       chatWindowRef.current.scrollTop = chatWindowRef.current.scrollHeight;
     }
   }, [history]);
-
-  // サンプルプロンプトの定義
-  const samplePrompts = [
-    {
-      text: 'Run a DFT calculation for a water molecule',
-      icon: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
-        />
-      ),
-    },
-    {
-      text: 'Research the structure of photocatalysts',
-      icon: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-        />
-      ),
-    },
-    {
-      text: 'Extend absorption wavelength based on benzene ring',
-      icon: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M13 10V3L4 14h7v7l9-11h-7z"
-        />
-      ),
-    },
-    {
-      text: 'Analyze the latest completed calculation',
-      icon: (
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-        />
-      ),
-    },
-  ];
 
   // サンプルプロンプトクリック時のハンドラー
   const handlePromptClick = useCallback(

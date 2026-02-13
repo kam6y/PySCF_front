@@ -17,6 +17,11 @@ import { searchPubChem, convertSmilesToXyz } from '../apiClient';
 import { useSupportedParameters } from '../hooks/useCalculationQueries';
 import { useAppSettings, useGpu4PyscfStatus } from '../hooks';
 import { useMethodDefaults } from '../hooks/useMethodDefaults';
+import {
+  CALCULATION_BUTTON_TEXT,
+  INPUT_PLACEHOLDERS,
+  isCustomDielectricConstant,
+} from '../constants/calculationDefaults';
 
 // Helper type to extract all keys from a union type
 type DistributiveKeyOf<T> = T extends any ? keyof T : never;
@@ -76,6 +81,20 @@ export const CalculationSettingsPage = ({
   const isGpuAccelerationEnabled =
     appSettings?.gpu_acceleration_enabled ?? false;
   const gpuCapableMethods = useMemo(() => new Set(['HF', 'DFT', 'TDDFT']), []);
+  const isCompleted = useMemo(
+    () =>
+      activeCalculation?.status === 'completed' ||
+      activeCalculation?.status === 'error',
+    [activeCalculation?.status]
+  );
+  const solventDisplayValue = useMemo((): string => {
+    const solventValue = activeCalculation?.parameters?.solvent || '-';
+    return isCustomDielectricConstant(solventValue) ? 'custom' : solventValue;
+  }, [activeCalculation?.parameters?.solvent]);
+  const customDielectricValue = useMemo((): string => {
+    const solventValue = activeCalculation?.parameters?.solvent || '';
+    return isCustomDielectricConstant(solventValue) ? solventValue : '';
+  }, [activeCalculation?.parameters?.solvent]);
 
   // Initialize local state when active calculation changes
   useEffect(() => {
@@ -101,7 +120,12 @@ export const CalculationSettingsPage = ({
     }
 
     previousCalculationIdRef.current = currentCalculationId;
-  }, [activeCalculation, isEditingName]);
+  }, [
+    activeCalculation?.id,
+    activeCalculation?.name,
+    activeCalculation?.parameters?.molecule_name,
+    isEditingName,
+  ]);
 
   useEffect(() => {
     // Re-apply the current style when atomic radii setting changes
@@ -147,9 +171,6 @@ export const CalculationSettingsPage = ({
         return;
       }
 
-      const isCompleted =
-        activeCalculation.status === 'completed' ||
-        activeCalculation.status === 'error';
       const currentParams = activeCalculation.parameters;
 
       let processedValue = value;
@@ -188,6 +209,7 @@ export const CalculationSettingsPage = ({
       onCalculationUpdate,
       createNewCalculationFromExisting,
       applyMethodDefaults,
+      isCompleted,
     ]
   );
 
@@ -204,9 +226,6 @@ export const CalculationSettingsPage = ({
   const handleXYZChange = useCallback(
     (xyzData: string, isValid: boolean) => {
       if (isValid && activeCalculation) {
-        const isCompleted =
-          activeCalculation.status === 'completed' ||
-          activeCalculation.status === 'error';
         const currentParams = activeCalculation.parameters;
 
         const updatedParams = {
@@ -224,7 +243,12 @@ export const CalculationSettingsPage = ({
         }
       }
     },
-    [activeCalculation, onCalculationUpdate, createNewCalculationFromExisting]
+    [
+      activeCalculation,
+      onCalculationUpdate,
+      createNewCalculationFromExisting,
+      isCompleted,
+    ]
   );
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -360,10 +384,6 @@ export const CalculationSettingsPage = ({
 
       setLocalName(moleculeName);
 
-      const isCompleted =
-        activeCalculation.status === 'completed' ||
-        activeCalculation.status === 'error';
-
       const updatedParams = {
         ...params,
         xyz: data.xyz,
@@ -388,69 +408,6 @@ export const CalculationSettingsPage = ({
     } finally {
       setIsConverting(false);
     }
-  };
-
-  const getInputPlaceholder = () => {
-    return inputMethod === 'smiles'
-      ? 'e.g., CCO for ethanol'
-      : 'e.g., aspirin, or 2244';
-  };
-
-  const getCalculationButtonText = () => {
-    switch (calculationStatus) {
-      case 'running':
-        return 'Running...';
-      case 'waiting':
-        return 'Waiting...';
-      case 'completed':
-        return 'Completed!';
-      case 'error':
-        return 'Error';
-      default:
-        return '+ Start Calc';
-    }
-  };
-
-  const isCustomDielectricConstant = (
-    solventValue: string | undefined
-  ): boolean => {
-    if (!solventValue || solventValue === '-') return false;
-
-    const predefinedSolvents = [
-      'water',
-      'dimethylsulfoxide',
-      'n,n-dimethylformamide',
-      'nitromethane',
-      'methanol',
-      'ethanol',
-      'acetone',
-      'dichloroethane',
-      'dichloromethane',
-      'tetrahydrofuran',
-      'chlorobenzene',
-      'chloroform',
-      'diethylether',
-      'toluene',
-      'benzene',
-      '1,4-dioxane',
-      'cyclohexane',
-      'custom',
-    ];
-
-    if (predefinedSolvents.includes(solventValue.toLowerCase())) return false;
-
-    const numValue = parseFloat(solventValue);
-    return !isNaN(numValue) && numValue > 0;
-  };
-
-  const getSolventDisplayValue = (): string => {
-    const solventValue = params.solvent || '-';
-    return isCustomDielectricConstant(solventValue) ? 'custom' : solventValue;
-  };
-
-  const getCustomDielectricValue = (): string => {
-    const solventValue = params.solvent || '';
-    return isCustomDielectricConstant(solventValue) ? solventValue : '';
   };
 
   return (
@@ -592,7 +549,8 @@ export const CalculationSettingsPage = ({
                     !hasValidMolecule || calculationStatus === 'completed'
                   }
                 >
-                  {getCalculationButtonText()}
+                  {CALCULATION_BUTTON_TEXT[calculationStatus] ??
+                    '+ Start Calc'}
                 </button>
               )}
             </div>
@@ -1044,7 +1002,7 @@ export const CalculationSettingsPage = ({
               <div className={styles.settingRow}>
                 <label>Solvent(dielectric constant)</label>
                 <select
-                  value={getSolventDisplayValue()}
+                  value={solventDisplayValue}
                   onChange={e => handleParamChange('solvent', e.target.value)}
                   disabled={
                     params.solvent_method === 'none' ||
@@ -1084,7 +1042,7 @@ export const CalculationSettingsPage = ({
                     <input
                       type="number"
                       min="0"
-                      value={getCustomDielectricValue()}
+                      value={customDielectricValue}
                       onChange={e =>
                         handleParamChange('solvent', e.target.value || '78.36')
                       }
@@ -1144,7 +1102,9 @@ export const CalculationSettingsPage = ({
             <input
               type="text"
               value={pubchemInput}
-              placeholder={getInputPlaceholder()}
+              placeholder={
+                INPUT_PLACEHOLDERS[inputMethod] ?? INPUT_PLACEHOLDERS.pubchem
+              }
               onChange={e => {
                 setPubchemInput(e.target.value);
                 if (convertError) setConvertError(null);

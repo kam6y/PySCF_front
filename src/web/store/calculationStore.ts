@@ -74,7 +74,7 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       // Method-specific parameters will be set by useMethodDefaults
     } as QuantumCalculationRequest;
 
-    const newId = `new-calculation-${Date.now()}`;
+    const newId = `new-calculation-${crypto.randomUUID()}`;
     const newCalculation: CalculationInstance = {
       id: newId,
       name: '',
@@ -99,7 +99,7 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
     originalCalc: CalculationInstance,
     newParams: QuantumCalculationRequest
   ) => {
-    const newId = `new-calculation-${Date.now()}`;
+    const newId = `new-calculation-${crypto.randomUUID()}`;
     const newCalculation: CalculationInstance = {
       ...originalCalc,
       id: newId,

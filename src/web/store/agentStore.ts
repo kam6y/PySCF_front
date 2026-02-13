@@ -5,7 +5,7 @@ export type ChatHistory = {
   role: 'user' | 'model';
   parts: { text: string }[];
   isStreaming?: boolean;
-  tempId?: number;
+  tempId?: string;
 };
 
 // エージェントステータスの型定義
