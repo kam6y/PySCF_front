@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppSettings, useGpu4Pyscf } from '../hooks';
 import {
   TIMEZONE_LABELS,
@@ -20,32 +20,30 @@ interface SettingsPageProps {
   // Props will be added when integrating with the main app
 }
 
+interface SettingsFormValues {
+  maxParallelInstances?: number;
+  maxCpuUtilization?: number;
+  maxMemoryUtilization?: number;
+  geminiApiKey: string;
+  calculationsDirectory: string;
+  timezone: Timezone;
+  gpuAccelerationEnabled: boolean;
+}
+
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
-  const [maxParallelInstances, setMaxParallelInstances] = useState<
-    number | undefined
-  >(undefined);
-  const [maxCpuUtilization, setMaxCpuUtilization] = useState<
-    number | undefined
-  >(undefined);
-  const [maxMemoryUtilization, setMaxMemoryUtilization] = useState<
-    number | undefined
-  >(undefined);
-  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
-  const [calculationsDirectory, setCalculationsDirectory] =
-    useState<string>('');
-  const [timezone, setTimezone] = useState<Timezone>('UTC');
+  const [formValues, setFormValues] = useState<SettingsFormValues>({
+    geminiApiKey: '',
+    calculationsDirectory: '',
+    timezone: 'UTC',
+    gpuAccelerationEnabled: false,
+  });
   const [isSelectingFolder, setIsSelectingFolder] = useState(false);
-  const [gpuAccelerationEnabled, setGpuAccelerationEnabled] =
-    useState<boolean>(false);
-  const [originalValues, setOriginalValues] = useState<{
-    maxParallelInstances?: number;
-    maxCpuUtilization?: number;
-    maxMemoryUtilization?: number;
-    geminiApiKey?: string;
-    calculationsDirectory?: string;
-    timezone?: Timezone;
-    gpuAccelerationEnabled?: boolean;
-  }>({});
+  const [originalValues, setOriginalValues] = useState<SettingsFormValues>({
+    geminiApiKey: '',
+    calculationsDirectory: '',
+    timezone: 'UTC',
+    gpuAccelerationEnabled: false,
+  });
 
   const { settings, isLoading, isUpdating, error, updateSettings } =
     useAppSettings();
@@ -59,6 +57,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     refetch: refetchGpuStatus,
   } = useGpu4Pyscf();
 
+  const updateFormValue = <K extends keyof SettingsFormValues>(
+    key: K,
+    value: SettingsFormValues[K]
+  ) => {
+    setFormValues(prev => ({ ...prev, [key]: value }));
+  };
+
   // Update local state when settings are loaded
   useEffect(() => {
     if (settings) {
@@ -71,7 +76,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         settings.max_memory_utilization_percent
       );
 
-      const newValues = {
+      const newValues: SettingsFormValues = {
         maxParallelInstances: !isNaN(maxParallelInstancesValue)
           ? maxParallelInstancesValue
           : DEFAULT_MAX_PARALLEL_INSTANCES,
@@ -87,24 +92,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         gpuAccelerationEnabled: settings.gpu_acceleration_enabled ?? false,
       };
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('SettingsPage: Loading settings', { settings, newValues });
-      }
-
-      setMaxParallelInstances(newValues.maxParallelInstances);
-      setMaxCpuUtilization(newValues.maxCpuUtilization);
-      setMaxMemoryUtilization(newValues.maxMemoryUtilization);
-      setGeminiApiKey(newValues.geminiApiKey);
-      setCalculationsDirectory(newValues.calculationsDirectory);
-      setTimezone(newValues.timezone);
-      setGpuAccelerationEnabled(newValues.gpuAccelerationEnabled ?? false);
+      setFormValues(newValues);
       setOriginalValues(newValues);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('SettingsPage: State updated', {
-          originalValues: newValues,
-        });
-      }
     }
   }, [settings]);
 
@@ -112,50 +101,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     try {
       updateSettings({
         max_parallel_instances:
-          maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
+          formValues.maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
         max_cpu_utilization_percent:
-          maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION,
+          formValues.maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION,
         max_memory_utilization_percent:
-          maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
-        gpu_acceleration_enabled: gpuAccelerationEnabled,
+          formValues.maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
+        gpu_acceleration_enabled: formValues.gpuAccelerationEnabled,
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
-        calculations_directory: calculationsDirectory,
-        timezone: timezone,
-        gemini_api_key: geminiApiKey || null,
+        calculations_directory: formValues.calculationsDirectory,
+        timezone: formValues.timezone,
+        gemini_api_key: formValues.geminiApiKey || null,
       });
 
-      const newValues = {
-        maxParallelInstances,
-        maxCpuUtilization,
-        maxMemoryUtilization,
-        geminiApiKey,
-        calculationsDirectory,
-        timezone,
-        gpuAccelerationEnabled,
-      };
+      const newValues = { ...formValues };
       setOriginalValues(newValues);
     } catch (error) {
       console.error('Failed to save settings:', error);
-      // Reset to original values on error
-      setMaxParallelInstances(originalValues.maxParallelInstances);
-      setMaxCpuUtilization(originalValues.maxCpuUtilization);
-      setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
-      setGeminiApiKey(originalValues.geminiApiKey || '');
-      setCalculationsDirectory(originalValues.calculationsDirectory || '');
-      setTimezone(originalValues.timezone || 'UTC');
-      setGpuAccelerationEnabled(originalValues.gpuAccelerationEnabled ?? false);
+      setFormValues({ ...originalValues });
     }
   };
 
   const handleCancel = () => {
-    setMaxParallelInstances(originalValues.maxParallelInstances);
-    setMaxCpuUtilization(originalValues.maxCpuUtilization);
-    setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
-    setGeminiApiKey(originalValues.geminiApiKey || '');
-    setCalculationsDirectory(originalValues.calculationsDirectory || '');
-    setTimezone(originalValues.timezone || 'UTC');
-    setGpuAccelerationEnabled(originalValues.gpuAccelerationEnabled ?? false);
+    setFormValues({ ...originalValues });
   };
 
   const handleSelectFolder = async () => {
@@ -165,7 +133,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
       if (!result.canceled && result.filePath) {
         // Append /PySCF_calculations to the selected path
         const fullPath = `${result.filePath}/PySCF_calculations`;
-        setCalculationsDirectory(fullPath);
+        updateFormValue('calculationsDirectory', fullPath);
       }
     } catch (error) {
       console.error('Failed to select folder:', error);
@@ -175,95 +143,52 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   };
 
   const hasUnsavedChanges = useMemo(() => {
-    // Return false if settings haven't been loaded yet
-    if (!originalValues || Object.keys(originalValues).length === 0) {
-      return false;
-    }
+    // settings 未ロード時は変更なしとみなす
+    if (!settings) return false;
 
-    // Use default values for comparison if values are undefined
-    const currentParallel =
-      maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
-    const currentCpu = maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
-    const currentMemory =
-      maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
-    const currentGeminiApiKey = geminiApiKey;
-    const currentCalculationsDirectory = calculationsDirectory;
-    const currentTimezone = timezone;
-    const currentGpuEnabled = gpuAccelerationEnabled ?? false;
+    const floatClose = (
+      a: number | undefined,
+      b: number | undefined,
+      defaultValue: number
+    ) => Math.abs((a ?? defaultValue) - (b ?? defaultValue)) <= 0.001;
 
-    const originalParallel =
-      originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
-    const originalCpu =
-      originalValues.maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
-    const originalMemory =
-      originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
-    const originalGeminiApiKey = originalValues.geminiApiKey || '';
-    const originalCalculationsDirectory =
-      originalValues.calculationsDirectory || '';
-    const originalTimezone = originalValues.timezone || 'UTC';
-    const originalGpuEnabled = originalValues.gpuAccelerationEnabled ?? false;
+    if (
+      (formValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES) !==
+      (originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES)
+    )
+      return true;
+    if (
+      !floatClose(
+        formValues.maxCpuUtilization,
+        originalValues.maxCpuUtilization,
+        DEFAULT_MAX_CPU_UTILIZATION
+      )
+    )
+      return true;
+    if (
+      !floatClose(
+        formValues.maxMemoryUtilization,
+        originalValues.maxMemoryUtilization,
+        DEFAULT_MAX_MEMORY_UTILIZATION
+      )
+    )
+      return true;
+    if (formValues.geminiApiKey !== (originalValues.geminiApiKey || ''))
+      return true;
+    if (
+      formValues.calculationsDirectory !==
+      (originalValues.calculationsDirectory || '')
+    )
+      return true;
+    if (formValues.timezone !== (originalValues.timezone || 'UTC')) return true;
+    if (
+      (formValues.gpuAccelerationEnabled ?? false) !==
+      (originalValues.gpuAccelerationEnabled ?? false)
+    )
+      return true;
 
-    const parallelChanged = currentParallel !== originalParallel;
-    const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
-    const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
-    const geminiApiKeyChanged = currentGeminiApiKey !== originalGeminiApiKey;
-    const calculationsDirectoryChanged =
-      currentCalculationsDirectory !== originalCalculationsDirectory;
-    const timezoneChanged = currentTimezone !== originalTimezone;
-    const gpuEnabledChanged = currentGpuEnabled !== originalGpuEnabled;
-
-    const hasChanges =
-      parallelChanged ||
-      cpuChanged ||
-      memoryChanged ||
-      geminiApiKeyChanged ||
-      calculationsDirectoryChanged ||
-      timezoneChanged ||
-      gpuEnabledChanged;
-
-    // Debug logging in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('SettingsPage: hasUnsavedChanges check', {
-        current: {
-          currentParallel,
-          currentCpu,
-          currentMemory,
-          currentGeminiApiKey,
-        },
-        original: {
-          originalParallel,
-          originalCpu,
-          originalMemory,
-          originalGeminiApiKey,
-        },
-        changes: {
-          parallelChanged,
-          cpuChanged,
-          memoryChanged,
-          geminiApiKeyChanged,
-          gpuEnabledChanged,
-        },
-        hasChanges,
-      });
-    }
-
-    return hasChanges;
-  }, [
-    maxParallelInstances,
-    maxCpuUtilization,
-    maxMemoryUtilization,
-    geminiApiKey,
-    calculationsDirectory,
-    timezone,
-    gpuAccelerationEnabled,
-    originalValues?.maxParallelInstances,
-    originalValues?.maxCpuUtilization,
-    originalValues?.maxMemoryUtilization,
-    originalValues?.geminiApiKey,
-    originalValues?.calculationsDirectory,
-    originalValues?.timezone,
-    originalValues?.gpuAccelerationEnabled,
-  ]);
+    return false;
+  }, [formValues, originalValues, settings]);
 
   const gpuInstallLabel = useMemo(() => {
     if (!gpuStatus) {
@@ -395,16 +320,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   min="1"
                   max="16"
                   step="1"
-                  value={maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES}
+                  value={
+                    formValues.maxParallelInstances ||
+                    DEFAULT_MAX_PARALLEL_INSTANCES
+                  }
                   onChange={e => {
                     const newValue = Number(e.target.value);
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: maxParallelInstances changed',
-                        newValue
-                      );
-                    }
-                    setMaxParallelInstances(newValue);
+                    updateFormValue('maxParallelInstances', newValue);
                   }}
                   className={styles.slider}
                   disabled={isUpdating}
@@ -420,7 +342,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
-                  {maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES}
+                  {formValues.maxParallelInstances ||
+                    DEFAULT_MAX_PARALLEL_INSTANCES}
                 </span>
                 <span className={styles.valueUnit}>calculations</span>
               </div>
@@ -445,16 +368,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   min="10"
                   max="100"
                   step="5"
-                  value={maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION}
+                  value={
+                    formValues.maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION
+                  }
                   onChange={e => {
                     const newValue = Number(e.target.value);
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: maxCpuUtilization changed',
-                        newValue
-                      );
-                    }
-                    setMaxCpuUtilization(newValue);
+                    updateFormValue('maxCpuUtilization', newValue);
                   }}
                   className={styles.slider}
                   disabled={isUpdating}
@@ -468,9 +387,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
-                  {(maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION).toFixed(
-                    0
-                  )}
+                  {(
+                    formValues.maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION
+                  ).toFixed(0)}
                   %
                 </span>
                 <span className={styles.valueUnit}>CPU</span>
@@ -498,16 +417,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   min="10"
                   max="100"
                   step="5"
-                  value={maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION}
+                  value={
+                    formValues.maxMemoryUtilization ||
+                    DEFAULT_MAX_MEMORY_UTILIZATION
+                  }
                   onChange={e => {
                     const newValue = Number(e.target.value);
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: maxMemoryUtilization changed',
-                        newValue
-                      );
-                    }
-                    setMaxMemoryUtilization(newValue);
+                    updateFormValue('maxMemoryUtilization', newValue);
                   }}
                   className={styles.slider}
                   disabled={isUpdating}
@@ -522,7 +438,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
                   {(
-                    maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION
+                    formValues.maxMemoryUtilization ||
+                    DEFAULT_MAX_MEMORY_UTILIZATION
                   ).toFixed(0)}
                   %
                 </span>
@@ -557,14 +474,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             <label className={styles.gpuToggle}>
               <input
                 type="checkbox"
-                checked={gpuAccelerationEnabled}
+                checked={formValues.gpuAccelerationEnabled}
                 onChange={event =>
-                  setGpuAccelerationEnabled(event.target.checked)
+                  updateFormValue('gpuAccelerationEnabled', event.target.checked)
                 }
                 disabled={
                   isUpdating ||
                   isGpuStatusLoading ||
-                  (!canEnableGpuAcceleration && !gpuAccelerationEnabled)
+                  (!canEnableGpuAcceleration && !formValues.gpuAccelerationEnabled)
                 }
               />
               <span className={styles.gpuToggleTrack}></span>
@@ -749,22 +666,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   id="geminiApiKey"
                   type="password"
                   placeholder="Enter your Gemini API key..."
-                  value={geminiApiKey}
+                  value={formValues.geminiApiKey}
                   onChange={e => {
                     const newValue = e.target.value;
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: geminiApiKey changed (length)',
-                        newValue.length
-                      );
-                    }
-                    setGeminiApiKey(newValue);
+                    updateFormValue('geminiApiKey', newValue);
                   }}
                   className={styles.textInput}
                   disabled={isUpdating}
                 />
                 <div className={styles.inputStatus}>
-                  {geminiApiKey ? (
+                  {formValues.geminiApiKey ? (
                     <span className={styles.statusConfigured}>
                       ✓ API Key Configured
                     </span>
@@ -796,13 +707,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               <div className={styles.selectContainer}>
                 <select
                   id="timezone"
-                  value={timezone}
+                  value={formValues.timezone}
                   onChange={e => {
                     const newValue = e.target.value as Timezone;
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log('SettingsPage: timezone changed', newValue);
-                    }
-                    setTimezone(newValue);
+                    updateFormValue('timezone', newValue);
                   }}
                   className={styles.selectInput}
                   disabled={isUpdating}
@@ -839,7 +747,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 <div className={styles.selectedTimezone}>
                   <span className={styles.timezoneLabel}>Selected:</span>
                   <span className={styles.timezoneValue}>
-                    {getTimezoneLabel(timezone)}
+                    {getTimezoneLabel(formValues.timezone)}
                   </span>
                 </div>
               </div>
@@ -868,7 +776,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   id="calculationsDirectory"
                   type="text"
                   placeholder="Calculations directory path..."
-                  value={calculationsDirectory}
+                  value={formValues.calculationsDirectory}
                   readOnly
                   className={styles.textInput}
                   style={{
@@ -883,7 +791,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   {isSelectingFolder ? 'Selecting...' : 'Change Folder...'}
                 </button>
               </div>
-              {calculationsDirectory !==
+              {formValues.calculationsDirectory !==
                 originalValues.calculationsDirectory && (
                 <div className={styles.warningBox}>
                   <span className={styles.warningIcon}>⚠</span>
