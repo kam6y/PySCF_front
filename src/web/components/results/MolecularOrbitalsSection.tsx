@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import { MolecularOrbitalViewer } from '../MolecularOrbitalViewer';
 import { MolecularOrbitalEnergyDiagram } from '../MolecularOrbitalEnergyDiagram';
@@ -10,12 +11,12 @@ interface MolecularOrbitalsSectionProps {
   onError: (error: string) => void;
 }
 
-export const MolecularOrbitalsSection = ({
+export const MolecularOrbitalsSection = React.memo<MolecularOrbitalsSectionProps>(({
   calculationId,
   selectedOrbitalIndex,
   onOrbitalSelect,
   onError,
-}: MolecularOrbitalsSectionProps) => {
+}) => {
   return (
 <section
   className={`${styles.calculationSection} ${styles.molecularOrbitalsSection}`}
@@ -58,4 +59,4 @@ export const MolecularOrbitalsSection = ({
   </div>
 </section>
   );
-};
+});

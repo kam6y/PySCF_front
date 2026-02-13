@@ -12,7 +12,7 @@ export interface XYZInputProps {
   value?: string; // Allow external control of the input value
 }
 
-export const XYZInput: React.FC<XYZInputProps> = ({
+export const XYZInput = React.memo<XYZInputProps>(({
   onXYZChange,
   className = '',
   value,
@@ -158,4 +158,4 @@ H   0.000000  -0.763239  -0.477047`}
       </div>
     </div>
   );
-};
+});

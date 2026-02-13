@@ -167,24 +167,13 @@ export const MoleculeViewer = ({
 
   useEffect(() => {
     if (!containerRef.current) {
-      console.log('MoleculeViewer - containerRef not ready');
       return;
     }
-
-    const containerWidth = containerRef.current.clientWidth;
-    const containerHeight = containerRef.current.clientHeight;
-    console.log(
-      'MoleculeViewer - initializing 3Dmol viewer, container size:',
-      containerWidth,
-      'x',
-      containerHeight
-    );
 
     let viewer: GLViewer | null = null;
     try {
       viewer = $3Dmol.createViewer(containerRef.current, { backgroundColor });
       viewerRef.current = viewer;
-      console.log('MoleculeViewer - 3Dmol viewer created successfully');
       const resizeObserver = new ResizeObserver(() => {
         viewer?.resize();
       });
@@ -205,16 +194,11 @@ export const MoleculeViewer = ({
   useEffect(() => {
     if (!xyzData || !viewerRef.current) return;
 
-    console.log('MoleculeViewer - loading XYZ from props');
     try {
       const viewer = viewerRef.current;
       viewer.removeAllModels();
       const model = viewer.addModel(xyzData, 'xyz');
       modelRef.current = model;
-      console.log(
-        'MoleculeViewer - XYZ loaded from props, atoms:',
-        model?.atoms?.length
-      );
 
       // Apply default ball-and-stick style
       viewer.setStyle(
@@ -244,7 +228,6 @@ export const MoleculeViewer = ({
 
   // Handle vibration mode changes via props
   useEffect(() => {
-    console.log('MoleculeViewer - vibrationMode changed:', vibrationMode);
     if (vibrationMode && vibrationMode.length > 0) {
       let retryCount = 0;
       const MAX_RETRIES = 50; // 最大50回 (5秒) まで再試行
@@ -261,20 +244,11 @@ export const MoleculeViewer = ({
             );
             return;
           }
-          console.log(
-            `MoleculeViewer - viewer not ready, retrying in 100ms... (attempt ${retryCount}/${MAX_RETRIES})`
-          );
           animationTimeoutRef.current = window.setTimeout(startAnimation, 100);
           return;
         }
 
         const model = modelRef.current;
-        console.log(
-          'MoleculeViewer - model from ref:',
-          model,
-          'atoms:',
-          model?.atoms?.length
-        );
 
         if (!model || !model.atoms || model.atoms.length === 0) {
           retryCount++;
@@ -286,9 +260,6 @@ export const MoleculeViewer = ({
             );
             return;
           }
-          console.log(
-            `MoleculeViewer - model not ready, retrying in 100ms... (attempt ${retryCount}/${MAX_RETRIES})`
-          );
           animationTimeoutRef.current = window.setTimeout(startAnimation, 100);
           return;
         }
@@ -337,7 +308,6 @@ export const MoleculeViewer = ({
           const displacement =
             Math.sin(phase * 2 * Math.PI) * animationAmplitude;
 
-          let updatedCount = 0;
           currentModel.atoms.forEach((atom, index) => {
             const basePos = basePositionsRef.current[index];
             const disp = displacementMap.get(index);
@@ -346,21 +316,8 @@ export const MoleculeViewer = ({
               atom.x = basePos.x + (disp.dx ?? 0) * displacement;
               atom.y = basePos.y + (disp.dy ?? 0) * displacement;
               atom.z = basePos.z + (disp.dz ?? 0) * displacement;
-              updatedCount++;
             }
           });
-
-          // 初回のみログ出力（フレームごとに出力すると大量になるため）
-          if (elapsed < 100) {
-            console.log(
-              'Updated atoms:',
-              updatedCount,
-              '/',
-              currentModel.atoms.length,
-              'displacement:',
-              displacement.toFixed(4)
-            );
-          }
 
           // 座標変更後、スタイルを再設定してジオメトリを再計算
           viewer.setStyle(
@@ -374,18 +331,6 @@ export const MoleculeViewer = ({
         };
 
         // Start animation loop
-        console.log(
-          'Starting animation interval with fps:',
-          fps,
-          'amplitude:',
-          animationAmplitude
-        );
-        console.log(
-          'DisplacementMap size:',
-          displacementMap.size,
-          'basePositions:',
-          basePositionsRef.current.length
-        );
         animationIntervalRef.current = window.setInterval(
           animateFrame,
           1000 / fps
@@ -544,15 +489,6 @@ export const MoleculeViewer = ({
     areCoordinatesVisibleRef.current = showCoordinates ?? false;
     updateOverlays(viewer);
   }, [showCoordinates]);
-
-  console.log(
-    'MoleculeViewer - rendering with width:',
-    width,
-    'height:',
-    height,
-    'vibrationMode:',
-    vibrationMode?.length
-  );
 
   return (
     <div

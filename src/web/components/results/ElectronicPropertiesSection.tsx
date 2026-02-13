@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import {
   CalculationInstance,
@@ -13,11 +14,11 @@ interface ElectronicPropertiesSectionProps {
   activeCalculation: Pick<CalculationInstance, 'id'>;
 }
 
-export const ElectronicPropertiesSection = ({
+export const ElectronicPropertiesSection = React.memo<ElectronicPropertiesSectionProps>(({
   results,
   parameters,
   activeCalculation,
-}: ElectronicPropertiesSectionProps) => {
+}) => {
   return (
 <section
   className={`${styles.calculationSection} ${styles.electronicPropertiesSection}`}
@@ -309,4 +310,4 @@ export const ElectronicPropertiesSection = ({
     )}
 </section>
   );
-};
+});

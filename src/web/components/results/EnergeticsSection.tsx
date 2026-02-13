@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import {
   CalculationParameters,
@@ -12,11 +13,11 @@ interface EnergeticsSectionProps {
   };
 }
 
-export const EnergeticsSection = ({
+export const EnergeticsSection = React.memo<EnergeticsSectionProps>(({
   results,
   parameters,
   processedData,
-}: EnergeticsSectionProps) => {
+}) => {
   return (
 <section
   className={`${styles.calculationSection} ${styles.energeticsSection}`}
@@ -362,4 +363,4 @@ export const EnergeticsSection = ({
   )}
 </section>
   );
-};
+});

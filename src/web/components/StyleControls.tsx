@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSpec } from '../../types/3dmol';
 import { VAN_DER_WAALS_RADII } from '../data/atomicRadii';
 import styles from './StyleControls.module.css';
@@ -60,50 +60,53 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   const [atomRadius, setAtomRadius] = useState(0.3);
   const [bondRadius, setBondRadius] = useState(0.15);
 
-  const generateStyleSpec = (style: VisualizationStyle): StyleSpec => {
-    switch (style) {
-      case 'stick':
-        return {
-          stick: {
-            radius: bondRadius,
-            colorscheme: 'default',
-          },
-        };
+  const generateStyleSpec = useCallback(
+    (style: VisualizationStyle): StyleSpec => {
+      switch (style) {
+        case 'stick':
+          return {
+            stick: {
+              radius: bondRadius,
+              colorscheme: 'default',
+            },
+          };
 
-      case 'sphere':
-        return {
-          sphere: {
-            radius: atomRadius,
-            colorscheme: 'default',
-          },
-        };
+        case 'sphere':
+          return {
+            sphere: {
+              radius: atomRadius,
+              colorscheme: 'default',
+            },
+          };
 
-      case 'ball-and-stick':
-        return {
-          stick: {
-            radius: bondRadius,
-            colorscheme: 'default',
-          },
-          sphere: {
-            radius: atomRadius,
-            colorscheme: 'default',
-          },
-        };
+        case 'ball-and-stick':
+          return {
+            stick: {
+              radius: bondRadius,
+              colorscheme: 'default',
+            },
+            sphere: {
+              radius: atomRadius,
+              colorscheme: 'default',
+            },
+          };
 
-      case 'line':
-        return {
-          line: {
-            linewidth: 2,
-          },
-        };
+        case 'line':
+          return {
+            line: {
+              linewidth: 2,
+            },
+          };
 
-      default:
-        return {
-          stick: { radius: 0.2 },
-          sphere: { radius: 0.3 },
-        };
-    }
-  };
+        default:
+          return {
+            stick: { radius: 0.2 },
+            sphere: { radius: 0.3 },
+          };
+      }
+    },
+    [atomRadius, bondRadius]
+  );
 
   useEffect(() => {
     const styleSpec = generateStyleSpec(selectedStyle);
@@ -115,7 +118,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       (styleSpec as any)._useAtomicRadii = false;
     }
     onStyleChange(styleSpec);
-  }, [selectedStyle, atomRadius, bondRadius, onStyleChange, useAtomicRadii]);
+  }, [selectedStyle, generateStyleSpec, onStyleChange, useAtomicRadii]);
 
   return (
     <div className={`${styles.styleControls} ${className}`}>

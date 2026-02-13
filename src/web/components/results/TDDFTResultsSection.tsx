@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import {
   CalculationParameters,
@@ -9,10 +10,10 @@ interface TDDFTResultsSectionProps {
   parameters: CalculationParameters;
 }
 
-export const TDDFTResultsSection = ({
+export const TDDFTResultsSection = React.memo<TDDFTResultsSectionProps>(({
   results,
   parameters,
-}: TDDFTResultsSectionProps) => {
+}) => {
   if (!results.excitation_energies) {
     return null;
   }
@@ -402,4 +403,4 @@ export const TDDFTResultsSection = ({
   )}
 </>
   );
-};
+});

@@ -1,4 +1,4 @@
-import { RefObject } from 'react';
+import React from 'react';
 import { MoleculeViewer } from './MoleculeViewer';
 import { StyleControls } from './StyleControls';
 import { StyleSpec } from '../../types/3dmol';
@@ -17,7 +17,7 @@ interface MoleculeViewerSectionProps {
   onUseAtomicRadiiChange: (use: boolean) => void;
 }
 
-export const MoleculeViewerSection = ({
+export const MoleculeViewerSection = React.memo<MoleculeViewerSectionProps>(({
   hasValidMolecule,
   xyzData,
   currentStyle,
@@ -28,7 +28,7 @@ export const MoleculeViewerSection = ({
   onShowCoordinatesChange,
   useAtomicRadii,
   onUseAtomicRadiiChange,
-}: MoleculeViewerSectionProps) => {
+}) => {
   return (
     <div className={styles.mainContent}>
       <div className={styles.leftColumn}>
@@ -66,4 +66,4 @@ export const MoleculeViewerSection = ({
       </section>
     </div>
   );
-};
+});

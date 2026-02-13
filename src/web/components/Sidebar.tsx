@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { CalculationSummary, ChatSessionSummary } from '../types/api-types';
 import { useGetCalculationDetails } from '../hooks/useCalculationQueries';
 import { useDeleteChatSession } from '../hooks/useChatHistoryQueries';
@@ -268,7 +268,7 @@ interface CalculationCardProps {
   onRequestDelete: (calculationId: string, calculationName: string) => void;
 }
 
-const CalculationCard: React.FC<CalculationCardProps> = ({
+const CalculationCard = React.memo<CalculationCardProps>(({
   calculation,
   isActive,
   onSelect,
@@ -353,7 +353,7 @@ const CalculationCard: React.FC<CalculationCardProps> = ({
       </div>
     </div>
   );
-};
+});
 
 interface SidebarProps {
   isOpen: boolean;
@@ -425,12 +425,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const clearHistory = useAgentStore(state => state.clearHistory);
 
   // Chat delete handlers
-  const handleRequestChatDelete = (sessionId: string, sessionName: string) => {
-    setChatToDelete({ id: sessionId, name: sessionName });
-    setIsChatDeleteModalOpen(true);
-  };
+  const handleRequestChatDelete = useCallback(
+    (sessionId: string, sessionName: string) => {
+      setChatToDelete({ id: sessionId, name: sessionName });
+      setIsChatDeleteModalOpen(true);
+    },
+    []
+  );
 
-  const handleConfirmChatDelete = async () => {
+  const handleConfirmChatDelete = useCallback(async () => {
     if (!chatToDelete) return;
 
     // 削除するセッションが現在アクティブなセッションの場合、状態をクリア
@@ -442,21 +445,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
     await deleteChatSession.mutateAsync(chatToDelete.id);
     setIsChatDeleteModalOpen(false);
     setChatToDelete(null);
-  };
+  }, [
+    chatToDelete,
+    activeSessionId,
+    clearActiveSession,
+    clearHistory,
+    deleteChatSession,
+  ]);
 
-  const handleCancelChatDelete = () => {
+  const handleCancelChatDelete = useCallback(() => {
     setIsChatDeleteModalOpen(false);
     setChatToDelete(null);
-  };
+  }, []);
 
   // Bulk delete handler for error instances
-  const handleBulkDeleteError = (errorCalculations: CalculationSummary[]) => {
-    if (errorCalculations.length === 0) return;
-    setCalculationsToDelete(errorCalculations);
-    setIsBulkDeleteModalOpen(true);
-  };
+  const handleBulkDeleteError = useCallback(
+    (errorCalculations: CalculationSummary[]) => {
+      if (errorCalculations.length === 0) return;
+      setCalculationsToDelete(errorCalculations);
+      setIsBulkDeleteModalOpen(true);
+    },
+    []
+  );
 
-  const handleConfirmBulkDelete = async () => {
+  const handleConfirmBulkDelete = useCallback(async () => {
     try {
       // Delete all error calculations in parallel
       await Promise.all(
@@ -470,32 +482,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       console.error('一括削除中にエラーが発生しました:', error);
       alert('Failed to delete some calculations.');
     }
-  };
+  }, [calculationsToDelete, onCalculationDelete]);
 
-  const handleCancelBulkDelete = () => {
+  const handleCancelBulkDelete = useCallback(() => {
     setIsBulkDeleteModalOpen(false);
     setCalculationsToDelete([]);
-  };
+  }, []);
 
-  const handleRequestDelete = (
-    calculationId: string,
-    calculationName: string
-  ) => {
-    setCalculationToDelete({ id: calculationId, name: calculationName });
-    setIsDeleteModalOpen(true);
-  };
+  const handleRequestDelete = useCallback(
+    (calculationId: string, calculationName: string) => {
+      setCalculationToDelete({ id: calculationId, name: calculationName });
+      setIsDeleteModalOpen(true);
+    },
+    []
+  );
 
-  const handleConfirmDelete = async () => {
+  const handleConfirmDelete = useCallback(async () => {
     if (!calculationToDelete) return;
     await onCalculationDelete(calculationToDelete.id);
     setIsDeleteModalOpen(false);
     setCalculationToDelete(null);
-  };
+  }, [calculationToDelete, onCalculationDelete]);
 
-  const handleCancelDelete = () => {
+  const handleCancelDelete = useCallback(() => {
     setIsDeleteModalOpen(false);
     setCalculationToDelete(null);
-  };
+  }, []);
 
   return (
     <>

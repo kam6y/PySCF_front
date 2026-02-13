@@ -13,7 +13,7 @@ interface DropdownMenuProps {
   onClose: () => void;
 }
 
-export const DropdownMenu: React.FC<DropdownMenuProps> = ({
+export const DropdownMenu = React.memo<DropdownMenuProps>(({
   isOpen,
   selectedOption,
   onOptionSelect,
@@ -139,4 +139,4 @@ export const DropdownMenu: React.FC<DropdownMenuProps> = ({
       </div>
     </>
   );
-};
+});

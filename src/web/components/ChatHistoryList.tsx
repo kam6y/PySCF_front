@@ -13,7 +13,7 @@ interface ChatHistoryListProps {
   searchQuery: string;
 }
 
-export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
+export const ChatHistoryList = React.memo<ChatHistoryListProps>(({
   onSessionSelect,
   onRequestDelete,
   filteredSessions,
@@ -131,4 +131,4 @@ export const ChatHistoryList: React.FC<ChatHistoryListProps> = ({
       ))}
     </div>
   );
-};
+});

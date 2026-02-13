@@ -13,7 +13,7 @@ interface ConfirmationModalProps {
   variant?: 'destructive' | 'default';
 }
 
-export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
+export const ConfirmationModal = React.memo<ConfirmationModalProps>(({
   isOpen,
   title,
   message,
@@ -94,4 +94,4 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       </div>
     </div>
   );
-};
+});

@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import {
   CalculationParameters,
@@ -10,10 +11,10 @@ interface CASResultsSectionProps {
   parameters: CalculationParameters;
 }
 
-export const CASResultsSection = ({
+export const CASResultsSection = React.memo<CASResultsSectionProps>(({
   results,
   parameters,
-}: CASResultsSectionProps) => {
+}) => {
   return (
 <section
   className={`${styles.calculationSection} ${styles.casSection}`}
@@ -498,4 +499,4 @@ export const CASResultsSection = ({
     )}
 </section>
   );
-};
+});

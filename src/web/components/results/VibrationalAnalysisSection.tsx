@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import React, { type Dispatch, type SetStateAction } from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import { IRSpectrumChart } from '../IRSpectrumChart';
 import { VibrationModeViewer } from '../VibrationModeViewer';
@@ -27,7 +27,7 @@ interface VibrationalAnalysisSectionProps {
   onError: (error: string) => void;
 }
 
-export const VibrationalAnalysisSection = ({
+export const VibrationalAnalysisSection = React.memo<VibrationalAnalysisSectionProps>(({
   calculationId,
   results,
   irSpectrumData,
@@ -39,7 +39,7 @@ export const VibrationalAnalysisSection = ({
   onPeakSelect,
   onClearSelection,
   onError,
-}: VibrationalAnalysisSectionProps) => {
+}) => {
   return (
 <section
   className={`${styles.calculationSection} ${styles.vibrationalSection}`}
@@ -86,4 +86,4 @@ export const VibrationalAnalysisSection = ({
     )}
 </section>
   );
-};
+});

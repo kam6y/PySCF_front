@@ -1,6 +1,6 @@
 // src/web/App.tsx
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
@@ -177,13 +177,37 @@ export const App = () => {
   }, [chatSessionsData?.sessions, appState.ui.searchQuery]);
 
   // イベントハンドラー（統合されたアクションを使用）
-  const handleSearchChange = (query: string) => {
-    appState.ui.setSearchQuery(query);
-  };
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      appState.ui.setSearchQuery(query);
+    },
+    [appState.ui]
+  );
 
-  const handleCalculationSelect = (calculationId: string) => {
-    appState.actions.handleCalculationSelect(calculationId);
-  };
+  const handleCalculationSelect = useCallback(
+    (calculationId: string) => {
+      appState.actions.handleCalculationSelect(calculationId);
+    },
+    [appState.actions]
+  );
+
+  const handleCalculationDelete = useCallback(
+    async (calculationId: string) => {
+      await calculationActions.handleCalculationDelete(calculationId);
+      // 削除された計算がアクティブだった場合はクリア
+      if (calculationData.activeCalculationId === calculationId) {
+        appState.calculation.selectCalculation(null);
+        appState.calculation.clearStaged();
+        appState.ui.setCurrentPage('calculation-settings');
+      }
+    },
+    [
+      calculationActions,
+      calculationData.activeCalculationId,
+      appState.calculation,
+      appState.ui,
+    ]
+  );
 
   // チャット履歴のハンドラー
   const setActiveSessionId = useChatHistoryStore(
@@ -328,15 +352,7 @@ export const App = () => {
             : null
         }
         onCalculationSelect={handleCalculationSelect}
-        onCalculationDelete={async (calculationId: string) => {
-          await calculationActions.handleCalculationDelete(calculationId);
-          // 削除された計算がアクティブだった場合はクリア
-          if (calculationData.activeCalculationId === calculationId) {
-            appState.calculation.selectCalculation(null);
-            appState.calculation.clearStaged();
-            appState.ui.setCurrentPage('calculation-settings');
-          }
-        }}
+        onCalculationDelete={handleCalculationDelete}
         onCreateNew={appState.actions.handleCreateNew}
         searchQuery={appState.ui.searchQuery}
         onSearchChange={handleSearchChange}

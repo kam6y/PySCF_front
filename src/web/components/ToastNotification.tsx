@@ -51,7 +51,7 @@ const getDisplayContent = (notification: Notification) => {
   }
 };
 
-export const ToastNotification: React.FC<ToastNotificationProps> = ({
+export const ToastNotification = React.memo<ToastNotificationProps>(({
   notification,
   onClose,
   onNavigate,
@@ -132,4 +132,4 @@ export const ToastNotification: React.FC<ToastNotificationProps> = ({
       </button>
     </div>
   );
-};
+});

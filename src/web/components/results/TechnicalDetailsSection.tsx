@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import {
   CalculationParameters,
@@ -9,10 +10,10 @@ interface TechnicalDetailsSectionProps {
   parameters: CalculationParameters;
 }
 
-export const TechnicalDetailsSection = ({
+export const TechnicalDetailsSection = React.memo<TechnicalDetailsSectionProps>(({
   results,
   parameters,
-}: TechnicalDetailsSectionProps) => {
+}) => {
   return (
 <section
   className={`${styles.calculationSection} ${styles.technicalDetailsSection}`}
@@ -116,4 +117,4 @@ export const TechnicalDetailsSection = ({
   </div>
 </section>
   );
-};
+});

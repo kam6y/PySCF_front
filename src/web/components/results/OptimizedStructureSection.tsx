@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import { MoleculeViewerSection } from '../MoleculeViewerSection';
 import {
@@ -20,7 +20,7 @@ interface OptimizedStructureSectionProps {
   onUseAtomicRadiiChange: (use: boolean) => void;
 }
 
-export const OptimizedStructureSection = ({
+export const OptimizedStructureSection = React.memo<OptimizedStructureSectionProps>(({
   results,
   parameters,
   currentStyle,
@@ -31,7 +31,7 @@ export const OptimizedStructureSection = ({
   onShowCoordinatesChange,
   useAtomicRadii,
   onUseAtomicRadiiChange,
-}: OptimizedStructureSectionProps) => {
+}) => {
   const structureTitle = useMemo(() => {
     switch (parameters.calculation_method) {
       case 'HF':
@@ -125,4 +125,4 @@ export const OptimizedStructureSection = ({
   </div>
 </section>
   );
-};
+});

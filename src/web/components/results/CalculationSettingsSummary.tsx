@@ -1,3 +1,4 @@
+import React from 'react';
 import styles from '../../pages/CalculationResultsPage.module.css';
 import {
   CalculationInstance,
@@ -15,10 +16,10 @@ interface CalculationSettingsSummaryProps {
   };
 }
 
-export const CalculationSettingsSummary = ({
+export const CalculationSettingsSummary = React.memo<CalculationSettingsSummaryProps>(({
   activeCalculation,
   processedData,
-}: CalculationSettingsSummaryProps) => {
+}) => {
   const { results, parameters } = processedData;
   const completedAt = activeCalculation.updatedAt;
   const computeDeviceLabel = results.gpu_enabled ? 'GPU' : 'CPU';
@@ -268,4 +269,4 @@ export const CalculationSettingsSummary = ({
   </div>
 </section>
   );
-};
+});

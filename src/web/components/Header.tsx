@@ -16,7 +16,7 @@ interface HeaderProps {
   onAIAgentToggle: (enabled: boolean) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header = React.memo<HeaderProps>(({
   onDropdownToggle,
   onPlusClick,
   isDropdownOpen,
@@ -234,4 +234,4 @@ export const Header: React.FC<HeaderProps> = ({
       />
     </header>
   );
-};
+});
