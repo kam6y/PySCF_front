@@ -8,15 +8,15 @@ import {
   IR_SPECTRUM_DEFAULTS,
   type IRSettings,
 } from '../utils/irSpectrumConstants';
-import { CalculationSettingsSummary } from '../components/results/CalculationSettingsSummary';
-import { OptimizedStructureSection } from '../components/results/OptimizedStructureSection';
-import { ElectronicPropertiesSection } from '../components/results/ElectronicPropertiesSection';
-import { CASResultsSection } from '../components/results/CASResultsSection';
-import { EnergeticsSection } from '../components/results/EnergeticsSection';
-import { VibrationalAnalysisSection } from '../components/results/VibrationalAnalysisSection';
-import { MolecularOrbitalsSection } from '../components/results/MolecularOrbitalsSection';
-import { TDDFTResultsSection } from '../components/results/TDDFTResultsSection';
-import { TechnicalDetailsSection } from '../components/results/TechnicalDetailsSection';
+import { CalculationSettingsSummary } from '../components/calculation-results/CalculationSettingsSummary';
+import { OptimizedStructureSection } from '../components/calculation-results/OptimizedStructureSection';
+import { ElectronicPropertiesSection } from '../components/calculation-results/ElectronicPropertiesSection';
+import { CASResultsSection } from '../components/calculation-results/CASResultsSection';
+import { EnergeticsSection } from '../components/calculation-results/EnergeticsSection';
+import { VibrationalAnalysisSection } from '../components/calculation-results/VibrationalAnalysisSection';
+import { MolecularOrbitalsSection } from '../components/calculation-results/MolecularOrbitalsSection';
+import { TDDFTResultsSection } from '../components/calculation-results/TDDFTResultsSection';
+import { TechnicalDetailsSection } from '../components/calculation-results/TechnicalDetailsSection';
 
 type IRSpectrumData = components['schemas']['IRSpectrumData'];
 type IRPeak = components['schemas']['IRPeak'];
