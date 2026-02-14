@@ -5,7 +5,7 @@ import {
   getChatSessionDetail,
   updateChatSession,
   deleteChatSession,
-} from '../apiClient';
+} from '../api/chatHistory';
 
 // Query keys
 export const chatHistoryKeys = {

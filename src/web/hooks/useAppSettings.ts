@@ -1,13 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { components } from '../types/generated-api';
-import { getSettings, updateSettings } from '../apiClient';
+import { getSettings, updateSettings } from '../api/settings';
 import { useCalculationStore } from '../store/calculationStore';
 
 // Type definitions
 type AppSettings = components['schemas']['AppSettings'];
 type SettingsResponse = components['schemas']['SettingsResponse'];
-
-// API Client functions are now imported from ../apiClient
 
 // Query keys
 const settingsKeys = {

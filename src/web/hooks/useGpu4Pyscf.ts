@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getGpu4PyscfStatus, installGpu4Pyscf } from '../apiClient';
+import { getGpu4PyscfStatus, installGpu4Pyscf } from '../api/system';
 import { components } from '../types/generated-api';
 
 type Gpu4PyscfStatus = components['schemas']['Gpu4PyscfStatus'];

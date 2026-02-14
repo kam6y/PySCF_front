@@ -6,7 +6,7 @@ import { StandaloneStructServiceProvider } from 'ketcher-standalone';
 import { Ketcher } from 'ketcher-core';
 import 'ketcher-react/dist/index.css';
 import styles from './DrawMoleculePage.module.css';
-import { convertSmilesToXyz } from '../apiClient';
+import { convertSmilesToXyz } from '../api/molecule';
 import { useUIStore } from '../store/uiStore';
 import { useCalculationStore } from '../store/calculationStore';
 import { useNotificationStore } from '../store/notificationStore';

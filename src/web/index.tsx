@@ -4,7 +4,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
-import { ApiError } from './apiClient';
+import { ApiError } from './api/core';
 
 const queryClient = new QueryClient({
   defaultOptions: {

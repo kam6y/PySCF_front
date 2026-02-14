@@ -17,7 +17,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import styles from './IRSpectrumChart.module.css';
-import { getIRSpectrum } from '../apiClient';
+import { getIRSpectrum } from '../api/quantum';
 import type { components } from '../types/generated-api';
 import {
   IR_SPECTRUM_DEFAULTS,

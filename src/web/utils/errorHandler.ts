@@ -1,4 +1,4 @@
-import { ApiError } from '../apiClient';
+import { ApiError } from '../api/core';
 import {
   showErrorNotification,
   showResourceInsufficientErrorNotification,

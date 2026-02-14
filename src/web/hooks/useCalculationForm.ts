@@ -8,7 +8,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { StyleSpec, ExtendedStyleSpec } from '../../types/3dmol';
-import { searchPubChem, convertSmilesToXyz } from '../apiClient';
+import { searchPubChem, convertSmilesToXyz } from '../api/molecule';
 import { useSupportedParameters } from './useCalculationQueries';
 import { useAppSettings } from './useAppSettings';
 import { useGpu4PyscfStatus } from './useGpu4Pyscf';

@@ -4,7 +4,7 @@
  */
 
 import { components, operations } from './generated-api';
-import { ApiError } from '../apiClient';
+import { ApiError } from '../api/core';
 
 // Export enum types as union types for convenience
 export type SearchType = components['schemas']['SearchType'];

@@ -1,14 +1,15 @@
 // src/web/hooks/useCalculationQueries.ts
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as apiClient from '../apiClient';
+import * as quantumApi from '../api/quantum';
+import { searchPubChem, convertSmilesToXyz } from '../api/molecule';
 import { QuantumCalculationRequest } from '../types/api-types';
 
 // 計算リストを取得するQuery
 export const useGetCalculations = () => {
   return useQuery({
     queryKey: ['calculations'],
-    queryFn: apiClient.getCalculations,
+    queryFn: quantumApi.getCalculations,
 
     // リストは頻繁に変更される可能性があるため、staleTimeを短めに
     staleTime: 30 * 1000, // 30秒
@@ -24,7 +25,7 @@ export const useGetCalculations = () => {
 export const useGetCalculationDetails = (id: string | null) => {
   return useQuery({
     queryKey: ['calculation', id],
-    queryFn: () => apiClient.getCalculationDetails(id!),
+    queryFn: () => quantumApi.getCalculationDetails(id!),
     enabled: !!id && !id.startsWith('new-calculation-'), // idが存在し、一時IDでない場合にのみ実行
 
     // WebSocketがリアルタイム更新を提供するため、ポーリングは不要
@@ -47,7 +48,7 @@ export const useStartCalculation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (params: QuantumCalculationRequest) =>
-      apiClient.startCalculation(params),
+      quantumApi.startCalculation(params),
     onSuccess: () => {
       // 成功したら計算リストのキャッシュを無効化して再取得させる
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
@@ -59,7 +60,7 @@ export const useStartCalculation = () => {
 export const useDeleteCalculation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiClient.deleteCalculation(id),
+    mutationFn: (id: string) => quantumApi.deleteCalculation(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
     },
@@ -70,7 +71,7 @@ export const useDeleteCalculation = () => {
 export const usePauseCalculation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiClient.pauseCalculation(id),
+    mutationFn: (id: string) => quantumApi.pauseCalculation(id),
     onSuccess: (data, id) => {
       // 成功したら関連するキャッシュを更新
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
@@ -83,7 +84,7 @@ export const usePauseCalculation = () => {
 export const useResumeCalculation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiClient.resumeCalculation(id),
+    mutationFn: (id: string) => quantumApi.resumeCalculation(id),
     onSuccess: (data, id) => {
       // サーバーレスポンスを即座にキャッシュに反映
       queryClient.setQueryData(['calculation', id], {
@@ -109,7 +110,7 @@ export const useUpdateCalculationName = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, newName }: { id: string; newName: string }) =>
-      apiClient.updateCalculationName(id, newName),
+      quantumApi.updateCalculationName(id, newName),
     onSuccess: (data, variables) => {
       // 成功したら関連するキャッシュを更新
       queryClient.invalidateQueries({ queryKey: ['calculations'] });
@@ -129,14 +130,14 @@ export const useSearchPubChem = () => {
     }: {
       query: string;
       searchType: 'name' | 'cid';
-    }) => apiClient.searchPubChem(query, searchType),
+    }) => searchPubChem(query, searchType),
   });
 };
 
 // SMILES変換Mutation
 export const useConvertSmilesToXyz = () => {
   return useMutation({
-    mutationFn: (smiles: string) => apiClient.convertSmilesToXyz(smiles),
+    mutationFn: (smiles: string) => convertSmilesToXyz(smiles),
   });
 };
 
@@ -144,7 +145,7 @@ export const useConvertSmilesToXyz = () => {
 export const useGetOrbitals = (calculationId: string | null) => {
   return useQuery({
     queryKey: ['orbitals', calculationId],
-    queryFn: () => apiClient.getOrbitals(calculationId!),
+    queryFn: () => quantumApi.getOrbitals(calculationId!),
     enabled: !!calculationId && !calculationId.startsWith('new-calculation-'), // idが存在し、一時IDでない場合にのみ実行
   });
 };
@@ -162,7 +163,7 @@ export const useGetOrbitalCube = (
   return useQuery({
     queryKey: ['orbital-cube', calculationId, orbitalIndex, options],
     queryFn: () =>
-      apiClient.getOrbitalCube(calculationId!, orbitalIndex!, options),
+      quantumApi.getOrbitalCube(calculationId!, orbitalIndex!, options),
     enabled:
       !!calculationId &&
       orbitalIndex !== null &&
@@ -191,7 +192,7 @@ export const useGenerateOrbitalCube = () => {
         isovaluePos?: number;
         isovalueNeg?: number;
       };
-    }) => apiClient.getOrbitalCube(calculationId, orbitalIndex, options),
+    }) => quantumApi.getOrbitalCube(calculationId, orbitalIndex, options),
     onSuccess: (data, variables) => {
       // 成功したら該当するキャッシュを更新
       queryClient.setQueryData(
@@ -211,7 +212,7 @@ export const useGenerateOrbitalCube = () => {
 export const useListCubeFiles = (calculationId: string | null) => {
   return useQuery({
     queryKey: ['cube-files', calculationId],
-    queryFn: () => apiClient.listCubeFiles(calculationId!),
+    queryFn: () => quantumApi.listCubeFiles(calculationId!),
     enabled: !!calculationId && !calculationId.startsWith('new-calculation-'),
   });
 };
@@ -225,7 +226,7 @@ export const useDeleteCubeFiles = () => {
     }: {
       calculationId: string;
       orbitalIndex?: number;
-    }) => apiClient.deleteCubeFiles(calculationId, orbitalIndex),
+    }) => quantumApi.deleteCubeFiles(calculationId, orbitalIndex),
     onSuccess: (data, variables) => {
       // Invalidate related queries
       queryClient.invalidateQueries({
@@ -242,7 +243,7 @@ export const useDeleteCubeFiles = () => {
 export const useSupportedParameters = () => {
   return useQuery({
     queryKey: ['supported-parameters'],
-    queryFn: apiClient.getSupportedParameters,
+    queryFn: quantumApi.getSupportedParameters,
     staleTime: 24 * 60 * 60 * 1000, // 24時間キャッシュを保持（パラメータは頻繁に変更されない）
     gcTime: 24 * 60 * 60 * 1000, // 24時間メモリに保持
     refetchOnWindowFocus: false, // ウィンドウフォーカス時の再取得を無効化

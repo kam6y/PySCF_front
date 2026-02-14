@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { streamChatWithAgent } from '../apiClient';
+import { streamChatWithAgent } from '../api/agent';
 import { useNotificationStore } from '../store/notificationStore';
 import { useAgentStore, ChatHistory, AgentStatus } from '../store/agentStore';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
