@@ -45,8 +45,8 @@ Your partner is Japanese, so please speak and report in Japanese.
 
 ## 品質ゲート（必須）
 - レビュー基準は「別Codexレビューで緊急度 high 以上がゼロ」であること。
-- high 以上が出た場合は、別Codexに修正指示 → 別Codexレビューを繰り返す。
-- 修正時は妥当性を判断させ、妥当と判断した指摘のみ採用する。
+- high 以上が出た場合は、`codex-reply`で実装したCodexに修正指示 → 別Codexレビューを繰り返す。
+- 修正時はレビューの妥当性を判断させ、妥当と判断した指摘のみ採用するように指示する。。
 
 停止条件は次の2つのみ:
 1. high 以上がゼロになった。
