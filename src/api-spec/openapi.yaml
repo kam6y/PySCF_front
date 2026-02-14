@@ -2072,7 +2072,7 @@ components:
 
     CalculationSummary:
       type: object
-      required: [id, name, path, date, has_checkpoint, status]
+      required: [id, name, date, status]
       properties:
         id:
           type: string
@@ -2080,15 +2080,9 @@ components:
         name:
           type: string
           description: Display name
-        path:
-          type: string
-          description: Directory path
         date:
           type: string
           description: Date string
-        has_checkpoint:
-          type: boolean
-          description: Whether checkpoint file exists
         status:
           $ref: '#/components/schemas/CalculationStatus'
         calculation_method:

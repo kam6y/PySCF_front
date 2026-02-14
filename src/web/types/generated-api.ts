@@ -1122,12 +1122,8 @@ export interface components {
             id: string;
             /** @description Display name */
             name: string;
-            /** @description Directory path */
-            path: string;
             /** @description Date string */
             date: string;
-            /** @description Whether checkpoint file exists */
-            has_checkpoint: boolean;
             status: components["schemas"]["CalculationStatus"];
             /** @description Calculation method (DFT, HF, MP2, etc.) */
             calculation_method?: string | null;

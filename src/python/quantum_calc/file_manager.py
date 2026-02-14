@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class CalculationFileManager:
     """Manages files generated during quantum chemistry calculations."""
+    VALID_STATUSES = frozenset({'pending', 'running', 'completed', 'error', 'waiting', 'pausing', 'paused'})
 
     def __init__(self, base_dir: Optional[str] = None):
         if base_dir is None:
@@ -169,9 +170,7 @@ class CalculationFileManager:
             calculations.append({
                 'id': item.name,  # Use directory name as the unique ID
                 'name': display_name,  # Use this for display purposes
-                'path': str(item),
                 'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
-                'has_checkpoint': (item / "calculation.chk").exists(),
                 'status': calc_status,
                 # Include additional fields for better search results
                 'calculation_method': params.get('calculation_method') if params else None,
@@ -256,7 +255,10 @@ class CalculationFileManager:
             return 'error' 
         try:
             with open(status_file, 'r') as f:
-                return json.load(f).get('status', 'pending')
+                status = json.load(f).get('status', 'pending')
+                if status not in self.VALID_STATUSES:
+                    status = 'error'
+                return status
         except (json.JSONDecodeError, OSError):
             return 'pending'
     
@@ -274,6 +276,8 @@ class CalculationFileManager:
             with open(status_file, 'r') as f:
                 status_data = json.load(f)
                 status = status_data.get('status', 'pending')
+                if status not in self.VALID_STATUSES:
+                    status = 'error'
                 waiting_reason = status_data.get('waiting_reason')
                 return status, waiting_reason
         except (json.JSONDecodeError, OSError):

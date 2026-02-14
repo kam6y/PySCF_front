@@ -494,9 +494,7 @@ class ResumeInfo(BaseModel):
 class CalculationSummary(BaseModel):
     id: str = Field(..., description='Unique calculation ID')
     name: str = Field(..., description='Display name')
-    path: str = Field(..., description='Directory path')
     date: str = Field(..., description='Date string')
-    has_checkpoint: bool = Field(..., description='Whether checkpoint file exists')
     status: CalculationStatus
     calculation_method: Optional[str] = Field(
         None, description='Calculation method (DFT, HF, MP2, etc.)'

@@ -240,9 +240,9 @@ class TestCalculationListAPI:
         """
         # ARRANGE
         mock_calculations = [
-            {'id': 'calc-1', 'name': 'Test 1', 'status': 'completed'},
-            {'id': 'calc-2', 'name': 'Test 2', 'status': 'running'},
-            {'id': 'calc-3', 'name': 'Test 3', 'status': 'error'}
+            {'id': 'calc-1', 'name': 'Test 1', 'status': 'completed', 'date': '2024-01-01T00:00:00'},
+            {'id': 'calc-2', 'name': 'Test 2', 'status': 'running', 'date': '2024-01-02T00:00:00'},
+            {'id': 'calc-3', 'name': 'Test 3', 'status': 'error', 'date': '2024-01-03T00:00:00'}
         ]
         mock_result = {'calculations': mock_calculations, 'count': 3}
         mock_service = mocker.patch('api.quantum.get_quantum_service')
