@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import styles from './ToastNotification.module.css';
 import { Notification } from '../store/notificationStore';
+import { ERROR_CODES } from '../utils/errorClassifier';
 
 interface ToastNotificationProps {
   notification: Notification;
@@ -15,31 +16,31 @@ const getDisplayContent = (notification: Notification) => {
   }
 
   switch (notification.errorCode) {
-    case 'CPU_INSUFFICIENT_SYSTEM':
+    case ERROR_CODES.CPU_INSUFFICIENT_SYSTEM:
       return {
         title: 'High CPU Usage',
         message:
           'System CPU usage exceeds the limit. Please close other programs to reduce CPU usage before retrying.',
       };
-    case 'CPU_INSUFFICIENT_LIMIT':
+    case ERROR_CODES.CPU_INSUFFICIENT_LIMIT:
       return {
         title: 'CPU Limit Reached',
         message:
           'Cannot start calculation due to CPU usage limit. Please wait for running calculations to complete.',
       };
-    case 'MEMORY_INSUFFICIENT_SYSTEM':
+    case ERROR_CODES.MEMORY_INSUFFICIENT_SYSTEM:
       return {
         title: 'High Memory Usage',
         message:
           'System memory usage exceeds the limit. Please close other programs to free up memory before retrying.',
       };
-    case 'MEMORY_INSUFFICIENT_LIMIT':
+    case ERROR_CODES.MEMORY_INSUFFICIENT_LIMIT:
       return {
         title: 'Memory Limit Reached',
         message:
           'Cannot start calculation due to memory usage limit. Please wait for running calculations to complete.',
       };
-    case 'RESOURCE_INSUFFICIENT':
+    case ERROR_CODES.RESOURCE_INSUFFICIENT:
       return {
         title: 'Insufficient Resources',
         message:

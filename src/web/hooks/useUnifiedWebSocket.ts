@@ -7,6 +7,7 @@ import {
   showInfoNotification,
 } from '../store/notificationStore';
 import { handleError } from '../utils/errorHandler';
+import { isResourceInsufficientError } from '../utils/errorClassifier';
 
 export interface UseUnifiedWebSocketOptions {
   activeCalculationId: string | null;
@@ -114,21 +115,9 @@ export const useUnifiedWebSocket = ({
         const errorMessage =
           currentErrorMessage || 'Detailed error information is not available.';
 
-        // リソース不足エラーの判定
-        const isResourceInsufficientError =
-          errorMessage &&
-          (errorMessage.toLowerCase().includes('cpu usage') ||
-            errorMessage.toLowerCase().includes('memory usage') ||
-            errorMessage.toLowerCase().includes('system cpu usage') ||
-            errorMessage.toLowerCase().includes('system memory usage') ||
-            errorMessage.toLowerCase().includes('no active calculations'));
+        const isResourceError = isResourceInsufficientError(errorMessage);
 
-        const title =
-          previousStatus === 'running'
-            ? `Calculation "${molecularName}" failed`
-            : `Calculation "${molecularName}" failed to start`;
-
-        if (isResourceInsufficientError) {
+        if (isResourceError) {
           handleError(new Error(errorMessage), 'Calculation failed');
         } else {
           handleError(

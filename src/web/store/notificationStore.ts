@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { classifyResourceError } from '../utils/errorClassifier';
 
 export interface Notification {
   id: string;
@@ -122,23 +123,11 @@ export const showErrorWithCodeNotification = (
   });
 };
 
-// 後方互換性のためのリソース不足エラー通知関数
 export const showResourceInsufficientErrorNotification = (
   errorMessage: string,
   calculationId?: string
 ) => {
-  // エラーメッセージの内容からエラーコードを判定
-  let errorCode = 'RESOURCE_INSUFFICIENT';
-
-  if (errorMessage.toLowerCase().includes('cpu')) {
-    errorCode = errorMessage.includes('no active calculations')
-      ? 'CPU_INSUFFICIENT_SYSTEM'
-      : 'CPU_INSUFFICIENT_LIMIT';
-  } else if (errorMessage.toLowerCase().includes('memory')) {
-    errorCode = errorMessage.includes('no active calculations')
-      ? 'MEMORY_INSUFFICIENT_SYSTEM'
-      : 'MEMORY_INSUFFICIENT_LIMIT';
-  }
+  const errorCode = classifyResourceError(errorMessage);
 
   return showErrorWithCodeNotification(
     errorCode,

@@ -3,6 +3,7 @@ import {
   showErrorNotification,
   showResourceInsufficientErrorNotification,
 } from '../store/notificationStore';
+import { isResourceInsufficientError } from './errorClassifier';
 
 /**
  * Global error handler for the application.
@@ -54,12 +55,7 @@ export const handleError = (error: unknown, context?: string) => {
     // Standard Error object
     message = error.message;
 
-    // Check for specific error patterns (like resource insufficiency)
-    if (
-      message.toLowerCase().includes('cpu usage') ||
-      message.toLowerCase().includes('memory usage') ||
-      message.toLowerCase().includes('no active calculations')
-    ) {
+    if (isResourceInsufficientError(message)) {
       showResourceInsufficientErrorNotification(message, calculationId);
       return;
     }
