@@ -1,0 +1,75 @@
+"""Calculation status transitions and notification management."""
+
+import os
+import logging
+from enum import Enum
+from typing import Optional, Callable
+
+logger = logging.getLogger(__name__)
+
+
+class CalculationStatus(Enum):
+    """Calculation lifecycle states."""
+    WAITING = "waiting"
+    RUNNING = "running"
+    PAUSING = "pausing"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    ERROR = "error"
+
+
+ALLOWED_TRANSITIONS: dict[CalculationStatus, set[CalculationStatus]] = {
+    CalculationStatus.WAITING: {CalculationStatus.RUNNING, CalculationStatus.ERROR},
+    CalculationStatus.RUNNING: {CalculationStatus.COMPLETED, CalculationStatus.ERROR, CalculationStatus.PAUSING},
+    CalculationStatus.PAUSING: {CalculationStatus.PAUSED, CalculationStatus.ERROR},
+    CalculationStatus.PAUSED: {CalculationStatus.RUNNING},
+    CalculationStatus.COMPLETED: set(),
+    CalculationStatus.ERROR: set(),
+}
+
+
+class CalculationStatusManager:
+    """Manages calculation status transitions, file persistence, and WebSocket notifications."""
+
+    def __init__(self, notification_callback: Optional[Callable] = None):
+        self.notification_callback = notification_callback
+
+    def transition(self, calculation_id: str, new_status: CalculationStatus,
+                   error_message: Optional[str] = None) -> None:
+        """
+        Execute a status transition: persist to file + send WebSocket notification.
+
+        This is used by the parent process (CalculationProcessManager) for all status
+        updates. Worker processes write status directly via file_manager since they
+        cannot access parent process objects.
+        """
+        from quantum_calc.file_manager import CalculationFileManager
+        from quantum_calc import get_current_settings
+
+        settings = get_current_settings()
+        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+
+        status_str = new_status.value
+        file_manager.save_calculation_status(calc_dir, status_str)
+
+        if new_status == CalculationStatus.ERROR and error_message:
+            file_manager.save_calculation_results(calc_dir, {'error': error_message})
+            logger.info(f"Calculation {calculation_id} transitioned to 'error': {error_message}")
+        else:
+            logger.info(f"Calculation {calculation_id} transitioned to '{status_str}'")
+
+        self.notify(calculation_id, status_str, error_message)
+
+    def notify(self, calculation_id: str, status: str,
+               error_message: Optional[str] = None) -> None:
+        """Send WebSocket notification for a calculation status change."""
+        if self.notification_callback is None:
+            logger.debug(f"WebSocket notification not available for calculation {calculation_id}")
+            return
+
+        try:
+            self.notification_callback(calculation_id, status, error_message)
+            logger.debug(f"Sent WebSocket notification for calculation {calculation_id} with status {status}")
+        except Exception as e:
+            logger.warning(f"Failed to send WebSocket notification for calculation {calculation_id}: {e}")
