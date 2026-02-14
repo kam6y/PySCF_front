@@ -31,11 +31,11 @@ class NotificationService:
 
         try:
             from quantum_calc import get_current_settings
-            from quantum_calc.file_manager import CalculationFileManager
+            from quantum_calc._calculation_repository import CalculationRepository
             import os
 
             settings = get_current_settings()
-            file_manager = CalculationFileManager(
+            file_manager = CalculationRepository(
                 base_dir=settings.calculations_directory
             )
             calc_dir = os.path.join(
@@ -50,7 +50,7 @@ class NotificationService:
             # Read current data
             parameters = file_manager.read_calculation_parameters(calc_dir) or {}
             results = file_manager.read_calculation_results(calc_dir)
-            display_name = file_manager._get_display_name(calculation_id, parameters)
+            display_name = file_manager.get_display_name(calculation_id, parameters)
 
             # Build calculation instance
             calculation_instance = {

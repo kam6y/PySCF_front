@@ -10,20 +10,20 @@ from typing import Dict
 from flask import session
 from flask_socketio import emit, join_room, leave_room
 
-from quantum_calc.file_manager import CalculationFileManager
+from quantum_calc._calculation_repository import CalculationRepository
 from quantum_calc import get_websocket_watcher
 
 # Set up logging
 logger = logging.getLogger(__name__)
 
 
-def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationFileManager) -> Dict:
+def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationRepository) -> Dict:
     """Build a complete calculation instance from file system data."""
     try:
         parameters = file_manager.read_calculation_parameters(calc_path) or {}
         results = file_manager.read_calculation_results(calc_path)
         status = file_manager.read_calculation_status(calc_path) or 'pending'
-        display_name = file_manager._get_display_name(calc_id, parameters)
+        display_name = file_manager.get_display_name(calc_id, parameters)
         
         # Safe date retrieval
         try:
@@ -69,7 +69,7 @@ def register_websocket_handlers(socketio):
 
         from quantum_calc import get_current_settings
         settings = get_current_settings()
-        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+        file_manager = CalculationRepository(base_dir=settings.calculations_directory)
         calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
         
         # Calculation directory existence check
@@ -153,7 +153,7 @@ def register_websocket_handlers(socketio):
             try:
                 from quantum_calc import get_current_settings
                 settings = get_current_settings()
-                file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+                file_manager = CalculationRepository(base_dir=settings.calculations_directory)
                 watcher = get_websocket_watcher(file_manager.get_base_directory())
                 watcher.remove_connection(calculation_id, session['file_change_callback'])
             except Exception as e:
@@ -181,7 +181,7 @@ def register_websocket_handlers(socketio):
             try:
                 from quantum_calc import get_current_settings
                 settings = get_current_settings()
-                file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+                file_manager = CalculationRepository(base_dir=settings.calculations_directory)
                 watcher = get_websocket_watcher(file_manager.get_base_directory())
                 watcher.remove_connection(calculation_id, session['file_change_callback'])
                 logger.info(f"Cleaned up file watcher for disconnected client (calculation {calculation_id})")

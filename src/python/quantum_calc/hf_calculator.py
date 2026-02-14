@@ -9,7 +9,7 @@ from pyscf import gto, scf
 
 from .base_calculator import BaseCalculator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
-from .file_manager import CalculationFileManager
+from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
 
@@ -21,7 +21,7 @@ class HFCalculator(BaseCalculator):
     
     def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
         # Use file manager for better organization
-        self.file_manager = CalculationFileManager()
+        self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
         super().__init__(working_dir, optimize_geometry)

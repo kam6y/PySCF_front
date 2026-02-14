@@ -217,11 +217,11 @@ class CalculationProcessManager:
                     self.status_manager.transition(calculation_id, CalculationStatus.PAUSED)
                     pause_manager.clear_pause_request(calculation_id)
                     # Remove pause flag file
-                    from quantum_calc.file_manager import CalculationFileManager
+                    from quantum_calc._calculation_repository import CalculationRepository
                     from quantum_calc import get_current_settings
                     settings = get_current_settings()
-                    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
-                    calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+                    repository = CalculationRepository(base_dir=settings.calculations_directory)
+                    calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
                     pause_manager.remove_pause_flag_file(calc_dir)
                 else:
                     error_message = str(exception)
@@ -307,16 +307,16 @@ class CalculationProcessManager:
     def pause_calculation(self, calculation_id: str) -> bool:
         logger.info(f"Pause requested for calculation: {calculation_id}")
 
-        from quantum_calc.file_manager import CalculationFileManager
+        from quantum_calc._calculation_repository import CalculationRepository
         from quantum_calc import get_current_settings
         settings = get_current_settings()
-        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+        repository = CalculationRepository(base_dir=settings.calculations_directory)
 
-        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+        calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
         if not os.path.exists(calc_dir):
             raise ValueError(f"Calculation not found: {calculation_id}")
 
-        status, _ = file_manager.read_calculation_status_details(calc_dir)
+        status, _ = repository.read_calculation_status_details(calc_dir)
         if status != 'running':
             raise ValueError(f"Calculation is not running (status: {status})")
 
@@ -331,21 +331,21 @@ class CalculationProcessManager:
     def resume_calculation(self, calculation_id: str) -> Dict[str, Any]:
         logger.info(f"Resuming calculation: {calculation_id}")
 
-        from quantum_calc.file_manager import CalculationFileManager
+        from quantum_calc._calculation_repository import CalculationRepository
         from quantum_calc import get_current_settings
         settings = get_current_settings()
-        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+        repository = CalculationRepository(base_dir=settings.calculations_directory)
 
-        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+        calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
         if not os.path.exists(calc_dir):
             raise ValueError(f"Calculation not found: {calculation_id}")
 
-        status, _ = file_manager.read_calculation_status_details(calc_dir)
+        status, _ = repository.read_calculation_status_details(calc_dir)
         if status != 'paused':
             raise ValueError(f"Calculation is not paused (status: {status})")
 
-        pause_state = file_manager.load_pause_state(calc_dir)
-        params = file_manager.read_calculation_parameters(calc_dir)
+        pause_state = repository.load_pause_state(calc_dir)
+        params = repository.read_calculation_parameters(calc_dir)
         if not params:
             raise ValueError("No calculation parameters found")
 

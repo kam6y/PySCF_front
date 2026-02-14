@@ -1,8 +1,8 @@
-"""Unit tests for CalculationFileManager status validation."""
+"""Unit tests for CalculationRepository status validation."""
 
 import json
 
-from quantum_calc.file_manager import CalculationFileManager
+from quantum_calc._calculation_repository import CalculationRepository
 
 
 def test_read_calculation_status_invalid_value_returns_error(tmp_path):
@@ -11,7 +11,7 @@ def test_read_calculation_status_invalid_value_returns_error(tmp_path):
     WHEN read_calculation_status is called
     THEN it should return "error"
     """
-    manager = CalculationFileManager(base_dir=str(tmp_path))
+    manager = CalculationRepository(base_dir=str(tmp_path))
     calc_dir = tmp_path / "calc_invalid_status"
     calc_dir.mkdir()
 
@@ -27,7 +27,7 @@ def test_read_calculation_status_details_invalid_value_returns_error(tmp_path):
     WHEN read_calculation_status_details is called
     THEN it should return ("error", None)
     """
-    manager = CalculationFileManager(base_dir=str(tmp_path))
+    manager = CalculationRepository(base_dir=str(tmp_path))
     calc_dir = tmp_path / "calc_invalid_status_details"
     calc_dir.mkdir()
 
@@ -43,7 +43,7 @@ def test_read_calculation_status_valid_value_returns_as_is(tmp_path):
     WHEN status readers are called
     THEN the status should be returned as-is
     """
-    manager = CalculationFileManager(base_dir=str(tmp_path))
+    manager = CalculationRepository(base_dir=str(tmp_path))
     calc_dir = tmp_path / "calc_valid_status"
     calc_dir.mkdir()
 

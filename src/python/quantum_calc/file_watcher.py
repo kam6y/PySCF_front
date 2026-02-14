@@ -288,6 +288,40 @@ class WebSocketCalculationWatcher:
         with self._lock:
             return {calc_id: len(callbacks) for calc_id, callbacks in self.connections.items()}
     
+    def update_base_directory(self, new_base_directory: str) -> None:
+        """Update the base directory, re-scheduling all active watches."""
+        new_base = Path(new_base_directory)
+        with self._lock:
+            if new_base == self.base_directory:
+                return
+
+            # Collect calculation IDs that are currently watched
+            active_calc_ids = list(self.connections.keys())
+
+            # Unschedule all current watches
+            for calc_dir_str, watch in list(self.watched_dirs.items()):
+                try:
+                    self.observer.unschedule(watch)
+                except Exception as e:
+                    logger.error(f"Error unscheduling watch during base_dir update: {e}")
+            self.watched_dirs.clear()
+
+            # Update path
+            self.base_directory = new_base
+
+            # Re-schedule watches with the new base directory
+            for calc_id in active_calc_ids:
+                calc_dir = self.base_directory / calc_id
+                calc_dir_str = str(calc_dir)
+                if calc_dir.exists():
+                    try:
+                        watch = self.observer.schedule(self.event_handler, calc_dir_str, recursive=False)
+                        self.watched_dirs[calc_dir_str] = watch
+                    except Exception as e:
+                        logger.error(f"Error re-scheduling watch for {calc_id}: {e}")
+
+            logger.info(f"Watcher base directory updated to: {new_base}")
+
     def is_watching(self, calculation_id: str) -> bool:
         """Check if a calculation is currently being watched."""
         calc_dir = self.base_directory / calculation_id
@@ -320,6 +354,13 @@ def get_websocket_watcher(base_directory: Optional[str] = None) -> WebSocketCalc
             _global_watcher.start()
         
         return _global_watcher
+
+
+def update_watcher_base_directory(new_base_directory: str) -> None:
+    """Update the global watcher's base directory if it exists."""
+    with _watcher_lock:
+        if _global_watcher is not None:
+            _global_watcher.update_base_directory(new_base_directory)
 
 
 def shutdown_websocket_watcher():

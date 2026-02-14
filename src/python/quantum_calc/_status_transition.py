@@ -40,21 +40,21 @@ class CalculationStatusManager:
         Execute a status transition: persist to file + send WebSocket notification.
 
         This is used by the parent process (CalculationProcessManager) for all status
-        updates. Worker processes write status directly via file_manager since they
+        updates. Worker processes write status directly via CalculationRepository since they
         cannot access parent process objects.
         """
-        from quantum_calc.file_manager import CalculationFileManager
+        from quantum_calc._calculation_repository import CalculationRepository
         from quantum_calc import get_current_settings
 
         settings = get_current_settings()
-        file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
-        calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+        repository = CalculationRepository(base_dir=settings.calculations_directory)
+        calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
 
         status_str = new_status.value
-        file_manager.save_calculation_status(calc_dir, status_str)
+        repository.save_calculation_status(calc_dir, status_str)
 
         if new_status == CalculationStatus.ERROR and error_message:
-            file_manager.save_calculation_results(calc_dir, {'error': error_message})
+            repository.save_calculation_results(calc_dir, {'error': error_message})
             logger.info(f"Calculation {calculation_id} transitioned to 'error': {error_message}")
         else:
             logger.info(f"Calculation {calculation_id} transitioned to '{status_str}'")

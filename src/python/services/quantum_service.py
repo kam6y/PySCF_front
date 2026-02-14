@@ -16,7 +16,9 @@ from quantum_calc import (
     get_process_manager, get_all_supported_parameters, get_current_settings,
     InputError, GeometryError, ProcessManagerError, CalculationError, FileManagerError
 )
-from quantum_calc.file_manager import CalculationFileManager
+from quantum_calc._calculation_repository import CalculationRepository
+from quantum_calc._cube_artifact_service import CubeArtifactService
+from quantum_calc._calculation_directory_migration import CalculationDirectoryMigration
 from quantum_calc.orbital_generator import MolecularOrbitalGenerator
 from quantum_calc.ir_spectrum import create_ir_spectrum_from_calculation_results
 from .exceptions import (
@@ -35,7 +37,9 @@ class QuantumService:
         # Load calculations directory from settings
         settings = get_current_settings()
         calculations_dir = settings.calculations_directory
-        self.file_manager = CalculationFileManager(base_dir=calculations_dir)
+        self.repository = CalculationRepository(base_dir=calculations_dir)
+        self.cube_service = CubeArtifactService(base_dir=calculations_dir)
+        self.migration = CalculationDirectoryMigration(base_dir=calculations_dir)
 
     def update_calculations_directory(self, new_directory: str) -> None:
         """
@@ -45,7 +49,12 @@ class QuantumService:
             new_directory: New directory path for calculations
         """
         logger.info(f"Updating QuantumService calculations directory to: {new_directory}")
-        self.file_manager.set_base_directory(new_directory)
+        self.migration.set_base_directory(new_directory)
+        self.repository.set_base_directory(new_directory)
+        self.cube_service.set_base_directory(new_directory)
+
+        from quantum_calc.file_watcher import update_watcher_base_directory
+        update_watcher_base_directory(new_directory)
 
     def get_supported_parameters(self) -> Dict[str, Any]:
         """
@@ -144,11 +153,11 @@ class QuantumService:
             
             # Initialize calculation directory
             try:
-                calc_dir = self.file_manager.create_calculation_dir(params['name'])
+                calc_dir = self.repository.create_calculation_dir(params['name'])
                 calculation_id = os.path.basename(calc_dir)
                 
                 # Save initial parameters
-                self.file_manager.save_calculation_parameters(calc_dir, params)
+                self.repository.save_calculation_parameters(calc_dir, params)
                 logger.info(f"Created calculation directory and saved parameters for calculation {calculation_id}")
             except Exception as file_error:
                 logger.error(f"Failed to set up calculation files: {file_error}")
@@ -173,8 +182,8 @@ class QuantumService:
                 # Handle submission failure
                 if not success:
                     error_message = waiting_reason if waiting_reason else 'Failed to submit calculation to process pool.'
-                    self.file_manager.save_calculation_status(calc_dir, 'error')
-                    self.file_manager.save_calculation_results(calc_dir, {'error': error_message})
+                    self.repository.save_calculation_status(calc_dir, 'error')
+                    self.repository.save_calculation_results(calc_dir, {'error': error_message})
                     logger.error(f"Failed to submit calculation {calculation_id} to process pool: {error_message}")
                     
                     # Create error instance but still return it (calculation was created)
@@ -183,7 +192,7 @@ class QuantumService:
                     return error_instance
                 
                 # Set initial status
-                self.file_manager.save_calculation_status(calc_dir, initial_status, waiting_reason)
+                self.repository.save_calculation_status(calc_dir, initial_status, waiting_reason)
                 logger.info(f"Queued calculation {calculation_id} for molecule '{params['name']}'")
                 
                 # Return initial calculation instance
@@ -199,9 +208,9 @@ class QuantumService:
                 raise ResourceUnavailableError(f'System initialization error: Unable to initialize calculation system. Please check system resources and try again.')
             except Exception as submit_error:
                 # Update status to error
-                self.file_manager.save_calculation_status(calc_dir, 'error')
+                self.repository.save_calculation_status(calc_dir, 'error')
                 error_message = f'Failed to submit calculation: {str(submit_error)}'
-                self.file_manager.save_calculation_results(calc_dir, {'error': error_message})
+                self.repository.save_calculation_results(calc_dir, {'error': error_message})
                 logger.error(f"Unexpected error during calculation submission: {submit_error}")
                 raise ServiceError(error_message)
                 
@@ -245,7 +254,7 @@ class QuantumService:
             ServiceError: If listing fails
         """
         try:
-            calculations = self.file_manager.list_calculations(
+            calculations = self.repository.list_calculations(
                 name_query=name_query,
                 status=status,
                 calculation_method=calculation_method,
@@ -255,7 +264,7 @@ class QuantumService:
             )
 
             return {
-                'base_directory': self.file_manager.get_base_directory(),
+                'base_directory': self.repository.get_base_directory(),
                 'calculations': calculations,
                 'count': len(calculations)
             }
@@ -285,17 +294,17 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
             # Read all calculation data from disk
-            parameters = self.file_manager.read_calculation_parameters(calc_path) or {}
-            results = self.file_manager.read_calculation_results(calc_path)
-            status, waiting_reason = self.file_manager.read_calculation_status_details(calc_path)
+            parameters = self.repository.read_calculation_parameters(calc_path) or {}
+            results = self.repository.read_calculation_results(calc_path)
+            status, waiting_reason = self.repository.read_calculation_status_details(calc_path)
             
-            display_name = self.file_manager._get_display_name(calculation_id, parameters)
+            display_name = self.repository.get_display_name(calculation_id, parameters)
             creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
             
             calculation_instance = {
@@ -316,7 +325,7 @@ class QuantumService:
             return {
                 'calculation': calculation_instance,
                 'files': {
-                    'checkpoint_exists': self.file_manager.file_exists(calc_path, 'calculation.chk'),
+                    'checkpoint_exists': self.repository.file_exists(calc_path, 'calculation.chk'),
                     'parameters_file_exists': parameters is not None,
                     'results_file_exists': results is not None,
                 }
@@ -348,7 +357,7 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            result_id = self.file_manager.rename_calculation(calculation_id, new_name)
+            result_id = self.repository.rename_calculation(calculation_id, new_name)
             if not result_id:
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
@@ -393,7 +402,7 @@ class QuantumService:
                     'Please pause or wait for the calculation to complete first.'
                 )
 
-            calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -472,13 +481,13 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
             # Check if completed
-            status = self.file_manager.read_calculation_status(calc_path)
+            status = self.repository.read_calculation_status(calc_path)
             if status != 'completed':
                 raise ValidationError(f'Calculation "{calculation_id}" is not completed. Status: {status}')
             
@@ -532,13 +541,13 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
             # Check if completed
-            status = self.file_manager.read_calculation_status(calc_path)
+            status = self.repository.read_calculation_status(calc_path)
             if status != 'completed':
                 raise ValidationError(f'Calculation "{calculation_id}" is not completed. Status: {status}')
             
@@ -595,12 +604,12 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
-            cube_files = self.file_manager.get_cube_files_info(calc_path)
+            cube_files = self.cube_service.get_cube_files_info(calc_path)
             
             logger.info(f"Found {len(cube_files)} CUBE files for calculation {calculation_id}")
             
@@ -630,12 +639,12 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
-            deleted_count = self.file_manager.delete_cube_files(calc_path, orbital_index)
+            deleted_count = self.cube_service.delete_cube_files(calc_path, orbital_index)
             
             if deleted_count > 0:
                 if orbital_index is not None:
@@ -687,18 +696,18 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.file_manager.get_base_directory(), calculation_id)
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
             # Check if completed
-            status = self.file_manager.read_calculation_status(calc_path)
+            status = self.repository.read_calculation_status(calc_path)
             if status != 'completed':
                 raise ValidationError(f'Calculation is not completed (status: {status}). IR spectrum cannot be generated.')
             
             # Read results
-            results = self.file_manager.read_calculation_results(calc_path)
+            results = self.repository.read_calculation_results(calc_path)
             if not results:
                 raise NotFoundError('Calculation results not found.')
             

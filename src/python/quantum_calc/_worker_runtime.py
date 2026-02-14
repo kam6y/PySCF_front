@@ -219,7 +219,7 @@ def _prepare_setup_parameters(parameters: dict, memory_mb: int) -> dict:
     return setup_params
 
 
-def _handle_calculation_error(error: Exception, calc_dir: str, file_manager,
+def _handle_calculation_error(error: Exception, calc_dir: str, repository,
                               calculation_method: str, memory_mb: int,
                               cpu_cores: int, process_logger) -> tuple:
     """
@@ -278,8 +278,8 @@ def _handle_calculation_error(error: Exception, calc_dir: str, file_manager,
     process_logger.error(f"Error diagnosis: {error_info}")
 
     # Save error status and information
-    file_manager.save_calculation_status(calc_dir, 'error')
-    file_manager.save_calculation_results(calc_dir, {'error': error_message, 'diagnosis': error_info})
+    repository.save_calculation_status(calc_dir, 'error')
+    repository.save_calculation_results(calc_dir, {'error': error_message, 'diagnosis': error_info})
 
     return False, error_message
 
@@ -307,7 +307,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     _check_casci_dependencies(calculation_method, process_logger)
 
     # Import calculator classes and exception types
-    from quantum_calc.file_manager import CalculationFileManager
+    from quantum_calc._calculation_repository import CalculationRepository
     from quantum_calc import get_current_settings
     from quantum_calc.pause_manager import pause_manager
     from threadpoolctl import threadpool_info, threadpool_limits
@@ -317,12 +317,12 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
 
     # Load current settings to get calculations directory
     settings = get_current_settings()
-    file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
-    calc_dir = os.path.join(file_manager.get_base_directory(), calculation_id)
+    repository = CalculationRepository(base_dir=settings.calculations_directory)
+    calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
 
     try:
         # Update status to running
-        file_manager.save_calculation_status(calc_dir, 'running')
+        repository.save_calculation_status(calc_dir, 'running')
         process_logger.info(f"Starting calculation {calculation_id} in process {os.getpid()}")
         process_logger.info(f"Using {cpu_cores} CPU cores and {memory_mb} MB memory")
 
@@ -373,11 +373,11 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             results = calculator.run_calculation()
 
         # Save results and update status to completed
-        file_manager.save_calculation_results(calc_dir, results)
-        file_manager.save_calculation_status(calc_dir, 'completed')
+        repository.save_calculation_results(calc_dir, results)
+        repository.save_calculation_status(calc_dir, 'completed')
 
         # Clean up pause state file if it exists (from previous pause/resume cycle)
-        file_manager.delete_pause_state(calc_dir)
+        repository.delete_pause_state(calc_dir)
         process_logger.debug(f"Cleaned up pause state file for calculation {calculation_id}")
 
         process_logger.info(f"Calculation {calculation_id} completed successfully in process {os.getpid()}")
@@ -410,10 +410,10 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
                     process_logger.warning(f"Failed to read geometry trajectory: {read_error}")
 
             # Save pause state to file
-            file_manager.save_pause_state(calc_dir, pause_state)
+            repository.save_pause_state(calc_dir, pause_state)
 
             # Update status to 'paused'
-            file_manager.save_calculation_status(calc_dir, 'paused')
+            repository.save_calculation_status(calc_dir, 'paused')
 
             # Remove pause flag file
             pause_manager.remove_pause_flag_file(calc_dir)
@@ -424,7 +424,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             raise e
 
         # For all other exceptions, handle as errors
-        return _handle_calculation_error(e, calc_dir, file_manager, calculation_method, memory_mb, cpu_cores, process_logger)
+        return _handle_calculation_error(e, calc_dir, repository, calculation_method, memory_mb, cpu_cores, process_logger)
 
     finally:
         # Clean up pause flag file if it exists

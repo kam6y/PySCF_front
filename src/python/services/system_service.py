@@ -21,7 +21,7 @@ from importlib import metadata, util
 
 from quantum_calc import get_process_manager, get_current_settings
 from quantum_calc.resource_manager import get_resource_manager
-from quantum_calc.file_manager import CalculationFileManager
+from quantum_calc._calculation_repository import CalculationRepository
 from .exceptions import ServiceError, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -477,7 +477,7 @@ class SystemService:
             try:
                 # Load current settings to get calculations directory
                 settings = get_current_settings()
-                file_manager = CalculationFileManager(base_dir=settings.calculations_directory)
+                file_manager = CalculationRepository(base_dir=settings.calculations_directory)
                 base_dir = file_manager.get_base_directory()
                 
                 diagnostics['file_manager'] = {

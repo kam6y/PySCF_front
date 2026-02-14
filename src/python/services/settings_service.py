@@ -10,7 +10,7 @@ from typing import Dict, Any
 
 from quantum_calc import get_process_manager, get_current_settings, update_app_settings
 from quantum_calc.resource_manager import get_resource_manager
-from quantum_calc.file_manager import CalculationFileManager
+from quantum_calc._calculation_directory_migration import CalculationDirectoryMigration
 from .exceptions import ServiceError, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -70,11 +70,10 @@ class SettingsService:
                 logger.info(f"Calculations directory changing from {current_calc_dir} to {new_calc_dir}")
 
                 try:
-                    # Create file manager with current directory
-                    file_manager = CalculationFileManager(base_dir=current_calc_dir)
+                    migration = CalculationDirectoryMigration(base_dir=current_calc_dir)
 
                     # Move calculations to new directory
-                    move_result = file_manager.move_calculations_directory(new_calc_dir)
+                    move_result = migration.move_calculations_directory(new_calc_dir)
 
                     if not move_result['success']:
                         logger.warning(f"Some calculations failed to move: {move_result}")
