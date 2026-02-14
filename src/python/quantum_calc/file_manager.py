@@ -176,6 +176,7 @@ class CalculationFileManager:
                 # Include additional fields for better search results
                 'calculation_method': params.get('calculation_method') if params else None,
                 'basis_function': params.get('basis_function') if params else None,
+                'exchange_correlation': params.get('exchange_correlation') if params else None,
                 'created_at': params.get('created_at') if params else None
             })
 

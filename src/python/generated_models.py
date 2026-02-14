@@ -498,6 +498,14 @@ class CalculationSummary(BaseModel):
     date: str = Field(..., description='Date string')
     has_checkpoint: bool = Field(..., description='Whether checkpoint file exists')
     status: CalculationStatus
+    calculation_method: Optional[str] = Field(
+        None, description='Calculation method (DFT, HF, MP2, etc.)'
+    )
+    basis_function: Optional[str] = Field(None, description='Basis set used')
+    exchange_correlation: Optional[str] = Field(
+        None, description='Exchange-correlation functional (DFT/TDDFT only)'
+    )
+    created_at: Optional[str] = Field(None, description='ISO format creation timestamp')
 
 
 class Data4(BaseModel):

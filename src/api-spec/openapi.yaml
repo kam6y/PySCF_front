@@ -2091,6 +2091,22 @@ components:
           description: Whether checkpoint file exists
         status:
           $ref: '#/components/schemas/CalculationStatus'
+        calculation_method:
+          type: string
+          nullable: true
+          description: Calculation method (DFT, HF, MP2, etc.)
+        basis_function:
+          type: string
+          nullable: true
+          description: Basis set used
+        exchange_correlation:
+          type: string
+          nullable: true
+          description: Exchange-correlation functional (DFT/TDDFT only)
+        created_at:
+          type: string
+          nullable: true
+          description: ISO format creation timestamp
 
     StartCalculationResponse:
       type: object

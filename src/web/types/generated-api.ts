@@ -1129,6 +1129,14 @@ export interface components {
             /** @description Whether checkpoint file exists */
             has_checkpoint: boolean;
             status: components["schemas"]["CalculationStatus"];
+            /** @description Calculation method (DFT, HF, MP2, etc.) */
+            calculation_method?: string | null;
+            /** @description Basis set used */
+            basis_function?: string | null;
+            /** @description Exchange-correlation functional (DFT/TDDFT only) */
+            exchange_correlation?: string | null;
+            /** @description ISO format creation timestamp */
+            created_at?: string | null;
         };
         StartCalculationResponse: {
             /** @example true */
