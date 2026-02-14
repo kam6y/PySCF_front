@@ -60,11 +60,7 @@ export const useCalculationData = () => {
 
   // サイドバー用の計算リスト
   const sidebarCalculations = useMemo(() => {
-    if (!calculationsData?.calculations) return [];
-
-    return calculationsData.calculations.filter(
-      calc => calc.status !== 'pending' || true // 必要に応じてフィルタリング条件を調整
-    );
+    return calculationsData?.calculations ?? [];
   }, [calculationsData]);
 
   return {

@@ -128,6 +128,7 @@ export const App = () => {
       console.log('[App] Auto-creating new calculation on app startup');
       appState.calculation.createNewCalculation();
     }
+    // appState.calculation を依存配列に含めると createNewCalculation → stagedCalculation 変更 → 再実行の無限ループになるため除外
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showInitialSetup, settings]);
 

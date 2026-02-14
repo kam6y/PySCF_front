@@ -11,9 +11,6 @@ export { useCalculationData } from './useCalculationData';
 export { useActiveCalculation } from './useActiveCalculation';
 export { useCalculationActions } from './useCalculationActions';
 
-// その他のフック
-export { useActiveCalculationId } from './useActiveCalculationId';
-
 // 設定管理フック
 export {
   useAppSettings,
@@ -27,10 +24,6 @@ export {
   useGpu4PyscfStatus,
   useInstallGpu4Pyscf,
 } from './useGpu4Pyscf';
-
-// 互換性のため残存（非推奨）
-export { useCalculationOperations } from './useCalculationOperations';
-export type { CalculationOperations } from './useCalculationOperations';
 
 // パフォーマンス最適化フック
 export { useProcessedCalculationResults } from './useProcessedCalculationResults';
