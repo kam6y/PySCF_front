@@ -176,8 +176,8 @@ class TestCalculationSubmissionAPI:
         assert response.status_code == 400
         data = response.get_json()
         assert data['success'] is False
-        # Check for error in either 'error' or 'validation_error' field
-        error_message = data.get('error', data.get('validation_error', '')).lower()
+        assert 'error' in data
+        error_message = data['error'].lower()
         assert 'ncas' in error_message or 'not applicable' in error_message
 
     def test_tddft_rejects_optimize_geometry_true(self, client, mocker, sample_h2_xyz):
@@ -203,9 +203,9 @@ class TestCalculationSubmissionAPI:
         # ASSERT
         assert response.status_code == 400
         data = response.get_json()
-        # Pydantic validation error format
-        assert 'validation_error' in data
-        assert 'optimize_geometry' in str(data['validation_error']).lower()
+        # Pydantic validation error is now handled by global errorhandler
+        assert 'error' in data
+        assert 'optimize_geometry' in data['error'].lower()
 
 
 class TestCalculationListAPI:

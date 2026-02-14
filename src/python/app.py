@@ -47,6 +47,8 @@ from websocket import register_websocket_handlers
 # Import cleanup functions from quantum_calc
 from quantum_calc import shutdown_process_manager, shutdown_websocket_watcher
 from quantum_calc.exceptions import ProcessManagerError
+from services.exceptions import ServiceError
+from werkzeug.exceptions import HTTPException
 
 # Initialize configuration and logging
 try:
@@ -226,6 +228,23 @@ def create_app(server_port: int = None, test_config: dict = None):
     @app.errorhandler(405)
     def method_not_allowed(error):
         return jsonify({'success': False, 'error': 'Method not allowed for this endpoint.'}), 405
+
+    @app.errorhandler(ServiceError)
+    def handle_service_error(error):
+        """Handle all ServiceError exceptions from the service layer."""
+        if error.status_code >= 500:
+            logger.error(f"Service error: {error.message}", exc_info=True)
+        else:
+            logger.warning(f"Service error: {error.message}")
+        return jsonify({'success': False, 'error': error.message}), error.status_code
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(error):
+        """Catch-all handler for unhandled exceptions."""
+        if isinstance(error, HTTPException):
+            return error
+        logger.error(f"Unhandled exception: {error}", exc_info=True)
+        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
 
     # Store socketio instance for access by other modules
     app.socketio = socketio
