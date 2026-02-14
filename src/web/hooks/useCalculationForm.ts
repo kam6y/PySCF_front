@@ -20,6 +20,7 @@ import {
   SMILESConvertResponseData,
 } from '../types/api-types';
 import { isCustomDielectricConstant } from '../constants/calculationDefaults';
+import { showErrorNotification } from '../store/notificationStore';
 
 export type DistributiveKeyOf<T> = T extends any ? keyof T : never;
 
@@ -329,8 +330,10 @@ export const useCalculationForm = ({
     } catch (error) {
       console.error('Error renaming calculation:', error);
       setLocalName(activeCalculation.name || '');
-      alert(
-        `Failed to rename calculation: ${error instanceof Error ? error.message : 'Unknown error'}`
+      showErrorNotification(
+        'Failed to rename calculation',
+        error instanceof Error ? error.message : 'Unknown error',
+        renameModal.targetCalculationId
       );
     } finally {
       setRenameModal({
@@ -361,11 +364,14 @@ export const useCalculationForm = ({
     setIsEditingName(false);
   }, [activeCalculation]);
 
-  const handleNameKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    }
-  }, []);
+  const handleNameKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        e.currentTarget.blur();
+      }
+    },
+    []
+  );
 
   const handleStartCalculation = useCallback(async () => {
     if (

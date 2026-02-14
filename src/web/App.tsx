@@ -1,6 +1,12 @@
 // src/web/App.tsx
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
@@ -29,6 +35,8 @@ export const App = () => {
   const appState = useAppState();
   const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
+  const createNewCalculation = appState.calculation.createNewCalculation;
+  const stagedCalculation = appState.calculation.stagedCalculation;
 
   // アプリ設定の取得
   const { settings, updateSettings } = useAppSettings();
@@ -36,6 +44,7 @@ export const App = () => {
   // 初回セットアップダイアログの表示状態
   const [showInitialSetup, setShowInitialSetup] = useState(false);
   const [defaultDirectory, setDefaultDirectory] = useState('');
+  const hasAutoCreatedInitialCalculationRef = useRef(false);
 
   // プラットフォーム情報の取得
   const [platform, setPlatform] = useState<string>('');
@@ -110,7 +119,8 @@ export const App = () => {
 
     // 初回セットアップ完了後、自動的に新規計算を作成
     console.log('[App] Auto-creating new calculation after setup completion');
-    appState.calculation.createNewCalculation();
+    createNewCalculation();
+    hasAutoCreatedInitialCalculationRef.current = true;
   };
 
   // チャットセッションのデータ取得
@@ -118,19 +128,18 @@ export const App = () => {
 
   // アプリ起動時に自動的に新規計算を作成
   useEffect(() => {
+    if (hasAutoCreatedInitialCalculationRef.current) {
+      return;
+    }
+
     // 初回セットアップダイアログが閉じており、settingsがロードされ、
     // まだ新規計算が作成されていない場合のみ実行
-    if (
-      !showInitialSetup &&
-      settings &&
-      !appState.calculation.stagedCalculation
-    ) {
+    if (!showInitialSetup && settings && !stagedCalculation) {
       console.log('[App] Auto-creating new calculation on app startup');
-      appState.calculation.createNewCalculation();
+      createNewCalculation();
+      hasAutoCreatedInitialCalculationRef.current = true;
     }
-    // appState.calculation を依存配列に含めると createNewCalculation → stagedCalculation 変更 → 再実行の無限ループになるため除外
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showInitialSetup, settings]);
+  }, [showInitialSetup, settings, stagedCalculation, createNewCalculation]);
 
   // AIチャット画面を開いた時にサイドバーのタブを"chats"に自動切り替え
   // AI Agent ページがOFFの場合は"calculations"に戻す

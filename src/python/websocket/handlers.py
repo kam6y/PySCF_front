@@ -5,7 +5,6 @@ Handles client connections for calculation status updates and progress monitorin
 
 import logging
 import os
-import threading
 from datetime import datetime
 from typing import Dict
 from flask import session
@@ -16,11 +15,6 @@ from quantum_calc import get_websocket_watcher
 
 # Set up logging
 logger = logging.getLogger(__name__)
-
-# Global WebSocket connection registry for immediate notifications  
-# calculation_id -> set of session IDs
-active_websockets = {}
-websocket_lock = threading.Lock()
 
 
 def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationFileManager) -> Dict:
