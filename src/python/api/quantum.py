@@ -308,7 +308,8 @@ def get_ir_spectrum(calculation_id):
     broadening_fwhm = request.args.get('broadening_fwhm', default=100.0, type=float)
     x_min = request.args.get('x_min', default=400.0, type=float)
     x_max = request.args.get('x_max', default=4000.0, type=float)
-    show_peaks = request.args.get('show_peaks', default=True, type=bool)
+    show_peaks_raw = request.args.get('show_peaks')
+    show_peaks = show_peaks_raw.lower() in ('true', '1') if show_peaks_raw is not None else True
 
     # Call service layer
     result = quantum_service.generate_ir_spectrum(
