@@ -21,7 +21,7 @@ export const useCalculationData = () => {
     error: calculationsError,
   } = useGetCalculations();
 
-  const { data: detailsData, isLoading: detailsLoading } =
+  const { data: detailsData, isLoading: detailsLoading, error: detailsError } =
     useGetCalculationDetails(activeCalculationId);
 
   // アクティブ計算の決定（優先順位付き）
@@ -75,6 +75,7 @@ export const useCalculationData = () => {
     detailsLoading,
     calculationsLoading,
     calculationsError,
+    detailsError,
 
     // 補助データ
     sidebarCalculations,

@@ -270,7 +270,7 @@ export const App = () => {
           <CalculationResultsPage
             activeCalculation={calculationData.activeCalculation || undefined}
             isLoadingDetails={calculationData.detailsLoading}
-            detailsError={null}
+            detailsError={calculationData.detailsError?.message ?? null}
             onCalculationUpdate={calculationActions.handleCalculationUpdate}
           />
         );
