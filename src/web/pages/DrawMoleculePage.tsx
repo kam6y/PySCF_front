@@ -15,6 +15,7 @@ import {
   DEFAULT_CALCULATION_PARAMETERS,
   STATUS_MESSAGES,
 } from '../constants/calculationDefaults';
+import { isCalculationEditable } from '../utils/calculationStatus';
 
 type KetcherWindow = Window & {
   ketcher?: {
@@ -242,12 +243,8 @@ export const DrawMoleculePage: React.FC = () => {
       !activeCalculation.parameters?.ketcher_data
   );
 
-  // 編集可否の判定（running/waitingの場合は編集不可）
-  const canEdit =
-    !activeCalculation ||
-    activeCalculation.status === 'pending' ||
-    activeCalculation.status === 'error' ||
-    activeCalculation.status === 'completed';
+  // 編集可否の判定（pending/completed/error/undefined のみ編集可）
+  const canEdit = isCalculationEditable(activeCalculation?.status);
 
   // Ketcherインスタンスの初期化（メモ化して安定化）
   const handleOnInit = useCallback((ketcher: Ketcher) => {

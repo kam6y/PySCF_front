@@ -2,13 +2,15 @@ import React from 'react';
 import styles from '../../pages/CalculationSettingsPage.module.css';
 import { XYZInput } from '../XYZInput';
 import { INPUT_PLACEHOLDERS } from '../../constants/calculationDefaults';
+import type { CalculationStatus } from '../../types/api-types';
+import { isCalculationEditable } from '../../utils/calculationStatus';
 
 interface MolecularInputSectionProps {
   inputMethod: string;
   pubchemInput: string;
   isConverting: boolean;
   convertError: string | null;
-  calculationStatus: string;
+  calculationStatus: CalculationStatus;
   xyzInputValue: string;
   onInputMethodChange: (method: string) => void;
   onPubchemInputChange: (value: string) => void;
@@ -43,7 +45,7 @@ export const MolecularInputSection = React.memo<MolecularInputSectionProps>(
                 value="pubchem"
                 checked={inputMethod === 'pubchem'}
                 onChange={e => onInputMethodChange(e.target.value)}
-                disabled={calculationStatus === 'running'}
+                disabled={!isCalculationEditable(calculationStatus)}
               />
               <span className={styles.radioText}>Get from PubChem Name/CID</span>
             </label>
@@ -54,7 +56,7 @@ export const MolecularInputSection = React.memo<MolecularInputSectionProps>(
                 value="smiles"
                 checked={inputMethod === 'smiles'}
                 onChange={e => onInputMethodChange(e.target.value)}
-                disabled={calculationStatus === 'running'}
+                disabled={!isCalculationEditable(calculationStatus)}
               />
               <span className={styles.radioText}>Get from SMILES</span>
             </label>
@@ -75,7 +77,7 @@ export const MolecularInputSection = React.memo<MolecularInputSectionProps>(
                 }
               }}
               className={styles.pubchemInput}
-              disabled={calculationStatus === 'running'}
+              disabled={!isCalculationEditable(calculationStatus)}
             />
             <button
               onClick={onXYZConvert}
@@ -83,7 +85,7 @@ export const MolecularInputSection = React.memo<MolecularInputSectionProps>(
               disabled={
                 isConverting ||
                 !pubchemInput.trim() ||
-                calculationStatus === 'running'
+                !isCalculationEditable(calculationStatus)
               }
             >
               {isConverting ? 'Converting...' : 'Convert to XYZ'}
@@ -106,7 +108,11 @@ export const MolecularInputSection = React.memo<MolecularInputSectionProps>(
         </div>
         <div className={styles.xyzDirectInput}>
           <h4 className={styles.subsectionTitle}>Direct XYZ Input/Edit</h4>
-          <XYZInput onXYZChange={onXYZChange} value={xyzInputValue} />
+          <XYZInput
+            onXYZChange={onXYZChange}
+            value={xyzInputValue}
+            disabled={!isCalculationEditable(calculationStatus)}
+          />
         </div>
       </section>
     );

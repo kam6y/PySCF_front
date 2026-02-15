@@ -7,6 +7,7 @@ import {
   QuantumCalculationRequest,
 } from '../../types/api-types';
 import { DistributiveKeyOf } from '../../hooks/useCalculationForm';
+import { isCalculationEditable } from '../../utils/calculationStatus';
 
 interface CalculationHeaderProps {
   activeCalculation?: CalculationInstance;
@@ -61,7 +62,7 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
               onKeyDown={onNameKeyDown}
               onChange={onNameChange}
               className={styles.moleculeNameInput}
-              disabled={calculationStatus === 'running'}
+              disabled={!isCalculationEditable(calculationStatus)}
               data-editing={isEditingName}
             />
             {localName && (
@@ -93,7 +94,7 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                       min="1"
                       max="32"
                       className={styles.cpuCoresInput}
-                      disabled={calculationStatus === 'running'}
+                      disabled={!isCalculationEditable(calculationStatus)}
                     />
                     <div className={styles.spinnerArrows}>
                       <button
@@ -105,7 +106,7 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                             Math.min(32, (params.cpu_cores || 1) + 1)
                           )
                         }
-                        disabled={calculationStatus === 'running'}
+                        disabled={!isCalculationEditable(calculationStatus)}
                       >
                         ▲
                       </button>
@@ -118,7 +119,7 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                             Math.max(1, (params.cpu_cores || 1) - 1)
                           )
                         }
-                        disabled={calculationStatus === 'running'}
+                        disabled={!isCalculationEditable(calculationStatus)}
                       >
                         ▼
                       </button>
@@ -139,7 +140,7 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                       }
                       min="128"
                       className={styles.memoryValueInput}
-                      disabled={calculationStatus === 'running'}
+                      disabled={!isCalculationEditable(calculationStatus)}
                     />
                     <span className={styles.memoryUnit}>MB</span>
                   </div>

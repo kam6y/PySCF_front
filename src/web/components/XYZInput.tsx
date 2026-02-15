@@ -10,12 +10,14 @@ export interface XYZInputProps {
   onXYZChange: (xyzData: string, isValid: boolean) => void;
   className?: string;
   value?: string; // Allow external control of the input value
+  disabled?: boolean;
 }
 
 export const XYZInput = React.memo<XYZInputProps>(({
   onXYZChange,
   className = '',
   value,
+  disabled,
 }) => {
   const [xyzInput, setXyzInput] = useState('');
   const [validationResult, setValidationResult] =
@@ -80,6 +82,7 @@ export const XYZInput = React.memo<XYZInputProps>(({
         id="xyz-textarea"
         value={xyzInput}
         onChange={handleInputChange}
+        disabled={disabled}
         placeholder={`3
 Water molecule
 O   0.000000   0.000000   0.119262

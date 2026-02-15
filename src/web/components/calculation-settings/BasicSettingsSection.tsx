@@ -2,14 +2,16 @@ import React from 'react';
 import styles from '../../pages/CalculationSettingsPage.module.css';
 import {
   CalculationParameters,
+  CalculationStatus,
   QuantumCalculationRequest,
   SupportedParametersResponseData,
 } from '../../types/api-types';
 import { DistributiveKeyOf } from '../../hooks/useCalculationForm';
+import { isCalculationEditable } from '../../utils/calculationStatus';
 
 interface BasicSettingsSectionProps {
   params: CalculationParameters;
-  calculationStatus: string;
+  calculationStatus: CalculationStatus;
   isLoadingParams: boolean;
   paramsError: unknown;
   supportedParams?: SupportedParametersResponseData;
@@ -41,7 +43,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.calculation_method}
             onChange={e => onParamChange('calculation_method', e.target.value)}
-            disabled={calculationStatus === 'running' || isLoadingParams}
+            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -61,7 +63,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.basis_function}
             onChange={e => onParamChange('basis_function', e.target.value)}
-            disabled={calculationStatus === 'running' || isLoadingParams}
+            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -95,7 +97,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
                 params.calculation_method === 'DFT' ||
                 params.calculation_method === 'TDDFT'
               ) ||
-              calculationStatus === 'running' ||
+              !isCalculationEditable(calculationStatus) ||
               isLoadingParams
             }
           >
@@ -126,7 +128,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
             value={params.charges || 0}
             onChange={e => onParamChange('charges', Number(e.target.value))}
             className={`${styles.numberInput} ${styles.withSpinner}`}
-            disabled={calculationStatus === 'running'}
+            disabled={!isCalculationEditable(calculationStatus)}
           />
         </div>
         <div className={styles.settingRow}>
@@ -138,7 +140,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
             min={0}
             step={1}
             className={`${styles.numberInput} ${styles.withSpinner}`}
-            disabled={calculationStatus === 'running'}
+            disabled={!isCalculationEditable(calculationStatus)}
           />
         </div>
         <div className={styles.settingRow}>
@@ -150,7 +152,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
                 onParamChange('optimize_geometry', e.target.checked)
               }
               disabled={
-                calculationStatus === 'running' ||
+                !isCalculationEditable(calculationStatus) ||
                 isParameterDisabled(
                   'optimize_geometry',
                   params.calculation_method || 'DFT'

@@ -2,14 +2,16 @@ import React from 'react';
 import styles from '../../pages/CalculationSettingsPage.module.css';
 import {
   CalculationParameters,
+  CalculationStatus,
   QuantumCalculationRequest,
   SupportedParametersResponseData,
 } from '../../types/api-types';
 import { DistributiveKeyOf } from '../../hooks/useCalculationForm';
+import { isCalculationEditable } from '../../utils/calculationStatus';
 
 interface AdvancedMethodSettingsProps {
   params: CalculationParameters;
-  calculationStatus: string;
+  calculationStatus: CalculationStatus;
   isLoadingParams: boolean;
   paramsError: unknown;
   supportedParams?: SupportedParametersResponseData;
@@ -48,7 +50,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 max={20}
                 step={1}
                 className={`${styles.numberInput} ${styles.withSpinner}`}
-                disabled={calculationStatus === 'running' || isLoadingParams}
+                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
               />
             </div>
             <div className={styles.settingRow}>
@@ -66,7 +68,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 max={40}
                 step={1}
                 className={`${styles.numberInput} ${styles.withSpinner}`}
-                disabled={calculationStatus === 'running' || isLoadingParams}
+                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
               />
             </div>
             {params.calculation_method === 'CASSCF' && (
@@ -78,7 +80,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     onChange={e =>
                       onParamChange('conv_tol', parseFloat(e.target.value))
                     }
-                    disabled={calculationStatus === 'running'}
+                    disabled={!isCalculationEditable(calculationStatus)}
                   >
                     <option value={1e-5}>1e-5 (loose)</option>
                     <option value={1e-6}>1e-6 (normal)</option>
@@ -93,7 +95,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     onChange={e =>
                       onParamChange('conv_tol_grad', parseFloat(e.target.value))
                     }
-                    disabled={calculationStatus === 'running'}
+                    disabled={!isCalculationEditable(calculationStatus)}
                   >
                     <option value={1e-3}>1e-3 (loose)</option>
                     <option value={1e-4}>1e-4 (normal)</option>
@@ -116,7 +118,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     max={200}
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
-                    disabled={calculationStatus === 'running'}
+                    disabled={!isCalculationEditable(calculationStatus)}
                   />
                 </div>
               </>
@@ -140,7 +142,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 max={100}
                 step={1}
                 className={`${styles.numberInput} ${styles.withSpinner}`}
-                disabled={calculationStatus === 'running'}
+                disabled={!isCalculationEditable(calculationStatus)}
               />
             </div>
             <div className={styles.settingRow}>
@@ -149,7 +151,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                   type="checkbox"
                   checked={(params as any).natorb !== false}
                   onChange={e => onParamChange('natorb', e.target.checked)}
-                  disabled={calculationStatus === 'running'}
+                  disabled={!isCalculationEditable(calculationStatus)}
                 />
                 Transform to Natural Orbitals in Active Space
               </label>
@@ -174,7 +176,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 max={50}
                 step={1}
                 className={`${styles.numberInput} ${styles.withSpinner}`}
-                disabled={calculationStatus === 'running' || isLoadingParams}
+                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
               />
             </div>
             <div className={styles.settingRow}>
@@ -182,7 +184,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
               <select
                 value={(params as any).tddft_method}
                 onChange={e => onParamChange('tddft_method', e.target.value)}
-                disabled={calculationStatus === 'running' || isLoadingParams}
+                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
               >
                 {isLoadingParams ? (
                   <option value="">Loading...</option>
@@ -209,7 +211,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                   onChange={e =>
                     onParamChange('tddft_analyze_nto', e.target.checked)
                   }
-                  disabled={calculationStatus === 'running'}
+                  disabled={!isCalculationEditable(calculationStatus)}
                 />
                 Natural Transition Orbital Analysis
               </label>
@@ -226,7 +228,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                   type="checkbox"
                   checked={(params as any).frozen_core !== false}
                   onChange={e => onParamChange('frozen_core', e.target.checked)}
-                  disabled={calculationStatus === 'running'}
+                  disabled={!isCalculationEditable(calculationStatus)}
                 />
                 Use Frozen Core Approximation
               </label>

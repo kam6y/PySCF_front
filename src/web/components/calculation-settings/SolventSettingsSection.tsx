@@ -3,14 +3,16 @@ import styles from '../../pages/CalculationSettingsPage.module.css';
 import { isCustomDielectricConstant } from '../../constants/calculationDefaults';
 import {
   CalculationParameters,
+  CalculationStatus,
   QuantumCalculationRequest,
   SupportedParametersResponseData,
 } from '../../types/api-types';
 import { DistributiveKeyOf } from '../../hooks/useCalculationForm';
+import { isCalculationEditable } from '../../utils/calculationStatus';
 
 interface SolventSettingsSectionProps {
   params: CalculationParameters;
-  calculationStatus: string;
+  calculationStatus: CalculationStatus;
   isLoadingParams: boolean;
   paramsError: unknown;
   supportedParams?: SupportedParametersResponseData;
@@ -40,7 +42,7 @@ export const SolventSettingsSection = React.memo<SolventSettingsSectionProps>(
           <select
             value={params.solvent_method || 'none'}
             onChange={e => onParamChange('solvent_method', e.target.value)}
-            disabled={calculationStatus === 'running'}
+            disabled={!isCalculationEditable(calculationStatus)}
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -107,7 +109,8 @@ export const SolventSettingsSection = React.memo<SolventSettingsSectionProps>(
             value={solventDisplayValue}
             onChange={e => onParamChange('solvent', e.target.value)}
             disabled={
-              params.solvent_method === 'none' || calculationStatus === 'running'
+              params.solvent_method === 'none' ||
+              !isCalculationEditable(calculationStatus)
             }
           >
             {isLoadingParams ? (
@@ -144,7 +147,7 @@ export const SolventSettingsSection = React.memo<SolventSettingsSectionProps>(
                   onParamChange('solvent', e.target.value || '78.36')
                 }
                 className={styles.numberInput}
-                disabled={calculationStatus === 'running'}
+                disabled={!isCalculationEditable(calculationStatus)}
               />
             </div>
           )}

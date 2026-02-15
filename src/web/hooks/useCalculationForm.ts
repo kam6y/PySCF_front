@@ -21,6 +21,7 @@ import {
 } from '../types/api-types';
 import { isCustomDielectricConstant } from '../constants/calculationDefaults';
 import { showErrorNotification } from '../store/notificationStore';
+import { isCalculationEditable } from '../utils/calculationStatus';
 
 export type DistributiveKeyOf<T> = T extends any ? keyof T : never;
 
@@ -175,6 +176,7 @@ export const useCalculationForm = ({
       value: string | number | boolean
     ) => {
       if (!activeCalculation) return;
+      if (!isCalculationEditable(activeCalculation.status)) return;
 
       if (field === 'name') {
         if (activeCalculation.id.startsWith('new-calculation-')) {
@@ -235,6 +237,7 @@ export const useCalculationForm = ({
 
   const handleXYZChange = useCallback(
     (xyzData: string, isValid: boolean) => {
+      if (!isCalculationEditable(activeCalculation?.status)) return;
       if (isValid && activeCalculation) {
         const updatedParams = {
           ...activeCalculation.parameters,
@@ -374,6 +377,7 @@ export const useCalculationForm = ({
   );
 
   const handleStartCalculation = useCallback(async () => {
+    if (!isCalculationEditable(activeCalculation?.status)) return;
     if (
       !activeCalculation ||
       !activeCalculation.parameters?.xyz ||
@@ -409,6 +413,7 @@ export const useCalculationForm = ({
 
   const handleXYZConvert = useCallback(async () => {
     if (!activeCalculation || !pubchemInput.trim()) return;
+    if (!isCalculationEditable(activeCalculation.status)) return;
 
     setIsConverting(true);
     setConvertError(null);
