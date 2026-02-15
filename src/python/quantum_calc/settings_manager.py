@@ -10,6 +10,23 @@ from generated_models import AppSettings
 
 logger = logging.getLogger(__name__)
 
+_SENSITIVE_KEYS = {"gemini_api_key", "research_email"}
+
+
+def _mask_settings(settings) -> dict:
+    """ログ出力用に機密フィールドをマスクした辞書を返す。"""
+    if hasattr(settings, "model_dump"):
+        d = settings.model_dump(mode="json")
+    elif isinstance(settings, dict):
+        d = dict(settings)
+    else:
+        return {"<unserializable>": str(type(settings))}
+    for key in _SENSITIVE_KEYS:
+        if key in d and d[key] is not None:
+            d[key] = "***"
+    return d
+
+
 class SettingsManager:
     """Manager for application settings persistence and retrieval."""
     
@@ -75,7 +92,7 @@ class SettingsManager:
                 try:
                     # Try to validate loaded data using Pydantic model
                     settings = AppSettings(**data)
-                    logger.info(f"Loaded settings: {settings}")
+                    logger.info(f"Loaded settings: {_mask_settings(settings)}")
                     return settings
                 except Exception as validation_error:
                     # Migration needed - merge existing data with defaults
@@ -85,7 +102,7 @@ class SettingsManager:
                 # Create new settings file with defaults
                 default_settings = self.get_default_settings()
                 self.save_settings(default_settings)
-                logger.info(f"Created new settings file with defaults: {default_settings}")
+                logger.info(f"Created new settings file with defaults: {_mask_settings(default_settings)}")
                 return default_settings
                 
         except (json.JSONDecodeError, ValueError, TypeError) as e:
@@ -130,7 +147,7 @@ class SettingsManager:
             
             # Save migrated settings back to file
             if self.save_settings(migrated_settings):
-                logger.info(f"Successfully migrated settings: {migrated_settings}")
+                logger.info(f"Successfully migrated settings: {_mask_settings(migrated_settings)}")
             else:
                 logger.warning("Failed to save migrated settings to file")
             
@@ -164,7 +181,7 @@ class SettingsManager:
             # Atomic rename
             temp_file.replace(self.settings_file)
             
-            logger.info(f"Saved settings: {settings}")
+            logger.info(f"Saved settings: {_mask_settings(settings)}")
             return True
             
         except Exception as e:
