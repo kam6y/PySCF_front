@@ -300,6 +300,7 @@ def start_development_server():
 
     # Create app instance with the determined port
     # Global socketio instance is used automatically
+    global app
     app = create_app(server_port=actual_port)
     
     # Register cleanup functions
@@ -324,12 +325,10 @@ def start_development_server():
         cleanup_resources()
 
 
-# Create global app instance for import by other modules
-# Global socketio instance is already defined above
-# These are created at module import time for Gunicorn compatibility
-# Port is determined from environment variable or configuration
-app = create_app()
-
-
 if __name__ == '__main__':
+    # Development mode: create_app() is called once inside start_development_server()
     start_development_server()
+else:
+    # Production (Gunicorn) mode: create app at module import time
+    # Gunicorn references this via app:app
+    app = create_app()
