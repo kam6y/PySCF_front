@@ -68,14 +68,8 @@ class NotificationService:
                 calculation_instance['error'] = error_message
                 calculation_instance['errorMessage'] = error_message
 
-            # Send to calculation-specific room
-            self._socketio.emit(
-                'calculation_update',
-                calculation_instance,
-                room=f'calculation_{calculation_id}'
-            )
-
             # Send to global updates room
+            # (calculation-specific room is handled by file_watcher via handlers.py)
             self._socketio.emit(
                 'calculation_update',
                 calculation_instance,

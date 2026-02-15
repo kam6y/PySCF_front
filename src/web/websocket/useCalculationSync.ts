@@ -31,8 +31,8 @@ export const useCalculationSync = ({
   const queryClient = useQueryClient();
   const activeCalculationIdRef = useRef(activeCalculationId);
   activeCalculationIdRef.current = activeCalculationId;
-  const lastUpdateTimestamps = useRef<Map<string, number>>(new Map());
   const currentActiveCalculationId = useRef<string | null>(null);
+  const lastNotifiedStatus = useRef<Map<string, string>>(new Map());
   const syncFailureCountRef = useRef<number>(0);
   const isConnectedRef = useRef<boolean>(false);
 
@@ -41,22 +41,6 @@ export const useCalculationSync = ({
   onCalculationUpdateRef.current = onCalculationUpdate;
   const onWebSocketErrorRef = useRef(onWebSocketError);
   onWebSocketErrorRef.current = onWebSocketError;
-
-  // 重複更新防止チェック
-  const isDuplicateUpdate = useCallback((calculationId: string): boolean => {
-    const currentTimestamp = Date.now();
-    const lastUpdateTime = lastUpdateTimestamps.current.get(calculationId);
-
-    if (lastUpdateTime && currentTimestamp - lastUpdateTime < 100) {
-      console.log(
-        `[UnifiedWebSocket] Skipping duplicate update for calculation ${calculationId} (within 100ms)`
-      );
-      return true;
-    }
-
-    lastUpdateTimestamps.current.set(calculationId, currentTimestamp);
-    return false;
-  }, []);
 
   // 統一されたキャッシュ更新ロジック
   const updateCalculationCache = useCallback(
@@ -107,34 +91,16 @@ export const useCalculationSync = ({
         return;
       }
 
-      // 重複更新チェック
-      if (isDuplicateUpdate(calculationId)) {
-        return;
-      }
-
       console.log(
         `[UnifiedWebSocket] Processing update for calculation ${calculationId}: ${updatedCalculation.status}`
       );
 
-      // 前のステータスを取得
-      const previousDetailData = queryClient.getQueryData([
-        'calculation',
-        calculationId,
-      ]) as { calculation: CalculationInstance } | undefined;
-      const previousStatus = previousDetailData?.calculation?.status;
-
-      // 前のエラーメッセージを取得
-      const previousErrorMessage =
-        previousDetailData?.calculation?.error ||
-        previousDetailData?.calculation?.results?.error;
-      const currentErrorMessage =
-        updatedCalculation.error || updatedCalculation.results?.error;
-
-      // 変更があった場合のみ処理
+      // ref ベースでステータス重複を判定（React Query キャッシュは
+      // invalidate→refetch が非同期のため、短時間に2通来ると両方
+      // shouldUpdate=true になる問題を回避）
+      const previousStatus = lastNotifiedStatus.current.get(calculationId);
       const hasStatusChanged = previousStatus !== updatedCalculation.status;
-      const hasErrorMessageChanged = currentErrorMessage !== previousErrorMessage;
-      const shouldUpdate =
-        hasStatusChanged || hasErrorMessageChanged || !previousStatus;
+      const shouldUpdate = hasStatusChanged || !previousStatus;
 
       if (!shouldUpdate) {
         console.log(
@@ -142,6 +108,8 @@ export const useCalculationSync = ({
         );
         return;
       }
+
+      lastNotifiedStatus.current.set(calculationId, updatedCalculation.status);
 
       console.log(
         `[UnifiedWebSocket] Status change detected for ${calculationId}: ${previousStatus || 'pending'} -> ${updatedCalculation.status}`
@@ -153,7 +121,7 @@ export const useCalculationSync = ({
       // 通知処理
       onCalculationUpdateRef.current?.(updatedCalculation, previousStatus);
     },
-    [isDuplicateUpdate, queryClient, updateCalculationCache]
+    [queryClient, updateCalculationCache]
   );
 
   const handleSocketError = useCallback(

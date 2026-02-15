@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 class CalculationFileWatcher(FileSystemEventHandler):
     """
     File system event handler for calculation directories.
-    Monitors status.json, results.json, and parameters.json files.
+    Monitors results.json and parameters.json files.
+    (status.json is handled by notification_service via global_updates room.)
     """
     
     def __init__(self, callback: Callable[[str, Dict], None]):
@@ -46,7 +47,10 @@ class CalculationFileWatcher(FileSystemEventHandler):
         """
         super().__init__()
         self.callback = callback
-        self.monitored_files = {'status.json', 'results.json', 'parameters.json'}
+        # status.json is excluded: status transitions are delivered via
+        # notification_service -> global_updates room, so watching the file
+        # would cause duplicate delivery to clients in both rooms.
+        self.monitored_files = {'results.json', 'parameters.json'}
         self._lock = threading.Lock()
     
     def on_modified(self, event):
