@@ -119,18 +119,22 @@ export const SolventSettingsSection = React.memo<SolventSettingsSectionProps>(
               <option value="">Error loading solvents</option>
             ) : (
               supportedParams?.solvents &&
-              Object.entries(supportedParams.solvents).map(([group, solvents]) => (
-                <optgroup key={group} label={group}>
-                  {solvents.map(solvent => (
-                    <option key={solvent.value} value={solvent.value}>
-                      {solvent.display}
-                    </option>
-                  ))}
-                </optgroup>
-              ))
+              Object.entries(supportedParams.solvents).map(
+                ([group, solvents]) => (
+                  <optgroup key={group} label={group}>
+                    {solvents.map(solvent => (
+                      <option key={solvent.value} value={solvent.value}>
+                        {solvent.display}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              )
             )}
             {!isLoadingParams && !paramsError && (
-              <option value="custom">Custom (Enter dielectric constant below)</option>
+              <option value="custom">
+                Custom (Enter dielectric constant below)
+              </option>
             )}
           </select>
         </div>

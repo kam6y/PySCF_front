@@ -13,6 +13,4 @@ export type {
   UseCalculationSyncReturn,
 } from './useCalculationSync';
 export { invalidateQueriesWithRetry } from './invalidateQueriesWithRetry';
-export type {
-  InvalidateQueriesWithRetryOptions,
-} from './invalidateQueriesWithRetry';
+export type { InvalidateQueriesWithRetryOptions } from './invalidateQueriesWithRetry';

@@ -15,7 +15,9 @@ export const useCalculationData = () => {
   const activeCalculationId = useCalculationStore(
     state => state.activeCalculationId
   );
-  const stagedCalculation = useCalculationStore(state => state.stagedCalculation);
+  const stagedCalculation = useCalculationStore(
+    state => state.stagedCalculation
+  );
 
   // サーバーデータの取得
   const {
@@ -24,8 +26,11 @@ export const useCalculationData = () => {
     error: calculationsError,
   } = useGetCalculations();
 
-  const { data: detailsData, isLoading: detailsLoading, error: detailsError } =
-    useGetCalculationDetails(activeCalculationId);
+  const {
+    data: detailsData,
+    isLoading: detailsLoading,
+    error: detailsError,
+  } = useGetCalculationDetails(activeCalculationId);
 
   // アクティブ計算の決定（優先順位付き）
   const activeCalculation = useMemo(() => {

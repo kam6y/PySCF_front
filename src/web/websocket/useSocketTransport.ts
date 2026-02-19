@@ -85,7 +85,9 @@ export const useSocketTransport = ({
 
     // 接続処理中の場合はスキップ
     if (isConnectingRef.current) {
-      console.log('[UnifiedWebSocket] Connection already in progress, skipping');
+      console.log(
+        '[UnifiedWebSocket] Connection already in progress, skipping'
+      );
       return;
     }
 
@@ -149,10 +151,7 @@ export const useSocketTransport = ({
         const handler = onReconnectRef.current;
         if (!handler) return;
         Promise.resolve(handler(socket, attemptNumber)).catch(error => {
-          console.error(
-            '[UnifiedWebSocket] Reconnect handler failed:',
-            error
-          );
+          console.error('[UnifiedWebSocket] Reconnect handler failed:', error);
         });
       });
 
@@ -171,7 +170,9 @@ export const useSocketTransport = ({
           error.message.includes('503');
 
         if (isTransientError) {
-          console.log('[UnifiedWebSocket] Transient error, auto-reconnecting...');
+          console.log(
+            '[UnifiedWebSocket] Transient error, auto-reconnecting...'
+          );
           return;
         }
 

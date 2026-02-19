@@ -50,7 +50,9 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 max={20}
                 step={1}
                 className={`${styles.numberInput} ${styles.withSpinner}`}
-                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+                disabled={
+                  !isCalculationEditable(calculationStatus) || isLoadingParams
+                }
               />
             </div>
             <div className={styles.settingRow}>
@@ -68,7 +70,9 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 max={40}
                 step={1}
                 className={`${styles.numberInput} ${styles.withSpinner}`}
-                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+                disabled={
+                  !isCalculationEditable(calculationStatus) || isLoadingParams
+                }
               />
             </div>
             {params.calculation_method === 'CASSCF' && (
@@ -176,7 +180,9 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 max={50}
                 step={1}
                 className={`${styles.numberInput} ${styles.withSpinner}`}
-                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+                disabled={
+                  !isCalculationEditable(calculationStatus) || isLoadingParams
+                }
               />
             </div>
             <div className={styles.settingRow}>
@@ -184,7 +190,9 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
               <select
                 value={(params as any).tddft_method}
                 onChange={e => onParamChange('tddft_method', e.target.value)}
-                disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+                disabled={
+                  !isCalculationEditable(calculationStatus) || isLoadingParams
+                }
               >
                 {isLoadingParams ? (
                   <option value="">Loading...</option>

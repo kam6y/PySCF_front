@@ -147,7 +147,8 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                 </div>
               </>
             )}
-            {calculationStatus === 'running' || calculationStatus === 'pausing' ? (
+            {calculationStatus === 'running' ||
+            calculationStatus === 'pausing' ? (
               <button
                 className={`${styles.pauseBtn} ${
                   calculationStatus === 'pausing' ? styles.pausing : ''
@@ -189,7 +190,9 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                       : styles.pending
                 }`}
                 onClick={onStartCalculation}
-                disabled={!hasValidMolecule || calculationStatus === 'completed'}
+                disabled={
+                  !hasValidMolecule || calculationStatus === 'completed'
+                }
               >
                 {CALCULATION_BUTTON_TEXT[calculationStatus] ?? '+ Start Calc'}
               </button>

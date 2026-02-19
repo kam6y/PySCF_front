@@ -45,13 +45,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     gpuAccelerationEnabled: false,
   });
 
-  const {
-    settings,
-    isLoading,
-    isUpdating,
-    error,
-    updateSettingsAsync,
-  } = useAppSettings();
+  const { settings, isLoading, isUpdating, error, updateSettingsAsync } =
+    useAppSettings();
   const {
     status: gpuStatus,
     isLoading: isGpuStatusLoading,
@@ -481,12 +476,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 type="checkbox"
                 checked={formValues.gpuAccelerationEnabled}
                 onChange={event =>
-                  updateFormValue('gpuAccelerationEnabled', event.target.checked)
+                  updateFormValue(
+                    'gpuAccelerationEnabled',
+                    event.target.checked
+                  )
                 }
                 disabled={
                   isUpdating ||
                   isGpuStatusLoading ||
-                  (!canEnableGpuAcceleration && !formValues.gpuAccelerationEnabled)
+                  (!canEnableGpuAcceleration &&
+                    !formValues.gpuAccelerationEnabled)
                 }
               />
               <span className={styles.gpuToggleTrack}></span>

@@ -27,9 +27,12 @@ export const DEFAULT_CALCULATION_PARAMETERS: QuantumCalculationRequest = {
 // DrawMoleculePage のステータスメッセージ
 export const STATUS_MESSAGES: Record<string, string> = {
   running: 'Calculation is running. The molecule structure is read-only.',
-  waiting: 'Calculation is waiting for resources. The molecule structure is read-only.',
-  completed: 'Calculation completed. Edit the structure to create a new calculation.',
-  error: 'Previous calculation had errors. Edit the structure to create a new calculation.',
+  waiting:
+    'Calculation is waiting for resources. The molecule structure is read-only.',
+  completed:
+    'Calculation completed. Edit the structure to create a new calculation.',
+  error:
+    'Previous calculation had errors. Edit the structure to create a new calculation.',
 };
 
 // CalculationSettingsPage の計算ボタンテキスト

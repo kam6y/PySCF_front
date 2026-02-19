@@ -34,10 +34,12 @@ export const CalculationSettingsPage = ({
     createNewCalculationFromExisting,
   });
 
-  if (!activeCalculation || !state.params || !state.calculationStatus) return null;
+  if (!activeCalculation || !state.params || !state.calculationStatus)
+    return null;
 
   const params = state.params;
-  const calculationStatus = state.calculationStatus as CalculationInstance['status'];
+  const calculationStatus =
+    state.calculationStatus as CalculationInstance['status'];
   const sharedSectionProps = {
     params,
     calculationStatus,

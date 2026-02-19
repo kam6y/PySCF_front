@@ -54,8 +54,12 @@ export const CalculationsList: React.FC<CalculationsListProps> = ({
         <div key={group.status} className={styles.statusSection}>
           <div className={styles.statusSectionHeader}>
             <div className={styles.statusSectionInfo}>
-              <span className={styles.statusSectionIcon}>{group.config.icon}</span>
-              <h4 className={styles.statusSectionTitle}>{group.config.label}</h4>
+              <span className={styles.statusSectionIcon}>
+                {group.config.icon}
+              </span>
+              <h4 className={styles.statusSectionTitle}>
+                {group.config.label}
+              </h4>
             </div>
             {group.status === 'error' && group.calculations.length > 0 && (
               <button

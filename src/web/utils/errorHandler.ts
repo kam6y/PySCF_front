@@ -24,7 +24,10 @@ export const handleError = (error: unknown, context?: string) => {
   if (error instanceof ApiError) {
     const resp = error.response;
     calculationId =
-      resp !== null && typeof resp === 'object' && 'id' in resp && typeof (resp as { id?: unknown }).id === 'string'
+      resp !== null &&
+      typeof resp === 'object' &&
+      'id' in resp &&
+      typeof (resp as { id?: unknown }).id === 'string'
         ? (resp as { id: string }).id
         : undefined; // Try to extract calculation ID if available in response
 

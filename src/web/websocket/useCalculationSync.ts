@@ -186,7 +186,9 @@ export const useCalculationSync = ({
 
   const handleReconnect = useCallback(
     async (_socket: Socket, attemptNumber: number) => {
-      console.log(`[UnifiedWebSocket] Reconnected after ${attemptNumber} attempts`);
+      console.log(
+        `[UnifiedWebSocket] Reconnected after ${attemptNumber} attempts`
+      );
       console.log('[UnifiedWebSocket] Syncing data after reconnection...');
 
       const activeId = activeCalculationIdRef.current;
@@ -274,7 +276,10 @@ export const useCalculationSync = ({
   });
 
   const manageActiveCalculationRoom = useCallback(
-    (newActiveId: string | null, emit: (event: string, data?: unknown) => void) => {
+    (
+      newActiveId: string | null,
+      emit: (event: string, data?: unknown) => void
+    ) => {
       if (!isConnectedRef.current) return;
 
       const previousId = currentActiveCalculationId.current;
@@ -287,13 +292,17 @@ export const useCalculationSync = ({
 
       // 前のルームから退出
       if (previousId && !previousId.startsWith('new-calculation-')) {
-        console.log(`[UnifiedWebSocket] Leaving calculation room: ${previousId}`);
+        console.log(
+          `[UnifiedWebSocket] Leaving calculation room: ${previousId}`
+        );
         emit('leave_calculation', { calculation_id: previousId });
       }
 
       // 新しいルームに参加
       if (newActiveId && !newActiveId.startsWith('new-calculation-')) {
-        console.log(`[UnifiedWebSocket] Joining calculation room: ${newActiveId}`);
+        console.log(
+          `[UnifiedWebSocket] Joining calculation room: ${newActiveId}`
+        );
         emit('join_calculation', { calculation_id: newActiveId });
       }
 

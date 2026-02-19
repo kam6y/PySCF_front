@@ -268,9 +268,10 @@ export const CalculationResultsPage = ({
           onError={setError}
         />
 
-        {processedData.shouldShowTDDFTSection && results.excitation_energies && (
-          <TDDFTResultsSection results={results} parameters={parameters} />
-        )}
+        {processedData.shouldShowTDDFTSection &&
+          results.excitation_energies && (
+            <TDDFTResultsSection results={results} parameters={parameters} />
+          )}
 
         <TechnicalDetailsSection results={results} parameters={parameters} />
       </div>

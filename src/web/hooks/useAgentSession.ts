@@ -111,13 +111,7 @@ export function useAgentSession({
     }
     // Note: If sessionDetailData is not ready yet, this effect will re-run
     // when it becomes available (dependency array includes sessionDetailData)
-  }, [
-    activeSessionId,
-    sessionDetailData,
-    setHistory,
-    clearHistory,
-    isLoading,
-  ]);
+  }, [activeSessionId, sessionDetailData, setHistory, clearHistory, isLoading]);
 
   // Handle new chat confirm (defined first to avoid reference error)
   const handleNewChatConfirm = useCallback(async () => {
@@ -264,4 +258,3 @@ export function useAgentSession({
     handleTitleKeyDown,
   };
 }
-

@@ -1,6 +1,13 @@
 // src/web/pages/DrawMoleculePage.tsx
 
-import React, { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  memo,
+} from 'react';
 import { Editor } from 'ketcher-react';
 import { StandaloneStructServiceProvider } from 'ketcher-standalone';
 import { Ketcher } from 'ketcher-core';
@@ -94,7 +101,8 @@ const ensureKetcherGlobals = () => {
   ketcherGlobal.logging = {
     enabled: typeof logging.enabled === 'boolean' ? logging.enabled : false,
     level: typeof logging.level === 'number' ? logging.level : 0,
-    showTrace: typeof logging.showTrace === 'boolean' ? logging.showTrace : false,
+    showTrace:
+      typeof logging.showTrace === 'boolean' ? logging.showTrace : false,
   };
 
   if (!ketcherGlobal.editor || typeof ketcherGlobal.editor !== 'object') {
@@ -302,11 +310,14 @@ export const DrawMoleculePage: React.FC = () => {
           return;
         }
 
-        console.error('[Ketcher Restore] Failed to apply molecule state after retries', {
-          calculationId: currentCalcId,
-          attempts: RESTORE_MAX_RETRIES,
-          error,
-        });
+        console.error(
+          '[Ketcher Restore] Failed to apply molecule state after retries',
+          {
+            calculationId: currentCalcId,
+            attempts: RESTORE_MAX_RETRIES,
+            error,
+          }
+        );
         useNotificationStore.getState().addNotification({
           type: 'error',
           title: 'Restore Error',
@@ -353,24 +364,21 @@ export const DrawMoleculePage: React.FC = () => {
   }, [clearRestoreTimer]);
 
   // エラーハンドラー（非同期化してレンダリング中の状態更新を回避）
-  const handleError = useCallback(
-    (message: string) => {
-      console.error('Ketcher error:', message);
+  const handleError = useCallback((message: string) => {
+    console.error('Ketcher error:', message);
 
-      // レンダリングサイクルの外で状態更新を実行
-      queueMicrotask(() => {
-        setConvertError(message);
-        useNotificationStore.getState().addNotification({
-          type: 'error',
-          title: 'Ketcher Error',
-          message: message,
-          autoClose: false,
-          duration: 0,
-        });
+    // レンダリングサイクルの外で状態更新を実行
+    queueMicrotask(() => {
+      setConvertError(message);
+      useNotificationStore.getState().addNotification({
+        type: 'error',
+        title: 'Ketcher Error',
+        message: message,
+        autoClose: false,
+        duration: 0,
       });
-    },
-    []
-  );
+    });
+  }, []);
 
   // SMILESをXYZに変換してCalculation Settingsページへ遷移
   const handleConvertToXyz = async () => {
@@ -479,7 +487,7 @@ export const DrawMoleculePage: React.FC = () => {
   };
 
   const statusMessage = activeCalculation
-    ? STATUS_MESSAGES[activeCalculation.status] ?? null
+    ? (STATUS_MESSAGES[activeCalculation.status] ?? null)
     : null;
 
   return (
@@ -588,11 +596,13 @@ export const DrawMoleculePage: React.FC = () => {
               />
               <circle cx="12" cy="16" r="1" fill="currentColor" />
             </svg>
-            <h3 className={styles.unavailableTitle}>Draw Molecule Unavailable</h3>
+            <h3 className={styles.unavailableTitle}>
+              Draw Molecule Unavailable
+            </h3>
             <p className={styles.unavailableText}>
-              This calculation was not started using Draw Molecule. The molecular
-              editor is only available for calculations created through this
-              page.
+              This calculation was not started using Draw Molecule. The
+              molecular editor is only available for calculations created
+              through this page.
             </p>
           </div>
         ) : (

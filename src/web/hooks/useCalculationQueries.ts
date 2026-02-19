@@ -14,11 +14,14 @@ export const calculationQueryKeys = {
   all: ['calculations'] as const,
   list: () => [...calculationQueryKeys.all, 'list'] as const,
   detail: (id: string) => [...calculationQueryKeys.all, 'detail', id] as const,
-  orbitals: (id: string) => [...calculationQueryKeys.all, 'orbitals', id] as const,
+  orbitals: (id: string) =>
+    [...calculationQueryKeys.all, 'orbitals', id] as const,
   orbitalCube: (id: string, idx: number, opts?: object) =>
     [...calculationQueryKeys.all, 'orbital-cube', id, idx, opts] as const,
-  cubeFiles: (id: string) => [...calculationQueryKeys.all, 'cube-files', id] as const,
-  supportedParams: () => [...calculationQueryKeys.all, 'supported-parameters'] as const,
+  cubeFiles: (id: string) =>
+    [...calculationQueryKeys.all, 'cube-files', id] as const,
+  supportedParams: () =>
+    [...calculationQueryKeys.all, 'supported-parameters'] as const,
 };
 
 const toCalculationSummary = (
@@ -102,7 +105,9 @@ export const usePauseCalculation = () => {
     onSuccess: (data, id) => {
       // 成功したら関連するキャッシュを更新
       queryClient.invalidateQueries({ queryKey: calculationQueryKeys.list() });
-      queryClient.invalidateQueries({ queryKey: calculationQueryKeys.detail(id) });
+      queryClient.invalidateQueries({
+        queryKey: calculationQueryKeys.detail(id),
+      });
     },
   });
 };
@@ -127,7 +132,9 @@ export const useResumeCalculation = () => {
             ...oldData,
             calculations: oldData.calculations.map(
               (calc: CalculationListResponseData['calculations'][number]) =>
-                calc.id === id ? toCalculationSummary(data.calculation, calc) : calc
+                calc.id === id
+                  ? toCalculationSummary(data.calculation, calc)
+                  : calc
             ),
           };
         }
@@ -276,8 +283,10 @@ export const useDeleteCubeFiles = () => {
         return;
       }
 
-      const orbitalCubePrefix =
-        calculationQueryKeys.orbitalCube(variables.calculationId, 0);
+      const orbitalCubePrefix = calculationQueryKeys.orbitalCube(
+        variables.calculationId,
+        0
+      );
       queryClient.invalidateQueries({
         predicate: query =>
           Array.isArray(query.queryKey) &&

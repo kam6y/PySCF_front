@@ -51,7 +51,8 @@ export async function invalidateQueriesWithRetry(
       const isLastAttempt = attempt === maxRetries - 1;
 
       // エラーの種類を判定
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       const isNetworkError =
         errorMessage.includes('ERR_NETWORK_CHANGED') ||
         errorMessage.includes('NetworkError') ||
@@ -79,4 +80,3 @@ export async function invalidateQueriesWithRetry(
     }
   }
 }
-

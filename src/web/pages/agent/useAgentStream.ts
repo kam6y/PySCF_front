@@ -2,7 +2,11 @@ import React, { useCallback, useRef, useState } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { streamChatWithAgent } from '../../api/agent';
 import { useNotificationStore } from '../../store/notificationStore';
-import { useAgentStore, AgentStatus, ChatHistory } from '../../store/agentStore';
+import {
+  useAgentStore,
+  AgentStatus,
+  ChatHistory,
+} from '../../store/agentStore';
 import { chatHistoryKeys } from '../../hooks/useChatHistoryQueries';
 
 type CreateChatSessionMutation = ReturnType<
@@ -299,4 +303,3 @@ export function useAgentStream({
     handleCancelMessage,
   };
 }
-

@@ -22,7 +22,9 @@ interface BasicSettingsSectionProps {
   isParameterDisabled: (paramName: string, method: string) => boolean;
   getParameterConstraint: (
     paramName: string
-  ) => SupportedParametersResponseData['parameter_constraints'][string] | undefined;
+  ) =>
+    | SupportedParametersResponseData['parameter_constraints'][string]
+    | undefined;
 }
 
 export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
@@ -43,7 +45,9 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.calculation_method}
             onChange={e => onParamChange('calculation_method', e.target.value)}
-            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+            disabled={
+              !isCalculationEditable(calculationStatus) || isLoadingParams
+            }
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -63,7 +67,9 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.basis_function}
             onChange={e => onParamChange('basis_function', e.target.value)}
-            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+            disabled={
+              !isCalculationEditable(calculationStatus) || isLoadingParams
+            }
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>

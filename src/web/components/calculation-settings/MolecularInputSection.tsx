@@ -47,7 +47,9 @@ export const MolecularInputSection = React.memo<MolecularInputSectionProps>(
                 onChange={e => onInputMethodChange(e.target.value)}
                 disabled={!isCalculationEditable(calculationStatus)}
               />
-              <span className={styles.radioText}>Get from PubChem Name/CID</span>
+              <span className={styles.radioText}>
+                Get from PubChem Name/CID
+              </span>
             </label>
             <label className={styles.radioOption}>
               <input

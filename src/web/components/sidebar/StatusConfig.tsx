@@ -227,7 +227,9 @@ export const STATUS_ORDER: (keyof typeof STATUS_CONFIG)[] = [
   'completed',
 ];
 
-export const groupCalculationsByStatus = (calculations: CalculationSummary[]) => {
+export const groupCalculationsByStatus = (
+  calculations: CalculationSummary[]
+) => {
   const grouped = calculations.reduce(
     (acc, calculation) => {
       const status = calculation.status as keyof typeof STATUS_CONFIG;

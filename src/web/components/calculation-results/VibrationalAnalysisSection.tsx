@@ -4,9 +4,7 @@ import { IRSpectrumChart } from '../IRSpectrumChart';
 import { VibrationModeViewer } from '../VibrationModeViewer';
 import { LazyViewer } from '../LazyViewer';
 import { CalculationResults } from '../../types/api-types';
-import {
-  IRSettings,
-} from '../../utils/irSpectrumConstants';
+import { IRSettings } from '../../utils/irSpectrumConstants';
 import type { components } from '../../types/generated-api';
 
 type IRSpectrumData = components['schemas']['IRSpectrumData'];
@@ -27,63 +25,64 @@ interface VibrationalAnalysisSectionProps {
   onError: (error: string) => void;
 }
 
-export const VibrationalAnalysisSection = React.memo<VibrationalAnalysisSectionProps>(({
-  calculationId,
-  results,
-  irSpectrumData,
-  selectedIRPeakIndex,
-  selectedVibrationMode,
-  irSettings,
-  onSetIRSettings,
-  onSpectrumDataLoaded,
-  onPeakSelect,
-  onClearSelection,
-  onError,
-}) => {
-  return (
-<section
-  className={`${styles.calculationSection} ${styles.vibrationalSection}`}
->
-  <h2 className={styles.primaryHeader}>Vibrational Analysis</h2>
+export const VibrationalAnalysisSection =
+  React.memo<VibrationalAnalysisSectionProps>(
+    ({
+      calculationId,
+      results,
+      irSpectrumData,
+      selectedIRPeakIndex,
+      selectedVibrationMode,
+      irSettings,
+      onSetIRSettings,
+      onSpectrumDataLoaded,
+      onPeakSelect,
+      onClearSelection,
+      onError,
+    }) => {
+      return (
+        <section
+          className={`${styles.calculationSection} ${styles.vibrationalSection}`}
+        >
+          <h2 className={styles.primaryHeader}>Vibrational Analysis</h2>
 
-  {/* IR Spectrum - Split into two sections */}
-  {results.vibrational_frequencies &&
-    results.vibrational_frequencies.length > 0 && (
-      <>
-        <div className={styles.irSpectrumSubsection}>
-          <h3>Infrared (IR) Spectrum</h3>
-          <div className={styles.sectionDescription}>
-            Theoretical infrared spectrum generated from vibrational
-            frequency calculations with scale factor corrections and
-            Lorentzian broadening for realistic peak shapes.
-          </div>
-          <LazyViewer>
-            <IRSpectrumChart
-              calculationId={calculationId}
-              onError={onError}
-              onSpectrumDataLoaded={onSpectrumDataLoaded}
-              selectedPeakIndex={selectedIRPeakIndex}
-              settings={irSettings}
-              onSettingsChange={onSetIRSettings}
-            />
-          </LazyViewer>
-        </div>
+          {/* IR Spectrum - Split into two sections */}
+          {results.vibrational_frequencies &&
+            results.vibrational_frequencies.length > 0 && (
+              <>
+                <div className={styles.irSpectrumSubsection}>
+                  <h3>Infrared (IR) Spectrum</h3>
+                  <div className={styles.sectionDescription}>
+                    Theoretical infrared spectrum generated from vibrational
+                    frequency calculations with scale factor corrections and
+                    Lorentzian broadening for realistic peak shapes.
+                  </div>
+                  <LazyViewer>
+                    <IRSpectrumChart
+                      calculationId={calculationId}
+                      onError={onError}
+                      onSpectrumDataLoaded={onSpectrumDataLoaded}
+                      selectedPeakIndex={selectedIRPeakIndex}
+                      settings={irSettings}
+                      onSettingsChange={onSetIRSettings}
+                    />
+                  </LazyViewer>
+                </div>
 
-        <LazyViewer>
-          <VibrationModeViewer
-            spectrumData={irSpectrumData}
-            optimizedGeometry={
-              results.optimized_geometry
-            }
-            selectedPeakIndex={selectedIRPeakIndex}
-            selectedVibrationMode={selectedVibrationMode}
-            onPeakSelect={onPeakSelect}
-            onClearSelection={onClearSelection}
-            settings={irSettings}
-          />
-        </LazyViewer>
-      </>
-    )}
-</section>
+                <LazyViewer>
+                  <VibrationModeViewer
+                    spectrumData={irSpectrumData}
+                    optimizedGeometry={results.optimized_geometry}
+                    selectedPeakIndex={selectedIRPeakIndex}
+                    selectedVibrationMode={selectedVibrationMode}
+                    onPeakSelect={onPeakSelect}
+                    onClearSelection={onClearSelection}
+                    settings={irSettings}
+                  />
+                </LazyViewer>
+              </>
+            )}
+        </section>
+      );
+    }
   );
-});

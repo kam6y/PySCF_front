@@ -52,85 +52,83 @@ const getDisplayContent = (notification: Notification) => {
   }
 };
 
-export const ToastNotification = React.memo<ToastNotificationProps>(({
-  notification,
-  onClose,
-  onNavigate,
-}) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
+export const ToastNotification = React.memo<ToastNotificationProps>(
+  ({ notification, onClose, onNavigate }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const [isExiting, setIsExiting] = useState(false);
 
-  const displayContent = getDisplayContent(notification);
+    const displayContent = getDisplayContent(notification);
 
-  useEffect(() => {
-    // Trigger entrance animation
-    const timer = setTimeout(() => setIsVisible(true), 10);
-    return () => clearTimeout(timer);
-  }, []);
+    useEffect(() => {
+      // Trigger entrance animation
+      const timer = setTimeout(() => setIsVisible(true), 10);
+      return () => clearTimeout(timer);
+    }, []);
 
-  const handleClose = () => {
-    setIsExiting(true);
-    // Wait for exit animation to complete
-    setTimeout(() => {
-      onClose(notification.id);
-    }, 300);
-  };
+    const handleClose = () => {
+      setIsExiting(true);
+      // Wait for exit animation to complete
+      setTimeout(() => {
+        onClose(notification.id);
+      }, 300);
+    };
 
-  const handleClick = () => {
-    if (notification.clickable && notification.calculationId && onNavigate) {
-      onNavigate(notification.calculationId);
-      handleClose();
-    }
-  };
+    const handleClick = () => {
+      if (notification.clickable && notification.calculationId && onNavigate) {
+        onNavigate(notification.calculationId);
+        handleClose();
+      }
+    };
 
-  const getIcon = () => {
-    switch (notification.type) {
-      case 'error':
-        return '❌';
-      case 'success':
-        return '✅';
-      case 'info':
-        return 'ℹ️';
-      default:
-        return 'ℹ️';
-    }
-  };
+    const getIcon = () => {
+      switch (notification.type) {
+        case 'error':
+          return '❌';
+        case 'success':
+          return '✅';
+        case 'info':
+          return 'ℹ️';
+        default:
+          return 'ℹ️';
+      }
+    };
 
-  const toastClassName = [
-    styles.toast,
-    styles[
-      `toast${notification.type.charAt(0).toUpperCase()}${notification.type.slice(1)}`
-    ],
-    isVisible ? styles.toastVisible : '',
-    isExiting ? styles.toastExiting : '',
-    notification.clickable ? styles.toastClickable : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+    const toastClassName = [
+      styles.toast,
+      styles[
+        `toast${notification.type.charAt(0).toUpperCase()}${notification.type.slice(1)}`
+      ],
+      isVisible ? styles.toastVisible : '',
+      isExiting ? styles.toastExiting : '',
+      notification.clickable ? styles.toastClickable : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
 
-  return (
-    <div
-      className={toastClassName}
-      onClick={handleClick}
-      style={{ cursor: notification.clickable ? 'pointer' : 'default' }}
-    >
-      <div className={styles.toastIcon}>{getIcon()}</div>
-      <div className={styles.toastContent}>
-        <div className={styles.toastTitle}>{displayContent.title}</div>
-        {displayContent.message && (
-          <div className={styles.toastMessage}>{displayContent.message}</div>
-        )}
-      </div>
-      <button
-        className={styles.toastCloseButton}
-        onClick={e => {
-          e.stopPropagation(); // 親のクリックイベントを阻止
-          handleClose();
-        }}
-        aria-label="Close notification"
+    return (
+      <div
+        className={toastClassName}
+        onClick={handleClick}
+        style={{ cursor: notification.clickable ? 'pointer' : 'default' }}
       >
-        ×
-      </button>
-    </div>
-  );
-});
+        <div className={styles.toastIcon}>{getIcon()}</div>
+        <div className={styles.toastContent}>
+          <div className={styles.toastTitle}>{displayContent.title}</div>
+          {displayContent.message && (
+            <div className={styles.toastMessage}>{displayContent.message}</div>
+          )}
+        </div>
+        <button
+          className={styles.toastCloseButton}
+          onClick={e => {
+            e.stopPropagation(); // 親のクリックイベントを阻止
+            handleClose();
+          }}
+          aria-label="Close notification"
+        >
+          ×
+        </button>
+      </div>
+    );
+  }
+);

@@ -17,11 +17,13 @@ export const useWebSocketConnection = ({
   onCalculationUpdate,
   onWebSocketError,
 }: UseWebSocketConnectionOptions) => {
-  const { transportHandlers, manageActiveCalculationRoom } = useCalculationSync({
-    activeCalculationId,
-    onCalculationUpdate,
-    onWebSocketError,
-  });
+  const { transportHandlers, manageActiveCalculationRoom } = useCalculationSync(
+    {
+      activeCalculationId,
+      onCalculationUpdate,
+      onWebSocketError,
+    }
+  );
 
   const { isConnected, reconnect, disconnect, emit } = useSocketTransport({
     handlers: transportHandlers,

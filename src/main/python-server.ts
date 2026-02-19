@@ -37,7 +37,9 @@ const resolveServerPort = async (defaultPort: number): Promise<number> => {
       console.log(`✓ Fallback port ${defaultPort} is available`);
       return defaultPort;
     } catch (fallbackError) {
-      console.log(`✗ CRITICAL: Fallback port ${defaultPort} is also unavailable`);
+      console.log(
+        `✗ CRITICAL: Fallback port ${defaultPort} is also unavailable`
+      );
       try {
         console.log(
           `Searching in extended range ${portRangeEnd + 1}-${portRangeEnd + 100}...`
@@ -104,7 +106,10 @@ const attachOutputHandlers = (proc: ChildProcess, serverPort: number): void => {
     if (output.includes('Application object must be callable')) {
       console.log('✗ CRITICAL: Flask application object error detected');
     }
-    if (output.includes('ModuleNotFoundError') || output.includes('ImportError')) {
+    if (
+      output.includes('ModuleNotFoundError') ||
+      output.includes('ImportError')
+    ) {
       console.log(`✗ CRITICAL: Python import error detected - ${output}`);
     }
   });
@@ -127,7 +132,10 @@ const attachOutputHandlers = (proc: ChildProcess, serverPort: number): void => {
     if (errorOutput.includes('Address already in use')) {
       console.log(`✗ CRITICAL: Port ${serverPort} is already in use`);
     }
-    if (errorOutput.includes('[CRITICAL]') || errorOutput.includes('CRITICAL')) {
+    if (
+      errorOutput.includes('[CRITICAL]') ||
+      errorOutput.includes('CRITICAL')
+    ) {
       console.log(`✗ CRITICAL ERROR FROM PYTHON: ${errorOutput}`);
     }
   });
@@ -156,7 +164,9 @@ const attachLifecycleHandlers = (
     console.error(`Working directory: ${pythonPath}`);
     console.error(`Environment variables:`, {
       CONDA_DEFAULT_ENV: process.env.CONDA_DEFAULT_ENV,
-      PATH: process.env.PATH?.split(':').filter(p => p.includes('conda')).slice(0, 3),
+      PATH: process.env.PATH?.split(':')
+        .filter(p => p.includes('conda'))
+        .slice(0, 3),
       PYTHONPATH: process.env.PYTHONPATH || 'Not set',
     });
     reject(error);
@@ -221,7 +231,11 @@ export const checkServerHealth = (
             console.log(
               `Health check attempt ${attempts}/${retries} failed with status: ${res.statusCode}`
             );
-            updateSplashStatus('health-check', 'Waiting for server...', attempts);
+            updateSplashStatus(
+              'health-check',
+              'Waiting for server...',
+              attempts
+            );
             if (attempts >= retries) {
               clearInterval(interval);
               const diagnosticMessage = buildDiagnosticMessage(
@@ -244,7 +258,11 @@ export const checkServerHealth = (
 
           if (attempts >= retries) {
             clearInterval(interval);
-            const diagnosticMessage = buildDiagnosticMessage(port, url, retries);
+            const diagnosticMessage = buildDiagnosticMessage(
+              port,
+              url,
+              retries
+            );
             reject(new Error(diagnosticMessage));
           }
         });
@@ -296,7 +314,9 @@ export const startPythonServer = async (
     updateSplashStatus('finding-port', 'Finding available port...');
 
     const defaultPort =
-      typeof serverConfig.server.port === 'number' ? serverConfig.server.port : 5000;
+      typeof serverConfig.server.port === 'number'
+        ? serverConfig.server.port
+        : 5000;
 
     try {
       flaskPort = await resolveServerPort(defaultPort);
@@ -337,15 +357,21 @@ export const startPythonServer = async (
     console.log(`=== Starting Gunicorn Server ===`);
     console.log(`Python executable: ${pythonExecutablePath}`);
     console.log(`Working directory: ${pythonPath}`);
-    console.log(`Gunicorn command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`);
+    console.log(
+      `Gunicorn command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`
+    );
     console.log(`Environment variables:`, {
       CONDA_DEFAULT_ENV: 'pyscf-env',
-      PATH: process.env.PATH?.split(':').filter(p => p.includes('conda')).slice(0, 3),
+      PATH: process.env.PATH?.split(':')
+        .filter(p => p.includes('conda'))
+        .slice(0, 3),
     });
 
     // Verify files exist before starting
     console.log(`File checks:`);
-    console.log(`• Python executable exists: ${fs.existsSync(pythonExecutablePath)}`);
+    console.log(
+      `• Python executable exists: ${fs.existsSync(pythonExecutablePath)}`
+    );
     console.log(`• Working directory exists: ${fs.existsSync(pythonPath)}`);
     const appPyPath = path.join(pythonPath, 'app.py');
     console.log(`• app.py exists: ${fs.existsSync(appPyPath)}`);
@@ -369,8 +395,15 @@ export const startPythonServer = async (
 
     // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
     setTimeout(() => {
-      console.log(`Starting health check for Gunicorn server on port ${flaskPort}`);
-      checkServerHealth(flaskPort!, authToken, healthCheckRetries, healthCheckInterval)
+      console.log(
+        `Starting health check for Gunicorn server on port ${flaskPort}`
+      );
+      checkServerHealth(
+        flaskPort!,
+        authToken,
+        healthCheckRetries,
+        healthCheckInterval
+      )
         .then(() => resolve(flaskPort!))
         .catch(reject);
     }, initialDelay);
