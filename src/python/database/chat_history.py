@@ -301,7 +301,13 @@ class ChatHistoryDatabase:
                 return None
 
             logger.info(f"Updated chat session: {session_id} - '{name}'")
-            return self.get_session(session_id)
+            cursor.execute("""
+                SELECT id, name, created_at, updated_at
+                FROM chat_sessions
+                WHERE id = ?
+            """, (session_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
     def delete_session(self, session_id: str) -> bool:
         """

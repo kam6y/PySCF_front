@@ -32,7 +32,7 @@ export const streamChatWithAgent = (
         (headers as any)['X-Auth-Token'] = authToken;
       }
 
-      fetchEventSource(`${getApiBaseUrl()}/api/agent/chat`, {
+      await fetchEventSource(`${getApiBaseUrl()}/api/agent/chat`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ message, history, session_id: sessionId }),
@@ -115,9 +115,12 @@ export const streamChatWithAgent = (
         },
       });
     } catch (error) {
-      callbacks.onError(
-        error instanceof Error ? error : new Error(String(error))
-      );
+      if (!isStreamClosed) {
+        isStreamClosed = true;
+        callbacks.onError(
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
     }
   })();
 
