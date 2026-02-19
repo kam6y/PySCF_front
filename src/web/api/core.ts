@@ -1,13 +1,13 @@
 const initialPort = window.electronAPI?.flaskPort;
 
 if (!initialPort) {
-  console.error('[API Client] Flask port not available. Using fallback: 5000');
-  console.error('[API Client] This indicates an initialization failure.');
+  console.error('[API Client] Flask port not available. API calls will fail explicitly.');
 }
 
-let API_BASE_URL = `http://127.0.0.1:${initialPort || 5000}`;
+// フォールバック 5000 を廃止。ポート未取得時は空文字列にして fetch が明確に失敗するようにする
+let API_BASE_URL = initialPort ? `http://127.0.0.1:${initialPort}` : '';
 
-console.log(`[API Client] Initialized with port: ${initialPort || 5000}`);
+console.log(`[API Client] Initialized with port: ${initialPort ?? 'UNAVAILABLE'}`);
 
 export const setApiBaseUrl = (port: number) => {
   API_BASE_URL = `http://127.0.0.1:${port}`;

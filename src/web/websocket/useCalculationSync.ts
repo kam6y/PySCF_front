@@ -33,6 +33,7 @@ export const useCalculationSync = ({
   activeCalculationIdRef.current = activeCalculationId;
   const currentActiveCalculationId = useRef<string | null>(null);
   const lastNotifiedStatus = useRef<Map<string, string>>(new Map());
+  const lastNotifiedUpdatedAt = useRef<Map<string, string>>(new Map());
   const syncFailureCountRef = useRef<number>(0);
   const isConnectedRef = useRef<boolean>(false);
 
@@ -95,24 +96,27 @@ export const useCalculationSync = ({
         `[UnifiedWebSocket] Processing update for calculation ${calculationId}: ${updatedCalculation.status}`
       );
 
-      // ref ベースでステータス重複を判定（React Query キャッシュは
-      // invalidate→refetch が非同期のため、短時間に2通来ると両方
-      // shouldUpdate=true になる問題を回避）
+      // updatedAt ベースで重複を判定（同一イベントの二重受信を排除）
+      // status ベースの判定は廃止: running 状態中の中間結果（scf_iterations等）を取りこぼすため
       const previousStatus = lastNotifiedStatus.current.get(calculationId);
-      const hasStatusChanged = previousStatus !== updatedCalculation.status;
-      const shouldUpdate = hasStatusChanged || !previousStatus;
+      const previousUpdatedAt =
+        lastNotifiedUpdatedAt.current.get(calculationId);
 
-      if (!shouldUpdate) {
+      if (previousUpdatedAt === updatedCalculation.updatedAt) {
         console.log(
-          `[UnifiedWebSocket] Skipping update for ${calculationId}: no meaningful changes detected`
+          `[UnifiedWebSocket] Skipping duplicate update for ${calculationId}: updatedAt unchanged (${updatedCalculation.updatedAt})`
         );
         return;
       }
 
       lastNotifiedStatus.current.set(calculationId, updatedCalculation.status);
+      lastNotifiedUpdatedAt.current.set(
+        calculationId,
+        updatedCalculation.updatedAt
+      );
 
       console.log(
-        `[UnifiedWebSocket] Status change detected for ${calculationId}: ${previousStatus || 'pending'} -> ${updatedCalculation.status}`
+        `[UnifiedWebSocket] Update detected for ${calculationId}: status=${previousStatus ?? 'none'} -> ${updatedCalculation.status}, updatedAt=${updatedCalculation.updatedAt}`
       );
 
       // キャッシュ更新

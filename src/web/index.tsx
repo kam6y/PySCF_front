@@ -61,20 +61,45 @@ const flaskPort = window.electronAPI?.flaskPort;
 
 if (!flaskPort) {
   console.error('[index.tsx] CRITICAL: Flask port not available from preload.');
-  console.error('[index.tsx] This indicates a serious initialization failure.');
-  // 本番環境では、ここでユーザーにエラーダイアログを表示することを推奨
+
+  // ポート未取得時はエラーUIをレンダリングし、アプリを起動しない（fail-fast）
+  root.render(
+    <StrictMode>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          fontFamily: 'system-ui, sans-serif',
+          color: '#c0392b',
+          textAlign: 'center',
+          padding: '2rem',
+        }}
+      >
+        <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
+          アプリケーションの起動に失敗しました
+        </h1>
+        <p>
+          バックエンドサーバーのポート番号を取得できませんでした。
+          <br />
+          アプリを再起動してください。
+        </p>
+      </div>
+    </StrictMode>
+  );
+} else {
+  // グローバル変数に保存（WebSocket接続用）
+  window.flaskPort = flaskPort;
+
+  console.log('[index.tsx] Rendering app with Flask port:', window.flaskPort);
+
+  root.render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </StrictMode>
+  );
 }
-
-// グローバル変数に保存（WebSocket接続用）
-window.flaskPort = flaskPort || 5000;
-
-console.log('[index.tsx] Rendering app with Flask port:', window.flaskPort);
-
-// 即座にレンダリング開始（ポートは既に確定済み）
-root.render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>
-);

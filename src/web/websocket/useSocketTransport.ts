@@ -96,7 +96,13 @@ export const useSocketTransport = ({
     disconnect();
 
     try {
-      const serverUrl = `http://127.0.0.1:${window.flaskPort}`;
+      const port = window.flaskPort;
+      if (!port) {
+        console.error('[UnifiedWebSocket] Flask port not set. Cannot connect.');
+        isConnectingRef.current = false;
+        return;
+      }
+      const serverUrl = `http://127.0.0.1:${port}`;
       console.log(`[UnifiedWebSocket] Connecting to ${serverUrl}`);
 
       const socket = io(serverUrl, {
