@@ -20,11 +20,6 @@ interface BasicSettingsSectionProps {
     value: string | number | boolean
   ) => void;
   isParameterDisabled: (paramName: string, method: string) => boolean;
-  getParameterConstraint: (
-    paramName: string
-  ) =>
-    | SupportedParametersResponseData['parameter_constraints'][string]
-    | undefined;
 }
 
 export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
@@ -36,8 +31,11 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
     supportedParams,
     onParamChange,
     isParameterDisabled,
-    getParameterConstraint,
   }) => {
+    const isGeometryOptimizationDisabled =
+      !isCalculationEditable(calculationStatus) ||
+      isParameterDisabled('optimize_geometry', params.calculation_method || 'DFT');
+
     return (
       <section className={styles.calculationSettingsSection}>
         <div className={styles.settingRow}>
@@ -150,31 +148,31 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           />
         </div>
         <div className={styles.settingRow}>
-          <label>
-            <input
-              type="checkbox"
-              checked={(params as any).optimize_geometry ?? true}
-              onChange={e =>
-                onParamChange('optimize_geometry', e.target.checked)
-              }
-              disabled={
-                !isCalculationEditable(calculationStatus) ||
-                isParameterDisabled(
-                  'optimize_geometry',
-                  params.calculation_method || 'DFT'
-                )
-              }
-            />
-            Geometry Optimization
-          </label>
-          {isParameterDisabled(
-            'optimize_geometry',
-            params.calculation_method || 'DFT'
-          ) && (
-            <div className={styles.frozenCoreHelp}>
-              {getParameterConstraint('optimize_geometry')?.description}
-            </div>
-          )}
+          <div
+            className={`${styles.toggleSwitch} ${
+              isGeometryOptimizationDisabled ? styles.toggleDisabled : ''
+            }`}
+          >
+            <label
+              className={styles.toggleLabel}
+              htmlFor="toggle-geometry-optimization"
+            >
+              Geometry Opt
+            </label>
+            <label className={styles.switch}>
+              <input
+                id="toggle-geometry-optimization"
+                type="checkbox"
+                checked={(params as any).optimize_geometry ?? true}
+                onChange={e =>
+                  onParamChange('optimize_geometry', e.target.checked)
+                }
+                disabled={isGeometryOptimizationDisabled}
+                aria-label="Geometry Optimization"
+              />
+              <span className={styles.slider}></span>
+            </label>
+          </div>
         </div>
       </section>
     );

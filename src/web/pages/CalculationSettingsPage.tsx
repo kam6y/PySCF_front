@@ -76,7 +76,6 @@ export const CalculationSettingsPage = ({
               <BasicSettingsSection
                 {...sharedSectionProps}
                 isParameterDisabled={computed.isParameterDisabled}
-                getParameterConstraint={computed.getParameterConstraint}
               />
               <AdvancedMethodSettings {...sharedSectionProps} />
               <SolventSettingsSection

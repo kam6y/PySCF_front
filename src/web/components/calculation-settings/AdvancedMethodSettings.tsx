@@ -30,6 +30,8 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
     supportedParams,
     onParamChange,
   }) => {
+    const isMethodSettingDisabled = !isCalculationEditable(calculationStatus);
+
     return (
       <>
         {(params.calculation_method === 'CASCI' ||
@@ -150,15 +152,26 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
               />
             </div>
             <div className={styles.settingRow}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={(params as any).natorb !== false}
-                  onChange={e => onParamChange('natorb', e.target.checked)}
-                  disabled={!isCalculationEditable(calculationStatus)}
-                />
-                Transform to Natural Orbitals in Active Space
-              </label>
+              <div
+                className={`${styles.toggleSwitch} ${
+                  isMethodSettingDisabled ? styles.toggleDisabled : ''
+                }`}
+              >
+                <label className={styles.toggleLabel} htmlFor="toggle-natorb">
+                  Transform to Natural Orbitals in Active Space
+                </label>
+                <label className={styles.switch}>
+                  <input
+                    id="toggle-natorb"
+                    type="checkbox"
+                    checked={(params as any).natorb !== false}
+                    onChange={e => onParamChange('natorb', e.target.checked)}
+                    disabled={isMethodSettingDisabled}
+                    aria-label="Transform to Natural Orbitals in Active Space"
+                  />
+                  <span className={styles.slider}></span>
+                </label>
+              </div>
             </div>
           </section>
         )}
@@ -212,17 +225,31 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
               </select>
             </div>
             <div className={styles.settingRow}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={(params as any).tddft_analyze_nto || false}
-                  onChange={e =>
-                    onParamChange('tddft_analyze_nto', e.target.checked)
-                  }
-                  disabled={!isCalculationEditable(calculationStatus)}
-                />
-                Natural Transition Orbital Analysis
-              </label>
+              <div
+                className={`${styles.toggleSwitch} ${
+                  isMethodSettingDisabled ? styles.toggleDisabled : ''
+                }`}
+              >
+                <label
+                  className={styles.toggleLabel}
+                  htmlFor="toggle-nto-analysis"
+                >
+                  Natural Transition Orbital Analysis
+                </label>
+                <label className={styles.switch}>
+                  <input
+                    id="toggle-nto-analysis"
+                    type="checkbox"
+                    checked={(params as any).tddft_analyze_nto || false}
+                    onChange={e =>
+                      onParamChange('tddft_analyze_nto', e.target.checked)
+                    }
+                    disabled={isMethodSettingDisabled}
+                    aria-label="Natural Transition Orbital Analysis"
+                  />
+                  <span className={styles.slider}></span>
+                </label>
+              </div>
             </div>
           </section>
         )}
@@ -231,15 +258,31 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
           params.calculation_method === 'CCSD_T') && (
           <section className={styles.calculationSettingsSection}>
             <div className={styles.settingRow}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={(params as any).frozen_core !== false}
-                  onChange={e => onParamChange('frozen_core', e.target.checked)}
-                  disabled={!isCalculationEditable(calculationStatus)}
-                />
-                Use Frozen Core Approximation
-              </label>
+              <div
+                className={`${styles.toggleSwitch} ${
+                  isMethodSettingDisabled ? styles.toggleDisabled : ''
+                }`}
+              >
+                <label
+                  className={styles.toggleLabel}
+                  htmlFor="toggle-frozen-core"
+                >
+                  Use Frozen Core Approximation
+                </label>
+                <label className={styles.switch}>
+                  <input
+                    id="toggle-frozen-core"
+                    type="checkbox"
+                    checked={(params as any).frozen_core !== false}
+                    onChange={e =>
+                      onParamChange('frozen_core', e.target.checked)
+                    }
+                    disabled={isMethodSettingDisabled}
+                    aria-label="Use Frozen Core Approximation"
+                  />
+                  <span className={styles.slider}></span>
+                </label>
+              </div>
               <div className={styles.frozenCoreHelp}>
                 Freeze core orbitals to reduce computational cost (recommended)
               </div>
