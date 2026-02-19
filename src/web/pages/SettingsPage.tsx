@@ -45,8 +45,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     gpuAccelerationEnabled: false,
   });
 
-  const { settings, isLoading, isUpdating, error, updateSettings } =
-    useAppSettings();
+  const {
+    settings,
+    isLoading,
+    isUpdating,
+    error,
+    updateSettingsAsync,
+  } = useAppSettings();
   const {
     status: gpuStatus,
     isLoading: isGpuStatusLoading,
@@ -99,7 +104,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
   const handleSave = async () => {
     try {
-      updateSettings({
+      await updateSettingsAsync({
         max_parallel_instances:
           formValues.maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
         max_cpu_utilization_percent:
