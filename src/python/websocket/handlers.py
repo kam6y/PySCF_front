@@ -14,6 +14,7 @@ from quantum_calc import get_websocket_watcher, CalculationRepository
 
 # Set up logging
 logger = logging.getLogger(__name__)
+_handlers_registered = False
 
 
 def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationRepository) -> Dict:
@@ -51,6 +52,11 @@ def build_calculation_instance(calc_id: str, calc_path: str, file_manager: Calcu
 
 def register_websocket_handlers(socketio):
     """Register all WebSocket event handlers with the SocketIO instance."""
+    global _handlers_registered
+    if _handlers_registered:
+        logger.debug("WebSocket handlers already registered; skipping.")
+        return
+    _handlers_registered = True
     
     @socketio.on('join_calculation')
     def on_join_calculation(data):

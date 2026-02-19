@@ -8,7 +8,6 @@ providing a unified interface for both API endpoints and AI agent tools.
 import logging
 import os
 import sys
-import json
 import multiprocessing
 import re
 import importlib
@@ -22,6 +21,7 @@ from importlib import metadata, util
 from quantum_calc import get_process_manager, get_current_settings, CalculationRepository
 from quantum_calc.resource_manager import get_resource_manager
 from .exceptions import ServiceError, ValidationError
+from config import get_server_config
 
 logger = logging.getLogger(__name__)
 
@@ -410,28 +410,24 @@ class SystemService:
         """
         try:
             logger.info("Getting comprehensive system diagnostics")
-            
-            # Load server config
+
             try:
-                config_path = os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-                    'config',
-                    'server-config.json'
-                )
-                if os.path.exists(config_path):
-                    with open(config_path, 'r', encoding='utf-8') as f:
-                        server_config = json.load(f)
-                else:
-                    server_config = {}
+                current_settings = get_current_settings()
             except Exception:
-                server_config = {}
+                current_settings = None
+
+            try:
+                _srv_cfg = get_server_config()
+                app_version = _srv_cfg.get('app_info.version', 'unknown')
+            except Exception:
+                app_version = 'unknown'
             
             # Collect system information
             diagnostics = {
                 'timestamp': datetime.now().isoformat(),
                 'service_info': {
                     'service': 'pyscf-front-api',
-                    'version': server_config.get('app_info', {}).get('version', 'unknown'),
+                    'version': app_version,
                     'pid': os.getpid(),
                     'working_directory': os.getcwd()
                 },
@@ -445,13 +441,14 @@ class SystemService:
             # Process manager diagnostics
             try:
                 process_manager = get_process_manager()
+                pm_diag = process_manager.get_diagnostics()
                 diagnostics['process_manager'] = {
                     'status': 'available',
-                    'max_workers': process_manager.max_workers,
-                    'max_parallel_instances': process_manager.max_parallel_instances,
-                    'active_calculations': len(process_manager.active_futures),
-                    'queued_calculations': len(process_manager.calculation_queue),
-                    'is_shutdown': process_manager._shutdown,
+                    'max_workers': pm_diag['max_workers'],
+                    'max_parallel_instances': pm_diag['max_parallel_instances'],
+                    'active_calculations': pm_diag['active_futures_count'],
+                    'queued_calculations': pm_diag['queued_calculations_count'],
+                    'is_shutdown': pm_diag['is_shutdown'],
                     'queue_status': process_manager.get_queue_status()
                 }
             except Exception as pm_error:
@@ -475,8 +472,10 @@ class SystemService:
             # File manager diagnostics
             try:
                 # Load current settings to get calculations directory
-                settings = get_current_settings()
-                file_manager = CalculationRepository(base_dir=settings.calculations_directory)
+                if current_settings is None:
+                    raise RuntimeError("Current settings unavailable")
+
+                file_manager = CalculationRepository(base_dir=current_settings.calculations_directory)
                 base_dir = file_manager.get_base_directory()
                 
                 diagnostics['file_manager'] = {
@@ -514,10 +513,12 @@ class SystemService:
             
             # Settings diagnostics
             try:
-                settings = get_current_settings()
+                if current_settings is None:
+                    raise RuntimeError("Current settings unavailable")
+
                 diagnostics['settings'] = {
                     'status': 'available',
-                    'settings': settings.model_dump()
+                    'settings': current_settings.model_dump()
                 }
             except Exception as settings_error:
                 diagnostics['settings'] = {
@@ -548,27 +549,25 @@ class SystemService:
             
             try:
                 process_manager = get_process_manager()
+                pm_diag = process_manager.get_diagnostics()
                 
                 # Get detailed process manager state
                 diagnostics = {
                     'timestamp': datetime.now().isoformat(),
                     'status': 'available',
                     'configuration': {
-                        'max_workers': process_manager.max_workers,
-                        'max_parallel_instances': process_manager.max_parallel_instances,
-                        'is_shutdown': process_manager._shutdown
+                        'max_workers': pm_diag['max_workers'],
+                        'max_parallel_instances': pm_diag['max_parallel_instances'],
+                        'is_shutdown': pm_diag['is_shutdown']
                     },
                     'current_state': {
-                        'active_futures_count': len(process_manager.active_futures),
-                        'active_calculation_ids': list(process_manager.active_futures.keys()),
-                        'queued_calculations_count': len(process_manager.calculation_queue),
-                        'completion_callbacks_count': len(process_manager.completion_callbacks)
+                        'active_futures_count': pm_diag['active_futures_count'],
+                        'active_calculation_ids': pm_diag['active_calculation_ids'],
+                        'queued_calculations_count': pm_diag['queued_calculations_count'],
+                        'completion_callbacks_count': pm_diag['completion_callbacks_count']
                     },
                     'queue_details': [],
-                    'resource_monitoring': {
-                        'monitoring_active': process_manager._resource_monitor_thread is not None and process_manager._resource_monitor_thread.is_alive(),
-                        'monitoring_interval': process_manager._resource_monitor_interval
-                    }
+                    'resource_monitoring': pm_diag['resource_monitoring']
                 }
                 
                 # Get detailed queue information
@@ -585,16 +584,13 @@ class SystemService:
                     diagnostics['queue_details'].append(queue_item)
                 
                 # Executor status
-                if process_manager.executor is not None:
-                    diagnostics['executor'] = {
-                        'available': True,
-                        'type': type(process_manager.executor).__name__
-                    }
-                else:
-                    diagnostics['executor'] = {
-                        'available': False,
-                        'error': 'ProcessPoolExecutor is None'
-                    }
+                diagnostics['executor'] = {
+                    'available': pm_diag['executor_available'],
+                    'type': pm_diag['executor_type'],
+                } if pm_diag['executor_available'] else {
+                    'available': False,
+                    'error': 'ProcessPoolExecutor is None'
+                }
                     
             except Exception as pm_error:
                 diagnostics = {

@@ -382,6 +382,27 @@ class CalculationProcessManager:
         status['max_workers'] = self.max_workers
         return status
 
+    def get_diagnostics(self) -> Dict[str, Any]:
+        """Return a read-only diagnostic snapshot of internal state."""
+        return {
+            'is_shutdown': self._shutdown,
+            'active_futures_count': len(self.active_futures),
+            'active_calculation_ids': list(self.active_futures.keys()),
+            'max_workers': self.max_workers,
+            'max_parallel_instances': self.max_parallel_instances,
+            'queued_calculations_count': len(self.calculation_queue),
+            'completion_callbacks_count': len(self.completion_callbacks),
+            'resource_monitoring': {
+                'monitoring_active': (
+                    self._resource_monitor_thread is not None
+                    and self._resource_monitor_thread.is_alive()
+                ),
+                'monitoring_interval': self._resource_monitor_interval,
+            },
+            'executor_available': self.executor is not None,
+            'executor_type': type(self.executor).__name__ if self.executor is not None else None,
+        }
+
     # --- Lifecycle ---
 
     def shutdown(self, wait: bool = True, timeout: Optional[float] = None):
