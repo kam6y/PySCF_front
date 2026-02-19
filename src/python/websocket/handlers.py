@@ -10,8 +10,7 @@ from typing import Dict
 from flask import session
 from flask_socketio import emit, join_room, leave_room
 
-from quantum_calc._calculation_repository import CalculationRepository
-from quantum_calc import get_websocket_watcher
+from quantum_calc import get_websocket_watcher, CalculationRepository
 
 # Set up logging
 logger = logging.getLogger(__name__)

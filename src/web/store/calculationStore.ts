@@ -3,7 +3,6 @@ import {
   CalculationInstance,
   QuantumCalculationRequest,
 } from '../types/api-types';
-import { useUIStore } from './uiStore';
 
 interface CalculationState {
   // アクティブ計算ID管理
@@ -89,10 +88,6 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       stagedCalculation: newCalculation,
       activeCalculationId: newId,
     });
-
-    // UIStoreのアクションを呼び出し
-    useUIStore.getState().setCurrentPage('calculation-settings');
-    useUIStore.getState().closeSidebar();
   },
 
   createNewFromExisting: (

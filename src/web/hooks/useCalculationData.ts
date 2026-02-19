@@ -12,7 +12,10 @@ import { useCalculationStore } from '../store/calculationStore';
  * データフェッチングのロジックを単一の場所に集約
  */
 export const useCalculationData = () => {
-  const { activeCalculationId, stagedCalculation } = useCalculationStore();
+  const activeCalculationId = useCalculationStore(
+    state => state.activeCalculationId
+  );
+  const stagedCalculation = useCalculationStore(state => state.stagedCalculation);
 
   // サーバーデータの取得
   const {

@@ -8,10 +8,11 @@ providing a unified interface for both API endpoints and AI agent tools.
 import logging
 from typing import Dict, Any
 
-from quantum_calc import get_process_manager, get_current_settings, update_app_settings
-from quantum_calc.settings_manager import _mask_settings
+from quantum_calc import (
+    get_process_manager, get_current_settings, update_app_settings,
+    CalculationDirectoryMigration, mask_settings,
+)
 from quantum_calc.resource_manager import get_resource_manager
-from quantum_calc._calculation_directory_migration import CalculationDirectoryMigration
 from .exceptions import ServiceError, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -57,7 +58,7 @@ class SettingsService:
             ServiceError: For other errors
         """
         try:
-            logger.info(f"Updating application settings: {_mask_settings(new_settings)}")
+            logger.info(f"Updating application settings: {mask_settings(new_settings)}")
 
             # Get current settings to detect changes
             current_settings = get_current_settings()

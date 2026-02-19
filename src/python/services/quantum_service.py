@@ -14,11 +14,9 @@ from typing import Optional, Dict, Any, Tuple, List
 
 from quantum_calc import (
     get_process_manager, get_all_supported_parameters, get_current_settings,
-    InputError, GeometryError, ProcessManagerError, CalculationError, FileManagerError
+    InputError, GeometryError, ProcessManagerError, CalculationError, FileManagerError,
+    CalculationRepository, CubeArtifactService, CalculationDirectoryMigration,
 )
-from quantum_calc._calculation_repository import CalculationRepository
-from quantum_calc._cube_artifact_service import CubeArtifactService
-from quantum_calc._calculation_directory_migration import CalculationDirectoryMigration
 from quantum_calc.orbital_generator import MolecularOrbitalGenerator
 from quantum_calc.ir_spectrum import create_ir_spectrum_from_calculation_results
 from .exceptions import (

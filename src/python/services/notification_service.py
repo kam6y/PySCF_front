@@ -30,8 +30,7 @@ class NotificationService:
             return
 
         try:
-            from quantum_calc import get_current_settings
-            from quantum_calc._calculation_repository import CalculationRepository
+            from quantum_calc import get_current_settings, CalculationRepository
             import os
 
             settings = get_current_settings()

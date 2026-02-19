@@ -19,9 +19,8 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, List
 from importlib import metadata, util
 
-from quantum_calc import get_process_manager, get_current_settings
+from quantum_calc import get_process_manager, get_current_settings, CalculationRepository
 from quantum_calc.resource_manager import get_resource_manager
-from quantum_calc._calculation_repository import CalculationRepository
 from .exceptions import ServiceError, ValidationError
 
 logger = logging.getLogger(__name__)

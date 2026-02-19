@@ -14,7 +14,10 @@ from ._status_transition import CalculationStatus
 from .process_manager import CalculationProcessManager, get_process_manager, initialize_process_manager_with_callback, shutdown_process_manager, update_process_manager_settings
 from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
 from .supported_parameters import get_all_supported_parameters
-from .settings_manager import SettingsManager, get_settings_manager, get_current_settings, update_app_settings
+from .settings_manager import SettingsManager, get_settings_manager, get_current_settings, update_app_settings, mask_settings
+from ._calculation_repository import CalculationRepository
+from ._cube_artifact_service import CubeArtifactService
+from ._calculation_directory_migration import CalculationDirectoryMigration
 
 __all__ = [
     'BaseCalculator',
@@ -48,5 +51,9 @@ __all__ = [
     'SettingsManager',
     'get_settings_manager',
     'get_current_settings',
-    'update_app_settings'
+    'update_app_settings',
+    'CalculationRepository',
+    'CubeArtifactService',
+    'CalculationDirectoryMigration',
+    'mask_settings',
 ]

@@ -35,7 +35,7 @@ export const App = () => {
   const appState = useAppState();
   const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
-  const createNewCalculation = appState.calculation.createNewCalculation;
+  const createNewCalculation = appState.actions.handleCreateNew;
   const stagedCalculation = appState.calculation.stagedCalculation;
 
   // アプリ設定の取得
