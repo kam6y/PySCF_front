@@ -256,7 +256,6 @@ export const startPythonServer = async (
       });
 
       // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
-
       setTimeout(() => {
         console.log(
           `Starting health check for Gunicorn server on port ${flaskPort}`
@@ -270,41 +269,14 @@ export const startPythonServer = async (
           .then(() => resolve(flaskPort!))
           .catch(reject);
       }, initialDelay);
-    } else {
-      // フォールバック: 直接実行（設定でGunicorn無効時のみ）
-      console.log('Starting server with direct execution (fallback mode)');
+    }
 
-      // サーバー起動の進捗を通知
-      updateSplashStatus('starting-server', 'Starting Python backend...');
-
-      // pyenv環境変数を除外した、conda環境専用の環境変数を作成
-      const condaBinDir = path.dirname(pythonExecutablePath);
-      const envVars = createCleanEnvironment(
-        condaBinDir,
-        serverPort,
-        authToken
-      );
-
-      pythonProcess = spawn(pythonExecutablePath, [], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: envVars,
-      });
-
-      // フォールバックモードでもヘルスチェックで起動を待つ
-      // ポートは既に決定済み(flaskPort)
-      setTimeout(() => {
-        console.log(
-          `Starting health check for direct execution server on port ${flaskPort}`
-        );
-        checkServerHealth(
-          flaskPort!,
-          authToken,
-          healthCheckRetries,
-          healthCheckInterval
-        )
-          .then(() => resolve(flaskPort!))
-          .catch(reject);
-      }, 1000);
+    if (!pythonProcess) {
+      const errorMessage =
+        'Gunicorn is disabled in config. Direct execution fallback has been removed.';
+      console.error(errorMessage);
+      reject(new Error(errorMessage));
+      return;
     }
 
     // stdout/stderrのログ出力
