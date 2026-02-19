@@ -92,7 +92,7 @@ jobs:
 
         # Build conda-pack (CI version - without conda.sh sourcing)
         # Ensure setuptools is available (conda-pack requires pkg_resources)
-        pip install setuptools
+        pip install "setuptools<75"
         rm -rf conda_env
         conda-pack -o conda_env.tar.gz
         mkdir -p conda_env
