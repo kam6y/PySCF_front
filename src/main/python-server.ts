@@ -44,7 +44,19 @@ export const checkServerHealth = (
             console.log('Python server is healthy.');
             resolve();
           } else {
-            console.log(`Health check failed with status: ${res.statusCode}`);
+            res.resume(); // ストリームリーク防止
+            attempts++;
+            console.log(
+              `Health check attempt ${attempts}/${retries} failed with status: ${res.statusCode}`
+            );
+            updateSplashStatus('health-check', 'Waiting for server...', attempts);
+            if (attempts >= retries) {
+              clearInterval(interval);
+              const diagnosticMessage = app.isPackaged
+                ? `Python backend failed to start after ${retries} attempts.\n\nDiagnostic information:\n- Port: ${port}\n- Health endpoint: ${url}\n\nThis may indicate:\n1. Bundled Python environment is corrupted\n2. Port ${port} is blocked by firewall\n3. Python dependencies are missing\n\nPlease report this issue with the console output.`
+                : `Python backend failed to start after ${retries} attempts.\n\nDiagnostic information:\n- Port: ${port}\n- Health endpoint: ${url}\n- Environment: Development mode\n\nTroubleshooting steps:\n1. Check if conda environment 'pyscf-env' is activated\n2. Verify all dependencies are installed: conda env create -f .github/environment.yml\n3. Test the Flask server manually: cd src/python && python app.py\n4. Check if port ${port} is available\n\nFor more details, see CLAUDE.md`;
+              reject(new Error(diagnosticMessage));
+            }
           }
         })
         .on('error', _err => {
