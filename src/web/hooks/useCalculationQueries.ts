@@ -3,12 +3,39 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as quantumApi from '../api/quantum';
 import { searchPubChem, convertSmilesToXyz } from '../api/molecule';
-import { QuantumCalculationRequest } from '../types/api-types';
+import {
+  CalculationInstance,
+  CalculationListResponseData,
+  CalculationSummary,
+  QuantumCalculationRequest,
+} from '../types/api-types';
+
+export const calculationQueryKeys = {
+  all: ['calculations'] as const,
+  list: () => [...calculationQueryKeys.all, 'list'] as const,
+  detail: (id: string) => [...calculationQueryKeys.all, 'detail', id] as const,
+  orbitals: (id: string) => [...calculationQueryKeys.all, 'orbitals', id] as const,
+  orbitalCube: (id: string, idx: number, opts?: object) =>
+    [...calculationQueryKeys.all, 'orbital-cube', id, idx, opts] as const,
+  cubeFiles: (id: string) => [...calculationQueryKeys.all, 'cube-files', id] as const,
+  supportedParams: () => [...calculationQueryKeys.all, 'supported-parameters'] as const,
+};
+
+const toCalculationSummary = (
+  calculation: CalculationInstance,
+  previousSummary: CalculationSummary
+): CalculationSummary => ({
+  ...previousSummary,
+  id: calculation.id,
+  name: calculation.name,
+  status: calculation.status,
+  date: previousSummary.date || calculation.createdAt,
+});
 
 // 計算リストを取得するQuery
 export const useGetCalculations = () => {
   return useQuery({
-    queryKey: ['calculations'],
+    queryKey: calculationQueryKeys.list(),
     queryFn: quantumApi.getCalculations,
 
     // リストは頻繁に変更される可能性があるため、staleTimeを短めに
@@ -24,7 +51,7 @@ export const useGetCalculations = () => {
 // 特定の計算詳細を取得するQuery
 export const useGetCalculationDetails = (id: string | null) => {
   return useQuery({
-    queryKey: ['calculation', id],
+    queryKey: calculationQueryKeys.detail(id ?? ''),
     queryFn: () => quantumApi.getCalculationDetails(id!),
     enabled: !!id && !id.startsWith('new-calculation-'), // idが存在し、一時IDでない場合にのみ実行
 
@@ -51,7 +78,7 @@ export const useStartCalculation = () => {
       quantumApi.startCalculation(params),
     onSuccess: () => {
       // 成功したら計算リストのキャッシュを無効化して再取得させる
-      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+      queryClient.invalidateQueries({ queryKey: calculationQueryKeys.list() });
     },
   });
 };
@@ -62,7 +89,7 @@ export const useDeleteCalculation = () => {
   return useMutation({
     mutationFn: (id: string) => quantumApi.deleteCalculation(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+      queryClient.invalidateQueries({ queryKey: calculationQueryKeys.list() });
     },
   });
 };
@@ -74,8 +101,8 @@ export const usePauseCalculation = () => {
     mutationFn: (id: string) => quantumApi.pauseCalculation(id),
     onSuccess: (data, id) => {
       // 成功したら関連するキャッシュを更新
-      queryClient.invalidateQueries({ queryKey: ['calculations'] });
-      queryClient.invalidateQueries({ queryKey: ['calculation', id] });
+      queryClient.invalidateQueries({ queryKey: calculationQueryKeys.list() });
+      queryClient.invalidateQueries({ queryKey: calculationQueryKeys.detail(id) });
     },
   });
 };
@@ -87,20 +114,24 @@ export const useResumeCalculation = () => {
     mutationFn: (id: string) => quantumApi.resumeCalculation(id),
     onSuccess: (data, id) => {
       // サーバーレスポンスを即座にキャッシュに反映
-      queryClient.setQueryData(['calculation', id], {
+      queryClient.setQueryData(calculationQueryKeys.detail(id), {
         calculation: data.calculation,
       });
 
       // リストキャッシュも更新
-      queryClient.setQueryData(['calculations'], (oldData: any) => {
-        if (!oldData?.calculations) return oldData;
-        return {
-          ...oldData,
-          calculations: oldData.calculations.map((calc: any) =>
-            calc.id === id ? data.calculation : calc
-          ),
-        };
-      });
+      queryClient.setQueryData(
+        calculationQueryKeys.list(),
+        (oldData: CalculationListResponseData | undefined) => {
+          if (!oldData?.calculations) return oldData;
+          return {
+            ...oldData,
+            calculations: oldData.calculations.map(
+              (calc: CalculationListResponseData['calculations'][number]) =>
+                calc.id === id ? toCalculationSummary(data.calculation, calc) : calc
+            ),
+          };
+        }
+      );
     },
   });
 };
@@ -113,9 +144,9 @@ export const useUpdateCalculationName = () => {
       quantumApi.updateCalculationName(id, newName),
     onSuccess: (data, variables) => {
       // 成功したら関連するキャッシュを更新
-      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+      queryClient.invalidateQueries({ queryKey: calculationQueryKeys.list() });
       queryClient.invalidateQueries({
-        queryKey: ['calculation', variables.id],
+        queryKey: calculationQueryKeys.detail(variables.id),
       });
     },
   });
@@ -144,7 +175,7 @@ export const useConvertSmilesToXyz = () => {
 // 軌道情報を取得するQuery
 export const useGetOrbitals = (calculationId: string | null) => {
   return useQuery({
-    queryKey: ['orbitals', calculationId],
+    queryKey: calculationQueryKeys.orbitals(calculationId ?? ''),
     queryFn: () => quantumApi.getOrbitals(calculationId!),
     enabled: !!calculationId && !calculationId.startsWith('new-calculation-'), // idが存在し、一時IDでない場合にのみ実行
   });
@@ -161,7 +192,11 @@ export const useGetOrbitalCube = (
   }
 ) => {
   return useQuery({
-    queryKey: ['orbital-cube', calculationId, orbitalIndex, options],
+    queryKey: calculationQueryKeys.orbitalCube(
+      calculationId ?? '',
+      orbitalIndex ?? -1,
+      options
+    ),
     queryFn: () =>
       quantumApi.getOrbitalCube(calculationId!, orbitalIndex!, options),
     enabled:
@@ -196,12 +231,11 @@ export const useGenerateOrbitalCube = () => {
     onSuccess: (data, variables) => {
       // 成功したら該当するキャッシュを更新
       queryClient.setQueryData(
-        [
-          'orbital-cube',
+        calculationQueryKeys.orbitalCube(
           variables.calculationId,
           variables.orbitalIndex,
-          variables.options,
-        ],
+          variables.options
+        ),
         data
       );
     },
@@ -211,7 +245,7 @@ export const useGenerateOrbitalCube = () => {
 // CUBE files management
 export const useListCubeFiles = (calculationId: string | null) => {
   return useQuery({
-    queryKey: ['cube-files', calculationId],
+    queryKey: calculationQueryKeys.cubeFiles(calculationId ?? ''),
     queryFn: () => quantumApi.listCubeFiles(calculationId!),
     enabled: !!calculationId && !calculationId.startsWith('new-calculation-'),
   });
@@ -230,10 +264,26 @@ export const useDeleteCubeFiles = () => {
     onSuccess: (data, variables) => {
       // Invalidate related queries
       queryClient.invalidateQueries({
-        queryKey: ['cube-files', variables.calculationId],
+        queryKey: calculationQueryKeys.cubeFiles(variables.calculationId),
       });
+      if (variables.orbitalIndex !== undefined) {
+        queryClient.invalidateQueries({
+          queryKey: calculationQueryKeys.orbitalCube(
+            variables.calculationId,
+            variables.orbitalIndex
+          ),
+        });
+        return;
+      }
+
+      const orbitalCubePrefix =
+        calculationQueryKeys.orbitalCube(variables.calculationId, 0);
       queryClient.invalidateQueries({
-        queryKey: ['orbital-cube', variables.calculationId],
+        predicate: query =>
+          Array.isArray(query.queryKey) &&
+          query.queryKey[0] === orbitalCubePrefix[0] &&
+          query.queryKey[1] === orbitalCubePrefix[1] &&
+          query.queryKey[2] === orbitalCubePrefix[2],
       });
     },
   });
@@ -242,7 +292,7 @@ export const useDeleteCubeFiles = () => {
 // サポートされているパラメータを取得するQuery
 export const useSupportedParameters = () => {
   return useQuery({
-    queryKey: ['supported-parameters'],
+    queryKey: calculationQueryKeys.supportedParams(),
     queryFn: quantumApi.getSupportedParameters,
     staleTime: 24 * 60 * 60 * 1000, // 24時間キャッシュを保持（パラメータは頻繁に変更されない）
     gcTime: 24 * 60 * 60 * 1000, // 24時間メモリに保持

@@ -26,7 +26,7 @@ export class ApiError extends Error {
   public readonly status: number;
   public readonly statusText: string;
   public readonly url: string;
-  public readonly response?: any;
+  public readonly response?: unknown;
   public readonly isNetworkError: boolean;
 
   constructor(
@@ -34,7 +34,7 @@ export class ApiError extends Error {
     status: number,
     statusText: string,
     url: string,
-    response?: any,
+    response?: unknown,
     isNetworkError = false
   ) {
     super(message);
@@ -65,7 +65,7 @@ export const request = async <T>(
     };
 
     if (authToken) {
-      (headers as any)['X-Auth-Token'] = authToken;
+      (headers as Record<string, string>)['X-Auth-Token'] = authToken;
     }
 
     const response = await fetch(url, {

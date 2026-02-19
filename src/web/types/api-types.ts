@@ -90,7 +90,7 @@ export type Operations = {
   startCalculation: operations['startCalculation'];
   listCalculations: operations['listCalculations'];
   getCalculationDetails: operations['getCalculationDetails'];
-  updateCalculation: operations['patchCalculation'];
+  updateCalculation: operations['updateCalculation'];
   deleteCalculation: operations['deleteCalculation'];
   getOrbitals: operations['getOrbitals'];
   getOrbitalCube: operations['getOrbitalCube'];

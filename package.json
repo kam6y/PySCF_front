@@ -31,6 +31,7 @@
     "verify-build-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && echo \"=== Build Environment Verification ===\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import conda_pack; print(f\\\"conda-pack: {conda_pack.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && echo \"✓ All build tools verified\"'",
     "validate-build": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/validate-build-completeness.py'",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
+    "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "my-review": "bash scripts/my-review.sh",

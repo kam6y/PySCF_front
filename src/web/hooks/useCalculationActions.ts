@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  calculationQueryKeys,
   useStartCalculation,
   useUpdateCalculationName,
   useDeleteCalculation,
@@ -140,10 +141,15 @@ export const useCalculationActions = () => {
 
   const handleCalculationUpdate = (updatedCalculation: CalculationInstance) => {
     // React Queryキャッシュを直接更新
-    queryClient.setQueryData(['calculation', updatedCalculation.id], {
-      calculation: updatedCalculation,
+    queryClient.setQueryData(
+      calculationQueryKeys.detail(updatedCalculation.id),
+      {
+        calculation: updatedCalculation,
+      }
+    );
+    queryClient.invalidateQueries({
+      queryKey: calculationQueryKeys.list(),
     });
-    queryClient.invalidateQueries({ queryKey: ['calculations'] });
   };
 
   return {

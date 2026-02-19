@@ -22,7 +22,11 @@ export const handleError = (error: unknown, context?: string) => {
 
   // Handle ApiError
   if (error instanceof ApiError) {
-    calculationId = error.response?.id; // Try to extract calculation ID if available in response
+    const resp = error.response;
+    calculationId =
+      resp !== null && typeof resp === 'object' && 'id' in resp && typeof (resp as { id?: unknown }).id === 'string'
+        ? (resp as { id: string }).id
+        : undefined; // Try to extract calculation ID if available in response
 
     if (error.isNetworkError) {
       title = 'Network Error';

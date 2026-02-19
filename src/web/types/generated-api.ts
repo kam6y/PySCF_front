@@ -160,7 +160,7 @@ export interface paths {
          * Update calculation metadata
          * @description Update calculation name and other metadata
          */
-        put: operations["patchCalculation"];
+        put: operations["updateCalculation"];
         post?: never;
         /**
          * Delete calculation
@@ -2545,7 +2545,7 @@ export interface operations {
             };
         };
     };
-    patchCalculation: {
+    updateCalculation: {
         parameters: {
             query?: never;
             header?: never;

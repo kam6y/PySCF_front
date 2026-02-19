@@ -9,6 +9,7 @@ import {
 } from './python-env';
 import { findAvailablePort } from './port-manager';
 import { updateSplashStatus } from './splash-window-manager';
+import type { ServerConfig } from './config';
 
 const buildDiagnosticMessage = (
   port: number,
@@ -55,7 +56,10 @@ const resolveServerPort = async (defaultPort: number): Promise<number> => {
     }
   }
 };
-const buildGunicornArgs = (serverConfig: any, serverPort: number): string[] => {
+const buildGunicornArgs = (
+  serverConfig: ServerConfig,
+  serverPort: number
+): string[] => {
   const serverSettings = serverConfig.server;
   const gunicornSettings = serverConfig.gunicorn;
   return [
@@ -253,7 +257,7 @@ export const checkServerHealth = (
  * 設定ファイルに基づいて開発・本番環境で同一の起動方法を使用
  */
 export const startPythonServer = async (
-  serverConfig: any,
+  serverConfig: ServerConfig,
   authToken: string
 ): Promise<number> => {
   return new Promise(async (resolve, reject) => {

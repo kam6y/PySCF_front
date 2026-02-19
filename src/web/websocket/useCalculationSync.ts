@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Socket } from 'socket.io-client';
 import { CalculationInstance } from '../types/api-types';
 import { handleError } from '../utils/errorHandler';
+import { calculationQueryKeys } from '../hooks/useCalculationQueries';
 import { invalidateQueriesWithRetry } from './invalidateQueriesWithRetry';
 import type { SocketEventHandlers } from './useSocketTransport';
 
@@ -52,11 +53,13 @@ export const useCalculationSync = ({
         // キャッシュを無効化して再取得を促す（データの整合性はサーバーが保証）
         // 1. 個別計算詳細のキャッシュを無効化
         queryClient.invalidateQueries({
-          queryKey: ['calculation', calculationId],
+          queryKey: calculationQueryKeys.detail(calculationId),
         });
 
         // 2. 計算リストのキャッシュを無効化
-        queryClient.invalidateQueries({ queryKey: ['calculations'] });
+        queryClient.invalidateQueries({
+          queryKey: calculationQueryKeys.list(),
+        });
 
         console.log(
           `[UnifiedWebSocket] Invalidated queries for calculation ${calculationId}`
@@ -73,7 +76,9 @@ export const useCalculationSync = ({
 
   const notifyWebSocketError = useCallback(
     (errorMessage: string) => {
-      queryClient.invalidateQueries({ queryKey: ['calculations'] });
+      queryClient.invalidateQueries({
+        queryKey: calculationQueryKeys.list(),
+      });
       onWebSocketErrorRef.current?.(errorMessage);
     },
     [queryClient]
@@ -191,12 +196,12 @@ export const useCalculationSync = ({
         await Promise.all([
           invalidateQueriesWithRetry({
             queryClient,
-            queryKey: ['calculations'],
+            queryKey: [...calculationQueryKeys.list()],
           }),
           activeId && !activeId.startsWith('new-calculation-')
             ? invalidateQueriesWithRetry({
                 queryClient,
-                queryKey: ['calculation', activeId],
+                queryKey: [...calculationQueryKeys.detail(activeId)],
               })
             : Promise.resolve(),
         ]);

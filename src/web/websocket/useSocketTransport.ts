@@ -7,7 +7,7 @@ export interface SocketEventHandlers {
   onReconnect?: (socket: Socket, attemptNumber: number) => void;
   onConnectError?: (error: Error) => void;
   onError?: (errorData: unknown) => void;
-  dataListeners?: Record<string, (data: any) => void>;
+  dataListeners?: Record<string, (data: unknown) => void>;
 }
 
 export interface UseSocketTransportOptions {
@@ -187,7 +187,7 @@ export const useSocketTransport = ({
         for (const eventName of Object.keys(initialListeners)) {
           socket.on(eventName, (data: unknown) => {
             const latestListener = dataListenersRef.current?.[eventName];
-            latestListener?.(data as any);
+            latestListener?.(data);
           });
         }
       }

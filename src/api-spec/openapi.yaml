@@ -338,7 +338,7 @@ paths:
     put:
       summary: Update calculation metadata
       description: Update calculation name and other metadata
-      operationId: patchCalculation
+      operationId: updateCalculation
       parameters:
         - name: calculationId
           in: path

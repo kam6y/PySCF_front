@@ -2,10 +2,25 @@ import path from 'node:path';
 import fs from 'fs';
 import { app, dialog } from 'electron';
 
+export interface ServerConfig {
+  server: { host: string; port: number };
+  gunicorn: {
+    workers: number;
+    threads: number;
+    worker_class: string;
+    timeout: number;
+    keep_alive: number;
+    access_logfile: string | null;
+    log_level: string;
+    preload_app: boolean;
+  };
+  production: { use_gunicorn: boolean };
+}
+
 /**
  * サーバー設定を読み込む
  */
-export const loadServerConfig = (): any => {
+export const loadServerConfig = (): ServerConfig => {
   try {
     // 開発環境では config/ ディレクトリから読み込み
     let configPath = path.join(__dirname, '..', 'config', 'server-config.json');
@@ -21,7 +36,7 @@ export const loadServerConfig = (): any => {
 
     if (fs.existsSync(configPath)) {
       const configContent = fs.readFileSync(configPath, 'utf8');
-      const config = JSON.parse(configContent);
+      const config = JSON.parse(configContent) as ServerConfig;
       console.log(`Loaded server configuration from: ${configPath}`);
       return config;
     } else {
