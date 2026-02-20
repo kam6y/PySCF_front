@@ -167,11 +167,19 @@ def _create_calculator_instance(calculation_method: str, parameters: dict,
         calculator_class = calculator_classes['DFT']
         process_logger.warning(f"Unknown calculation method '{calculation_method}', defaulting to DFT")
 
+    geomopt_kwargs = {}
+    if calculation_method in ['DFT', 'HF', 'MP2']:
+        for key in ['geomopt_maxsteps', 'geomopt_conv_energy']:
+            value = parameters.get(key)
+            if value is not None:
+                geomopt_kwargs[key] = value
+
     return calculator_class(
         working_dir=calc_dir,
         keep_files=True,
         molecule_name=molecule_name,
-        optimize_geometry=optimize_geometry
+        optimize_geometry=optimize_geometry,
+        **geomopt_kwargs
     )
 
 

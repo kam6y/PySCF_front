@@ -19,12 +19,19 @@ logger = logging.getLogger(__name__)
 class MP2Calculator(BaseCalculator):
     """MP2 calculator using PySCF for structure optimization and MP2 energy calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(
+        self,
+        working_dir: Optional[str] = None,
+        keep_files: bool = False,
+        molecule_name: Optional[str] = None,
+        optimize_geometry: bool = True,
+        **kwargs
+    ):
         # Use file manager for better organization
         self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry)
+        super().__init__(working_dir, optimize_geometry, **kwargs)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None
         self.mp2: Optional[mp.MP2] = None
@@ -184,10 +191,16 @@ class MP2Calculator(BaseCalculator):
         # Create MP2 object for geometry optimization
         logger.info("Creating MP2 object for geometry optimization...")
         mp2_obj = mp.MP2(self.mf)
+
+        optimize_kwargs = {}
+        if getattr(self, 'geomopt_maxsteps', None) is not None:
+            optimize_kwargs['maxsteps'] = self.geomopt_maxsteps
+        if getattr(self, 'geomopt_conv_energy', None) is not None:
+            optimize_kwargs['convergence_energy'] = self.geomopt_conv_energy
         
         # Perform MP2 geometry optimization
         logger.info("Performing geometry optimization at MP2 level...")
-        optimized_mol = geometric_solver.optimize(mp2_obj)
+        optimized_mol = geometric_solver.optimize(mp2_obj, **optimize_kwargs)
         self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
         logger.info("MP2 geometry optimization completed")
         

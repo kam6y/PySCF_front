@@ -20,12 +20,19 @@ logger = logging.getLogger(__name__)
 class DFTCalculator(BaseCalculator):
     """DFT calculator using PySCF for structure optimization and orbital analysis."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(
+        self,
+        working_dir: Optional[str] = None,
+        keep_files: bool = False,
+        molecule_name: Optional[str] = None,
+        optimize_geometry: bool = True,
+        **kwargs
+    ):
         # Use file manager for better organization
         self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry)
+        super().__init__(working_dir, optimize_geometry, **kwargs)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[dft.RKS] = None
         self.optimized_geometry: Optional[np.ndarray] = None

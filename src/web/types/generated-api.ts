@@ -570,6 +570,17 @@ export interface components {
              * @default true
              */
             optimize_geometry: boolean;
+            /**
+             * @description Maximum number of geometry optimization steps
+             * @default 100
+             */
+            geomopt_maxsteps: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             * @default 0.000001
+             */
+            geomopt_conv_energy: number | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -584,6 +595,17 @@ export interface components {
             basis_function: string;
             /** @default true */
             optimize_geometry: boolean;
+            /**
+             * @description Maximum number of geometry optimization steps
+             * @default 100
+             */
+            geomopt_maxsteps: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             * @default 0.000001
+             */
+            geomopt_conv_energy: number | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -598,6 +620,17 @@ export interface components {
             basis_function: string;
             /** @default true */
             optimize_geometry: boolean;
+            /**
+             * @description Maximum number of geometry optimization steps
+             * @default 100
+             */
+            geomopt_maxsteps: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             * @default 0.000001
+             */
+            geomopt_conv_energy: number | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -875,6 +908,13 @@ export interface components {
              * @description Gradient convergence tolerance used
              */
             conv_tol_grad?: number | null;
+            /** @description Maximum number of geometry optimization steps */
+            geomopt_maxsteps?: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             */
+            geomopt_conv_energy?: number | null;
             /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
             ketcher_data?: string | null;
         };
@@ -1366,6 +1406,10 @@ export interface components {
                 conv_tol?: number;
                 /** @description Default gradient convergence tolerance (CASSCF) */
                 conv_tol_grad?: number;
+                /** @description Default maximum geometry optimization steps (DFT/HF/MP2) */
+                geomopt_maxsteps?: number;
+                /** @description Default energy convergence threshold for geometry optimization (DFT/HF/MP2) */
+                geomopt_conv_energy?: number;
             };
         };
         /** @description Constraint definition for a calculation parameter */

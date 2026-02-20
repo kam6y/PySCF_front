@@ -120,6 +120,12 @@ class DFTCalculationRequest(CalculationRequestBase):
     optimize_geometry: Optional[bool] = Field(
         True, description='Whether to perform geometry optimization'
     )
+    geomopt_maxsteps: Optional[int] = Field(
+        100, description='Maximum number of geometry optimization steps', ge=1, le=1000
+    )
+    geomopt_conv_energy: Optional[float] = Field(
+        1e-06, description='Energy convergence threshold (Hartree)'
+    )
 
 
 class CalculationMethod2(Enum):
@@ -130,6 +136,12 @@ class HFCalculationRequest(CalculationRequestBase):
     calculation_method: Literal['HF']
     basis_function: Optional[str] = '6-31G(d)'
     optimize_geometry: Optional[bool] = True
+    geomopt_maxsteps: Optional[int] = Field(
+        100, description='Maximum number of geometry optimization steps', ge=1, le=1000
+    )
+    geomopt_conv_energy: Optional[float] = Field(
+        1e-06, description='Energy convergence threshold (Hartree)'
+    )
 
 
 class CalculationMethod3(Enum):
@@ -140,6 +152,12 @@ class MP2CalculationRequest(CalculationRequestBase):
     calculation_method: Literal['MP2']
     basis_function: Optional[str] = '6-31G(d)'
     optimize_geometry: Optional[bool] = True
+    geomopt_maxsteps: Optional[int] = Field(
+        100, description='Maximum number of geometry optimization steps', ge=1, le=1000
+    )
+    geomopt_conv_energy: Optional[float] = Field(
+        1e-06, description='Energy convergence threshold (Hartree)'
+    )
 
 
 class CalculationMethod4(Enum):
@@ -386,6 +404,12 @@ class CalculationParameters(BaseModel):
     )
     conv_tol_grad: Optional[float] = Field(
         None, description='Gradient convergence tolerance used'
+    )
+    geomopt_maxsteps: Optional[int] = Field(
+        None, description='Maximum number of geometry optimization steps', ge=1, le=1000
+    )
+    geomopt_conv_energy: Optional[float] = Field(
+        None, description='Energy convergence threshold (Hartree)'
     )
     ketcher_data: Optional[str] = Field(
         None,
@@ -727,6 +751,13 @@ class MethodDefaultValues1(BaseModel):
     )
     conv_tol_grad: Optional[float] = Field(
         None, description='Default gradient convergence tolerance (CASSCF)'
+    )
+    geomopt_maxsteps: Optional[int] = Field(
+        None, description='Default maximum geometry optimization steps (DFT/HF/MP2)'
+    )
+    geomopt_conv_energy: Optional[float] = Field(
+        None,
+        description='Default energy convergence threshold for geometry optimization (DFT/HF/MP2)',
     )
 
 

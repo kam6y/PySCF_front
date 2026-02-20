@@ -22,6 +22,8 @@ export const DEFAULT_CALCULATION_PARAMETERS: QuantumCalculationRequest = {
   conv_tol: 1e-6,
   conv_tol_grad: 1e-4,
   optimize_geometry: true,
+  geomopt_maxsteps: 100,
+  geomopt_conv_energy: 1e-6,
 } as QuantumCalculationRequest;
 
 // DrawMoleculePage のステータスメッセージ

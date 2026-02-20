@@ -15,17 +15,23 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'basis_function': '6-31G(d)',
         'exchange_correlation': 'B3LYP',
         'memory_mb': 2000,
-        'optimize_geometry': True
+        'optimize_geometry': True,
+        'geomopt_maxsteps': 100,
+        'geomopt_conv_energy': 1e-6
     },
     'HF': {
         'basis_function': '6-31G(d)',
         'memory_mb': 2000,
-        'optimize_geometry': True
+        'optimize_geometry': True,
+        'geomopt_maxsteps': 100,
+        'geomopt_conv_energy': 1e-6
     },
     'MP2': {
         'basis_function': '6-31G(d)',
         'memory_mb': 3000,
-        'optimize_geometry': True
+        'optimize_geometry': True,
+        'geomopt_maxsteps': 100,
+        'geomopt_conv_energy': 1e-6
     },
     'CCSD': {
         'basis_function': 'cc-pVDZ',  # Correlation-consistent basis recommended for CCSD
@@ -106,6 +112,16 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
     'optimize_geometry': {
         'applicable_methods': ['DFT', 'HF', 'MP2'],
         'description': 'DFT, HF, and MP2 methods only'
+    },
+    'geomopt_maxsteps': {
+        'min': 1,
+        'max': 1000,
+        'applicable_methods': ['DFT', 'HF', 'MP2'],
+        'description': 'Maximum geometry optimization steps (1-1000)'
+    },
+    'geomopt_conv_energy': {
+        'applicable_methods': ['DFT', 'HF', 'MP2'],
+        'description': 'Energy convergence threshold in Hartree'
     },
     'frozen_core': {
         'applicable_methods': ['CCSD', 'CCSD_T'],

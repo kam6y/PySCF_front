@@ -176,6 +176,56 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
           </section>
         )}
 
+        {['DFT', 'HF', 'MP2'].includes(params.calculation_method) &&
+          (params as any).optimize_geometry !== false && (
+            <section className={styles.calculationSettingsSection}>
+              <div className={styles.settingRow}>
+                <label>Max Optimization Steps</label>
+                <input
+                  type="number"
+                  value={
+                    (params as any).geomopt_maxsteps !== undefined
+                      ? (params as any).geomopt_maxsteps
+                      : 100
+                  }
+                  onChange={e =>
+                    onParamChange(
+                      'geomopt_maxsteps',
+                      Math.max(1, Math.min(1000, Number(e.target.value)))
+                    )
+                  }
+                  min={1}
+                  max={1000}
+                  step={1}
+                  className={`${styles.numberInput} ${styles.withSpinner}`}
+                  disabled={
+                    !isCalculationEditable(calculationStatus) || isLoadingParams
+                  }
+                />
+              </div>
+              <div className={styles.settingRow}>
+                <label>Energy Convergence (Hartree)</label>
+                <select
+                  value={(params as any).geomopt_conv_energy ?? 1e-6}
+                  onChange={e =>
+                    onParamChange(
+                      'geomopt_conv_energy',
+                      parseFloat(e.target.value)
+                    )
+                  }
+                  disabled={
+                    !isCalculationEditable(calculationStatus) || isLoadingParams
+                  }
+                >
+                  <option value={1e-5}>1e-5 (loose)</option>
+                  <option value={1e-6}>1e-6 (normal)</option>
+                  <option value={1e-7}>1e-7 (tight)</option>
+                  <option value={1e-8}>1e-8 (very tight)</option>
+                </select>
+              </div>
+            </section>
+          )}
+
         {params.calculation_method === 'TDDFT' && (
           <section className={styles.calculationSettingsSection}>
             <div className={styles.settingRow}>

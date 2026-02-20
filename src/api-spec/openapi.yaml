@@ -1213,6 +1213,19 @@ components:
               type: boolean
               default: true
               description: Whether to perform geometry optimization
+            geomopt_maxsteps:
+              type: integer
+              minimum: 1
+              maximum: 1000
+              default: 100
+              nullable: true
+              description: Maximum number of geometry optimization steps
+            geomopt_conv_energy:
+              type: number
+              format: float
+              default: 1.0e-6
+              nullable: true
+              description: Energy convergence threshold (Hartree)
 
     # Hartree-Fock calculation request
     HFCalculationRequest:
@@ -1230,6 +1243,19 @@ components:
             optimize_geometry:
               type: boolean
               default: true
+            geomopt_maxsteps:
+              type: integer
+              minimum: 1
+              maximum: 1000
+              default: 100
+              nullable: true
+              description: Maximum number of geometry optimization steps
+            geomopt_conv_energy:
+              type: number
+              format: float
+              default: 1.0e-6
+              nullable: true
+              description: Energy convergence threshold (Hartree)
 
     # MP2 calculation request
     MP2CalculationRequest:
@@ -1247,6 +1273,19 @@ components:
             optimize_geometry:
               type: boolean
               default: true
+            geomopt_maxsteps:
+              type: integer
+              minimum: 1
+              maximum: 1000
+              default: 100
+              nullable: true
+              description: Maximum number of geometry optimization steps
+            geomopt_conv_energy:
+              type: number
+              format: float
+              default: 1.0e-6
+              nullable: true
+              description: Energy convergence threshold (Hartree)
 
     # CCSD calculation request
     CCSDCalculationRequest:
@@ -1640,6 +1679,17 @@ components:
           format: float
           nullable: true
           description: Gradient convergence tolerance used
+        geomopt_maxsteps:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          nullable: true
+          description: Maximum number of geometry optimization steps
+        geomopt_conv_energy:
+          type: number
+          format: float
+          nullable: true
+          description: Energy convergence threshold (Hartree)
         ketcher_data:
           type: string
           nullable: true
@@ -2512,6 +2562,12 @@ components:
           conv_tol_grad:
             type: number
             description: Default gradient convergence tolerance (CASSCF)
+          geomopt_maxsteps:
+            type: integer
+            description: Default maximum geometry optimization steps (DFT/HF/MP2)
+          geomopt_conv_energy:
+            type: number
+            description: Default energy convergence threshold for geometry optimization (DFT/HF/MP2)
       description: Default values for each calculation method (e.g., DFT, CCSD, TDDFT)
 
     ParameterConstraint:

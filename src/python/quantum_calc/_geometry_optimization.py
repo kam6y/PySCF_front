@@ -46,14 +46,21 @@ class GeometryOptimizationMixin:
 
         logger.info("Starting geometry optimization...")
 
-        # Integrate callback for geometry optimization
-        # Note: geometric_solver.optimize accepts callback parameter
+        optimize_kwargs = {}
+        if getattr(self, 'geomopt_maxsteps', None) is not None:
+            optimize_kwargs['maxsteps'] = self.geomopt_maxsteps
+        if getattr(self, 'geomopt_conv_energy', None) is not None:
+            optimize_kwargs['convergence_energy'] = self.geomopt_conv_energy
+
         try:
-            optimized_mol = geometric_solver.optimize(self.mf, callback=self._geometry_optimization_callback)
+            optimized_mol = geometric_solver.optimize(
+                self.mf,
+                callback=self._geometry_optimization_callback,
+                **optimize_kwargs
+            )
         except TypeError:
-            # Fallback if callback is not supported by this version of PySCF
             logger.warning("Geometry optimization callback not supported, using standard optimization")
-            optimized_mol = geometric_solver.optimize(self.mf)
+            optimized_mol = geometric_solver.optimize(self.mf, **optimize_kwargs)
 
         self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
         logger.info("Geometry optimization completed")

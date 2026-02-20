@@ -32,11 +32,19 @@ class BaseCalculator(
 ):
     """Abstract base class for quantum chemistry calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(
+        self,
+        working_dir: Optional[str] = None,
+        optimize_geometry: bool = True,
+        geomopt_maxsteps: Optional[int] = None,
+        geomopt_conv_energy: Optional[float] = None
+    ):
         """Initialize calculator with optional working directory and geometry optimization flag."""
         self.working_dir = working_dir or tempfile.mkdtemp(prefix="pyscf_calc_")
         self.results: Dict[str, Any] = {}
         self.optimize_geometry = optimize_geometry
+        self.geomopt_maxsteps = geomopt_maxsteps
+        self.geomopt_conv_energy = geomopt_conv_energy
         self.gpu_enabled = False
         self._gpu4pyscf_available: Optional[bool] = None
         self._cuda_supported: Optional[bool] = None
