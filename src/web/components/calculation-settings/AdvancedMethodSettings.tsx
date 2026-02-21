@@ -81,33 +81,37 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
               <>
                 <div className={styles.settingRow}>
                   <label>Energy Convergence Tolerance</label>
-                  <select
+                  <input
+                    type="number"
+                    step={1e-6}
                     value={(params as any).conv_tol ?? 1e-6}
-                    onChange={e =>
-                      onParamChange('conv_tol', parseFloat(e.target.value))
-                    }
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val) && val > 0) {
+                        onParamChange('conv_tol', val);
+                      }
+                    }}
+                    placeholder="1e-6"
+                    className={styles.numberInput}
                     disabled={!isCalculationEditable(calculationStatus)}
-                  >
-                    <option value={1e-5}>1e-5 (loose)</option>
-                    <option value={1e-6}>1e-6 (normal)</option>
-                    <option value={1e-7}>1e-7 (tight)</option>
-                    <option value={1e-8}>1e-8 (very tight)</option>
-                  </select>
+                  />
                 </div>
                 <div className={styles.settingRow}>
                   <label>Gradient Convergence Tolerance</label>
-                  <select
+                  <input
+                    type="number"
+                    step={1e-4}
                     value={(params as any).conv_tol_grad ?? 1e-4}
-                    onChange={e =>
-                      onParamChange('conv_tol_grad', parseFloat(e.target.value))
-                    }
+                    onChange={e => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val) && val > 0) {
+                        onParamChange('conv_tol_grad', val);
+                      }
+                    }}
+                    placeholder="1e-4"
+                    className={styles.numberInput}
                     disabled={!isCalculationEditable(calculationStatus)}
-                  >
-                    <option value={1e-3}>1e-3 (loose)</option>
-                    <option value={1e-4}>1e-4 (normal)</option>
-                    <option value={1e-5}>1e-5 (tight)</option>
-                    <option value={1e-6}>1e-6 (very tight)</option>
-                  </select>
+                  />
                 </div>
                 <div className={styles.settingRow}>
                   <label>CASSCF Max Macro Iterations</label>
@@ -205,23 +209,22 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
               </div>
               <div className={styles.settingRow}>
                 <label>Energy Convergence (Hartree)</label>
-                <select
+                <input
+                  type="number"
+                  step={1e-6}
                   value={(params as any).geomopt_conv_energy ?? 1e-6}
-                  onChange={e =>
-                    onParamChange(
-                      'geomopt_conv_energy',
-                      parseFloat(e.target.value)
-                    )
-                  }
+                  onChange={e => {
+                    const val = parseFloat(e.target.value);
+                    if (!isNaN(val) && val > 0) {
+                      onParamChange('geomopt_conv_energy', val);
+                    }
+                  }}
+                  placeholder="1e-6"
+                  className={styles.numberInput}
                   disabled={
                     !isCalculationEditable(calculationStatus) || isLoadingParams
                   }
-                >
-                  <option value={1e-5}>1e-5 (loose)</option>
-                  <option value={1e-6}>1e-6 (normal)</option>
-                  <option value={1e-7}>1e-7 (tight)</option>
-                  <option value={1e-8}>1e-8 (very tight)</option>
-                </select>
+                />
               </div>
             </section>
           )}
