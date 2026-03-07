@@ -17,31 +17,36 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'memory_mb': 2000,
         'optimize_geometry': True,
         'geomopt_maxsteps': 100,
-        'geomopt_conv_energy': 1e-6
+        'geomopt_conv_energy': 1e-6,
+        'density_fitting': False
     },
     'HF': {
         'basis_function': '6-31G(d)',
         'memory_mb': 2000,
         'optimize_geometry': True,
         'geomopt_maxsteps': 100,
-        'geomopt_conv_energy': 1e-6
+        'geomopt_conv_energy': 1e-6,
+        'density_fitting': False
     },
     'MP2': {
         'basis_function': '6-31G(d)',
         'memory_mb': 3000,
         'optimize_geometry': True,
         'geomopt_maxsteps': 100,
-        'geomopt_conv_energy': 1e-6
+        'geomopt_conv_energy': 1e-6,
+        'density_fitting': False
     },
     'CCSD': {
         'basis_function': 'cc-pVDZ',  # Correlation-consistent basis recommended for CCSD
         'memory_mb': 4000,            # Higher memory requirements
-        'frozen_core': True           # Frozen core approximation to reduce cost
+        'frozen_core': True,          # Frozen core approximation to reduce cost
+        'density_fitting': False
     },
     'CCSD_T': {
         'basis_function': 'cc-pVDZ',  # Correlation-consistent basis recommended
         'memory_mb': 4000,            # Higher memory requirements
-        'frozen_core': True           # Frozen core approximation to reduce cost
+        'frozen_core': True,          # Frozen core approximation to reduce cost
+        'density_fitting': False
     },
     'TDDFT': {
         'basis_function': '6-31G(d)',
@@ -49,7 +54,8 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'memory_mb': 2000,
         'tddft_nstates': 10,          # Default number of excited states
         'tddft_method': 'TDDFT',      # Full TDDFT (vs TDA approximation)
-        'tddft_analyze_nto': False    # NTO analysis off by default
+        'tddft_analyze_nto': False,   # NTO analysis off by default
+        'density_fitting': False
     },
     'CASCI': {
         'basis_function': '6-31G(d)',
@@ -130,6 +136,14 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
     'tddft_analyze_nto': {
         'applicable_methods': ['TDDFT'],
         'description': 'Perform Natural Transition Orbital analysis for excited states'
+    },
+    'density_fitting': {
+        'applicable_methods': ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT'],
+        'description': 'Enable density fitting (RI/DF) approximation for faster integral evaluation'
+    },
+    'auxiliary_basis': {
+        'applicable_methods': ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT'],
+        'description': 'Auxiliary basis set for density fitting (auto-selected if not specified)'
     },
     'cpu_cores': {
         'min': 1,

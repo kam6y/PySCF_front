@@ -1226,6 +1226,14 @@ components:
               default: 1.0e-6
               nullable: true
               description: Energy convergence threshold (Hartree)
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # Hartree-Fock calculation request
     HFCalculationRequest:
@@ -1256,6 +1264,14 @@ components:
               default: 1.0e-6
               nullable: true
               description: Energy convergence threshold (Hartree)
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # MP2 calculation request
     MP2CalculationRequest:
@@ -1286,6 +1302,14 @@ components:
               default: 1.0e-6
               nullable: true
               description: Energy convergence threshold (Hartree)
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # CCSD calculation request
     CCSDCalculationRequest:
@@ -1304,6 +1328,14 @@ components:
               type: boolean
               default: true
               description: Use frozen core approximation to reduce computational cost
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # CCSD(T) calculation request
     CCSD_TCalculationRequest:
@@ -1322,6 +1354,14 @@ components:
               type: boolean
               default: true
               description: Use frozen core approximation
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # TDDFT calculation request
     TDDFTCalculationRequest:
@@ -1355,6 +1395,14 @@ components:
               type: boolean
               default: false
               description: Perform Natural Transition Orbital analysis
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # CASCI calculation request
     CASCICalculationRequest:
@@ -1690,6 +1738,14 @@ components:
           format: float
           nullable: true
           description: Energy convergence threshold (Hartree)
+        density_fitting:
+          type: boolean
+          nullable: true
+          description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+        auxiliary_basis:
+          type: string
+          nullable: true
+          description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
         ketcher_data:
           type: string
           nullable: true
@@ -1829,6 +1885,10 @@ components:
           type: integer
           nullable: true
           description: Total number of electrons in the molecule
+        resolved_auxiliary_basis:
+          type: string
+          nullable: true
+          description: Actual auxiliary basis selected by PySCF for density fitting
         mp2_same_spin_correlation:
           type: number
           nullable: true
@@ -2469,7 +2529,7 @@ components:
 
     SupportedParametersData:
       type: object
-      required: [calculation_methods, basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods, method_defaults, parameter_constraints]
+      required: [calculation_methods, basis_functions, auxiliary_basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods, method_defaults, parameter_constraints]
       properties:
         calculation_methods:
           type: array
@@ -2483,6 +2543,13 @@ components:
             items:
               type: string
           description: Supported basis functions grouped by category (e.g., Minimal, Pople Style, etc.)
+        auxiliary_basis_functions:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Supported auxiliary basis sets for density fitting, grouped by category
         exchange_correlation:
           type: object
           additionalProperties:
@@ -2532,6 +2599,9 @@ components:
           frozen_core:
             type: boolean
             description: Default frozen core approximation setting (CCSD/CCSD_T)
+          density_fitting:
+            type: boolean
+            description: Default density fitting setting
           tddft_nstates:
             type: integer
             description: Default number of excited states (TDDFT)

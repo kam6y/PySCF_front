@@ -207,10 +207,21 @@ export const useCalculationForm = ({
           value as string
         ) as QuantumCalculationRequest;
       } else {
-        updatedParams = {
-          ...currentParams,
-          [field]: processedValue,
-        } as QuantumCalculationRequest;
+        if (field === 'density_fitting' && processedValue === false) {
+          const { auxiliary_basis, ...paramsWithoutAuxiliaryBasis } =
+            currentParams as QuantumCalculationRequest & {
+              auxiliary_basis?: string | null;
+            };
+          updatedParams = {
+            ...paramsWithoutAuxiliaryBasis,
+            [field]: processedValue,
+          } as QuantumCalculationRequest;
+        } else {
+          updatedParams = {
+            ...currentParams,
+            [field]: processedValue,
+          } as QuantumCalculationRequest;
+        }
       }
 
       if (isCompleted && field !== 'xyz') {

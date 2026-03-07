@@ -32,10 +32,6 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
     onParamChange,
     isParameterDisabled,
   }) => {
-    const isGeometryOptimizationDisabled =
-      !isCalculationEditable(calculationStatus) ||
-      isParameterDisabled('optimize_geometry', params.calculation_method || 'DFT');
-
     return (
       <section className={styles.calculationSettingsSection}>
         <div className={styles.settingRow}>
@@ -43,9 +39,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.calculation_method}
             onChange={e => onParamChange('calculation_method', e.target.value)}
-            disabled={
-              !isCalculationEditable(calculationStatus) || isLoadingParams
-            }
+            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -65,9 +59,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.basis_function}
             onChange={e => onParamChange('basis_function', e.target.value)}
-            disabled={
-              !isCalculationEditable(calculationStatus) || isLoadingParams
-            }
+            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -93,9 +85,7 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <label>Exchange Functional</label>
           <select
             value={params.exchange_correlation || ''}
-            onChange={e =>
-              onParamChange('exchange_correlation', e.target.value)
-            }
+            onChange={e => onParamChange('exchange_correlation', e.target.value)}
             disabled={
               !(
                 params.calculation_method === 'DFT' ||
@@ -147,33 +137,47 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
             disabled={!isCalculationEditable(calculationStatus)}
           />
         </div>
-        <div className={styles.settingRow}>
-          <div
-            className={`${styles.toggleSwitch} ${
-              isGeometryOptimizationDisabled ? styles.toggleDisabled : ''
-            }`}
-          >
-            <label
-              className={styles.toggleLabel}
-              htmlFor="toggle-geometry-optimization"
+        {['DFT', 'HF', 'MP2'].includes(params.calculation_method) && (
+          <div className={styles.settingRow}>
+            <div
+              className={`${styles.toggleSwitch} ${
+                !isCalculationEditable(calculationStatus) ||
+                isParameterDisabled(
+                  'optimize_geometry',
+                  params.calculation_method || 'DFT'
+                )
+                  ? styles.toggleDisabled
+                  : ''
+              }`}
             >
-              Geometry Opt
-            </label>
-            <label className={styles.switch}>
-              <input
-                id="toggle-geometry-optimization"
-                type="checkbox"
-                checked={(params as any).optimize_geometry ?? true}
-                onChange={e =>
-                  onParamChange('optimize_geometry', e.target.checked)
-                }
-                disabled={isGeometryOptimizationDisabled}
-                aria-label="Geometry Optimization"
-              />
-              <span className={styles.slider}></span>
-            </label>
+              <label
+                className={styles.toggleLabel}
+                htmlFor="toggle-geometry-optimization"
+              >
+                Geometry Optimization
+              </label>
+              <label className={styles.switch}>
+                <input
+                  id="toggle-geometry-optimization"
+                  type="checkbox"
+                  checked={(params as any).optimize_geometry ?? true}
+                  onChange={e =>
+                    onParamChange('optimize_geometry', e.target.checked)
+                  }
+                  disabled={
+                    !isCalculationEditable(calculationStatus) ||
+                    isParameterDisabled(
+                      'optimize_geometry',
+                      params.calculation_method || 'DFT'
+                    )
+                  }
+                  aria-label="Geometry Optimization"
+                />
+                <span className={styles.slider}></span>
+              </label>
+            </div>
           </div>
-        </div>
+        )}
       </section>
     );
   }

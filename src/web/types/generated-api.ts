@@ -581,6 +581,13 @@ export interface components {
              * @default 0.000001
              */
             geomopt_conv_energy: number | null;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -606,6 +613,13 @@ export interface components {
              * @default 0.000001
              */
             geomopt_conv_energy: number | null;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -631,6 +645,13 @@ export interface components {
              * @default 0.000001
              */
             geomopt_conv_energy: number | null;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -648,6 +669,13 @@ export interface components {
              * @default true
              */
             frozen_core: boolean;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -665,6 +693,13 @@ export interface components {
              * @default true
              */
             frozen_core: boolean;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -698,6 +733,13 @@ export interface components {
              * @default false
              */
             tddft_analyze_nto: boolean;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -915,6 +957,10 @@ export interface components {
              * @description Energy convergence threshold (Hartree)
              */
             geomopt_conv_energy?: number | null;
+            /** @description Enable density fitting (RI/DF) approximation for faster integral evaluation */
+            density_fitting?: boolean | null;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
             /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
             ketcher_data?: string | null;
         };
@@ -993,6 +1039,8 @@ export interface components {
             num_primitive_gaussians?: number | null;
             /** @description Total number of electrons in the molecule */
             total_electrons?: number | null;
+            /** @description Actual auxiliary basis selected by PySCF for density fitting */
+            resolved_auxiliary_basis?: string | null;
             /** @description MP2 same-spin correlation energy in hartree */
             mp2_same_spin_correlation?: number | null;
             /** @description MP2 opposite-spin correlation energy in hartree */
@@ -1358,6 +1406,10 @@ export interface components {
             basis_functions: {
                 [key: string]: string[];
             };
+            /** @description Supported auxiliary basis sets for density fitting, grouped by category */
+            auxiliary_basis_functions: {
+                [key: string]: string[];
+            };
             /** @description Supported exchange-correlation functionals grouped by category (e.g., Hybrid, GGA, etc.) */
             exchange_correlation: {
                 [key: string]: string[];
@@ -1386,6 +1438,8 @@ export interface components {
                 optimize_geometry?: boolean;
                 /** @description Default frozen core approximation setting (CCSD/CCSD_T) */
                 frozen_core?: boolean;
+                /** @description Default density fitting setting */
+                density_fitting?: boolean;
                 /** @description Default number of excited states (TDDFT) */
                 tddft_nstates?: number;
                 /** @description Default TDDFT method (TDDFT) */

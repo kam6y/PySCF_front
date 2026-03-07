@@ -126,6 +126,14 @@ class DFTCalculationRequest(CalculationRequestBase):
     geomopt_conv_energy: Optional[float] = Field(
         1e-06, description='Energy convergence threshold (Hartree)'
     )
+    density_fitting: Optional[bool] = Field(
+        False,
+        description='Enable density fitting (RI/DF) approximation for faster integral evaluation',
+    )
+    auxiliary_basis: Optional[str] = Field(
+        None,
+        description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+    )
 
 
 class CalculationMethod2(Enum):
@@ -141,6 +149,14 @@ class HFCalculationRequest(CalculationRequestBase):
     )
     geomopt_conv_energy: Optional[float] = Field(
         1e-06, description='Energy convergence threshold (Hartree)'
+    )
+    density_fitting: Optional[bool] = Field(
+        False,
+        description='Enable density fitting (RI/DF) approximation for faster integral evaluation',
+    )
+    auxiliary_basis: Optional[str] = Field(
+        None,
+        description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
     )
 
 
@@ -158,6 +174,14 @@ class MP2CalculationRequest(CalculationRequestBase):
     geomopt_conv_energy: Optional[float] = Field(
         1e-06, description='Energy convergence threshold (Hartree)'
     )
+    density_fitting: Optional[bool] = Field(
+        False,
+        description='Enable density fitting (RI/DF) approximation for faster integral evaluation',
+    )
+    auxiliary_basis: Optional[str] = Field(
+        None,
+        description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+    )
 
 
 class CalculationMethod4(Enum):
@@ -170,6 +194,14 @@ class CCSDCalculationRequest(CalculationRequestBase):
     frozen_core: Optional[bool] = Field(
         True, description='Use frozen core approximation to reduce computational cost'
     )
+    density_fitting: Optional[bool] = Field(
+        False,
+        description='Enable density fitting (RI/DF) approximation for faster integral evaluation',
+    )
+    auxiliary_basis: Optional[str] = Field(
+        None,
+        description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+    )
 
 
 class CalculationMethod5(Enum):
@@ -181,6 +213,14 @@ class CCSDTCalculationRequest(CalculationRequestBase):
     basis_function: Optional[str] = 'cc-pVDZ'
     frozen_core: Optional[bool] = Field(
         True, description='Use frozen core approximation'
+    )
+    density_fitting: Optional[bool] = Field(
+        False,
+        description='Enable density fitting (RI/DF) approximation for faster integral evaluation',
+    )
+    auxiliary_basis: Optional[str] = Field(
+        None,
+        description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
     )
 
 
@@ -211,6 +251,14 @@ class TDDFTCalculationRequest(CalculationRequestBase):
     )
     tddft_analyze_nto: Optional[bool] = Field(
         False, description='Perform Natural Transition Orbital analysis'
+    )
+    density_fitting: Optional[bool] = Field(
+        False,
+        description='Enable density fitting (RI/DF) approximation for faster integral evaluation',
+    )
+    auxiliary_basis: Optional[str] = Field(
+        None,
+        description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
     )
 
 
@@ -410,6 +458,14 @@ class CalculationParameters(BaseModel):
     )
     geomopt_conv_energy: Optional[float] = Field(
         None, description='Energy convergence threshold (Hartree)'
+    )
+    density_fitting: Optional[bool] = Field(
+        None,
+        description='Enable density fitting (RI/DF) approximation for faster integral evaluation',
+    )
+    auxiliary_basis: Optional[str] = Field(
+        None,
+        description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
     )
     ketcher_data: Optional[str] = Field(
         None,
@@ -720,6 +776,9 @@ class MethodDefaultValues1(BaseModel):
     )
     frozen_core: Optional[bool] = Field(
         None, description='Default frozen core approximation setting (CCSD/CCSD_T)'
+    )
+    density_fitting: Optional[bool] = Field(
+        None, description='Default density fitting setting'
     )
     tddft_nstates: Optional[int] = Field(
         None, description='Default number of excited states (TDDFT)'
@@ -1676,6 +1735,9 @@ class CalculationResults(BaseModel):
     total_electrons: Optional[int] = Field(
         None, description='Total number of electrons in the molecule'
     )
+    resolved_auxiliary_basis: Optional[str] = Field(
+        None, description='Actual auxiliary basis selected by PySCF for density fitting'
+    )
     mp2_same_spin_correlation: Optional[float] = Field(
         None, description='MP2 same-spin correlation energy in hartree'
     )
@@ -1842,6 +1904,10 @@ class SupportedParametersData(BaseModel):
     basis_functions: Dict[str, List[str]] = Field(
         ...,
         description='Supported basis functions grouped by category (e.g., Minimal, Pople Style, etc.)',
+    )
+    auxiliary_basis_functions: Dict[str, List[str]] = Field(
+        ...,
+        description='Supported auxiliary basis sets for density fitting, grouped by category',
     )
     exchange_correlation: Dict[str, List[str]] = Field(
         ...,

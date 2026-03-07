@@ -77,7 +77,9 @@ export const CalculationSettingsPage = ({
                 {...sharedSectionProps}
                 isParameterDisabled={computed.isParameterDisabled}
               />
-              <AdvancedMethodSettings {...sharedSectionProps} />
+              <AdvancedMethodSettings
+                {...sharedSectionProps}
+              />
               <SolventSettingsSection
                 {...sharedSectionProps}
                 solventDisplayValue={computed.solventDisplayValue}

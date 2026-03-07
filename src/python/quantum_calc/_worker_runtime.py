@@ -206,6 +206,14 @@ def _prepare_setup_parameters(parameters: dict, memory_mb: int) -> dict:
         setup_params['frozen_core'] = parameters.get('frozen_core', True)
         setup_params['ccsd_t'] = (calculation_method == 'CCSD_T')
 
+    # Add density fitting parameters for applicable methods
+    if calculation_method in ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT']:
+        density_fitting = parameters.get('density_fitting', False)
+        setup_params['density_fitting'] = density_fitting
+        auxiliary_basis = parameters.get('auxiliary_basis')
+        if density_fitting and auxiliary_basis:
+            setup_params['auxiliary_basis'] = auxiliary_basis
+
     # Add TDDFT-specific parameters
     if calculation_method == 'TDDFT':
         setup_params['nstates'] = parameters.get('tddft_nstates', 10)

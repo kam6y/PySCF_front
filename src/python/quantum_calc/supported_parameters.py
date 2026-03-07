@@ -61,6 +61,30 @@ def get_supported_basis_functions() -> Dict[str, List[str]]:
     }
 
 
+def get_supported_auxiliary_basis_functions() -> Dict[str, List[str]]:
+    """Get supported auxiliary basis functions for density fitting, grouped by category."""
+    return {
+        'def2 RI': [
+            'def2-svp-ri',
+            'def2-tzvp-ri',
+            'def2-tzvpp-ri',
+            'def2-qzvp-ri',
+            'def2-qzvpp-ri',
+        ],
+        'cc RI': [
+            'cc-pvdz-ri',
+            'cc-pvtz-ri',
+            'cc-pvqz-ri',
+            'aug-cc-pvdz-ri',
+            'aug-cc-pvtz-ri',
+            'aug-cc-pvqz-ri',
+        ],
+        'Weigend': [
+            'weigend',
+        ],
+    }
+
+
 def get_supported_exchange_correlation() -> Dict[str, List[str]]:
     """Get supported exchange-correlation functionals grouped by category."""
     return {
@@ -185,6 +209,7 @@ def get_all_supported_parameters() -> Dict[str, Any]:
     return {
         'calculation_methods': get_supported_calculation_methods(),
         'basis_functions': get_supported_basis_functions(),
+        'auxiliary_basis_functions': get_supported_auxiliary_basis_functions(),
         'exchange_correlation': get_supported_exchange_correlation(),
         'solvent_methods': get_supported_solvent_methods(),
         'solvents': get_supported_solvents(),

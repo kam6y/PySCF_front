@@ -123,6 +123,22 @@ export const CalculationSettingsSummary =
                       </span>
                     </div>
                   )}
+                {parameters.density_fitting && (
+                  <>
+                    <div className={styles.infoRow}>
+                      <span className={styles.label}>Density Fitting:</span>
+                      <span className={styles.value}>Enabled</span>
+                    </div>
+                    <div className={styles.infoRow}>
+                      <span className={styles.label}>
+                        Actual Auxiliary Basis:
+                      </span>
+                      <span className={styles.value}>
+                        {results.resolved_auxiliary_basis || 'Unavailable'}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

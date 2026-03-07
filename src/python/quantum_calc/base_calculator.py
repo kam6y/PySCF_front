@@ -215,7 +215,9 @@ class BaseCalculator(
             'max_cycle': kwargs.get('max_cycle', get_max_cycle()),
             'solvent_method': kwargs.get('solvent_method', 'none'),
             'solvent': kwargs.get('solvent', '-'),
-            'memory_mb': kwargs.get('memory_mb', self._get_default_memory_mb())
+            'memory_mb': kwargs.get('memory_mb', self._get_default_memory_mb()),
+            'density_fitting': kwargs.get('density_fitting', False),
+            'auxiliary_basis': kwargs.get('auxiliary_basis', None),
         }
     
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
@@ -272,6 +274,14 @@ class BaseCalculator(
         # Create SCF method object (RHF/UHF, RKS/UKS, etc.)
         self.mf = self._create_scf_method(self.mol)
 
+        # Apply density fitting if enabled
+        self.density_fitting = common_params.get('density_fitting', False)
+        self.auxiliary_basis = common_params.get('auxiliary_basis', None)
+        if self.density_fitting:
+            auxbasis = self.auxiliary_basis if self.auxiliary_basis else None
+            self.mf = self.mf.density_fit(auxbasis=auxbasis)
+            logger.info(f"Density fitting enabled with auxiliary basis: {auxbasis or 'auto'}")
+
         # Apply solvent effects (now that solvent parameters are available)
         self.mf = self._apply_solvent_effects(self.mf)
 
@@ -296,7 +306,9 @@ class BaseCalculator(
             'solvent_method': common_params['solvent_method'],
             'solvent': common_params['solvent'],
             'atom_count': atom_count,
-            'method': self._get_method_description()
+            'method': self._get_method_description(),
+            'density_fitting': common_params.get('density_fitting', False),
+            'auxiliary_basis': common_params.get('auxiliary_basis'),
         })
         
         # Store calculation-specific parameters
@@ -406,6 +418,9 @@ class BaseCalculator(
         
         # Recreate mean field object with optimized geometry
         self.mf = self._create_scf_method(optimized_mol)
+        if getattr(self, 'density_fitting', False):
+            auxbasis = getattr(self, 'auxiliary_basis', None) or None
+            self.mf = self.mf.density_fit(auxbasis=auxbasis)
         self.mf = self._apply_solvent_effects(self.mf)
         self._apply_calculation_settings()
         
@@ -446,6 +461,10 @@ class BaseCalculator(
         """Prepare final results dictionary."""
         # Update with calculation-specific results
         self.results.update(specific_results)
+
+        resolved_auxiliary_basis = self._resolve_actual_auxiliary_basis()
+        if resolved_auxiliary_basis is not None:
+            self.results['resolved_auxiliary_basis'] = resolved_auxiliary_basis
         
         # Add common final results
         chk_path = self.get_checkpoint_path()
@@ -466,6 +485,55 @@ class BaseCalculator(
                 logger.info(f"Calculation files saved to: {self.working_dir}")
         
         return self.results
+
+    def _resolve_actual_auxiliary_basis(self) -> Optional[str]:
+        """Resolve the auxiliary basis actually used by PySCF for density fitting."""
+        if not getattr(self, 'density_fitting', False):
+            return None
+
+        mf = getattr(self, 'mf', None)
+        if mf is None:
+            return None
+
+        with_df = getattr(mf, 'with_df', None)
+        if with_df is None:
+            return None
+
+        auxbasis = getattr(with_df, 'auxbasis', None)
+        if isinstance(auxbasis, str) and auxbasis.strip():
+            return auxbasis
+
+        auxmol = getattr(with_df, 'auxmol', None)
+        auxmol_basis = getattr(auxmol, 'basis', None) if auxmol is not None else None
+        return self._format_auxiliary_basis_value(auxmol_basis)
+
+    def _format_auxiliary_basis_value(self, basis_value: Any) -> Optional[str]:
+        """Format PySCF auxiliary basis metadata for result display."""
+        if basis_value is None:
+            return None
+
+        if isinstance(basis_value, str):
+            return basis_value
+
+        if isinstance(basis_value, dict):
+            formatted_entries = {
+                str(atom): formatted
+                for atom, value in basis_value.items()
+                if (formatted := self._format_auxiliary_basis_value(value))
+            }
+            if not formatted_entries:
+                return None
+
+            unique_values = sorted(set(formatted_entries.values()))
+            if len(unique_values) == 1:
+                return unique_values[0]
+
+            return ', '.join(
+                f'{atom}: {formatted_entries[atom]}'
+                for atom in sorted(formatted_entries)
+            )
+
+        return None
     
     # ===== Abstract Methods for Subclasses =====
     
