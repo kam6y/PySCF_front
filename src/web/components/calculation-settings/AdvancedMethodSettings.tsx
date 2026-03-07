@@ -19,6 +19,7 @@ interface AdvancedMethodSettingsProps {
     field: DistributiveKeyOf<QuantumCalculationRequest>,
     value: string | number | boolean
   ) => void;
+  isParameterDisabled: (paramName: string, method: string) => boolean;
 }
 
 export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
@@ -29,6 +30,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
     paramsError,
     supportedParams,
     onParamChange,
+    isParameterDisabled,
   }) => {
     const isMethodSettingDisabled = !isCalculationEditable(calculationStatus);
 
@@ -92,6 +94,48 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     </>
                   )}
                 </select>
+              </div>
+            )}
+
+            {['DFT', 'HF', 'MP2'].includes(params.calculation_method) && (
+              <div className={styles.settingRow}>
+                <div
+                  className={`${styles.toggleSwitch} ${
+                    !isCalculationEditable(calculationStatus) ||
+                    isParameterDisabled(
+                      'optimize_geometry',
+                      params.calculation_method || 'DFT'
+                    )
+                      ? styles.toggleDisabled
+                      : ''
+                  }`}
+                >
+                  <label
+                    className={styles.toggleLabel}
+                    htmlFor="toggle-geometry-optimization"
+                  >
+                    Geometry Optimization
+                  </label>
+                  <label className={styles.switch}>
+                    <input
+                      id="toggle-geometry-optimization"
+                      type="checkbox"
+                      checked={(params as any).optimize_geometry ?? true}
+                      onChange={e =>
+                        onParamChange('optimize_geometry', e.target.checked)
+                      }
+                      disabled={
+                        !isCalculationEditable(calculationStatus) ||
+                        isParameterDisabled(
+                          'optimize_geometry',
+                          params.calculation_method || 'DFT'
+                        )
+                      }
+                      aria-label="Geometry Optimization"
+                    />
+                    <span className={styles.slider}></span>
+                  </label>
+                </div>
               </div>
             )}
 
@@ -213,7 +257,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                           {method === 'TDDFT'
                             ? 'Full TDDFT'
                             : method === 'TDA'
-                              ? 'Tamm-Dancoff Approximation (TDA)'
+                              ? 'TDA'
                               : method}
                         </option>
                       ))
@@ -230,7 +274,7 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                       className={styles.toggleLabel}
                       htmlFor="toggle-nto-analysis"
                     >
-                      Natural Transition Orbital Analysis
+                      NTO Analysis
                     </label>
                     <label className={styles.switch}>
                       <input

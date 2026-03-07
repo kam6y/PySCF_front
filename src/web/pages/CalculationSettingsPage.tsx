@@ -75,10 +75,10 @@ export const CalculationSettingsPage = ({
             <div className={styles.calculationColumn}>
               <BasicSettingsSection
                 {...sharedSectionProps}
-                isParameterDisabled={computed.isParameterDisabled}
               />
               <AdvancedMethodSettings
                 {...sharedSectionProps}
+                isParameterDisabled={computed.isParameterDisabled}
               />
               <SolventSettingsSection
                 {...sharedSectionProps}
