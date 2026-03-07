@@ -73,9 +73,7 @@ export const CalculationSettingsPage = ({
               onCalculationResume={onCalculationResume}
             />
             <div className={styles.calculationColumn}>
-              <BasicSettingsSection
-                {...sharedSectionProps}
-              />
+              <BasicSettingsSection {...sharedSectionProps} />
               <AdvancedMethodSettings
                 {...sharedSectionProps}
                 isParameterDisabled={computed.isParameterDisabled}

@@ -37,7 +37,9 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.calculation_method}
             onChange={e => onParamChange('calculation_method', e.target.value)}
-            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+            disabled={
+              !isCalculationEditable(calculationStatus) || isLoadingParams
+            }
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -57,7 +59,9 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <select
             value={params.basis_function}
             onChange={e => onParamChange('basis_function', e.target.value)}
-            disabled={!isCalculationEditable(calculationStatus) || isLoadingParams}
+            disabled={
+              !isCalculationEditable(calculationStatus) || isLoadingParams
+            }
           >
             {isLoadingParams ? (
               <option value="">Loading...</option>
@@ -83,7 +87,9 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <label>Exchange Functional</label>
           <select
             value={params.exchange_correlation || ''}
-            onChange={e => onParamChange('exchange_correlation', e.target.value)}
+            onChange={e =>
+              onParamChange('exchange_correlation', e.target.value)
+            }
             disabled={
               !(
                 params.calculation_method === 'DFT' ||

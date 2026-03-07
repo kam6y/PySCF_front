@@ -48,7 +48,10 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     : ''
                 }`}
               >
-                <label className={styles.toggleLabel} htmlFor="toggle-density-fitting">
+                <label
+                  className={styles.toggleLabel}
+                  htmlFor="toggle-density-fitting"
+                >
                   Density Fitting (RI/DF)
                 </label>
                 <label className={styles.switch}>
@@ -56,7 +59,9 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     id="toggle-density-fitting"
                     type="checkbox"
                     checked={params.density_fitting || false}
-                    onChange={e => onParamChange('density_fitting', e.target.checked)}
+                    onChange={e =>
+                      onParamChange('density_fitting', e.target.checked)
+                    }
                     disabled={!isCalculationEditable(calculationStatus)}
                     aria-label="Density Fitting (RI/DF)"
                   />
@@ -69,7 +74,9 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                 <label>Auxiliary Basis Set</label>
                 <select
                   value={params.auxiliary_basis || ''}
-                  onChange={e => onParamChange('auxiliary_basis', e.target.value)}
+                  onChange={e =>
+                    onParamChange('auxiliary_basis', e.target.value)
+                  }
                   disabled={isMethodSettingDisabled || isLoadingParams}
                 >
                   {isLoadingParams ? (
@@ -80,17 +87,17 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     <>
                       <option value="">Auto (recommended)</option>
                       {supportedParams?.auxiliary_basis_functions &&
-                        Object.entries(supportedParams.auxiliary_basis_functions).map(
-                          ([group, bases]) => (
-                            <optgroup key={group} label={group}>
-                              {bases.map(basis => (
-                                <option key={basis} value={basis}>
-                                  {basis}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )
-                        )}
+                        Object.entries(
+                          supportedParams.auxiliary_basis_functions
+                        ).map(([group, bases]) => (
+                          <optgroup key={group} label={group}>
+                            {bases.map(basis => (
+                              <option key={basis} value={basis}>
+                                {basis}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
                     </>
                   )}
                 </select>
@@ -162,7 +169,8 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                       step={1}
                       className={`${styles.numberInput} ${styles.withSpinner}`}
                       disabled={
-                        !isCalculationEditable(calculationStatus) || isLoadingParams
+                        !isCalculationEditable(calculationStatus) ||
+                        isLoadingParams
                       }
                     />
                   </div>
@@ -181,7 +189,8 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                       placeholder="1e-6"
                       className={styles.numberInput}
                       disabled={
-                        !isCalculationEditable(calculationStatus) || isLoadingParams
+                        !isCalculationEditable(calculationStatus) ||
+                        isLoadingParams
                       }
                     />
                   </div>
@@ -198,7 +207,10 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                       : ''
                   }`}
                 >
-                  <label className={styles.toggleLabel} htmlFor="toggle-frozen-core">
+                  <label
+                    className={styles.toggleLabel}
+                    htmlFor="toggle-frozen-core"
+                  >
                     Use Frozen Core Approximation
                   </label>
                   <label className={styles.switch}>
@@ -206,7 +218,9 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                       id="toggle-frozen-core"
                       type="checkbox"
                       checked={(params as any).frozen_core !== false}
-                      onChange={e => onParamChange('frozen_core', e.target.checked)}
+                      onChange={e =>
+                        onParamChange('frozen_core', e.target.checked)
+                      }
                       disabled={!isCalculationEditable(calculationStatus)}
                       aria-label="Use Frozen Core Approximation"
                     />
@@ -234,7 +248,8 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                     step={1}
                     className={`${styles.numberInput} ${styles.withSpinner}`}
                     disabled={
-                      !isCalculationEditable(calculationStatus) || isLoadingParams
+                      !isCalculationEditable(calculationStatus) ||
+                      isLoadingParams
                     }
                   />
                 </div>
@@ -242,9 +257,12 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
                   <label>TDDFT Method</label>
                   <select
                     value={(params as any).tddft_method}
-                    onChange={e => onParamChange('tddft_method', e.target.value)}
+                    onChange={e =>
+                      onParamChange('tddft_method', e.target.value)
+                    }
                     disabled={
-                      !isCalculationEditable(calculationStatus) || isLoadingParams
+                      !isCalculationEditable(calculationStatus) ||
+                      isLoadingParams
                     }
                   >
                     {isLoadingParams ? (
@@ -441,7 +459,6 @@ export const AdvancedMethodSettings = React.memo<AdvancedMethodSettingsProps>(
             </div>
           </section>
         )}
-
       </>
     );
   }
