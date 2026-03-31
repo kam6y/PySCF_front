@@ -45,8 +45,10 @@ const detectCondaEnvironmentPath = async (): Promise<string | null> => {
   const homeDir = app.getPath('home');
   const commonLocations = [
     // macOS / Linux
+    path.join(homeDir, 'miniforge3'),
     path.join(homeDir, 'miniconda3'),
     path.join(homeDir, 'anaconda3'),
+    path.join(homeDir, 'opt', 'miniforge3'),
     path.join(homeDir, 'opt', 'miniconda3'),
     path.join(homeDir, 'opt', 'anaconda3'),
     '/opt/miniconda3',
