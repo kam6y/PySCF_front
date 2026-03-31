@@ -16,6 +16,8 @@ interface OptimizedStructureSectionProps {
   onShowAxesChange: (show: boolean) => void;
   showCoordinates: boolean;
   onShowCoordinatesChange: (show: boolean) => void;
+  showAtomNumbers: boolean;
+  onShowAtomNumbersChange: (show: boolean) => void;
   useAtomicRadii: boolean;
   onUseAtomicRadiiChange: (use: boolean) => void;
 }
@@ -31,6 +33,8 @@ export const OptimizedStructureSection =
       onShowAxesChange,
       showCoordinates,
       onShowCoordinatesChange,
+      showAtomNumbers,
+      onShowAtomNumbersChange,
       useAtomicRadii,
       onUseAtomicRadiiChange,
     }) => {
@@ -119,6 +123,8 @@ export const OptimizedStructureSection =
                   onShowAxesChange={onShowAxesChange}
                   showCoordinates={showCoordinates}
                   onShowCoordinatesChange={onShowCoordinatesChange}
+                  showAtomNumbers={showAtomNumbers}
+                  onShowAtomNumbersChange={onShowAtomNumbersChange}
                   useAtomicRadii={useAtomicRadii}
                   onUseAtomicRadiiChange={onUseAtomicRadiiChange}
                 />

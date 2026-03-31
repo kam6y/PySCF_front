@@ -64,6 +64,7 @@ export const useCalculationForm = ({
   const [isEditingName, setIsEditingName] = useState(false);
   const [showAxes, setShowAxes] = useState(false);
   const [showCoordinates, setShowCoordinates] = useState(false);
+  const [showAtomNumbers, setShowAtomNumbers] = useState(false);
   const [useAtomicRadii, setUseAtomicRadii] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameModal, setRenameModal] = useState<RenameModalState>({
@@ -510,6 +511,7 @@ export const useCalculationForm = ({
       isEditingName,
       showAxes,
       showCoordinates,
+      showAtomNumbers,
       useAtomicRadii,
       isRenaming,
       renameModal,
@@ -534,6 +536,7 @@ export const useCalculationForm = ({
       handleConvertErrorClear,
       setShowAxes,
       setShowCoordinates,
+      setShowAtomNumbers,
       setUseAtomicRadii,
     },
     computed: {

@@ -46,6 +46,7 @@ export const CalculationResultsPage = ({
   });
   const [showAxes, setShowAxes] = useState(false);
   const [showCoordinates, setShowCoordinates] = useState(false);
+  const [showAtomNumbers, setShowAtomNumbers] = useState(false);
   const [useAtomicRadii, setUseAtomicRadii] = useState(false);
 
   // IR Spectrum shared state
@@ -218,6 +219,8 @@ export const CalculationResultsPage = ({
             onShowAxesChange={setShowAxes}
             showCoordinates={showCoordinates}
             onShowCoordinatesChange={setShowCoordinates}
+            showAtomNumbers={showAtomNumbers}
+            onShowAtomNumbersChange={setShowAtomNumbers}
             useAtomicRadii={useAtomicRadii}
             onUseAtomicRadiiChange={setUseAtomicRadii}
           />

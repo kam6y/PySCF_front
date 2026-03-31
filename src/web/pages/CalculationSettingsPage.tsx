@@ -94,6 +94,8 @@ export const CalculationSettingsPage = ({
             onShowAxesChange={handlers.setShowAxes}
             showCoordinates={state.showCoordinates}
             onShowCoordinatesChange={handlers.setShowCoordinates}
+            showAtomNumbers={state.showAtomNumbers}
+            onShowAtomNumbersChange={handlers.setShowAtomNumbers}
             useAtomicRadii={state.useAtomicRadii}
             onUseAtomicRadiiChange={handlers.setUseAtomicRadii}
           />

@@ -25,6 +25,7 @@ export interface MoleculeViewerProps {
   currentStyle?: StyleSpec | null;
   showAxes?: boolean;
   showCoordinates?: boolean;
+  showAtomNumbers?: boolean;
 }
 
 export const MoleculeViewer = ({
@@ -38,12 +39,14 @@ export const MoleculeViewer = ({
   currentStyle = null,
   showAxes = false,
   showCoordinates = false,
+  showAtomNumbers = false,
 }: MoleculeViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<GLViewer | null>(null);
   const modelRef = useRef<GLModel | null>(null);
   const areAxesVisibleRef = useRef(true);
   const areCoordinatesVisibleRef = useRef(false);
+  const areAtomNumbersVisibleRef = useRef(false);
   const animationIntervalRef = useRef<number | null>(null);
   const animationTimeoutRef = useRef<number | null>(null);
   const basePositionsRef = useRef<Array<{ x: number; y: number; z: number }>>(
@@ -141,23 +144,34 @@ export const MoleculeViewer = ({
       });
     }
 
-    // --- 原子座標の描画 (有効な場合) ---
-    if (areCoordinatesVisibleRef.current) {
-      model.atoms.forEach(atom => {
+    // --- 原子番号・座標ラベルの描画 ---
+    const showCoords = areCoordinatesVisibleRef.current;
+    const showNumbers = areAtomNumbersVisibleRef.current;
+    if (showCoords || showNumbers) {
+      model.atoms.forEach((atom, index) => {
         if (
           atom.x === undefined ||
           atom.y === undefined ||
           atom.z === undefined
         )
           return;
-        const text = `(${atom.x.toFixed(4)}, ${atom.y.toFixed(4)}, ${atom.z.toFixed(4)})`;
+
+        let text: string;
+        if (showNumbers && showCoords) {
+          text = `(${index + 1}, ${atom.x.toFixed(4)}, ${atom.y.toFixed(4)}, ${atom.z.toFixed(4)})`;
+        } else if (showNumbers) {
+          text = (index + 1).toString();
+        } else {
+          text = `(${atom.x.toFixed(4)}, ${atom.y.toFixed(4)}, ${atom.z.toFixed(4)})`;
+        }
+
         viewer.addLabel(text, {
           position: { x: atom.x, y: atom.y, z: atom.z },
-          fontColor: '#333333',
-          fontSize: 16,
+          fontColor: 'black',
+          fontSize: 12,
           inFront: true,
           backgroundColor: 'white',
-          backgroundOpacity: 0.6,
+          backgroundOpacity: 0.8,
         });
       });
     }
@@ -489,6 +503,15 @@ export const MoleculeViewer = ({
     areCoordinatesVisibleRef.current = showCoordinates ?? false;
     updateOverlays(viewer);
   }, [showCoordinates]);
+
+  // Update atom numbers visibility when showAtomNumbers prop changes
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    areAtomNumbersVisibleRef.current = showAtomNumbers ?? false;
+    updateOverlays(viewer);
+  }, [showAtomNumbers]);
 
   return (
     <div

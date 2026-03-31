@@ -10,6 +10,8 @@ export interface StyleControlsProps {
   onShowAxesChange: (show: boolean) => void;
   showCoordinates: boolean;
   onShowCoordinatesChange: (show: boolean) => void;
+  showAtomNumbers: boolean;
+  onShowAtomNumbersChange: (show: boolean) => void;
   useAtomicRadii?: boolean;
   onUseAtomicRadiiChange?: (use: boolean) => void;
 }
@@ -52,6 +54,8 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   onShowAxesChange,
   showCoordinates,
   onShowCoordinatesChange,
+  showAtomNumbers,
+  onShowAtomNumbersChange,
   useAtomicRadii = false,
   onUseAtomicRadiiChange,
 }) => {
@@ -218,6 +222,17 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               type="checkbox"
               checked={showCoordinates}
               onChange={e => onShowCoordinatesChange(e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
+        </div>
+        <div className={styles.toggleSwitch} style={{ marginTop: '12px' }}>
+          <span className={styles.toggleLabel}>Show Atom Numbers</span>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={showAtomNumbers}
+              onChange={e => onShowAtomNumbersChange(e.target.checked)}
             />
             <span className="slider"></span>
           </label>

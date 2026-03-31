@@ -13,6 +13,8 @@ interface MoleculeViewerSectionProps {
   onShowAxesChange: (show: boolean) => void;
   showCoordinates: boolean;
   onShowCoordinatesChange: (show: boolean) => void;
+  showAtomNumbers: boolean;
+  onShowAtomNumbersChange: (show: boolean) => void;
   useAtomicRadii: boolean;
   onUseAtomicRadiiChange: (use: boolean) => void;
 }
@@ -27,6 +29,8 @@ export const MoleculeViewerSection = React.memo<MoleculeViewerSectionProps>(
     onShowAxesChange,
     showCoordinates,
     onShowCoordinatesChange,
+    showAtomNumbers,
+    onShowAtomNumbersChange,
     useAtomicRadii,
     onUseAtomicRadiiChange,
   }) => {
@@ -38,6 +42,7 @@ export const MoleculeViewerSection = React.memo<MoleculeViewerSectionProps>(
             currentStyle={currentStyle}
             showAxes={showAxes}
             showCoordinates={showCoordinates}
+            showAtomNumbers={showAtomNumbers}
             width={'100%'}
             height={'100%'}
             backgroundColor="white"
@@ -61,6 +66,8 @@ export const MoleculeViewerSection = React.memo<MoleculeViewerSectionProps>(
             onShowAxesChange={onShowAxesChange}
             showCoordinates={showCoordinates}
             onShowCoordinatesChange={onShowCoordinatesChange}
+            showAtomNumbers={showAtomNumbers}
+            onShowAtomNumbersChange={onShowAtomNumbersChange}
             useAtomicRadii={useAtomicRadii}
             onUseAtomicRadiiChange={onUseAtomicRadiiChange}
           />
