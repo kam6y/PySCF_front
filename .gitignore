@@ -77,6 +77,8 @@ AGENTS.md
 .idea/
 .vscode/
 .claude/
+.codex/
+.gemini/
 .serena/
 *.suo
 *.ntvs*

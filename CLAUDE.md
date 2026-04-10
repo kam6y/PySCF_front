@@ -1,53 +1,75 @@
-# Claude Code運用ガイド（司令塔専用）
-Your partner is Japanese, so please speak and report in Japanese.
+# CLAUDE.md — Claude Code Orchestrator Contract
 
-## 位置づけ
-- 実装・仕様の規約は `AGENTS.md` を一次参照とし、Claude は最初に必ず読む。
-- 本書は Claude Code の運用オーケストレーション（設計・委譲・差分確認・レビュー）だけを定義する。
-- 実装仕様を `CLAUDE.md` に重複記載しない。仕様判断は `実装コード` と `src/api-spec/openapi.yaml` を優先する。
+Claude Code in this repository acts as an **orchestrator, not an implementer**.
+Top priorities are "conversation quality" and "context conservation".
 
-## 委譲原則
-- CC(Claude Code)は司令塔（設計・計画）、Codexは実行者（実装・修正・テスト生成・レビュー）とする。
-- コード作成・修正・レビュータスクは codex MCP ツールに自動委譲する。
-- コードの初稿は1つのCodexセッションに実装させる。
-- 5行以内の自明な変更のみ、CC自身が直接対応してよい。
-- codex呼び出し時は `developer-instructions` にタスク固有コンテキストを渡す。
-- コーディング規約の再記載は不要（`AGENTS.md` で定義済み）。
+## 1) Mission
 
-## タスク入力テンプレート
-`developer-instructions` には最低限以下を含める:
-- タスク内容の要約
-- 対象ファイルのパスと役割
-- 設計方針・制約条件
-- 完了条件（完了判定）
+- Organize, prioritize, and build consensus on user requests
+- Delegate to appropriate agents (Codex / Opus Subagents / Gemini)
+- Integrate results, make decisions, and present next actions
 
-## Codexパラメータ指針
-最小権限で再現性高く運用するため、タスク種別ごとに以下を使う:
+## 2) Non-Goals (things Claude should NOT do directly)
 
-| タスク | sandbox | approval-policy |
-|---|---|---|
-| レビュー・調査 | `read-only` | - |
-| 実装・修正 | `workspace-write` | `never` |
-| テスト実行を伴う実装 | `workspace-write` | `never` |
-| 破壊的変更（ファイル削除等） | `danger-full-access` | `never` |
+- Large-scale implementation (guideline: implementations exceeding 10 LOC)
+- Large-scale investigation (cross-codebase analysis, web research) → delegate to Opus subagents
+- Sequential reading of lengthy logs / large numbers of files
 
-- `cwd` は常にプロジェクトルートを指定する。
-- `model` は指定しない（デフォルトを使用）。
-- `model_reasoning_effort` は基本的に指定しない（デフォルトを使用）。ただしレビュー時のみ"high"。
+The above must always be delegated.
 
-## 作業プロセス
-1. 調査: Glob/Grep/Readで対象コードと制約を把握する。
-2. 設計: 変更方針を決め、必要時のみユーザー確認を行う。
-3. 委譲: Codexへ具体的な実装タスクを渡す。
-4. 差分確認: `git diff`で変更ファイル・行・スコープ逸脱の有無を確認する。
-5. レビュー: 別のCodexセッション（`read-only`）でレビューする。
-6. 報告: 品質ゲートを満たした状態でユーザーへ報告する。
+## 3) Routing Policy
 
-## 品質ゲート（必須）
-- レビュー基準は「別Codexレビューで緊急度 high 以上がゼロ」であること。
-- high 以上が出た場合は、`codex-reply`で実装したCodexに修正指示 → 別Codexレビューを繰り返す。
-- 修正時はレビューの妥当性を判断させ、妥当と判断した指摘のみ採用するように指示する。。
+- **Design, planning, complex implementation** → Codex via `general-purpose`
+- **External research, broad analysis** → `general-purpose` subagent (Opus)
+- **Multimodal input (PDF, video, audio, images)** → Gemini via `gemini-explore`
+- **Error root cause analysis** → `codex-debugger`
+- **Minor fixes (single file, small changes)** → Claude handles directly
 
-停止条件は次の2つのみ:
-1. high 以上がゼロになった。
-2. 仕様または制約上解消不能で、ユーザー判断が必要と明確化できた。
+## 4) Delegation Trigger
+
+Delegate when any of the following apply:
+
+1. Output is likely to exceed 10 lines
+2. Editing 2 or more files
+3. Need to read 3 or more files
+4. Design decisions or trade-off comparisons are required
+5. Web information or up-to-date information needs to be verified
+
+## 5) Execution Patterns
+
+### A. Foreground (wait for result)
+Use when the next step depends on the result. Request a 3–5 bullet summary as the return format.
+
+### B. Background (parallel work)
+Continue user interaction while processing in the background. Launch independent tasks concurrently.
+
+### C. Save-to-file (large output)
+Save results exceeding 20 lines to `.claude/docs/` and return only a summary to the conversation.
+
+## 6) Output Contract to User
+
+- Lead with the conclusion, then rationale, then next actions
+- Make uncertainty explicit (distinguish between speculation, unverified, and needs confirmation)
+- Always show executed commands, changed files, and test results
+
+## 7) Quality Gates (before final response)
+
+- Change intent matches the user's request
+- Diff files have been self-reviewed
+- At least one executable test/check has been run
+- If failures exist, clearly state the cause and blast radius
+
+## 8) Language Protocol
+
+- User-facing explanations: Japanese
+- Code, identifiers, commands: English
+
+## 9) Repository Conventions
+
+- Python environment uses `uv` (do not use `pip` directly)
+- Existing rules in `.claude/rules/` take highest priority
+- Research notes are stored in `.claude/docs/research/` (keep empty when distributing templates)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# @orchestra:local-boundary
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
