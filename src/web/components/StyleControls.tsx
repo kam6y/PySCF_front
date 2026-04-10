@@ -16,7 +16,7 @@ export interface StyleControlsProps {
   onUseAtomicRadiiChange?: (use: boolean) => void;
 }
 
-export type VisualizationStyle = 'stick' | 'sphere' | 'ball-and-stick' | 'line';
+export type VisualizationStyle = 'stick' | 'sphere';
 
 export interface StyleOption {
   id: VisualizationStyle;
@@ -35,16 +35,6 @@ const styleOptions: StyleOption[] = [
     label: 'Space-filling',
     description: 'Show atoms as spheres',
   },
-  {
-    id: 'ball-and-stick',
-    label: 'Ball & Stick',
-    description: 'Combination of spheres and sticks',
-  },
-  {
-    id: 'line',
-    label: 'Wireframe',
-    description: 'Show bonds as thin lines',
-  },
 ];
 
 export const StyleControls: React.FC<StyleControlsProps> = ({
@@ -59,61 +49,53 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   useAtomicRadii = false,
   onUseAtomicRadiiChange,
 }) => {
-  const [selectedStyle, setSelectedStyle] =
-    useState<VisualizationStyle>('ball-and-stick');
+  const [selectedStyles, setSelectedStyles] = useState<Set<VisualizationStyle>>(
+    () => new Set<VisualizationStyle>(['stick', 'sphere'])
+  );
   const [atomRadius, setAtomRadius] = useState(0.3);
   const [bondRadius, setBondRadius] = useState(0.15);
 
-  const generateStyleSpec = useCallback(
-    (style: VisualizationStyle): StyleSpec => {
-      switch (style) {
-        case 'stick':
-          return {
-            stick: {
-              radius: bondRadius,
-              colorscheme: 'default',
-            },
-          };
-
-        case 'sphere':
-          return {
-            sphere: {
-              radius: atomRadius,
-              colorscheme: 'default',
-            },
-          };
-
-        case 'ball-and-stick':
-          return {
-            stick: {
-              radius: bondRadius,
-              colorscheme: 'default',
-            },
-            sphere: {
-              radius: atomRadius,
-              colorscheme: 'default',
-            },
-          };
-
-        case 'line':
-          return {
-            line: {
-              linewidth: 2,
-            },
-          };
-
-        default:
-          return {
-            stick: { radius: 0.2 },
-            sphere: { radius: 0.3 },
-          };
+  const toggleStyle = useCallback((id: VisualizationStyle) => {
+    setSelectedStyles(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        // Prevent unchecking the last selected style
+        if (next.size === 1) return prev;
+        next.delete(id);
+      } else {
+        next.add(id);
       }
+      return next;
+    });
+  }, []);
+
+  const generateStyleSpec = useCallback(
+    (selected: Set<VisualizationStyle>): StyleSpec => {
+      const spec: StyleSpec = {};
+      if (selected.has('stick')) {
+        spec.stick = {
+          radius: bondRadius,
+          colorscheme: 'default',
+        };
+      }
+      if (selected.has('sphere')) {
+        spec.sphere = {
+          radius: atomRadius,
+          colorscheme: 'default',
+        };
+      }
+      // Fallback: should never happen because toggleStyle prevents empty set
+      if (!spec.stick && !spec.sphere) {
+        spec.stick = { radius: bondRadius, colorscheme: 'default' };
+        spec.sphere = { radius: atomRadius, colorscheme: 'default' };
+      }
+      return spec;
     },
     [atomRadius, bondRadius]
   );
 
   useEffect(() => {
-    const styleSpec = generateStyleSpec(selectedStyle);
+    const styleSpec = generateStyleSpec(selectedStyles);
     // Add metadata to indicate if atomic radii should be used
     if (useAtomicRadii) {
       (styleSpec as any)._useAtomicRadii = true;
@@ -122,7 +104,13 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       (styleSpec as any)._useAtomicRadii = false;
     }
     onStyleChange(styleSpec);
-  }, [selectedStyle, generateStyleSpec, onStyleChange, useAtomicRadii]);
+  }, [
+    selectedStyles,
+    generateStyleSpec,
+    onStyleChange,
+    useAtomicRadii,
+    atomRadius,
+  ]);
 
   return (
     <div className={`${styles.styleControls} ${className}`}>
@@ -131,27 +119,29 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       </div>
 
       <div className={styles.styleOptions}>
-        {styleOptions.map(option => (
-          <label
-            key={option.id}
-            className={`${styles.styleOption} ${selectedStyle === option.id ? styles.selected : ''}`}
-          >
-            <input
-              type="radio"
-              name="visualization-style"
-              value={option.id}
-              checked={selectedStyle === option.id}
-              onChange={() => setSelectedStyle(option.id)}
-              className={styles.styleRadio}
-            />
-            <div className={styles.optionContent}>
-              <div className={styles.optionLabel}>{option.label}</div>
-            </div>
-          </label>
-        ))}
+        {styleOptions.map(option => {
+          const isSelected = selectedStyles.has(option.id);
+          return (
+            <label
+              key={option.id}
+              className={`${styles.styleOption} ${isSelected ? styles.selected : ''}`}
+            >
+              <input
+                type="checkbox"
+                value={option.id}
+                checked={isSelected}
+                onChange={() => toggleStyle(option.id)}
+                className={styles.styleRadio}
+              />
+              <div className={styles.optionContent}>
+                <div className={styles.optionLabel}>{option.label}</div>
+              </div>
+            </label>
+          );
+        })}
       </div>
 
-      {(selectedStyle === 'sphere' || selectedStyle === 'ball-and-stick') && (
+      {selectedStyles.has('sphere') && (
         <div className={styles.sizeControlSection}>
           <div
             className={`${styles.toggleSwitch} ${styles.toggleSwitchWithMargin}`}
@@ -184,7 +174,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         </div>
       )}
 
-      {(selectedStyle === 'stick' || selectedStyle === 'ball-and-stick') && (
+      {selectedStyles.has('stick') && (
         <div className={styles.sizeControlSection}>
           <div className={styles.sliderControl}>
             <label className={styles.sliderLabel}>

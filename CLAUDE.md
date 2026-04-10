@@ -66,7 +66,7 @@ Save results exceeding 20 lines to `.claude/docs/` and return only a summary to 
 
 ## 9) Repository Conventions
 
-- Python environment uses `uv` (do not use `pip` directly)
+- Python environment uses `conda`
 - Existing rules in `.claude/rules/` take highest priority
 - Research notes are stored in `.claude/docs/research/` (keep empty when distributing templates)
 
