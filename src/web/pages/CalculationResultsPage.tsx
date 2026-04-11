@@ -8,6 +8,7 @@ import {
   IR_SPECTRUM_DEFAULTS,
   type IRSettings,
 } from '../utils/irSpectrumConstants';
+import { useAtomMeasurement } from '../hooks/useAtomMeasurement';
 import { CalculationSettingsSummary } from '../components/calculation-results/CalculationSettingsSummary';
 import { OptimizedStructureSection } from '../components/calculation-results/OptimizedStructureSection';
 import { ElectronicPropertiesSection } from '../components/calculation-results/ElectronicPropertiesSection';
@@ -66,6 +67,11 @@ export const CalculationResultsPage = ({
     show_peaks: IR_SPECTRUM_DEFAULTS.show_peaks,
   });
 
+  const processedData = useProcessedCalculationResults(activeCalculation);
+  const measurement = useAtomMeasurement(
+    processedData?.results.optimized_geometry ?? null
+  );
+
   useEffect(() => {
     setError(detailsError);
   }, [detailsError]);
@@ -93,9 +99,6 @@ export const CalculationResultsPage = ({
       show_peaks: IR_SPECTRUM_DEFAULTS.show_peaks,
     });
   }, []);
-
-  // Process and memoize calculation results data
-  const processedData = useProcessedCalculationResults(activeCalculation);
 
   // Determine if optimized structure section should be shown
   const shouldShowOptimizedStructure = useMemo(() => {
@@ -223,6 +226,8 @@ export const CalculationResultsPage = ({
             onShowAtomNumbersChange={setShowAtomNumbers}
             useAtomicRadii={useAtomicRadii}
             onUseAtomicRadiiChange={setUseAtomicRadii}
+            selectedAtomIndices={measurement.selectedAtomIndices}
+            onAtomClick={measurement.handleAtomClick}
           />
         )}
 

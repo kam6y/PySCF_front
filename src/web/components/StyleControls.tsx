@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSpec } from '../../types/3dmol';
-import { VAN_DER_WAALS_RADII } from '../data/atomicRadii';
 import styles from './StyleControls.module.css';
 
 export interface StyleControlsProps {

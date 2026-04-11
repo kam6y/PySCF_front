@@ -9,11 +9,24 @@ export interface AtomSpec {
   x?: number;
   y?: number;
   z?: number;
+  index?: number;
+  clickable?: boolean;
+  callback?: AtomClickCallback;
+  hoverable?: boolean;
+  hover_callback?: AtomClickCallback;
+  unhover_callback?: AtomClickCallback;
   properties?: {
     [key: string]: any;
     charge?: number;
   };
 }
+
+export type AtomClickCallback = (
+  atom: AtomSpec,
+  viewer: GLViewer,
+  event: MouseEvent,
+  container: HTMLElement
+) => void;
 
 export interface StyleSpec {
   line?: {
@@ -69,6 +82,40 @@ export interface Label {
   remove(): void;
 }
 
+export interface Vec3Point {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface CylinderSpec {
+  start: Vec3Point;
+  end: Vec3Point;
+  radius?: number;
+  color?: string;
+  fromCap?: 0 | 1 | 2 | boolean;
+  toCap?: 0 | 1 | 2 | boolean;
+  dashed?: boolean;
+  opacity?: number;
+}
+
+export interface SphereSpec {
+  center: Vec3Point;
+  radius?: number;
+  color?: string;
+  opacity?: number;
+}
+
+export interface LineSpec {
+  start: Vec3Point;
+  end: Vec3Point;
+  color?: string;
+  dashed?: boolean;
+  linewidth?: number;
+}
+
+export interface GLShape {}
+
 export interface GLViewer {
   addModel(data: string, format?: string, options?: any): GLModel;
   removeModel(model: GLModel): void;
@@ -77,6 +124,17 @@ export interface GLViewer {
 
   setStyle(sel: AtomSpec, style: StyleSpec): GLViewer;
   addStyle(sel: AtomSpec, style: StyleSpec): GLViewer;
+  setClickable(
+    sel: AtomSpec,
+    clickable: boolean,
+    callback: AtomClickCallback
+  ): GLViewer;
+  setHoverable(
+    sel: AtomSpec,
+    hoverable: boolean,
+    hover_callback: AtomClickCallback,
+    unhover_callback: AtomClickCallback
+  ): GLViewer;
 
   zoomTo(
     sel?: AtomSpec,
@@ -127,6 +185,9 @@ export interface GLViewer {
   getModel(id?: number): GLModel;
 
   addArrow(spec: any): void;
+  addCylinder(spec: CylinderSpec): GLShape;
+  addSphere(spec: SphereSpec): GLShape;
+  addLine(spec: LineSpec): GLShape;
   removeAllShapes(): GLViewer;
   addLabel(text: string, options: LabelSpec): Label;
   removeAllLabels(): GLViewer;
@@ -177,7 +238,10 @@ declare module '3dmol' {
     callback?: () => void
   ): void;
 
-  export const ElementColors: { [element: string]: number };
+  export const elementColors: {
+    defaultColor: number;
+    defaultColors: Record<string, number>;
+  };
 
   export enum SurfaceType {
     VDW = 1,

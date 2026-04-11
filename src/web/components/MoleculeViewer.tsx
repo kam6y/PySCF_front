@@ -1,18 +1,40 @@
-import { useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as $3Dmol from '3dmol';
 import {
   GLViewer,
   GLModel,
   StyleSpec,
-  Label,
   AtomSpec,
   ExtendedStyleSpec,
 } from '../../types/3dmol';
 import { getAtomicRadius, VAN_DER_WAALS_RADII } from '../data/atomicRadii';
 import type { components } from '../types/generated-api';
+import {
+  angle,
+  angleLabelPoint,
+  dihedral,
+  dihedralLabelPoint,
+  distance,
+  midpoint,
+} from '../utils/geometry';
+import { elementTint } from '../utils/colorTint';
 import styles from './MoleculeViewer.module.css';
 
 type AtomDisplacement = components['schemas']['AtomDisplacement'];
+
+const MEASUREMENT_HIGHLIGHT_RADIUS = 0.55;
+const MEASUREMENT_HIGHLIGHT_OPACITY = 0.55;
+const MEASUREMENT_CONNECTOR_RADIUS = 0.05;
+const MEASUREMENT_CONNECTOR_COLOR = '#ffcc00';
+const MEASUREMENT_LABEL_OFFSET = 0.5;
+const NOOP_CLICK = () => {};
+
+const formatDistanceLabel = (value: number): string => `${value.toFixed(3)} Å`;
+
+const formatAngleLabel = (value: number): string => `A: ${value.toFixed(3)} °`;
+
+const formatDihedralLabel = (value: number): string =>
+  `DA: ${value.toFixed(3)} °`;
 
 export interface MoleculeViewerProps {
   width?: number | string;
@@ -26,6 +48,8 @@ export interface MoleculeViewerProps {
   showAxes?: boolean;
   showCoordinates?: boolean;
   showAtomNumbers?: boolean;
+  selectedAtomIndices?: number[];
+  onAtomClick?: (atomIndex: number) => void;
 }
 
 export const MoleculeViewer = ({
@@ -40,6 +64,8 @@ export const MoleculeViewer = ({
   showAxes = false,
   showCoordinates = false,
   showAtomNumbers = false,
+  selectedAtomIndices = [],
+  onAtomClick,
 }: MoleculeViewerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<GLViewer | null>(null);
@@ -49,14 +75,25 @@ export const MoleculeViewer = ({
   const areAtomNumbersVisibleRef = useRef(false);
   const animationIntervalRef = useRef<number | null>(null);
   const animationTimeoutRef = useRef<number | null>(null);
+  const onAtomClickRef = useRef<typeof onAtomClick>(onAtomClick);
   const basePositionsRef = useRef<Array<{ x: number; y: number; z: number }>>(
     []
   );
+  const [hasModel, setHasModel] = useState(false);
+  const isVibrationActive = !!(vibrationMode && vibrationMode.length > 0);
+
+  useEffect(() => {
+    onAtomClickRef.current = onAtomClick;
+  }, [onAtomClick]);
 
   /**
    * 軸やラベルなどのオーバーレイをすべて更新する統一関数
    */
-  const updateOverlays = (viewer: GLViewer) => {
+  const updateOverlays = (
+    viewer: GLViewer,
+    currentSelectedAtomIndices: number[],
+    isVibrationActive: boolean
+  ) => {
     // 既存のシェイプとラベルをすべてクリア
     viewer.removeAllShapes();
     viewer.removeAllLabels();
@@ -176,6 +213,76 @@ export const MoleculeViewer = ({
       });
     }
 
+    if (currentSelectedAtomIndices.length > 0 && !isVibrationActive) {
+      const measurementLabelStyle = {
+        fontColor: 'black',
+        fontSize: 12,
+        inFront: true,
+        backgroundColor: 'white',
+        backgroundOpacity: 0.8,
+      };
+      const selectedPositions = currentSelectedAtomIndices.map(
+        atomIndex => basePositionsRef.current[atomIndex]
+      );
+      const [p0, p1, p2, p3] = selectedPositions;
+
+      currentSelectedAtomIndices.forEach(atomIndex => {
+        const atom = model.atoms[atomIndex];
+        const position = basePositionsRef.current[atomIndex];
+        if (!atom || !position) {
+          return;
+        }
+
+        viewer.addSphere({
+          center: position,
+          radius: MEASUREMENT_HIGHLIGHT_RADIUS,
+          color: elementTint(atom.elem),
+          opacity: MEASUREMENT_HIGHLIGHT_OPACITY,
+        });
+      });
+
+      for (let i = 0; i < selectedPositions.length - 1; i += 1) {
+        const start = selectedPositions[i];
+        const end = selectedPositions[i + 1];
+        if (!start || !end) {
+          continue;
+        }
+
+        viewer.addCylinder({
+          start,
+          end,
+          radius: MEASUREMENT_CONNECTOR_RADIUS,
+          color: MEASUREMENT_CONNECTOR_COLOR,
+          fromCap: 1,
+          toCap: 1,
+          dashed: true,
+        });
+
+        viewer.addLabel(formatDistanceLabel(distance(start, end)), {
+          position: midpoint(start, end),
+          ...measurementLabelStyle,
+        });
+      }
+
+      if (selectedPositions.length === 3 && p0 && p1 && p2) {
+        viewer.addLabel(formatAngleLabel(angle(p0, p1, p2)), {
+          position: angleLabelPoint(p0, p1, p2, MEASUREMENT_LABEL_OFFSET),
+          ...measurementLabelStyle,
+        });
+      } else if (selectedPositions.length === 4 && p0 && p1 && p2 && p3) {
+        viewer.addLabel(formatDihedralLabel(dihedral(p0, p1, p2, p3)), {
+          position: dihedralLabelPoint(
+            p0,
+            p1,
+            p2,
+            p3,
+            MEASUREMENT_LABEL_OFFSET
+          ),
+          ...measurementLabelStyle,
+        });
+      }
+    }
+
     viewer.render();
   };
 
@@ -206,10 +313,21 @@ export const MoleculeViewer = ({
 
   // Load XYZ data when xyzData prop changes
   useEffect(() => {
-    if (!xyzData || !viewerRef.current) return;
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    if (!xyzData) {
+      viewer.removeAllModels();
+      viewer.removeAllShapes();
+      viewer.removeAllLabels();
+      modelRef.current = null;
+      basePositionsRef.current = [];
+      setHasModel(false);
+      viewer.render();
+      return;
+    }
 
     try {
-      const viewer = viewerRef.current;
       viewer.removeAllModels();
       const model = viewer.addModel(xyzData, 'xyz');
       modelRef.current = model;
@@ -230,19 +348,42 @@ export const MoleculeViewer = ({
           y: atom.y ?? 0,
           z: atom.z ?? 0,
         }));
+        setHasModel(model.atoms.length > 0);
+      } else {
+        basePositionsRef.current = [];
+        setHasModel(false);
       }
 
-      updateOverlays(viewer);
+      updateOverlays(viewer, selectedAtomIndices, isVibrationActive);
       viewer.zoomTo();
       viewer.render();
     } catch (error) {
+      setHasModel(false);
       console.error('Failed to load XYZ data from props:', error);
     }
   }, [xyzData]);
 
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) {
+      return;
+    }
+
+    if (hasModel && !isVibrationActive) {
+      viewer.setClickable({}, true, atom => {
+        const atomIndex = atom.index ?? -1;
+        if (atomIndex >= 0) {
+          onAtomClickRef.current?.(atomIndex);
+        }
+      });
+    } else {
+      viewer.setClickable({}, false, NOOP_CLICK);
+    }
+  }, [hasModel, vibrationMode]);
+
   // Handle vibration mode changes via props
   useEffect(() => {
-    if (vibrationMode && vibrationMode.length > 0) {
+    if (vibrationMode && vibrationMode.length > 0 && xyzData) {
       let retryCount = 0;
       const MAX_RETRIES = 50; // 最大50回 (5秒) まで再試行
 
@@ -418,7 +559,7 @@ export const MoleculeViewer = ({
         viewer.render();
       }
     };
-  }, [vibrationMode, animationAmplitude]);
+  }, [vibrationMode, animationAmplitude, xyzData]);
 
   // Apply style when currentStyle prop changes
   useEffect(() => {
@@ -492,7 +633,7 @@ export const MoleculeViewer = ({
     if (!viewer) return;
 
     areAxesVisibleRef.current = showAxes ?? false;
-    updateOverlays(viewer);
+    updateOverlays(viewer, selectedAtomIndices, isVibrationActive);
   }, [showAxes]);
 
   // Update coordinates visibility when showCoordinates prop changes
@@ -501,7 +642,7 @@ export const MoleculeViewer = ({
     if (!viewer) return;
 
     areCoordinatesVisibleRef.current = showCoordinates ?? false;
-    updateOverlays(viewer);
+    updateOverlays(viewer, selectedAtomIndices, isVibrationActive);
   }, [showCoordinates]);
 
   // Update atom numbers visibility when showAtomNumbers prop changes
@@ -510,8 +651,15 @@ export const MoleculeViewer = ({
     if (!viewer) return;
 
     areAtomNumbersVisibleRef.current = showAtomNumbers ?? false;
-    updateOverlays(viewer);
+    updateOverlays(viewer, selectedAtomIndices, isVibrationActive);
   }, [showAtomNumbers]);
+
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer) return;
+
+    updateOverlays(viewer, selectedAtomIndices, isVibrationActive);
+  }, [selectedAtomIndices, isVibrationActive]);
 
   return (
     <div

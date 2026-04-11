@@ -98,6 +98,8 @@ export const CalculationSettingsPage = ({
             onShowAtomNumbersChange={handlers.setShowAtomNumbers}
             useAtomicRadii={state.useAtomicRadii}
             onUseAtomicRadiiChange={handlers.setUseAtomicRadii}
+            selectedAtomIndices={state.selectedAtomIndices}
+            onAtomClick={handlers.handleAtomClick}
           />
         </div>
         <MolecularInputSection

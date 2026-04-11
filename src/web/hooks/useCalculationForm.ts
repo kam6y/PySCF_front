@@ -22,6 +22,7 @@ import {
 import { isCustomDielectricConstant } from '../constants/calculationDefaults';
 import { showErrorNotification } from '../store/notificationStore';
 import { isCalculationEditable } from '../utils/calculationStatus';
+import { useAtomMeasurement } from './useAtomMeasurement';
 
 export type DistributiveKeyOf<T> = T extends any ? keyof T : never;
 
@@ -123,6 +124,9 @@ export const useCalculationForm = ({
     gpuStatus.gpu4pyscf_installed;
   const showCpuSettings =
     !isGpuAccelerationEnabled || !isGpuCapableMethod || !isGpuReady;
+  const measurement = useAtomMeasurement(
+    activeCalculation?.parameters?.xyz ?? null
+  );
 
   useEffect(() => {
     const currentCalculationId = activeCalculation?.id || null;
@@ -513,6 +517,7 @@ export const useCalculationForm = ({
       showCoordinates,
       showAtomNumbers,
       useAtomicRadii,
+      selectedAtomIndices: measurement.selectedAtomIndices,
       isRenaming,
       renameModal,
       params: activeCalculation?.parameters,
@@ -538,6 +543,7 @@ export const useCalculationForm = ({
       setShowCoordinates,
       setShowAtomNumbers,
       setUseAtomicRadii,
+      handleAtomClick: measurement.handleAtomClick,
     },
     computed: {
       hasValidMolecule,

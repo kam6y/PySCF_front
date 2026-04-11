@@ -20,6 +20,8 @@ interface OptimizedStructureSectionProps {
   onShowAtomNumbersChange: (show: boolean) => void;
   useAtomicRadii: boolean;
   onUseAtomicRadiiChange: (use: boolean) => void;
+  selectedAtomIndices: number[];
+  onAtomClick: (atomIndex: number) => void;
 }
 
 export const OptimizedStructureSection =
@@ -37,6 +39,8 @@ export const OptimizedStructureSection =
       onShowAtomNumbersChange,
       useAtomicRadii,
       onUseAtomicRadiiChange,
+      selectedAtomIndices,
+      onAtomClick,
     }) => {
       const structureTitle = useMemo(() => {
         switch (parameters.calculation_method) {
@@ -127,6 +131,8 @@ export const OptimizedStructureSection =
                   onShowAtomNumbersChange={onShowAtomNumbersChange}
                   useAtomicRadii={useAtomicRadii}
                   onUseAtomicRadiiChange={onUseAtomicRadiiChange}
+                  selectedAtomIndices={selectedAtomIndices}
+                  onAtomClick={onAtomClick}
                 />
               </div>
             </div>
