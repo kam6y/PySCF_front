@@ -14,6 +14,8 @@ import { GLViewer } from '../../types/3dmol';
 interface MolecularOrbitalViewerProps {
   calculationId: string;
   onError?: (error: string) => void;
+  selectedOrbitalIndex?: number | null;
+  onOrbitalSelect?: (orbitalIndex: number) => void;
 }
 
 interface ViewerOptions {
@@ -23,7 +25,13 @@ interface ViewerOptions {
 }
 
 export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
-  React.memo(({ calculationId, onError }) => {
+  React.memo(
+    ({
+      calculationId,
+      onError,
+      selectedOrbitalIndex: externalSelectedOrbitalIndex,
+      onOrbitalSelect,
+    }) => {
     const queryClient = useQueryClient();
     const viewerRef = useRef<HTMLDivElement>(null);
     const resizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -259,9 +267,21 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
         );
         if (homoOrbital) {
           setSelectedOrbitalIndex(homoOrbital.index);
+          onOrbitalSelect?.(homoOrbital.index);
         }
       }
-    }, [orbitalsData, selectedOrbitalIndex, calculationId]);
+    }, [orbitalsData, selectedOrbitalIndex, calculationId, onOrbitalSelect]);
+
+    // 外部から渡された選択軌道を内部状態に同期
+    useEffect(() => {
+      if (
+        externalSelectedOrbitalIndex !== undefined &&
+        externalSelectedOrbitalIndex !== null &&
+        externalSelectedOrbitalIndex !== selectedOrbitalIndex
+      ) {
+        setSelectedOrbitalIndex(externalSelectedOrbitalIndex);
+      }
+    }, [externalSelectedOrbitalIndex, selectedOrbitalIndex]);
 
     // CUBEデータが更新されたときに分子軌道を表示
     useEffect(() => {
@@ -441,6 +461,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
     ) => {
       const newIndex = parseInt(event.target.value, 10);
       setSelectedOrbitalIndex(newIndex);
+      onOrbitalSelect?.(newIndex);
     };
 
     const handleOptionsChange = (newOptions: Partial<ViewerOptions>) => {

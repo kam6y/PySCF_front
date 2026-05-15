@@ -49,6 +49,8 @@ export const MolecularOrbitalsSection =
                 <MolecularOrbitalViewer
                   key={calculationId}
                   calculationId={calculationId}
+                  selectedOrbitalIndex={selectedOrbitalIndex}
+                  onOrbitalSelect={onOrbitalSelect}
                   onError={onError}
                 />
               </LazyViewer>

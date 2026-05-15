@@ -361,7 +361,21 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
             .data(processedOrbitals)
             .enter()
             .append('g')
-            .attr('class', 'orbital');
+            .attr('class', 'orbital')
+            .style('cursor', onOrbitalSelect ? 'pointer' : 'default')
+            .on('click', (_event, d) => {
+              onOrbitalSelect?.(d.index);
+            });
+
+          // Transparent hit area for easier clicking (wider than the visible bar)
+          const hitPadding = 6 * invScale;
+          orbitalGroup
+            .append('rect')
+            .attr('x', orbitalX - hitPadding)
+            .attr('y', d => d.yPosition - hitPadding)
+            .attr('width', scaledOrbitalWidth + hitPadding * 2)
+            .attr('height', hitPadding * 2)
+            .attr('fill', 'transparent');
 
           // Orbital rectangles with inverse scaling to maintain constant visual size
           orbitalGroup
@@ -505,7 +519,6 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
       }, [
         processedOrbitals,
         orbitalSummary,
-        selectedOrbitalIndex,
         viewerSize,
         getOrbitalColor,
         calculateLabelPositions,
