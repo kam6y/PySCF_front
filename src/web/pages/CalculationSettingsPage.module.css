@@ -538,6 +538,9 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   border: 1px solid #e0e0e0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .molecularInputSection h3 {
@@ -655,6 +658,10 @@
 
 .xyzDirectInput {
   border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Error Messages */

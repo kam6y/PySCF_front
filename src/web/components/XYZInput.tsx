@@ -1,9 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import {
-  parseXYZData,
-  getSampleXYZData,
-  XYZValidationResult,
-} from '../utils/xyzParser';
+import { parseXYZData, XYZValidationResult } from '../utils/xyzParser';
 import styles from './XYZInput.module.css';
 
 export interface XYZInputProps {
@@ -40,8 +36,6 @@ export const XYZInput = React.memo<XYZInputProps>(
         return () => clearTimeout(timeoutId);
       }
     }, [value]);
-
-    const sampleData = getSampleXYZData();
 
     const validateXYZ = useCallback(
       (input: string) => {
@@ -116,50 +110,6 @@ H   0.000000  -0.763239  -0.477047
           )}
         </div>
 
-        {/* Format Help Link */}
-        <div className={styles.xyzFormatHelp}>
-          <a
-            href="#"
-            className={styles.formatHelpLink}
-            onClick={e => {
-              e.preventDefault();
-              const details =
-                e.currentTarget.parentElement?.querySelector('details');
-              if (details) {
-                details.open = !details.open;
-              }
-            }}
-          >
-            ▶ XYZ Format Help
-          </a>
-
-          <details className={styles.formatHelpDetails}>
-            <summary className={styles.formatHelpSummary}></summary>
-            <div className={styles.formatHelpContent}>
-              <p>
-                <strong>XYZ format structure:</strong>
-              </p>
-              <ol>
-                <li>First line: Number of atoms (integer)</li>
-                <li>Second line: Comment or description (optional)</li>
-                <li>
-                  Following lines: Element symbol followed by X, Y, Z
-                  coordinates
-                </li>
-              </ol>
-              <p>
-                <strong>Example:</strong>
-              </p>
-              <pre className={styles.formatExample}>
-                {`3
-Water molecule
-O   0.000000   0.000000   0.119262
-H   0.000000   0.763239  -0.477047
-H   0.000000  -0.763239  -0.477047`}
-              </pre>
-            </div>
-          </details>
-        </div>
       </div>
     );
   }
