@@ -43,6 +43,11 @@ const common: Configuration = {
         test: /\.tsx?$/,
         exclude: /node_modules/,
         loader: "ts-loader",
+        options: {
+          compilerOptions: {
+            noEmit: false,
+          },
+        },
       },
       {
         // CSS Module files (.module.css)
