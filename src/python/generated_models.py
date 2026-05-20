@@ -656,6 +656,7 @@ class OrbitalType(Enum):
     core = 'core'
     homo = 'homo'
     lumo = 'lumo'
+    occupied = 'occupied'
     virtual = 'virtual'
 
 

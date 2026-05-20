@@ -91,7 +91,9 @@ class CalculationDirectoryMigration:
         # Get all calculation directories
         calculations = []
         if old_path_obj.exists():
-            for item in old_path_obj.iterdir():
+            for item in sorted(old_path_obj.iterdir(), key=lambda path: path.name):
+                if is_migration_to_subfolder and item.resolve() == new_path_obj:
+                    continue
                 if item.is_dir():
                     calculations.append(item)
 
@@ -105,26 +107,41 @@ class CalculationDirectoryMigration:
                 "message": "No calculations to move"
             }
 
+        conflicting_moves = []
+        for calc_dir in calculations:
+            dest_dir = new_path_obj / calc_dir.name
+            if dest_dir.exists():
+                logger.warning(f"Destination already exists, cannot move: {dest_dir}")
+                conflicting_moves.append({
+                    "name": calc_dir.name,
+                    "reason": "Destination already exists"
+                })
+
+        if conflicting_moves:
+            return {
+                "success": False,
+                "moved_count": 0,
+                "failed_count": len(conflicting_moves),
+                "new_path": str(new_path_obj),
+                "old_path": str(old_path_obj),
+                "failed_moves": conflicting_moves,
+                "message": (
+                    f"Cannot move calculations: {len(conflicting_moves)} "
+                    "destination conflicts detected"
+                )
+            }
+
         # Perform the move operation
-        moved_count = 0
+        moved_directories = []
         failed_moves = []
 
         for calc_dir in calculations:
             try:
                 dest_dir = new_path_obj / calc_dir.name
 
-                # If destination exists, skip with warning
-                if dest_dir.exists():
-                    logger.warning(f"Destination already exists, skipping: {dest_dir}")
-                    failed_moves.append({
-                        "name": calc_dir.name,
-                        "reason": "Destination already exists"
-                    })
-                    continue
-
                 # Move directory
                 shutil.move(str(calc_dir), str(dest_dir))
-                moved_count += 1
+                moved_directories.append((dest_dir, calc_dir))
                 logger.info(f"Moved calculation: {calc_dir.name} -> {dest_dir}")
 
             except Exception as e:
@@ -133,6 +150,43 @@ class CalculationDirectoryMigration:
                     "name": calc_dir.name,
                     "reason": str(e)
                 })
+                break
+
+        rollback_errors = []
+        if failed_moves:
+            logger.warning("Move failed; rolling back moved calculation directories")
+            for dest_dir, original_dir in reversed(moved_directories):
+                try:
+                    shutil.move(str(dest_dir), str(original_dir))
+                    logger.info(f"Rolled back calculation: {dest_dir.name} -> {original_dir}")
+                except Exception as e:
+                    logger.error(f"Failed to roll back {dest_dir.name}: {e}")
+                    rollback_errors.append({
+                        "name": dest_dir.name,
+                        "reason": str(e)
+                    })
+
+            remaining_moved_count = sum(
+                1 for dest_dir, _ in moved_directories if dest_dir.exists()
+            )
+            result = {
+                "success": False,
+                "moved_count": remaining_moved_count,
+                "failed_count": len(failed_moves),
+                "new_path": str(new_path_obj),
+                "old_path": str(old_path_obj),
+                "failed_moves": failed_moves,
+                "message": (
+                    f"Move failed after {len(moved_directories)} calculations; "
+                    f"rolled back {len(moved_directories) - len(rollback_errors)}"
+                )
+            }
+
+            if rollback_errors:
+                result["rollback_errors"] = rollback_errors
+
+            logger.info(f"Move operation completed: {result['message']}")
+            return result
 
         # Update base_dir
         self.base_dir = new_path_obj
@@ -147,7 +201,7 @@ class CalculationDirectoryMigration:
 
         result = {
             "success": len(failed_moves) == 0,
-            "moved_count": moved_count,
+            "moved_count": len(moved_directories),
             "failed_count": len(failed_moves),
             "new_path": str(new_path_obj),
             "old_path": str(old_path_obj)
@@ -155,9 +209,12 @@ class CalculationDirectoryMigration:
 
         if failed_moves:
             result["failed_moves"] = failed_moves
-            result["message"] = f"Moved {moved_count} calculations, {len(failed_moves)} failed"
+            result["message"] = (
+                f"Moved {len(moved_directories)} calculations, "
+                f"{len(failed_moves)} failed"
+            )
         else:
-            result["message"] = f"Successfully moved {moved_count} calculations"
+            result["message"] = f"Successfully moved {len(moved_directories)} calculations"
 
         logger.info(f"Move operation completed: {result['message']}")
         return result

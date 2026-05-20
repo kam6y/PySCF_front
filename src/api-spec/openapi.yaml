@@ -2379,7 +2379,7 @@ components:
           description: Orbital occupancy (0.0 for virtual, 1.0 or 2.0 for occupied)
         orbital_type:
           type: string
-          enum: [core, homo, lumo, virtual]
+          enum: [core, homo, lumo, occupied, virtual]
           description: Type of orbital
         label:
           type: string

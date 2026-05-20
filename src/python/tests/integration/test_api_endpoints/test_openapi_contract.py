@@ -22,6 +22,7 @@ HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 PYTHON_DIR = Path(__file__).resolve().parents[3]
 API_DIR = PYTHON_DIR / "api"
 OPENAPI_PATH = PYTHON_DIR.parent / "api-spec" / "openapi.yaml"
+ORBITAL_GENERATOR_PATH = PYTHON_DIR / "quantum_calc" / "orbital_generator.py"
 
 _IMPL_PATH_PARAM_PATTERN = re.compile(r"<[^>]+>")
 _OPENAPI_PATH_PARAM_PATTERN = re.compile(r"\{[^}]+\}")
@@ -201,6 +202,21 @@ def _resolve_schema(spec: dict, schema: dict) -> dict:
     return spec["components"]["schemas"][schema_name]
 
 
+def _extract_string_assignments(path: Path, variable_name: str) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    values: set[str] = set()
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not isinstance(node.value, ast.Constant) or not isinstance(node.value.value, str):
+            continue
+        if any(isinstance(target, ast.Name) and target.id == variable_name for target in node.targets):
+            values.add(node.value.value)
+
+    return values
+
+
 def test_openapi_and_implementation_have_same_public_routes() -> None:
     impl_routes, _ = _extract_implementation_contract()
     openapi_routes, _ = _extract_openapi_contract()
@@ -271,6 +287,21 @@ def test_list_calculations_method_filter_matches_calculation_method_schema() -> 
     calculation_method_schema = spec["components"]["schemas"]["CalculationMethod"]
 
     assert parameter_schema["enum"] == calculation_method_schema["enum"]
+
+
+def test_openapi_orbital_type_enum_allows_runtime_orbital_generator_values() -> None:
+    """OpenAPI must allow every orbital_type emitted by MolecularOrbitalGenerator."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    orbital_type_schema = spec["components"]["schemas"]["OrbitalInfo"]["properties"][
+        "orbital_type"
+    ]
+
+    runtime_orbital_types = _extract_string_assignments(
+        ORBITAL_GENERATOR_PATH,
+        "orbital_type",
+    )
+
+    assert runtime_orbital_types <= set(orbital_type_schema["enum"])
 
 
 def test_delete_calculation_documents_validation_error_response() -> None:

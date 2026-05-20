@@ -1302,7 +1302,7 @@ export interface components {
              * @description Type of orbital
              * @enum {string}
              */
-            orbital_type: "core" | "homo" | "lumo" | "virtual";
+            orbital_type: "core" | "homo" | "lumo" | "occupied" | "virtual";
             /** @description Human-readable label (e.g., "HOMO", "LUMO", "HOMO-1", "LUMO+2") */
             label?: string;
         };

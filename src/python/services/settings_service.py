@@ -20,6 +20,27 @@ logger = logging.getLogger(__name__)
 
 class SettingsService:
     """Service for application settings management."""
+
+    @staticmethod
+    def _raise_for_failed_migration(move_result: Dict[str, Any]) -> None:
+        """Convert a failed directory migration result into a service exception."""
+        message = move_result.get("message", "Move operation failed")
+        failed_moves = move_result.get("failed_moves", [])
+        rollback_errors = move_result.get("rollback_errors", [])
+
+        is_user_fixable_conflict = (
+            failed_moves
+            and not rollback_errors
+            and all(
+                failed_move.get("reason") == "Destination already exists"
+                for failed_move in failed_moves
+            )
+        )
+
+        error_message = f"Failed to move calculations directory: {message}"
+        if is_user_fixable_conflict:
+            raise ValidationError(error_message)
+        raise ServiceError(error_message)
     
     def get_settings(self) -> Dict[str, Any]:
         """
@@ -77,11 +98,22 @@ class SettingsService:
                     # Move calculations to new directory
                     move_result = migration.move_calculations_directory(new_calc_dir)
 
-                    if not move_result['success']:
-                        logger.warning(f"Some calculations failed to move: {move_result}")
+                    if move_result.get('success') is not True:
+                        logger.warning(f"Calculations directory migration failed: {move_result}")
+                        self._raise_for_failed_migration(move_result)
 
                     logger.info(f"Successfully moved calculations: {move_result['message']}")
 
+                except ValueError as move_error:
+                    logger.error(f"Invalid calculations directory migration: {move_error}")
+                    raise ValidationError(
+                        f'Failed to move calculations directory: {str(move_error)}'
+                    )
+                except OSError as move_error:
+                    logger.error(f"Failed to move calculations directory: {move_error}", exc_info=True)
+                    raise ServiceError(f'Failed to move calculations directory: {str(move_error)}')
+                except ServiceError:
+                    raise
                 except Exception as move_error:
                     logger.error(f"Failed to move calculations directory: {move_error}", exc_info=True)
                     raise ServiceError(f'Failed to move calculations directory: {str(move_error)}')
