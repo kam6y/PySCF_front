@@ -362,14 +362,32 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
         )
 
         # Parse XYZ and setup calculation
-        atoms = calculator.parse_xyz(parameters['xyz'])
+        pause_state = parameters.get('pause_state')
+        setup_xyz = parameters['xyz']
+        if (
+            parameters.get('resume_from_pause', False)
+            and pause_state
+            and pause_state.get('calculation_phase') == 'geometry_optimization'
+        ):
+            file_manager = getattr(calculator, 'file_manager', None)
+            if file_manager is not None:
+                try:
+                    last_geometry = file_manager.load_last_geometry(calc_dir)
+                    if last_geometry:
+                        setup_xyz = last_geometry
+                        process_logger.info(
+                            "Using last geometry trajectory step for resumed geometry optimization"
+                        )
+                except Exception as e:
+                    process_logger.warning(f"Failed to load last geometry from trajectory: {e}")
+
+        atoms = calculator.parse_xyz(setup_xyz)
         setup_params = _prepare_setup_parameters(parameters, memory_mb)
         calculator.setup_calculation(atoms, **setup_params)
 
         # Resume from checkpoint if this is a resumed calculation
         # IMPORTANT: Must be called AFTER setup_calculation() so that self.mf exists
         if parameters.get('resume_from_pause', False):
-            pause_state = parameters.get('pause_state')
             process_logger.info(f"Resuming calculation {calculation_id} from checkpoint")
             if pause_state:
                 process_logger.info(f"Pause state: {pause_state}")

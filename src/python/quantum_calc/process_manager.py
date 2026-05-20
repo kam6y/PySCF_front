@@ -226,7 +226,11 @@ class CalculationProcessManager:
                 else:
                     error_message = str(exception)
                     logger.error(f"Calculation {calculation_id} failed with exception: {error_message}")
-                    self.status_manager.notify(calculation_id, 'error', error_message)
+                    self.status_manager.transition(
+                        calculation_id,
+                        CalculationStatus.ERROR,
+                        error_message,
+                    )
             else:
                 success, calc_error = future.result()
                 if success:

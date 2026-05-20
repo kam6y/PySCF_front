@@ -119,6 +119,7 @@ def _create_simple_chat_stream(message: str, history: list, session_id: str = No
     # Accumulate AI response for saving to database
     accumulated_response = []
     db_save_successful = False
+    client_aborted = False
 
     try:
         logger.debug(f"Starting Gemini chat stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
@@ -186,7 +187,14 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
 
     except GeneratorExit:
         # Client disconnected - clean up gracefully
+        client_aborted = True
         logger.info("Client disconnected from SSE stream (GeneratorExit)")
+        raise
+
+    except (BrokenPipeError, ConnectionResetError) as e:
+        # Client disconnected while streaming; do not persist partial responses.
+        client_aborted = True
+        logger.info(f"Client disconnected from SSE stream ({type(e).__name__})")
         raise
 
     except Exception as e:
@@ -200,7 +208,7 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
 
     finally:
         # Fallback: Save AI response to database if not already saved
-        if session_id and accumulated_response and not db_save_successful:
+        if session_id and accumulated_response and not db_save_successful and not client_aborted:
             try:
                 complete_response = ''.join(accumulated_response)
                 chat_service = get_chat_history_service()

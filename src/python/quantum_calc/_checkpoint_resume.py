@@ -120,16 +120,3 @@ class CheckpointResumeMixin:
             self.mf.init_guess = 'chkfile'
             self.mf.chkfile = chk_path
             logger.info("Configured SCF to use checkpoint file as initial guess")
-
-        # If pause state contains geometry trajectory info, load last geometry
-        if pause_state and hasattr(self, 'file_manager'):
-            try:
-                last_geometry = self.file_manager.load_last_geometry(self.working_dir)
-                if last_geometry:
-                    logger.info("Loaded last geometry from trajectory file")
-                    # Parse and set as starting geometry for optimization
-                    atoms = self.parse_xyz(last_geometry)
-                    logger.info(f"Resuming geometry optimization from step with {len(atoms)} atoms")
-                    # The geometry will be used in the next optimization call
-            except Exception as e:
-                logger.warning(f"Failed to load last geometry from trajectory: {e}")

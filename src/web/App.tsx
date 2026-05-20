@@ -39,7 +39,7 @@ export const App = () => {
   const stagedCalculation = appState.calculation.stagedCalculation;
 
   // アプリ設定の取得
-  const { settings, updateSettings } = useAppSettings();
+  const { settings, updateSettingsAsync } = useAppSettings();
 
   // 初回セットアップダイアログの表示状態
   const [showInitialSetup, setShowInitialSetup] = useState(false);
@@ -104,11 +104,19 @@ export const App = () => {
 
   // 初回セットアップ完了時の処理
   const handleSetupComplete = async (calculationsDirectory: string) => {
-    if (settings) {
-      await updateSettings({
+    if (!settings) {
+      console.error('Failed to save initial setup settings: settings missing');
+      return;
+    }
+
+    try {
+      await updateSettingsAsync({
         ...settings,
         calculations_directory: calculationsDirectory,
       });
+    } catch (error) {
+      console.error('Failed to save initial setup settings:', error);
+      return;
     }
 
     // セットアップ完了フラグをLocalStorageに保存

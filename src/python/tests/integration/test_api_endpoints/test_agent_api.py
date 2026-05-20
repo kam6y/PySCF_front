@@ -7,6 +7,8 @@ responses from the Gemini API.
 
 import json
 
+from api.agent import _create_simple_chat_stream
+
 
 class TestAgentChatAPI:
     """Integration tests for POST /api/agent/chat endpoint."""
@@ -177,3 +179,55 @@ class TestAgentChatAPI:
         error_events = [e for e in events if e['type'] == 'error']
         assert len(error_events) > 0
         assert 'API key' in error_events[0]['payload']['message']
+
+    def test_chat_stream_client_abort_does_not_save_partial_model_message(self, mocker):
+        """
+        GIVEN Gemini API starts streaming a model response for a saved session
+        WHEN the SSE generator is closed after the first chunk
+        THEN the partial model response is not saved to chat history
+        """
+        # ARRANGE
+        session_id = "session-cancelled"
+        mock_chat_service = mocker.MagicMock()
+        mocker.patch(
+            "api.agent.get_chat_history_service",
+            return_value=mock_chat_service,
+        )
+
+        mock_settings_service = mocker.patch("api.agent.SettingsService")
+        mock_settings_service.return_value.get_settings.return_value = {
+            "gemini_api_key": "test-api-key"
+        }
+
+        mock_genai = mocker.MagicMock()
+        mock_model = mocker.MagicMock()
+        mock_chat = mocker.MagicMock()
+        mock_chunk = mocker.MagicMock()
+        mock_chunk.text = "Partial response"
+
+        mock_chat.send_message.return_value = iter([mock_chunk])
+        mock_model.start_chat.return_value = mock_chat
+        mock_genai.GenerativeModel.return_value = mock_model
+        mocker.patch.dict("sys.modules", {"google.generativeai": mock_genai})
+
+        generator = _create_simple_chat_stream("What is water?", [], session_id)
+
+        # ACT
+        status_event = next(generator)
+        chunk_event = next(generator)
+        generator.close()
+
+        # ASSERT
+        assert json.loads(status_event.replace("data: ", ""))["type"] == "agent_status"
+        assert json.loads(chunk_event.replace("data: ", ""))["type"] == "chunk"
+        mock_chat_service.add_message.assert_any_call(
+            session_id,
+            "user",
+            "What is water?",
+        )
+        model_saves = [
+            call
+            for call in mock_chat_service.add_message.call_args_list
+            if call.args[1] == "model"
+        ]
+        assert model_saves == []
