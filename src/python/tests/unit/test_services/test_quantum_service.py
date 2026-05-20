@@ -761,6 +761,45 @@ def test_recover_stale_non_terminal_calculations_keeps_active_and_queued(
     ) == ("error", None)
 
 
+def test_recover_stale_non_terminal_calculations_preserves_existing_results(
+    tmp_path,
+    mocker,
+):
+    """
+    GIVEN a stale non-terminal calculation already has valid results
+    WHEN stale recovery marks the calculation as error
+    THEN the existing results file should not be overwritten
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_dir = tmp_path / "stale-with-results"
+    calc_dir.mkdir()
+    expected_results = {
+        "energy": -75.0,
+        "success": True,
+        "mulliken_charges": [0.1, -0.1],
+    }
+    service.repository.save_calculation_parameters(
+        str(calc_dir),
+        {"name": "stale-with-results", "created_at": "2026-05-20T00:00:00"},
+    )
+    service.repository.save_calculation_status(str(calc_dir), "running")
+    service.repository.save_calculation_results(str(calc_dir), expected_results)
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+
+    service._recover_stale_non_terminal_calculations(process_manager)
+
+    assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+        "error",
+        None,
+    )
+    assert service.repository.read_calculation_results(str(calc_dir)) == expected_results
+
+
 @pytest.mark.parametrize("status", ["pending", "running", "waiting", "pausing"])
 def test_delete_calculation_rejects_non_terminal_status(tmp_path, mocker, status):
     """

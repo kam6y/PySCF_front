@@ -1021,11 +1021,13 @@ class QuantumService:
                     calculation_id,
                     status,
                 )
+                existing_results = self.repository.read_calculation_results(calc_dir)
                 self.repository.save_calculation_status(calc_dir, 'error')
-                self.repository.save_calculation_results(
-                    calc_dir,
-                    {'error': self.RESTART_INTERRUPTED_MESSAGE},
-                )
+                if existing_results is None:
+                    self.repository.save_calculation_results(
+                        calc_dir,
+                        {'error': self.RESTART_INTERRUPTED_MESSAGE},
+                    )
             except Exception as e:
                 logger.warning(
                     "Failed to recover stale calculation %s: %s",

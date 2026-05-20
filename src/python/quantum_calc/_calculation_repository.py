@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from datetime import datetime
 from uuid import uuid4
 
@@ -223,11 +223,31 @@ class CalculationRepository:
         """Check if a specific file exists in the calculation directory."""
         return (Path(calc_dir) / filename).exists()
 
+    def _atomic_write_json(
+        self,
+        target_file: Path,
+        data: Dict[str, Any],
+        default: Optional[Callable[[Any], Any]] = None,
+    ) -> None:
+        """Write JSON through a same-directory temp file before replacing."""
+        temp_file = target_file.with_name(f".{target_file.name}.{uuid4().hex}.tmp")
+        try:
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, default=default)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_file, target_file)
+        except Exception:
+            try:
+                temp_file.unlink()
+            except OSError:
+                pass
+            raise
+
     def save_calculation_parameters(self, calc_dir: str, parameters: Dict[str, Any]) -> None:
         """Save calculation parameters to JSON file."""
         params_file = Path(calc_dir) / "parameters.json"
-        with open(params_file, 'w') as f:
-            json.dump(parameters, f, indent=2, default=str)
+        self._atomic_write_json(params_file, parameters, default=str)
 
     def read_calculation_parameters(self, calc_dir: str) -> Optional[Dict[str, Any]]:
         """Read calculation parameters from JSON file."""
@@ -243,8 +263,7 @@ class CalculationRepository:
     def save_calculation_results(self, calc_dir: str, results: Dict[str, Any]) -> None:
         """Save calculation results to JSON file."""
         results_file = Path(calc_dir) / "results.json"
-        with open(results_file, 'w') as f:
-            json.dump(results, f, indent=2, default=str)
+        self._atomic_write_json(results_file, results, default=str)
 
     def read_calculation_results(self, calc_dir: str) -> Optional[Dict[str, Any]]:
         """Read calculation results from JSON file."""
@@ -267,8 +286,7 @@ class CalculationRepository:
         if waiting_reason is not None:
             status_data['waiting_reason'] = waiting_reason
 
-        with open(status_file, 'w') as f:
-            json.dump(status_data, f, indent=2)
+        self._atomic_write_json(status_file, status_data)
 
     def read_calculation_status(self, calc_dir: str) -> str:
         """Read calculation status from JSON file."""
@@ -286,7 +304,7 @@ class CalculationRepository:
                     status = 'error'
                 return status
         except (json.JSONDecodeError, OSError):
-            return 'pending'
+            return 'error'
 
     def read_calculation_status_details(self, calc_dir: str) -> tuple[str, Optional[str]]:
         """Read calculation status and waiting reason from JSON file."""
@@ -307,7 +325,7 @@ class CalculationRepository:
                 waiting_reason = status_data.get('waiting_reason')
                 return status, waiting_reason
         except (json.JSONDecodeError, OSError):
-            return 'pending', None
+            return 'error', None
 
     def save_pause_state(self, calc_dir: str, pause_info: Dict[str, Any]) -> None:
         """
