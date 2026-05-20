@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -30,6 +31,27 @@ class CalculationRepository:
         self.base_dir = Path(new_path)
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
+    def resolve_calculation_path(self, calculation_id: str) -> Path:
+        """Resolve a calculation ID to a path that stays inside base_dir."""
+        if not calculation_id or calculation_id in {".", ".."}:
+            raise ValueError("Invalid calculation ID")
+
+        separators = {"/", "\\", os.sep}
+        if os.altsep:
+            separators.add(os.altsep)
+        if any(separator in calculation_id for separator in separators if separator):
+            raise ValueError("Invalid calculation ID")
+
+        base_path = self.base_dir.resolve(strict=False)
+        calc_path = (base_path / calculation_id).resolve(strict=False)
+
+        try:
+            calc_path.relative_to(base_path)
+        except ValueError as e:
+            raise ValueError("Invalid calculation ID") from e
+
+        return calc_path
+
     def create_calculation_dir(self, molecule_name: Optional[str] = None) -> str:
         clean_name = (
             "".join(c for c in molecule_name if c.isalnum() or c in "._-").strip()
@@ -51,7 +73,7 @@ class CalculationRepository:
 
     def rename_calculation(self, calculation_id: str, new_name: str) -> Optional[str]:
         """Updates the display name of a calculation without changing the directory name."""
-        calc_path = self.base_dir / calculation_id
+        calc_path = self.resolve_calculation_path(calculation_id)
         if not calc_path.is_dir():
             return None
 

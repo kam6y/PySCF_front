@@ -311,9 +311,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
         '200':
           description: Calculation details
@@ -342,9 +343,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       requestBody:
         required: true
         content:
@@ -385,9 +387,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
         '200':
           description: Calculation deleted successfully
@@ -423,9 +426,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
         '202':
           description: Pause request accepted
@@ -461,9 +465,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
         '202':
           description: Resume request accepted
@@ -499,9 +504,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
         '200':
           description: Molecular orbital information
@@ -531,9 +537,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
         - name: orbitalIndex
           in: path
           required: true
@@ -597,9 +604,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
         '200':
           description: CUBE files list retrieved successfully
@@ -628,9 +636,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
         - name: orbital_index
           in: query
           required: false
@@ -666,9 +675,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
         - name: broadening_fwhm
           in: query
           required: false

@@ -6,7 +6,9 @@ monitoring, results retrieval, and orbital/spectrum analysis.
 """
 
 import pytest
+from quantum_calc._calculation_repository import CalculationRepository
 from services.exceptions import NotFoundError, ServiceError, ValidationError
+from services.quantum_service import QuantumService
 
 
 class TestSupportedParametersAPI:
@@ -431,6 +433,85 @@ class TestCalculationDeletionAPI:
         data = response.get_json()
         assert data['success'] is False
         assert 'Cannot delete calculation' in data['error']
+
+    def test_delete_calculation_rejects_encoded_parent_directory_and_keeps_sentinel(
+        self,
+        client,
+        mocker,
+        tmp_path,
+    ):
+        """
+        GIVEN the calculations base has a parent sentinel directory
+        WHEN DELETE receives an encoded parent-directory calculation ID
+        THEN it returns 400 and does not remove data outside the base directory
+        """
+        base_dir = tmp_path / "calculations"
+        base_dir.mkdir()
+        sentinel_dir = tmp_path / "sentinel"
+        sentinel_dir.mkdir()
+        sentinel_file = sentinel_dir / "keep.txt"
+        sentinel_file.write_text("must remain")
+
+        service = QuantumService()
+        service.repository = CalculationRepository(base_dir=str(base_dir))
+        process_manager = mocker.Mock()
+        process_manager.get_active_calculations.return_value = []
+        process_manager.get_queued_calculations.return_value = []
+        mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+        mocker.patch("api.quantum.get_quantum_service", return_value=service)
+
+        response = client.delete("/api/quantum/calculations/%2e%2e")
+
+        assert response.status_code == 400
+        assert base_dir.is_dir()
+        assert sentinel_dir.is_dir()
+        assert sentinel_file.read_text() == "must remain"
+
+
+class TestCalculationIdValidationAPI:
+    """Integration tests for request-derived calculation ID validation."""
+
+    @pytest.mark.parametrize(
+        ("method", "path", "json_body"),
+        [
+            ("get", "/api/quantum/calculations/a%5Cb", None),
+            ("put", "/api/quantum/calculations/a%5Cb", {"name": "New Name"}),
+            ("delete", "/api/quantum/calculations/a%5Cb", None),
+            ("post", "/api/quantum/calculations/a%5Cb/pause", None),
+            ("post", "/api/quantum/calculations/a%5Cb/resume", None),
+            ("get", "/api/quantum/calculations/a%5Cb/orbitals", None),
+            ("get", "/api/quantum/calculations/a%5Cb/orbitals/1/cube", None),
+            ("get", "/api/quantum/calculations/a%5Cb/orbitals/cube-files", None),
+            ("delete", "/api/quantum/calculations/a%5Cb/orbitals/cube-files", None),
+            ("get", "/api/quantum/calculations/a%5Cb/ir-spectrum", None),
+        ],
+    )
+    def test_calculation_id_endpoints_reject_path_separator_ids(
+        self,
+        client,
+        mocker,
+        tmp_path,
+        method,
+        path,
+        json_body,
+    ):
+        """
+        GIVEN a request-derived calculation ID contains a path separator
+        WHEN any calculation-ID endpoint is called
+        THEN the service validation returns 400
+        """
+        service = QuantumService()
+        service.repository = CalculationRepository(base_dir=str(tmp_path / "calculations"))
+        mocker.patch("api.quantum.get_quantum_service", return_value=service)
+
+        request_method = getattr(client, method)
+        kwargs = {"json": json_body} if json_body is not None else {}
+        response = request_method(path, **kwargs)
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["success"] is False
+        assert "Invalid calculation ID" in data["error"]
 
 
 class TestMolecularOrbitalsAPI:

@@ -2607,7 +2607,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2648,7 +2648,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2702,7 +2702,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2752,7 +2752,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2802,7 +2802,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2852,7 +2852,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2900,7 +2900,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
                 /** @description Molecular orbital index */
                 orbitalIndex: number;
@@ -2943,7 +2943,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2987,7 +2987,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -3037,7 +3037,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;

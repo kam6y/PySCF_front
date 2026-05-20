@@ -1,6 +1,5 @@
 """Calculation status transitions and notification management."""
 
-import os
 import logging
 from enum import Enum
 from typing import Optional, Callable
@@ -48,7 +47,7 @@ class CalculationStatusManager:
 
         settings = get_current_settings()
         repository = CalculationRepository(base_dir=settings.calculations_directory)
-        calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
+        calc_dir = str(repository.resolve_calculation_path(calculation_id))
 
         status_str = new_status.value
         repository.save_calculation_status(calc_dir, status_str)

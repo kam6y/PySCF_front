@@ -22,6 +22,8 @@ else:
 
 from watchdog.events import FileSystemEventHandler
 
+from ._calculation_repository import CalculationRepository
+
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +117,8 @@ class WebSocketCalculationWatcher:
         Args:
             base_directory: Base directory containing calculation folders
         """
-        self.base_directory = Path(base_directory)
+        self.repository = CalculationRepository(base_dir=base_directory)
+        self.base_directory = Path(self.repository.get_base_directory())
         self.observer = Observer()
         self.connections: Dict[str, Set[Callable]] = {}  # calculation_id -> set of callbacks
         self.watched_dirs: Dict[str, Any] = {}  # calculation_id -> ObservedWatch object from schedule()
@@ -179,7 +182,11 @@ class WebSocketCalculationWatcher:
             self.connections[calculation_id].add(callback)
             
             # Add directory to watch list if not already watched
-            calc_dir = self.base_directory / calculation_id
+            try:
+                calc_dir = self.repository.resolve_calculation_path(calculation_id)
+            except ValueError:
+                logger.warning("Rejected invalid calculation ID for watcher: %s", calculation_id)
+                return
             calc_dir_str = str(calc_dir)
             
             if calc_dir_str not in self.watched_dirs and calc_dir.exists():
@@ -213,7 +220,11 @@ class WebSocketCalculationWatcher:
         returned by schedule() and pass it to unschedule() later.
         This avoids relying on internal implementation details of the watchdog library.
         """
-        calc_dir = self.base_directory / calculation_id
+        try:
+            calc_dir = self.repository.resolve_calculation_path(calculation_id)
+        except ValueError:
+            logger.warning("Rejected invalid calculation ID while stopping watcher: %s", calculation_id)
+            return
         calc_dir_str = str(calc_dir)
         
         if calc_dir_str in self.watched_dirs:
@@ -307,11 +318,16 @@ class WebSocketCalculationWatcher:
             self.watched_dirs.clear()
 
             # Update path
-            self.base_directory = new_base
+            self.repository.set_base_directory(str(new_base))
+            self.base_directory = Path(self.repository.get_base_directory())
 
             # Re-schedule watches with the new base directory
             for calc_id in active_calc_ids:
-                calc_dir = self.base_directory / calc_id
+                try:
+                    calc_dir = self.repository.resolve_calculation_path(calc_id)
+                except ValueError:
+                    logger.warning("Skipped invalid calculation ID during watcher update: %s", calc_id)
+                    continue
                 calc_dir_str = str(calc_dir)
                 if calc_dir.exists():
                     try:
@@ -324,7 +340,10 @@ class WebSocketCalculationWatcher:
 
     def is_watching(self, calculation_id: str) -> bool:
         """Check if a calculation is currently being watched."""
-        calc_dir = self.base_directory / calculation_id
+        try:
+            calc_dir = self.repository.resolve_calculation_path(calculation_id)
+        except ValueError:
+            return False
         calc_dir_str = str(calc_dir)
         return calc_dir_str in self.watched_dirs
 

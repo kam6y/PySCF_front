@@ -327,7 +327,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     # Load current settings to get calculations directory
     settings = get_current_settings()
     repository = CalculationRepository(base_dir=settings.calculations_directory)
-    calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
+    calc_dir = str(repository.resolve_calculation_path(calculation_id))
 
     try:
         # Update status to running

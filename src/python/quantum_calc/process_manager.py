@@ -221,7 +221,7 @@ class CalculationProcessManager:
                     from quantum_calc import get_current_settings
                     settings = get_current_settings()
                     repository = CalculationRepository(base_dir=settings.calculations_directory)
-                    calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
+                    calc_dir = str(repository.resolve_calculation_path(calculation_id))
                     pause_manager.remove_pause_flag_file(calc_dir)
                 else:
                     error_message = str(exception)
@@ -316,7 +316,7 @@ class CalculationProcessManager:
         settings = get_current_settings()
         repository = CalculationRepository(base_dir=settings.calculations_directory)
 
-        calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
+        calc_dir = str(repository.resolve_calculation_path(calculation_id))
         if not os.path.exists(calc_dir):
             raise ValueError(f"Calculation not found: {calculation_id}")
 
@@ -340,7 +340,7 @@ class CalculationProcessManager:
         settings = get_current_settings()
         repository = CalculationRepository(base_dir=settings.calculations_directory)
 
-        calc_dir = os.path.join(repository.get_base_directory(), calculation_id)
+        calc_dir = str(repository.resolve_calculation_path(calculation_id))
         if not os.path.exists(calc_dir):
             raise ValueError(f"Calculation not found: {calculation_id}")
 

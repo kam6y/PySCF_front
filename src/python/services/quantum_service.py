@@ -327,10 +327,9 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            calc_path = self._resolve_calculation_path(calculation_id)
             self._recover_stale_non_terminal_calculations()
 
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
-            
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
@@ -392,6 +391,7 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            self._resolve_calculation_path(calculation_id)
             result_id = self.repository.rename_calculation(calculation_id, new_name)
             if not result_id:
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -427,9 +427,8 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            calc_path = self._resolve_calculation_path(calculation_id)
             self._recover_stale_non_terminal_calculations()
-
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
 
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -531,7 +530,7 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
+            calc_path = self._resolve_calculation_path(calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -597,7 +596,7 @@ class QuantumService:
                 isovalue_neg=isovalue_neg,
             )
 
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
+            calc_path = self._resolve_calculation_path(calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -660,7 +659,7 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
+            calc_path = self._resolve_calculation_path(calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -675,6 +674,8 @@ class QuantumService:
                 'total_files': len(cube_files),
                 'total_size_kb': sum(f['file_size_kb'] for f in cube_files)
             }
+        except (NotFoundError, ValidationError):
+            raise
         except Exception as e:
             logger.error(f"Error listing CUBE files for {calculation_id}: {e}", exc_info=True)
             raise ServiceError('An internal error occurred.')
@@ -695,7 +696,7 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
+            calc_path = self._resolve_calculation_path(calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -721,6 +722,8 @@ class QuantumService:
                 'deleted_files': deleted_count,
                 'message': message
             }
+        except (NotFoundError, ValidationError):
+            raise
         except Exception as e:
             logger.error(f"Error deleting CUBE files for {calculation_id}: {e}", exc_info=True)
             raise ServiceError('An internal error occurred.')
@@ -752,7 +755,7 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
+            calc_path = self._resolve_calculation_path(calculation_id)
             
             if not os.path.isdir(calc_path):
                 raise NotFoundError(f'Calculation "{calculation_id}" not found.')
@@ -836,6 +839,7 @@ class QuantumService:
         """
         try:
             logger.info(f"Pausing calculation: {calculation_id}")
+            self._resolve_calculation_path(calculation_id)
 
             # Get process manager
             process_manager = get_process_manager()
@@ -856,6 +860,8 @@ class QuantumService:
         except ValueError as e:
             logger.error(f"Cannot pause calculation {calculation_id}: {e}")
             raise ValidationError(str(e))
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"Error pausing calculation {calculation_id}: {e}", exc_info=True)
             raise ServiceError(f'Failed to pause calculation: {str(e)}')
@@ -877,6 +883,7 @@ class QuantumService:
         """
         try:
             logger.info(f"Resuming calculation: {calculation_id}")
+            self._resolve_calculation_path(calculation_id)
 
             # Get process manager
             process_manager = get_process_manager()
@@ -897,6 +904,8 @@ class QuantumService:
         except ValueError as e:
             logger.error(f"Cannot resume calculation {calculation_id}: {e}")
             raise ValidationError(str(e))
+        except ValidationError:
+            raise
         except Exception as e:
             logger.error(f"Error resuming calculation {calculation_id}: {e}", exc_info=True)
             raise ServiceError(f'Failed to resume calculation: {str(e)}')
@@ -973,6 +982,13 @@ class QuantumService:
                 f"{self.ORBITAL_CUBE_ISOVALUE_NEG_MIN} and {self.ORBITAL_CUBE_ISOVALUE_NEG_MAX}."
             )
 
+    def _resolve_calculation_path(self, calculation_id: str) -> str:
+        """Resolve a calculation ID from an external request into a safe path."""
+        try:
+            return str(self.repository.resolve_calculation_path(calculation_id))
+        except ValueError as e:
+            raise ValidationError(str(e)) from e
+
     def _recover_stale_non_terminal_calculations(
         self,
         process_manager: Optional[Any] = None,
@@ -987,15 +1003,13 @@ class QuantumService:
             return
 
         managed_ids = active_ids | queued_ids
-        base_directory = self.repository.get_base_directory()
-
         for calculation in self.repository.list_calculations():
             calculation_id = calculation.get('id')
             if not calculation_id or calculation_id in managed_ids:
                 continue
 
-            calc_dir = os.path.join(base_directory, calculation_id)
             try:
+                calc_dir = str(self.repository.resolve_calculation_path(calculation_id))
                 status, _ = self.repository.read_calculation_status_details(calc_dir)
                 if status not in self.NON_TERMINAL_STATUSES:
                     continue

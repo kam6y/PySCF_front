@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 import quantum_calc._calculation_repository as calculation_repository
 from quantum_calc._calculation_repository import CalculationRepository
 
@@ -80,3 +82,29 @@ def test_create_calculation_dir_same_name_same_second_creates_unique_directories
     assert first_dir != second_dir
     assert (tmp_path / Path(first_dir).name).is_dir()
     assert (tmp_path / Path(second_dir).name).is_dir()
+
+
+def test_resolve_calculation_path_valid_id_returns_path_under_base_dir(tmp_path):
+    """
+    GIVEN a valid calculation ID
+    WHEN resolve_calculation_path is called
+    THEN it should return the path under the repository base directory
+    """
+    manager = CalculationRepository(base_dir=str(tmp_path))
+
+    resolved_path = manager.resolve_calculation_path("calc-123")
+
+    assert resolved_path == tmp_path.resolve() / "calc-123"
+
+
+@pytest.mark.parametrize("calculation_id", ["", ".", "..", "a/b", r"a\b"])
+def test_resolve_calculation_path_rejects_unsafe_ids(tmp_path, calculation_id):
+    """
+    GIVEN an unsafe calculation ID
+    WHEN resolve_calculation_path is called
+    THEN it should reject the ID before filesystem access
+    """
+    manager = CalculationRepository(base_dir=str(tmp_path))
+
+    with pytest.raises(ValueError, match="Invalid calculation ID"):
+        manager.resolve_calculation_path(calculation_id)

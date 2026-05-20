@@ -94,7 +94,16 @@ def register_websocket_handlers(socketio):
         from quantum_calc import get_current_settings
         settings = get_current_settings()
         file_manager = CalculationRepository(base_dir=settings.calculations_directory)
-        calc_path = os.path.join(file_manager.get_base_directory(), calculation_id)
+        try:
+            calc_path = str(file_manager.resolve_calculation_path(calculation_id))
+        except ValueError:
+            logger.warning("Invalid calculation ID for SocketIO monitoring: %s", calculation_id)
+            emit('error', {
+                'error': 'Invalid calculation ID.',
+                'id': calculation_id,
+                'is_temporary': calculation_id.startswith('new-calculation-')
+            })
+            return
         
         # Calculation directory existence check
         if not os.path.isdir(calc_path):
