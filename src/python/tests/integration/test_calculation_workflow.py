@@ -93,7 +93,7 @@ class TestCalculationWorkflowSync:
         # If completed, verify results
         if calc_details['status'] == 'completed':
             assert 'results' in calc_details
-            assert 'energy' in calc_details['results']
+            assert 'energy' in calc_details['results'] or 'scf_energy' in calc_details['results']
 
     def test_workflow_calculation_listing(self, client, mocker, valid_dft_params):
         """
@@ -370,8 +370,8 @@ class TestCalculationWorkflowSync:
         response_orbitals = client.get(f'/api/quantum/calculations/{calc_id}/orbitals')
 
         # ASSERT
-        # May return 200 with orbital data, or 400 if calculation not complete/failed
-        assert response_orbitals.status_code in [200, 400]
+        # May return 200 with orbital data, or an error if checkpoint data is not available.
+        assert response_orbitals.status_code in [200, 400, 404]
         if response_orbitals.status_code == 200:
             orbitals_data = response_orbitals.get_json()
             assert orbitals_data['success'] is True

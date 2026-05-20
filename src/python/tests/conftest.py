@@ -6,11 +6,13 @@ to all test modules. Fixtures defined here follow best practices for Flask
 application testing using the Application Factory pattern.
 """
 
-import pytest
-import tempfile
 import os
 import logging
+import tempfile
 from concurrent.futures import Executor, Future
+from unittest import mock
+
+import pytest
 
 # Import application factory and socketio instance
 from app import create_app, socketio
@@ -22,7 +24,70 @@ logger = logging.getLogger(__name__)
 # Core Application Fixtures
 # ============================================================================
 
-@pytest.fixture(scope='session')
+class DummyExecutor(Executor):
+    """
+    A synchronous executor that mimics the ProcessPoolExecutor interface.
+
+    This executor runs tasks immediately and synchronously in the same thread,
+    which is essential for testing asynchronous workflows without the complexity
+    of actual multiprocessing. It allows tests to verify the complete workflow
+    from task submission to completion in a predictable, deterministic manner.
+
+    Usage:
+        Use mocker.patch to replace ProcessPoolExecutor with DummyExecutor:
+        ```
+        mocker.patch(
+            'module.ProcessPoolExecutor',
+            new=DummyExecutor
+        )
+        ```
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the dummy executor."""
+        super().__init__()
+        self._shutdown = False
+
+    def submit(self, fn, *args, **kwargs):
+        """
+        Execute the function immediately and return a Future with the result.
+
+        Args:
+            fn: The function to execute.
+            *args: Positional arguments for the function.
+            **kwargs: Keyword arguments for the function.
+
+        Returns:
+            Future: A Future object with the result or exception.
+        """
+        if self._shutdown:
+            raise RuntimeError('Executor has been shutdown.')
+
+        future = Future()
+        try:
+            result = fn(*args, **kwargs)
+            future.set_result(result)
+        except Exception as e:
+            future.set_exception(e)
+
+        return future
+
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        """Mark the executor as shut down."""
+        self._shutdown = True
+
+
+@pytest.fixture(autouse=True)
+def reset_process_manager_between_tests():
+    """Ensure process manager state does not leak between tests."""
+    from quantum_calc.process_manager import shutdown_process_manager
+
+    shutdown_process_manager()
+    yield
+    shutdown_process_manager()
+
+
+@pytest.fixture(scope='function')
 def app():
     """
     Create and configure a Flask application instance for testing.
@@ -56,10 +121,10 @@ def app():
 
     # Mock environment variables for testing
     # This ensures consistent behavior in CI and local environments
-    from unittest import mock
     import services as services_module
     import quantum_calc.settings_manager as settings_manager_module
     from quantum_calc.settings_manager import SettingsManager
+    from quantum_calc.process_manager import shutdown_process_manager
 
     test_settings_manager = SettingsManager(
         settings_file=os.path.join(temp_dir, "app-settings.json")
@@ -73,6 +138,7 @@ def app():
         mock.patch.dict(os.environ, {
             'PYSCF_ENV': 'development',
         }),
+        mock.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor),
         mock.patch.object(settings_manager_module, "_settings_manager", test_settings_manager),
         mock.patch.multiple(
             services_module,
@@ -83,6 +149,7 @@ def app():
             _system_service=None,
         ),
     ):
+        shutdown_process_manager()
         # Create app using Application Factory with test configuration
         _app = create_app(server_port=5000, test_config=test_config)
 
@@ -92,7 +159,6 @@ def app():
 
     # Cleanup: Shutdown process manager first to prevent "cannot schedule new futures after shutdown" errors
     try:
-        from quantum_calc.process_manager import shutdown_process_manager
         shutdown_process_manager()
         logger.info("Process manager shut down successfully")
     except Exception as e:
@@ -161,59 +227,6 @@ def runner(app):
 # Helper Classes and Utilities
 # ============================================================================
 
-class DummyExecutor(Executor):
-    """
-    A synchronous executor that mimics the ProcessPoolExecutor interface.
-
-    This executor runs tasks immediately and synchronously in the same thread,
-    which is essential for testing asynchronous workflows without the complexity
-    of actual multiprocessing. It allows tests to verify the complete workflow
-    from task submission to completion in a predictable, deterministic manner.
-
-    Usage:
-        Use mocker.patch to replace ProcessPoolExecutor with DummyExecutor:
-        ```
-        mocker.patch(
-            'module.ProcessPoolExecutor',
-            new=DummyExecutor
-        )
-        ```
-    """
-
-    def __init__(self, *args, **kwargs):
-        """Initialize the dummy executor."""
-        super().__init__()
-        self._shutdown = False
-
-    def submit(self, fn, *args, **kwargs):
-        """
-        Execute the function immediately and return a Future with the result.
-
-        Args:
-            fn: The function to execute.
-            *args: Positional arguments for the function.
-            **kwargs: Keyword arguments for the function.
-
-        Returns:
-            Future: A Future object with the result or exception.
-        """
-        if self._shutdown:
-            raise RuntimeError('Executor has been shutdown.')
-
-        future = Future()
-        try:
-            result = fn(*args, **kwargs)
-            future.set_result(result)
-        except Exception as e:
-            future.set_exception(e)
-
-        return future
-
-    def shutdown(self, wait=True):
-        """Mark the executor as shut down."""
-        self._shutdown = True
-
-
 @pytest.fixture
 def dummy_executor():
     """
@@ -275,7 +288,8 @@ def valid_dft_params(sample_h2_xyz):
         "basis_function": "sto-3g",
         "exchange_correlation": "b3lyp",
         "charges": 0,
-        "spin": 0
+        "spin": 0,
+        "optimize_geometry": False
     }
 
 
@@ -296,5 +310,6 @@ def valid_hf_params(sample_h2_xyz):
         "calculation_method": "HF",
         "basis_function": "sto-3g",
         "charges": 0,
-        "spin": 0
+        "spin": 0,
+        "optimize_geometry": False
     }
