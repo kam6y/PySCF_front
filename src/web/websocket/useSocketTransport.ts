@@ -136,6 +136,7 @@ export const useSocketTransport = ({
         socketRef.current = socket;
 
         socket.on('connect', () => {
+          socketRef.current = socket;
           isConnectingRef.current = false;
           if (isMountedRef.current) {
             setIsConnected(true);
@@ -149,12 +150,12 @@ export const useSocketTransport = ({
             setIsConnected(false);
           }
           onDisconnectRef.current?.(reason);
-          if (socketRef.current === socket) {
+          if (!socket.active && socketRef.current === socket) {
             socketRef.current = null;
           }
         });
 
-        socket.on('reconnect', attemptNumber => {
+        socket.io.on('reconnect', attemptNumber => {
           const handler = onReconnectRef.current;
           if (!handler) return;
           Promise.resolve(handler(socket, attemptNumber)).catch(error => {
@@ -162,7 +163,7 @@ export const useSocketTransport = ({
           });
         });
 
-        socket.on('reconnect_error', (error: Error) => {
+        socket.io.on('reconnect_error', (error: Error) => {
           console.error('[UnifiedWebSocket] Reconnection failed:', error);
         });
 

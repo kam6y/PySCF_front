@@ -2530,7 +2530,7 @@ export interface operations {
                 /** @description Filter by calculation status */
                 status?: "pending" | "running" | "completed" | "error" | "waiting" | "pausing" | "paused";
                 /** @description Filter by calculation method */
-                calculation_method?: "DFT" | "HF" | "MP2" | "CCSD" | "TDDFT" | "CASCI" | "CASSCF";
+                calculation_method?: components["schemas"]["CalculationMethod"];
                 /** @description Filter by basis set (case-insensitive) */
                 basis_function?: string;
                 /** @description Start date for date range filtering (ISO format YYYY-MM-DD) */

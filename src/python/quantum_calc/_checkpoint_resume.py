@@ -72,11 +72,14 @@ class CheckpointResumeMixin:
         self._check_pause_requested()
 
         # Save geometry trajectory step if file_manager is available
-        if hasattr(self, 'file_manager') and hasattr(envs, 'mol'):
+        if hasattr(self, 'file_manager'):
+            mol = envs.get('mol')
+            if mol is None:
+                return False
+
             try:
                 step_num = envs.get('cycle', 0)
                 # Convert current geometry to XYZ string
-                mol = envs['mol']
                 atom_symbols = [mol.atom_symbol(i) for i in range(mol.natm)]
                 coords = mol.atom_coords(unit="ANG")
 

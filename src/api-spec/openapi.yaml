@@ -241,8 +241,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
-            enum: [DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF]
+            $ref: '#/components/schemas/CalculationMethod'
           description: Filter by calculation method
         - name: basis_function
           in: query

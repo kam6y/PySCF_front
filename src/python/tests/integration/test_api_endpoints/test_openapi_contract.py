@@ -190,6 +190,17 @@ def _format_route(route: tuple[str, str]) -> str:
     return f"{method} {path}"
 
 
+def _resolve_schema(spec: dict, schema: dict) -> dict:
+    ref = schema.get("$ref")
+    if not isinstance(ref, str):
+        return schema
+
+    prefix = "#/components/schemas/"
+    assert ref.startswith(prefix), f"Unsupported schema reference: {ref}"
+    schema_name = ref.removeprefix(prefix)
+    return spec["components"]["schemas"][schema_name]
+
+
 def test_openapi_and_implementation_have_same_public_routes() -> None:
     impl_routes, _ = _extract_implementation_contract()
     openapi_routes, _ = _extract_openapi_contract()
@@ -244,3 +255,19 @@ def test_openapi_active_space_limits_match_runtime_constraints() -> None:
         properties = schemas[schema_name]["allOf"][1]["properties"]
         for param_name in ("ncas", "nelecas", "max_cycle_micro"):
             assert properties[param_name]["maximum"] == PARAMETER_CONSTRAINTS[param_name]["max"]
+
+
+def test_list_calculations_method_filter_matches_calculation_method_schema() -> None:
+    """The list endpoint method filter must allow every supported calculation method."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    operation = spec["paths"]["/api/quantum/calculations"]["get"]
+    method_parameter = next(
+        parameter
+        for parameter in operation["parameters"]
+        if parameter["name"] == "calculation_method"
+    )
+
+    parameter_schema = _resolve_schema(spec, method_parameter["schema"])
+    calculation_method_schema = spec["components"]["schemas"]["CalculationMethod"]
+
+    assert parameter_schema["enum"] == calculation_method_schema["enum"]
