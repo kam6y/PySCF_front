@@ -346,10 +346,7 @@ class CASSCFCalculator(BaseCalculator):
                 mol = self.mf.mol if hasattr(self, 'mf') and self.mf is not None else self.mol
 
                 # Calculate orbital rotation matrix
-                if hasattr(mol, 'get_ovlp'):
-                    S = mol.get_ovlp()
-                else:
-                    S = self.mf.get_ovlp()
+                S = mol.get_ovlp() if hasattr(mol, 'get_ovlp') else self.mf.get_ovlp()
                 
                 # Rotation matrix: R = C_initial^T * S * C_final
                 rotation_matrix = np.dot(self.mf.mo_coeff.T, np.dot(S, self.mycas.mo_coeff))

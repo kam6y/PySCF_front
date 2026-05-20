@@ -10,7 +10,7 @@ Note:
 """
 
 import logging
-from flask import Blueprint, jsonify
+from flask import Blueprint, Response, jsonify
 from flask_pydantic import validate
 
 from generated_models import (
@@ -24,6 +24,15 @@ logger = logging.getLogger(__name__)
 
 # Create chat history blueprint
 chat_history_bp = Blueprint('chat_history', __name__)
+
+
+def _chat_session_not_found(session_id: str) -> tuple[Response, int]:
+    """Return the standard chat-session 404 response."""
+    logger.warning(f"Chat session not found: {session_id}")
+    return jsonify({
+        'success': False,
+        'error': f'Chat session not found: {session_id}'
+    }), 404
 
 
 @chat_history_bp.route('/api/chat-history/sessions', methods=['GET'])
@@ -69,11 +78,7 @@ def get_chat_session(session_id: str):
     session_data = service.get_session_with_messages(session_id)
 
     if session_data is None:
-        logger.warning(f"Chat session not found: {session_id}")
-        return jsonify({
-            'success': False,
-            'error': f'Chat session not found: {session_id}'
-        }), 404
+        return _chat_session_not_found(session_id)
 
     return jsonify({
         'success': True,
@@ -94,11 +99,7 @@ def update_chat_session(session_id: str, body: UpdateChatSessionRequest):
     session = service.update_session(session_id, body.name)
 
     if session is None:
-        logger.warning(f"Chat session not found: {session_id}")
-        return jsonify({
-            'success': False,
-            'error': f'Chat session not found: {session_id}'
-        }), 404
+        return _chat_session_not_found(session_id)
 
     return jsonify({
         'success': True,
@@ -116,11 +117,7 @@ def delete_chat_session(session_id: str):
     deleted = service.delete_session(session_id)
 
     if not deleted:
-        logger.warning(f"Chat session not found: {session_id}")
-        return jsonify({
-            'success': False,
-            'error': f'Chat session not found: {session_id}'
-        }), 404
+        return _chat_session_not_found(session_id)
 
     return jsonify({
         'success': True,

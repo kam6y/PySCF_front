@@ -14,7 +14,7 @@ _SENSITIVE_KEYS = {"gemini_api_key", "research_email"}
 
 
 def mask_settings(settings) -> dict:
-    """ログ出力用に機密フィールドをマスクした辞書を返す。"""
+    """Return settings as a dict with sensitive fields masked for logging."""
     if hasattr(settings, "model_dump"):
         d = settings.model_dump(mode="json")
     elif isinstance(settings, dict):

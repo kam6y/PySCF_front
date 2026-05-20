@@ -276,7 +276,7 @@ class BaseCalculator(
 
         # Apply density fitting if enabled
         self.density_fitting = common_params.get('density_fitting', False)
-        self.auxiliary_basis = common_params.get('auxiliary_basis', None)
+        self.auxiliary_basis = common_params.get('auxiliary_basis')
         if self.density_fitting:
             auxbasis = self.auxiliary_basis if self.auxiliary_basis else None
             self.mf = self.mf.density_fit(auxbasis=auxbasis)
@@ -475,11 +475,10 @@ class BaseCalculator(
         })
         
         # Save files if requested
-        if hasattr(self, 'keep_files') and self.keep_files:
-            if hasattr(self, 'file_manager'):
-                self.file_manager.save_calculation_results(self.working_dir, self.results)
-                self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
-                logger.info(f"Calculation files saved to: {self.working_dir}")
+        if hasattr(self, 'keep_files') and self.keep_files and hasattr(self, 'file_manager'):
+            self.file_manager.save_calculation_results(self.working_dir, self.results)
+            self.file_manager.save_geometry(self.working_dir, self.results['optimized_geometry'])
+            logger.info(f"Calculation files saved to: {self.working_dir}")
         
         return self.results
 

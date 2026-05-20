@@ -65,6 +65,17 @@ class CubeArtifactService:
         else:
             return str(orbital_dir / "orbital_*_grid*.cube")
 
+    def _delete_files(self, file_paths: List[str]) -> int:
+        """Delete files and return the count of successful removals."""
+        deleted_count = 0
+        for file_path in file_paths:
+            try:
+                os.unlink(file_path)
+                deleted_count += 1
+            except Exception:
+                continue
+        return deleted_count
+
     def get_cube_files_info(self, calc_dir: str) -> List[Dict[str, Any]]:
         """Get information about CUBE files in a calculation directory."""
         cube_files = []
@@ -108,23 +119,14 @@ class CubeArtifactService:
         Returns:
             Number of files deleted
         """
-        deleted_count = 0
         calc_path = Path(calc_dir)
         orbital_dir = calc_path / "orbital"
 
         if not orbital_dir.exists():
-            return deleted_count
+            return 0
 
         pattern = self._get_cube_file_pattern(orbital_dir, orbital_index)
-
-        for file_path in glob.glob(pattern):
-            try:
-                os.unlink(file_path)
-                deleted_count += 1
-            except Exception:
-                continue
-
-        return deleted_count
+        return self._delete_files(glob.glob(pattern))
 
     def cleanup_calculation_directory(self, calc_dir: str, include_cube_files: bool = True) -> Dict[str, int]:
         """
@@ -159,12 +161,7 @@ class CubeArtifactService:
         ]
 
         for pattern in temp_patterns:
-            for file_path in glob.glob(pattern):
-                try:
-                    os.unlink(file_path)
-                    cleanup_stats["temp_files"] += 1
-                except Exception:
-                    continue
+            cleanup_stats["temp_files"] += self._delete_files(glob.glob(pattern))
 
         # Delete log files (optional, keep recent ones)
         log_pattern = str(calc_path / "*.log")
@@ -173,11 +170,6 @@ class CubeArtifactService:
         # Keep only the most recent 3 log files
         if len(log_files) > 3:
             log_files.sort(key=lambda f: os.path.getmtime(f), reverse=True)
-            for old_log in log_files[3:]:
-                try:
-                    os.unlink(old_log)
-                    cleanup_stats["log_files"] += 1
-                except Exception:
-                    continue
+            cleanup_stats["log_files"] = self._delete_files(log_files[3:])
 
         return cleanup_stats

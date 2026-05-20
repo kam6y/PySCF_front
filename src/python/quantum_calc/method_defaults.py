@@ -156,6 +156,12 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
     }
 }
 
+UNIVERSAL_PARAMS = {
+    'xyz', 'calculation_method', 'basis_function', 'charges', 'spin',
+    'solvent_method', 'solvent', 'name', 'cpu_cores', 'memory_mb',
+    'ketcher_data', 'created_at'
+}
+
 
 def get_method_defaults() -> Dict[str, Dict[str, Any]]:
     """Get all method default values.
@@ -318,13 +324,6 @@ def validate_parameters_for_method(
         >>> validate_parameters_for_method('TDDFT', {'xyz': '...', 'optimize_geometry': True})
         (False, "Parameter 'optimize_geometry' is disabled for method 'TDDFT'. Reason: Geometry optimization is not available for these calculation methods")
     """
-    # Universal parameters that are applicable to all calculation methods
-    UNIVERSAL_PARAMS = {
-        'xyz', 'calculation_method', 'basis_function', 'charges', 'spin',
-        'solvent_method', 'solvent', 'name', 'cpu_cores', 'memory_mb',
-        'ketcher_data', 'created_at'
-    }
-
     invalid_params = []
 
     for param_name, param_value in params.items():

@@ -391,10 +391,7 @@ class MulticonfigurationAnalysisMixin:
 
         try:
             # Get overlap matrix
-            if hasattr(mol, 'get_ovlp'):
-                S = mol.get_ovlp()
-            else:
-                S = self.mf.get_ovlp()
+            S = mol.get_ovlp() if hasattr(mol, 'get_ovlp') else self.mf.get_ovlp()
             
             cas_orbs = self.mycas.mo_coeff
             scf_orbs = self.mf.mo_coeff

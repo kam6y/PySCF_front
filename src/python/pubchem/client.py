@@ -70,7 +70,7 @@ class PubChemClient:
             return CompoundData(**compound_info)
 
         except PubChemNotFoundError:
-             # 見つからなかった場合はそのまま上位に伝播させる
+            # Let not-found errors propagate to the service layer unchanged.
             raise
         except (ValueError, KeyError, TypeError) as e:
             logger.error(f"Error processing data for query '{query}': {e}")
@@ -95,7 +95,7 @@ class PubChemClient:
                 return None
             return cids[0]
         except PubChemNotFoundError:
-            # 404の場合は単に見つからなかったケースとしてNoneを返す
+            # Treat 404 as a regular "not found" result for CID lookup.
             logger.warning(f"Could not find CID for '{query}' (type: {search_type})")
             return None
 

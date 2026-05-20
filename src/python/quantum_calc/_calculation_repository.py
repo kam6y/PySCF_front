@@ -120,14 +120,12 @@ class CalculationRepository:
             # Apply filters - skip this calculation if it doesn't match
 
             # Filter by name (case-insensitive partial match)
-            if name_query:
-                if name_query.lower() not in display_name.lower():
-                    continue
+            if name_query and name_query.lower() not in display_name.lower():
+                continue
 
             # Filter by status (exact match, case-insensitive)
-            if status:
-                if calc_status.lower() != status.lower():
-                    continue
+            if status and calc_status.lower() != status.lower():
+                continue
 
             # Filter by calculation_method (requires params)
             if calculation_method and params:

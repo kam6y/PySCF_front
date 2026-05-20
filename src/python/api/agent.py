@@ -37,6 +37,26 @@ def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
     return f"data: {json.dumps(event_data)}\n\n"
 
 
+def _extract_history_role(message: Any) -> str:
+    """Extract role from dict or Pydantic history message."""
+    if isinstance(message, dict):
+        return message.get("role", "")
+
+    role_attr = getattr(message, "role", "")
+    return str(role_attr).split('.')[-1] if hasattr(role_attr, 'value') else str(role_attr)
+
+
+def _extract_text_parts(parts: list) -> list:
+    """Extract text values from dict or Pydantic history parts."""
+    text_parts = []
+    for part in parts:
+        if isinstance(part, dict) and "text" in part:
+            text_parts.append(part["text"])
+        elif hasattr(part, "text"):
+            text_parts.append(part.text)
+    return text_parts
+
+
 def _convert_history_to_gemini_format(history: list) -> list:
     """
     Convert frontend message history format to Gemini API format.
@@ -62,25 +82,9 @@ def _convert_history_to_gemini_format(history: list) -> list:
     converted = []
 
     for msg in history:
-        # Handle both dict and Pydantic model objects
-        if isinstance(msg, dict):
-            role = msg.get("role", "")
-            parts = msg.get("parts", [])
-        else:
-            # Pydantic model (HistoryItem)
-            role_attr = getattr(msg, "role", "")
-            # Handle enum values (convert to string)
-            role = str(role_attr).split('.')[-1] if hasattr(role_attr, 'value') else str(role_attr)
-            parts = getattr(msg, "parts", [])
-
-        # Extract text content from parts
-        text_parts = []
-        for part in parts:
-            if isinstance(part, dict) and "text" in part:
-                text_parts.append(part["text"])
-            elif hasattr(part, "text"):
-                # Pydantic model
-                text_parts.append(part.text)
+        role = _extract_history_role(msg)
+        parts = msg.get("parts", []) if isinstance(msg, dict) else getattr(msg, "parts", [])
+        text_parts = _extract_text_parts(parts)
 
         if text_parts:
             converted.append({

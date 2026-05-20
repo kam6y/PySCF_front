@@ -84,19 +84,16 @@ def quantum_calculate():
 
     # Handle Pydantic RootModel[Union[...]] structure
     # Access .root attribute if present (discriminated union from OpenAPI)
-    if hasattr(body, 'root'):
-        validated_model = body.root
-    else:
-        validated_model = body
+    validated_model = body.root if hasattr(body, 'root') else body
 
-    # Pydanticモデルを辞書に変換
+    # Convert Pydantic model to a plain dictionary
     parameters = validated_model.model_dump(exclude_none=False, mode='python')
 
-    # Enum値を文字列に変換
+    # Convert enum values to strings
     for key, value in list(parameters.items()):
         parameters[key] = get_enum_value(value)
 
-    # タイムスタンプを追加
+    # Add creation timestamp
     parameters['created_at'] = datetime.now().isoformat()
 
     # Call service layer (also validates parameters for defense-in-depth and AI agent calls)

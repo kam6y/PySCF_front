@@ -8,6 +8,7 @@ providing a unified interface for both API endpoints and AI agent tools.
 import logging
 import os
 import shutil
+from contextlib import suppress
 from datetime import datetime
 from typing import Optional, Dict, Any
 
@@ -95,17 +96,14 @@ class QuantumService:
             # Reject requests with inapplicable or disabled parameters
             return applicability_error
 
-        # Check DFT method constraints
-        if calculation_method == 'DFT':
-            if not params.get('exchange_correlation'):
-                return "DFT method requires an exchange-correlation functional to be specified"
-        
-        # Check TDDFT method constraints
-        if calculation_method == 'TDDFT':
-            if not params.get('exchange_correlation'):
-                return "TDDFT method requires an exchange-correlation functional to be specified"
-            if not params.get('tddft_nstates') or params.get('tddft_nstates') < 1:
-                return "TDDFT method requires tddft_nstates to be specified and greater than 0"
+        # Check DFT/TDDFT method constraints
+        if calculation_method in {'DFT', 'TDDFT'} and not params.get('exchange_correlation'):
+            return f"{calculation_method} method requires an exchange-correlation functional to be specified"
+
+        if calculation_method == 'TDDFT' and (
+            not params.get('tddft_nstates') or params.get('tddft_nstates') < 1
+        ):
+            return "TDDFT method requires tddft_nstates to be specified and greater than 0"
         
         # Check CASCI/CASSCF method constraints
         if calculation_method in ['CASCI', 'CASSCF']:
@@ -197,12 +195,10 @@ class QuantumService:
                 
             except ProcessManagerError as e:
                 # Clean up created directory
-                try:
+                with suppress(Exception):
                     shutil.rmtree(calc_dir, ignore_errors=True)
-                except Exception:
-                    pass
                 logger.error(f"Process manager error: {e}")
-                raise ResourceUnavailableError(f'System initialization error: Unable to initialize calculation system. Please check system resources and try again.')
+                raise ResourceUnavailableError('System initialization error: Unable to initialize calculation system. Please check system resources and try again.')
             except Exception as submit_error:
                 # Update status to error
                 self.repository.save_calculation_status(calc_dir, 'error')
