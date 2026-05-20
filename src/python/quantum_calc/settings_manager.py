@@ -52,14 +52,27 @@ class SettingsManager:
     
     def get_default_settings(self) -> AppSettings:
         """Get default application settings."""
+        def fallback_cpu_count() -> int:
+            try:
+                return max(1, int(multiprocessing.cpu_count() or 1))
+            except (NotImplementedError, ValueError, TypeError):
+                return 1
+
         try:
             import psutil
-            total_cores = psutil.cpu_count(logical=True)
+            total_cores = psutil.cpu_count(logical=True) or fallback_cpu_count()
             total_memory_mb = int(psutil.virtual_memory().total / (1024 * 1024))
         except ImportError:
             # Fallback when psutil is not available
-            total_cores = multiprocessing.cpu_count()
+            total_cores = fallback_cpu_count()
             total_memory_mb = 4096  # Conservative 4GB estimate
+        except Exception as exc:
+            logger.warning(f"Failed to detect system resources via psutil: {exc}. Using conservative defaults.")
+            total_cores = fallback_cpu_count()
+            total_memory_mb = 4096
+
+        total_cores = max(1, int(total_cores or 1))
+        total_memory_mb = max(1, int(total_memory_mb or 4096))
 
         # Default calculations directory (with PySCF_calculations subfolder)
         default_calc_dir = str(Path.home() / "PySCF_calculations")

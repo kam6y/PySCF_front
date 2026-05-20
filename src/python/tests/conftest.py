@@ -57,10 +57,32 @@ def app():
     # Mock environment variables for testing
     # This ensures consistent behavior in CI and local environments
     from unittest import mock
+    import services as services_module
+    import quantum_calc.settings_manager as settings_manager_module
+    from quantum_calc.settings_manager import SettingsManager
 
-    with mock.patch.dict(os.environ, {
-        'PYSCF_ENV': 'development',
-    }):
+    test_settings_manager = SettingsManager(
+        settings_file=os.path.join(temp_dir, "app-settings.json")
+    )
+    test_settings = test_settings_manager.get_default_settings().model_copy(
+        update={'calculations_directory': temp_dir}
+    )
+    test_settings_manager.save_settings(test_settings)
+
+    with (
+        mock.patch.dict(os.environ, {
+            'PYSCF_ENV': 'development',
+        }),
+        mock.patch.object(settings_manager_module, "_settings_manager", test_settings_manager),
+        mock.patch.multiple(
+            services_module,
+            _quantum_service=None,
+            _pubchem_service=None,
+            _smiles_service=None,
+            _settings_service=None,
+            _system_service=None,
+        ),
+    ):
         # Create app using Application Factory with test configuration
         _app = create_app(server_port=5000, test_config=test_config)
 
@@ -70,11 +92,9 @@ def app():
 
     # Cleanup: Shutdown process manager first to prevent "cannot schedule new futures after shutdown" errors
     try:
-        from quantum_calc.process_manager import get_process_manager
-        process_manager = get_process_manager()
-        if process_manager:
-            process_manager.shutdown(wait=True)
-            logger.info("Process manager shut down successfully")
+        from quantum_calc.process_manager import shutdown_process_manager
+        shutdown_process_manager()
+        logger.info("Process manager shut down successfully")
     except Exception as e:
         print(f"Warning: Failed to shutdown process manager: {e}")
 

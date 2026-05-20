@@ -285,13 +285,18 @@ def validate_parameter_value(param_name: str, value: Any) -> tuple[bool, str]:
     if not constraint:
         return True, ''
 
-    # Check minimum value
-    if 'min' in constraint and value < constraint['min']:
-        return False, f"Value {value} is below minimum of {constraint['min']}"
+    try:
+        # Check minimum value
+        if 'min' in constraint and value < constraint['min']:
+            if constraint['min'] == 1:
+                return False, f"Value {value} is below minimum of 1 and must be greater than 0"
+            return False, f"Value {value} is below minimum of {constraint['min']}"
 
-    # Check maximum value
-    if 'max' in constraint and value > constraint['max']:
-        return False, f"Value {value} exceeds maximum of {constraint['max']}"
+        # Check maximum value
+        if 'max' in constraint and value > constraint['max']:
+            return False, f"Value {value} exceeds maximum of {constraint['max']}"
+    except TypeError:
+        return False, f"Value {value} cannot be compared with numeric constraints"
 
     return True, ''
 
@@ -325,11 +330,19 @@ def validate_parameters_for_method(
         (False, "Parameter 'optimize_geometry' is disabled for method 'TDDFT'. Reason: Geometry optimization is not available for these calculation methods")
     """
     invalid_params = []
+    invalid_values = []
 
     for param_name, param_value in params.items():
         # Skip None values (parameter not explicitly provided)
         if param_value is None:
             continue
+
+        value_is_valid, value_error = validate_parameter_value(param_name, param_value)
+        if not value_is_valid:
+            invalid_values.append({
+                'param': param_name,
+                'error': value_error
+            })
 
         # Skip universal parameters that apply to all methods
         if param_name in UNIVERSAL_PARAMS:
@@ -345,9 +358,14 @@ def validate_parameters_for_method(
                 'applicable_to': applicable_to
             })
 
-    # Build comprehensive error message if any invalid parameters found
-    if invalid_params:
+    # Build comprehensive error message if any invalid parameters or values found
+    if invalid_params or invalid_values:
         error_lines = []
+        for invalid in invalid_values:
+            error_lines.append(
+                f"Parameter '{invalid['param']}' has invalid value: {invalid['error']}"
+            )
+
         for invalid in invalid_params:
             param = invalid['param']
             applicable = ', '.join(invalid['applicable_to']) if invalid['applicable_to'] else 'none'

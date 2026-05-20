@@ -44,6 +44,26 @@ class TestPubChemSearchAPI:
         # Verify service was called correctly
         mock_service.return_value.search_compound.assert_called_once_with('water', 'name')
 
+    def test_search_defaults_to_name_when_search_type_omitted(self, client, mocker):
+        """
+        GIVEN searchType is omitted from the request
+        WHEN POST /api/pubchem/search is called
+        THEN the service is called with the default name search type
+        """
+        # ARRANGE
+        mock_result = {'xyz': 'H 0 0 0', 'cid': 123}
+        mock_service = mocker.patch('api.pubchem.get_pubchem_service')
+        mock_service.return_value.search_compound.return_value = mock_result
+
+        # ACT
+        response = client.post('/api/pubchem/search', json={
+            'query': 'water'
+        })
+
+        # ASSERT
+        assert response.status_code == 200
+        mock_service.return_value.search_compound.assert_called_once_with('water', 'name')
+
     @pytest.mark.parametrize("search_type", ['name', 'cid', 'formula'])
     def test_search_different_types(self, client, mocker, search_type):
         """

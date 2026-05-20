@@ -87,7 +87,7 @@ class DFTCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create DFT method object (RKS/UKS)."""
         spin = self.results.get('spin', 0)
-        if self._is_gpu4pyscf_available():
+        if self._require_gpu4pyscf_available():
             try:
                 from gpu4pyscf import dft as gpu_dft
                 if spin == 0:
@@ -99,8 +99,12 @@ class DFTCalculator(BaseCalculator):
                 self.gpu_enabled = True
                 return mf
             except Exception as exc:
-                logger.warning(f"GPU4PySCF DFT setup failed, falling back to CPU: {exc}")
                 self.gpu_enabled = False
+                raise CalculationError(
+                    "GPU4PySCF DFT setup failed. GPU acceleration is enabled, so "
+                    "the calculation was stopped instead of falling back to CPU. "
+                    f"Disable GPU acceleration to run on CPU. Original error: {exc}"
+                ) from exc
 
         if spin == 0:
             mf = dft.RKS(mol)

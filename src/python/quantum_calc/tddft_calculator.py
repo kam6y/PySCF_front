@@ -149,6 +149,12 @@ class TDDFTCalculator(BaseCalculator):
         try:
             self.mytd.kernel()
         except Exception as e:
+            if self.gpu_enabled:
+                raise CalculationError(
+                    "GPU4PySCF TDDFT calculation failed. GPU acceleration is enabled, "
+                    "so the calculation was stopped instead of falling back to CPU. "
+                    f"Disable GPU acceleration to run on CPU. Original error: {e}"
+                ) from e
             error_msg = str(e).lower()
             if "singular" in error_msg or "convergence" in error_msg:
                 raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
@@ -186,7 +192,7 @@ class TDDFTCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create DFT method object for TDDFT ground state (RKS/UKS)."""
         spin = self.results.get('spin', 0)
-        if self._is_gpu4pyscf_available():
+        if self._require_gpu4pyscf_available():
             try:
                 import gpu4pyscf
                 if spin == 0:
@@ -198,8 +204,12 @@ class TDDFTCalculator(BaseCalculator):
                 self.gpu_enabled = True
                 return mf
             except Exception as exc:
-                logger.warning(f"GPU4PySCF TDDFT setup failed, falling back to CPU: {exc}")
                 self.gpu_enabled = False
+                raise CalculationError(
+                    "GPU4PySCF TDDFT setup failed. GPU acceleration is enabled, so "
+                    "the calculation was stopped instead of falling back to CPU. "
+                    f"Disable GPU acceleration to run on CPU. Original error: {exc}"
+                ) from exc
 
         if spin == 0:
             mf = dft.RKS(mol)

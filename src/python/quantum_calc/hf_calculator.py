@@ -81,7 +81,7 @@ class HFCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create HF method object (RHF/UHF)."""
         spin = self.results.get('spin', 0)
-        if self._is_gpu4pyscf_available():
+        if self._require_gpu4pyscf_available():
             try:
                 from gpu4pyscf import scf as gpu_scf
                 if spin == 0:
@@ -93,8 +93,12 @@ class HFCalculator(BaseCalculator):
                 self.gpu_enabled = True
                 return mf
             except Exception as exc:
-                logger.warning(f"GPU4PySCF HF setup failed, falling back to CPU: {exc}")
                 self.gpu_enabled = False
+                raise CalculationError(
+                    "GPU4PySCF HF setup failed. GPU acceleration is enabled, so "
+                    "the calculation was stopped instead of falling back to CPU. "
+                    f"Disable GPU acceleration to run on CPU. Original error: {exc}"
+                ) from exc
 
         if spin == 0:
             mf = scf.RHF(mol)

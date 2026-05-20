@@ -19,6 +19,19 @@ def test_app_fixture(app):
     assert app.config['WTF_CSRF_ENABLED'] is False
 
 
+def test_app_fixture_isolates_current_settings_directory(app):
+    """
+    GIVEN the app fixture
+    WHEN current settings are loaded
+    THEN calculations_directory points at the temporary test directory
+    """
+    from quantum_calc import get_current_settings
+
+    settings = get_current_settings()
+
+    assert settings.calculations_directory == app.config['CALCULATIONS_DIR']
+
+
 def test_client_fixture(client):
     """
     GIVEN the client fixture

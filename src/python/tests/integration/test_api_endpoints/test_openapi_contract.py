@@ -14,6 +14,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
+from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
 
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
@@ -232,3 +233,14 @@ def test_openapi_and_implementation_have_same_query_parameter_names() -> None:
             mismatches.append("\n".join(mismatch_lines))
 
     assert not mismatches, "\n".join(mismatches)
+
+
+def test_openapi_active_space_limits_match_runtime_constraints() -> None:
+    """CASCI/CASSCF OpenAPI limits must match runtime validation constraints."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    schemas = spec["components"]["schemas"]
+
+    for schema_name in ("CASCICalculationRequest", "CASSCFCalculationRequest"):
+        properties = schemas[schema_name]["allOf"][1]["properties"]
+        for param_name in ("ncas", "nelecas", "max_cycle_micro"):
+            assert properties[param_name]["maximum"] == PARAMETER_CONSTRAINTS[param_name]["max"]

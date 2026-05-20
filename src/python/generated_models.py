@@ -269,12 +269,12 @@ class CalculationMethod7(Enum):
 class CASCICalculationRequest(CalculationRequestBase):
     calculation_method: Literal['CASCI']
     basis_function: Optional[str] = '6-31G(d)'
-    ncas: int = Field(..., description='Number of active space orbitals', ge=1, le=50)
+    ncas: int = Field(..., description='Number of active space orbitals', ge=1, le=20)
     nelecas: int = Field(
-        ..., description='Number of active space electrons', ge=1, le=100
+        ..., description='Number of active space electrons', ge=1, le=40
     )
     max_cycle_micro: Optional[int] = Field(
-        3, description='Maximum CI solver micro iterations', ge=1, le=20
+        3, description='Maximum CI solver micro iterations', ge=1, le=100
     )
     natorb: Optional[bool] = Field(
         True, description='Transform to natural orbitals in active space'
@@ -288,15 +288,15 @@ class CalculationMethod8(Enum):
 class CASSCFCalculationRequest(CalculationRequestBase):
     calculation_method: Literal['CASSCF']
     basis_function: Optional[str] = '6-31G(d)'
-    ncas: int = Field(..., description='Number of active space orbitals', ge=1, le=50)
+    ncas: int = Field(..., description='Number of active space orbitals', ge=1, le=20)
     nelecas: int = Field(
-        ..., description='Number of active space electrons', ge=1, le=100
+        ..., description='Number of active space electrons', ge=1, le=40
     )
     max_cycle_macro: Optional[int] = Field(
         50, description='Maximum CASSCF macro iterations', ge=1, le=200
     )
     max_cycle_micro: Optional[int] = Field(
-        3, description='Maximum CI solver micro iterations', ge=1, le=20
+        3, description='Maximum CI solver micro iterations', ge=1, le=100
     )
     natorb: Optional[bool] = Field(True, description='Transform to natural orbitals')
     conv_tol: Optional[float] = Field(

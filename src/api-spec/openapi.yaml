@@ -1420,19 +1420,19 @@ components:
             ncas:
               type: integer
               minimum: 1
-              maximum: 50
+              maximum: 20
               default: 4
               description: Number of active space orbitals
             nelecas:
               type: integer
               minimum: 1
-              maximum: 100
+              maximum: 40
               default: 4
               description: Number of active space electrons
             max_cycle_micro:
               type: integer
               minimum: 1
-              maximum: 20
+              maximum: 100
               default: 3
               description: Maximum CI solver micro iterations
             natorb:
@@ -1456,13 +1456,13 @@ components:
             ncas:
               type: integer
               minimum: 1
-              maximum: 50
+              maximum: 20
               default: 4
               description: Number of active space orbitals
             nelecas:
               type: integer
               minimum: 1
-              maximum: 100
+              maximum: 40
               default: 4
               description: Number of active space electrons
             max_cycle_macro:
@@ -1474,7 +1474,7 @@ components:
             max_cycle_micro:
               type: integer
               minimum: 1
-              maximum: 20
+              maximum: 100
               default: 3
               description: Maximum CI solver micro iterations
             natorb:

@@ -24,7 +24,12 @@ def search_pubchem(body: PubChemSearchRequest):
     pubchem_service = get_pubchem_service()
 
     query = body.query
-    search_type = body.searchType.value
+    search_type_value = body.searchType or "name"
+    search_type = (
+        search_type_value.value
+        if hasattr(search_type_value, "value")
+        else str(search_type_value)
+    )
 
     # Call service layer
     result = pubchem_service.search_compound(query, search_type)

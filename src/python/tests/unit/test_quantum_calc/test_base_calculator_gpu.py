@@ -5,8 +5,10 @@ Unit tests for BaseCalculator GPU detection helpers.
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import pytest
 import quantum_calc.base_calculator as base_calculator
 from quantum_calc.base_calculator import BaseCalculator
+from quantum_calc.exceptions import CalculationError
 
 
 class DummyCalculator(BaseCalculator):
@@ -23,6 +25,13 @@ class DummyCalculator(BaseCalculator):
 
     def _get_base_method_description(self) -> str:
         return "Dummy"
+
+
+class FailingKernel:
+    """Mean-field stand-in that fails during kernel execution."""
+
+    def kernel(self):
+        raise RuntimeError("CUDA execution failed")
 
 
 def test_gpu_disabled_returns_false(monkeypatch):
@@ -96,3 +105,31 @@ def test_gpu_available_when_cuda_supported_and_module_present(monkeypatch):
     monkeypatch.setattr(base_calculator.util, "find_spec", lambda _: object())
 
     assert calculator._is_gpu4pyscf_available() is True
+
+
+def test_gpu_required_raises_when_enabled_but_unavailable(monkeypatch):
+    """
+    GIVEN GPU acceleration enabled on an unsupported platform
+    WHEN GPU execution is required
+    THEN a calculation error is raised instead of falling back to CPU
+    """
+    calculator = DummyCalculator(optimize_geometry=False)
+    monkeypatch.setattr(calculator, "_is_gpu_acceleration_enabled", lambda: True)
+    monkeypatch.setattr(base_calculator.sys, "platform", "darwin")
+
+    with pytest.raises(CalculationError, match="GPU acceleration is enabled"):
+        calculator._require_gpu4pyscf_available()
+
+
+def test_gpu_runtime_failure_is_reported_as_calculation_error():
+    """
+    GIVEN a GPU-backed mean-field object
+    WHEN the PySCF kernel fails during execution
+    THEN the error is surfaced as a GPU calculation error
+    """
+    calculator = DummyCalculator(optimize_geometry=False)
+    calculator.mf = FailingKernel()
+    calculator.gpu_enabled = True
+
+    with pytest.raises(CalculationError, match="GPU4PySCF calculation failed"):
+        calculator._run_base_scf_calculation()

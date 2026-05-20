@@ -6,6 +6,7 @@ from quantum_calc.method_defaults import (
     get_defaults_for_method,
     is_parameter_applicable,
     validate_parameter_value,
+    validate_parameters_for_method,
     METHOD_DEFAULTS,
     PARAMETER_CONSTRAINTS,
 )
@@ -412,8 +413,6 @@ class TestValidateParametersForMethod:
 
     def test_valid_casci_parameters(self):
         """Test that valid CASCI parameters pass validation."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'CASCI',
@@ -427,6 +426,36 @@ class TestValidateParametersForMethod:
         is_valid, error = validate_parameters_for_method('CASCI', params)
         assert is_valid is True
         assert error == ''
+
+    def test_casci_rejects_out_of_range_active_space(self):
+        """Test that CASCI validation enforces active space bounds."""
+        params = {
+            'xyz': 'H 0 0 0\nH 0 0 0.74',
+            'calculation_method': 'CASCI',
+            'ncas': 21,
+            'nelecas': 41
+        }
+
+        is_valid, error = validate_parameters_for_method('CASCI', params)
+        assert is_valid is False
+        assert 'ncas' in error
+        assert 'nelecas' in error
+        assert 'exceeds maximum' in error
+
+    def test_universal_parameters_still_validate_bounds(self):
+        """Test that universal parameters are accepted only within their value bounds."""
+        params = {
+            'xyz': 'H 0 0 0\nH 0 0 0.74',
+            'calculation_method': 'DFT',
+            'basis_function': '6-31G(d)',
+            'cpu_cores': 64,
+            'memory_mb': 64
+        }
+
+        is_valid, error = validate_parameters_for_method('DFT', params)
+        assert is_valid is False
+        assert 'cpu_cores' in error
+        assert 'memory_mb' in error
 
     def test_casci_rejects_tddft_parameters(self):
         """Test that CASCI rejects TDDFT-specific parameters."""

@@ -71,6 +71,44 @@ class BaseCalculator(
                 )
         return self._gpu4pyscf_available
 
+    def _get_gpu4pyscf_unavailable_reason(self) -> str:
+        """Return a human-readable reason GPU4PySCF cannot be used."""
+        if not sys.platform.startswith("linux"):
+            return "GPU4PySCF is supported on Linux only"
+        if not self._is_cuda_supported():
+            return "supported CUDA Toolkit was not detected"
+        if util.find_spec("gpu4pyscf") is None:
+            return "gpu4pyscf package is not installed"
+        return "GPU4PySCF is unavailable"
+
+    def _require_gpu4pyscf_available(self) -> bool:
+        """
+        Require GPU4PySCF when GPU acceleration is enabled.
+
+        Returns False when GPU acceleration is disabled. Returns True when it is
+        enabled and all prerequisites are available. Raises instead of silently
+        falling back to CPU when GPU was explicitly enabled.
+        """
+        if not self._is_gpu_acceleration_enabled():
+            self.gpu_enabled = False
+            return False
+        if self._is_gpu4pyscf_available():
+            return True
+
+        reason = self._get_gpu4pyscf_unavailable_reason()
+        raise CalculationError(
+            "GPU acceleration is enabled but GPU4PySCF is unavailable: "
+            f"{reason}. Disable GPU acceleration to run this calculation on CPU."
+        )
+
+    def _raise_gpu_calculation_error(self, error: Exception) -> None:
+        """Raise a consistent error for GPU execution failures."""
+        raise CalculationError(
+            "GPU4PySCF calculation failed. GPU acceleration is enabled, so the "
+            "calculation was stopped instead of falling back to CPU. Disable GPU "
+            f"acceleration to run this calculation on CPU. Original error: {error}"
+        ) from error
+
     def _is_cuda_supported(self) -> bool:
         """Check whether a supported CUDA Toolkit is available (via nvcc)."""
         if self._cuda_supported is None:
@@ -202,6 +240,8 @@ class BaseCalculator(
             
             logger.info(f"{self._get_calculation_method_name()} setup completed successfully")
             
+        except CalculationError:
+            raise
         except Exception as e:
             from .exceptions import InputError
             raise InputError(f"Failed to setup {self._get_calculation_method_name()} calculation: {str(e)}")
@@ -438,7 +478,12 @@ class BaseCalculator(
     def _run_base_scf_calculation(self) -> float:
         """Run base SCF calculation and return energy."""
         logger.info(f"Running {self._get_base_method_description()} calculation...")
-        energy = self.mf.kernel()
+        try:
+            energy = self.mf.kernel()
+        except Exception as exc:
+            if self.gpu_enabled:
+                self._raise_gpu_calculation_error(exc)
+            raise
         logger.info(f"{self._get_base_method_description()} calculation completed")
         return energy
     
