@@ -18,7 +18,12 @@ from datetime import datetime
 from typing import Dict, Any, Optional, Tuple, List
 from importlib import metadata, util
 
-from quantum_calc import get_process_manager, get_current_settings, CalculationRepository
+from quantum_calc import (
+    get_process_manager,
+    get_current_settings,
+    CalculationRepository,
+    mask_settings,
+)
 from quantum_calc.resource_manager import get_resource_manager
 from .exceptions import ServiceError, ValidationError
 from config import get_server_config
@@ -518,7 +523,7 @@ class SystemService:
 
                 diagnostics['settings'] = {
                     'status': 'available',
-                    'settings': current_settings.model_dump()
+                    'settings': mask_settings(current_settings)
                 }
             except Exception as settings_error:
                 diagnostics['settings'] = {

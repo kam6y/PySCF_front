@@ -4,6 +4,55 @@ Integration tests for System API endpoints.
 Covers GPU4PySCF status detection and installation endpoints.
 """
 
+from generated_models import AppSettings
+
+
+class TestSystemDiagnosticsAPI:
+    """Integration tests for /api/debug/system-diagnostics endpoint."""
+
+    def test_get_system_diagnostics_masks_sensitive_settings(
+        self,
+        client,
+        mocker,
+        tmp_path,
+    ):
+        """
+        GIVEN current settings contain sensitive values
+        WHEN GET /api/debug/system-diagnostics is called
+        THEN settings diagnostics mask those values in the response payload
+        """
+        sensitive_api_key = "plain-gemini-api-key"
+        sensitive_email = "researcher@example.com"
+        settings = AppSettings(
+            max_parallel_instances=1,
+            max_cpu_utilization_percent=95.0,
+            max_memory_utilization_percent=95.0,
+            system_total_cores=1,
+            system_total_memory_mb=1024,
+            calculations_directory=str(tmp_path),
+            timezone="UTC",
+            gemini_api_key=sensitive_api_key,
+            research_email=sensitive_email,
+            gpu_acceleration_enabled=False,
+        )
+        mocker.patch(
+            "services.system_service.get_current_settings",
+            return_value=settings,
+        )
+
+        response = client.get("/api/debug/system-diagnostics")
+
+        assert response.status_code == 200
+        response_text = response.get_data(as_text=True)
+        data = response.get_json()
+        settings_payload = data["data"]["settings"]["settings"]
+        assert data["success"] is True
+        assert settings_payload["gemini_api_key"] == "***"
+        assert settings_payload["research_email"] == "***"
+        assert sensitive_api_key not in response_text
+        assert sensitive_email not in response_text
+
+
 class TestGpu4PyscfStatusAPI:
     """Integration tests for /api/system/gpu4pyscf-status endpoint."""
 

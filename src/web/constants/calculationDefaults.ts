@@ -1,7 +1,15 @@
-import { QuantumCalculationRequest } from '../types/api-types';
+import type { QuantumCalculationRequest } from '../types/api-types';
 
-// DrawMoleculePage / calculationStore で使用するデフォルト計算パラメータ
-export const DEFAULT_CALCULATION_PARAMETERS: QuantumCalculationRequest = {
+type DefaultDftCalculationParameters = Partial<
+  Extract<QuantumCalculationRequest, { calculation_method: 'DFT' }>
+> &
+  Pick<
+    Extract<QuantumCalculationRequest, { calculation_method: 'DFT' }>,
+    'calculation_method' | 'xyz'
+  >;
+
+// Minimal DFT payload used before method-specific defaults are applied.
+export const DEFAULT_CALCULATION_PARAMETERS = {
   calculation_method: 'DFT',
   basis_function: '6-31G(d)',
   exchange_correlation: 'B3LYP',
@@ -11,21 +19,7 @@ export const DEFAULT_CALCULATION_PARAMETERS: QuantumCalculationRequest = {
   solvent: '-',
   xyz: '',
   name: '',
-  tddft_nstates: 10,
-  tddft_method: 'TDDFT',
-  tddft_analyze_nto: false,
-  ncas: 4,
-  nelecas: 4,
-  max_cycle_macro: 50,
-  max_cycle_micro: 4,
-  natorb: true,
-  conv_tol: 1e-6,
-  conv_tol_grad: 1e-4,
-  density_fitting: false,
-  optimize_geometry: true,
-  geomopt_maxsteps: 100,
-  geomopt_conv_energy: 1e-6,
-} as QuantumCalculationRequest;
+} satisfies DefaultDftCalculationParameters;
 
 // DrawMoleculePage のステータスメッセージ
 export const STATUS_MESSAGES: Record<string, string> = {

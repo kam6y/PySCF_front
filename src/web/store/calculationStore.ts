@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import {
+import type {
   CalculationInstance,
   QuantumCalculationRequest,
 } from '../types/api-types';
+import { DEFAULT_CALCULATION_PARAMETERS } from '../constants/calculationDefaults';
 
 interface CalculationState {
   // アクティブ計算ID管理
@@ -58,21 +59,6 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
   },
 
   createNewCalculation: () => {
-    // Minimal default parameters - method-specific defaults are applied by
-    // useMethodDefaults hook in CalculationSettingsPage.tsx
-    const defaultParams: QuantumCalculationRequest = {
-      calculation_method: 'DFT',
-      basis_function: '6-31G(d)', // Will be overridden by method defaults
-      exchange_correlation: 'B3LYP', // Will be overridden by method defaults
-      charges: 0,
-      spin: 0,
-      solvent_method: 'none',
-      solvent: '-',
-      xyz: '',
-      name: '',
-      // Method-specific parameters will be set by useMethodDefaults
-    } as QuantumCalculationRequest;
-
     const newId = `new-calculation-${crypto.randomUUID()}`;
     const newCalculation: CalculationInstance = {
       id: newId,
@@ -80,7 +66,9 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
       status: 'pending',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      parameters: defaultParams,
+      parameters: {
+        ...DEFAULT_CALCULATION_PARAMETERS,
+      } as QuantumCalculationRequest,
       results: undefined,
     };
 
