@@ -70,6 +70,11 @@ logger = logging.getLogger(__name__)
 socketio = SocketIO()
 
 
+def _is_development_api_docs_path(path: str) -> bool:
+    """Return True when the request targets development-only API docs."""
+    return path == '/api-docs' or path.startswith('/api-docs/')
+
+
 def create_app(server_port: int = None, test_config: dict = None):
     """
     Application factory for Gunicorn compatibility and testing.
@@ -106,6 +111,12 @@ def create_app(server_port: int = None, test_config: dict = None):
         Verify authentication token for all requests.
         Skips verification for OPTIONS requests (CORS preflight) and TESTING mode.
         """
+        if (
+            os.getenv('PYSCF_ENV') == 'development'
+            and _is_development_api_docs_path(request.path)
+        ):
+            return None
+
         # Skip auth for OPTIONS requests to allow CORS preflight
         if request.method == 'OPTIONS':
             return None
