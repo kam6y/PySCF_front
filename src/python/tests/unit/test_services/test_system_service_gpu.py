@@ -6,8 +6,6 @@ import importlib
 import site
 import sys
 
-import pytest
-
 import services.system_service as system_service
 from services.system_service import SystemService
 

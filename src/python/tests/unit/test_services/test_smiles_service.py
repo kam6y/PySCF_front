@@ -6,7 +6,6 @@ SMILES to XYZ conversion logic, validation, and error handling.
 """
 
 import pytest
-from unittest.mock import MagicMock
 
 from services.smiles_service import SMILESService
 from services.exceptions import ServiceError, ValidationError
@@ -78,7 +77,7 @@ def test_convert_smiles_default_title(mocker):
     service = SMILESService()
     
     # ACT
-    result = service.convert_smiles(smiles)
+    service.convert_smiles(smiles)
     
     # ASSERT
     # Verify the converter was called with default title
@@ -309,7 +308,7 @@ def test_convert_smiles_strips_whitespace(mocker):
     service = SMILESService()
     
     # ACT
-    result = service.convert_smiles(smiles_with_whitespace)
+    service.convert_smiles(smiles_with_whitespace)
     
     # ASSERT
     # Verify that the stripped SMILES was passed to the converter
@@ -332,7 +331,7 @@ def test_convert_smiles_preserves_internal_structure(mocker):
     service = SMILESService()
     
     # ACT
-    result = service.convert_smiles(complex_smiles)
+    service.convert_smiles(complex_smiles)
     
     # ASSERT
     mock_converter.assert_called_once()

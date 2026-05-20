@@ -2,3 +2,5 @@
 # This module contains all WebSocket event handlers for real-time communication
 
 from .handlers import register_websocket_handlers
+
+__all__ = ["register_websocket_handlers"]

@@ -10,7 +10,6 @@ Tests the complete pause→resume→complete workflow including:
 """
 
 import pytest
-import os
 import json
 import time
 from pathlib import Path

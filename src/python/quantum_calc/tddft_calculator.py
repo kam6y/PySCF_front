@@ -1,13 +1,12 @@
 """TDDFT calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
 from typing import Dict, Any, List, Optional, Tuple
 from pyscf import gto, dft, tddft, tdscf
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
+from .exceptions import CalculationError, ConvergenceError, InputError
 from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
@@ -148,7 +147,7 @@ class TDDFTCalculator(BaseCalculator):
         
         # Run TDDFT calculation
         try:
-            excitation_energies = self.mytd.kernel()
+            self.mytd.kernel()
         except Exception as e:
             error_msg = str(e).lower()
             if "singular" in error_msg or "convergence" in error_msg:

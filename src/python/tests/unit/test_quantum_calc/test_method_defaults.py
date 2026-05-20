@@ -1,12 +1,10 @@
 """Unit tests for method defaults and parameter constraints."""
 
-import pytest
 from quantum_calc.method_defaults import (
     get_method_defaults,
     get_parameter_constraints,
     get_defaults_for_method,
     is_parameter_applicable,
-    is_parameter_disabled,
     validate_parameter_value,
     METHOD_DEFAULTS,
     PARAMETER_CONSTRAINTS,

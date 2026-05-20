@@ -383,7 +383,7 @@ def test_pubchem_service_custom_timeout(mocker):
     mock_client_class = mocker.patch('services.pubchem_service.PubChemClient')
     
     # ACT
-    service = PubChemService(timeout=60)
+    PubChemService(timeout=60)
     
     # ASSERT
     mock_client_class.assert_called_once_with(timeout=60)
@@ -399,7 +399,7 @@ def test_pubchem_service_default_timeout(mocker):
     mock_client_class = mocker.patch('services.pubchem_service.PubChemClient')
     
     # ACT
-    service = PubChemService()
+    PubChemService()
     
     # ASSERT
     mock_client_class.assert_called_once_with(timeout=30)

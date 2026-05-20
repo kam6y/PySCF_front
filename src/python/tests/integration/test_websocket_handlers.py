@@ -6,9 +6,7 @@ including joining rooms, receiving updates, and handling disconnections.
 """
 
 import pytest
-import os
 import json
-import tempfile
 import shutil
 from pathlib import Path
 

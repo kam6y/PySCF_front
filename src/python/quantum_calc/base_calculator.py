@@ -12,7 +12,7 @@ import subprocess
 from importlib import util
 import numpy as np
 from .config_manager import get_memory_for_method, get_max_cycle
-from .exceptions import PauseRequestedException
+from .exceptions import CalculationError, PauseRequestedException
 from ._checkpoint_resume import CheckpointResumeMixin
 from ._frequency_analysis import FrequencyAnalysisMixin
 from ._geometry_optimization import GeometryOptimizationMixin
@@ -334,7 +334,6 @@ class BaseCalculator(
         Get the method description for results storage.
         Subclasses should override this method.
         """
-        spin = self.results.get('spin', 0)
         base_method = self._get_base_method_description()
         return f"{base_method} ({self._get_calculation_method_name()})" if base_method else self._get_calculation_method_name()
     
@@ -371,7 +370,6 @@ class BaseCalculator(
 
         except Exception as e:
             import traceback
-            from .exceptions import CalculationError
 
             # Enhanced error logging for CASCI/CASSCF
             calculation_method = getattr(self, 'calculation_method', 'Unknown')
@@ -392,7 +390,6 @@ class BaseCalculator(
     
     def cleanup(self, keep_files: bool = False) -> None:
         """Clean up temporary files."""
-        import shutil
         if not keep_files and os.path.exists(self.working_dir) and "pyscf_calc_" in self.working_dir:
             shutil.rmtree(self.working_dir)
         elif keep_files:

@@ -1,7 +1,7 @@
 """Configuration manager for quantum calculation settings."""
 
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Tuple
 from flask import current_app
 
 logger = logging.getLogger(__name__)

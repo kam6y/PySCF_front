@@ -73,7 +73,7 @@ class ChatHistoryDatabase:
                             logger.info(f"Using project data directory (auto-detected development): {data_dir}")
                         else:
                             raise FileNotFoundError("Not in development environment")
-                    except (FileNotFoundError, OSError) as e:
+                    except (FileNotFoundError, OSError):
                         # Priority 4: Use user home directory (packaged app or fallback)
                         data_dir = Path.home() / ".pyscf_app" / "data"
                         logger.info(f"Using user home data directory (packaged/fallback): {data_dir}")

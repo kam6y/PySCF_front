@@ -1,12 +1,9 @@
 """Worker runtime functions for process-based quantum chemistry calculations."""
 
 import os
-import sys
 import logging
 
 from .config_manager import get_memory_for_method
-from .pause_manager import pause_manager
-from .exceptions import PauseRequestedException
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +22,6 @@ def _worker_initializer():
     The actual thread count for each calculation is set later in _setup_worker_environment()
     based on the user's cpu_cores parameter.
     """
-    import os
-
     thread_vars = [
         'OMP_NUM_THREADS',
         'MKL_NUM_THREADS',
@@ -101,11 +96,11 @@ def _check_casci_dependencies(calculation_method: str, process_logger) -> None:
         process_logger.info(f"PySCF version: {pyscf.__version__}")
 
         from pyscf import mcscf
-        process_logger.info("PySCF mcscf module loaded successfully")
+        process_logger.info(f"PySCF {mcscf.__name__} module loaded successfully")
 
         from pyscf import gto
         test_mol = gto.M(atom='H 0 0 0; H 0 0 0.74', basis='sto-3g', verbose=0)
-        process_logger.info("PySCF basic functionality test passed")
+        process_logger.info(f"PySCF basic functionality test passed ({test_mol.natm} atoms)")
     except ImportError as e:
         process_logger.error(f"PySCF dependency check failed: {e}")
         process_logger.error("CASCI/CASSCF calculations will likely fail")
@@ -117,10 +112,8 @@ def _check_casci_dependencies(calculation_method: str, process_logger) -> None:
 def _import_calculator_classes(process_logger):
     """
     Import calculator classes and return them as a dict.
-    Returns (calculators_dict, exception_classes_tuple).
     """
     from quantum_calc import DFTCalculator, HFCalculator, MP2Calculator, CCSDCalculator, TDDFTCalculator
-    from quantum_calc import CalculationError, ConvergenceError, InputError, PauseRequestedException
 
     calculators = {
         'DFT': DFTCalculator,
@@ -146,7 +139,7 @@ def _import_calculator_classes(process_logger):
         process_logger.error(f"Unexpected error importing CASCI/CASSCF calculators: {e}")
         process_logger.error("CASCI and CASSCF calculations will not be available")
 
-    return calculators, (CalculationError, ConvergenceError, InputError, PauseRequestedException)
+    return calculators
 
 
 def _create_calculator_instance(calculation_method: str, parameters: dict,
@@ -329,7 +322,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
     from threadpoolctl import threadpool_info, threadpool_limits
     from pyscf import lib
 
-    calculator_classes, exception_types = _import_calculator_classes(process_logger)
+    calculator_classes = _import_calculator_classes(process_logger)
 
     # Load current settings to get calculations directory
     settings = get_current_settings()

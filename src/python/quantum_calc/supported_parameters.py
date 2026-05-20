@@ -3,7 +3,6 @@
 import logging
 from typing import Dict, List, Any
 from pyscf import gto, dft
-from data.solvent_properties import SOLVENT_DIELECTRIC
 from quantum_calc.method_defaults import get_method_defaults, get_parameter_constraints
 
 logger = logging.getLogger(__name__)

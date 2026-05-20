@@ -9,11 +9,13 @@ application testing using the Application Factory pattern.
 import pytest
 import tempfile
 import os
-from pathlib import Path
+import logging
 from concurrent.futures import Executor, Future
 
 # Import application factory and socketio instance
 from app import create_app, socketio
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================

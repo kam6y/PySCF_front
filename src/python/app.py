@@ -33,7 +33,6 @@ from pydantic import ValidationError
 
 # Import unified configuration module
 from config import (
-    ServerConfig,
     get_server_config,
     determine_server_port,
     configure_flask_app,

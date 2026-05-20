@@ -5,8 +5,6 @@ Unit tests for BaseCalculator GPU detection helpers.
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 import quantum_calc.base_calculator as base_calculator
 from quantum_calc.base_calculator import BaseCalculator
 

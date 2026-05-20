@@ -6,10 +6,7 @@ to results retrieval, using DummyExecutor for synchronous testing.
 """
 
 import pytest
-import os
-import json
 import time
-from pathlib import Path
 from tests.conftest import DummyExecutor
 
 

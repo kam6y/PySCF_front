@@ -6,7 +6,7 @@ monitoring, results retrieval, and orbital/spectrum analysis.
 """
 
 import pytest
-from services.exceptions import NotFoundError, ValidationError, ServiceError
+from services.exceptions import NotFoundError, ServiceError
 
 
 class TestSupportedParametersAPI:

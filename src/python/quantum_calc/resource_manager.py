@@ -1,6 +1,5 @@
 """System resource manager for monitoring CPU and memory usage."""
 
-import os
 import logging
 import multiprocessing
 from typing import Dict, List, Optional, Tuple

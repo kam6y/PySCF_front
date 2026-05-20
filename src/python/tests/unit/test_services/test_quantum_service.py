@@ -6,7 +6,6 @@ Focuses on validate_calculation_parameters() which is core business logic.
 """
 
 import pytest
-from unittest.mock import MagicMock
 
 from services.quantum_service import QuantumService
 from services.exceptions import ServiceError

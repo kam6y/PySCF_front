@@ -1,13 +1,12 @@
 """CASCI calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
 from pyscf import gto, scf, mcscf
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
+from .exceptions import CalculationError, InputError
 from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
@@ -255,5 +254,4 @@ class CASCICalculator(BaseCalculator):
         
         logger.info("CASCI results analysis completed")
         return analysis_results
-
 

@@ -4,9 +4,6 @@ Integration tests for System API endpoints.
 Covers GPU4PySCF status detection and installation endpoints.
 """
 
-import pytest
-
-
 class TestGpu4PyscfStatusAPI:
     """Integration tests for /api/system/gpu4pyscf-status endpoint."""
 

@@ -3,7 +3,7 @@
 import os
 import tempfile
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 from datetime import datetime
 import numpy as np
 from pyscf import gto, lib, tools

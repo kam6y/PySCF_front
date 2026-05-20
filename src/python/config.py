@@ -12,7 +12,6 @@ ensuring consistent configuration access across all modules.
 import json
 import logging
 import os
-import socket
 from pathlib import Path
 from typing import Dict, Any, Optional
 

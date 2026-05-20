@@ -5,7 +5,6 @@ Tests the chat endpoint which uses Server-Sent Events (SSE) for streaming
 responses from the Gemini API.
 """
 
-import pytest
 import json
 
 

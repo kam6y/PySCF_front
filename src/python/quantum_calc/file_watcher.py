@@ -9,9 +9,7 @@ import logging
 import threading
 from pathlib import Path
 from typing import Dict, Callable, Optional, Set, Any
-from datetime import datetime
 import queue
-import threading
 
 # Platform-specific observer selection
 # FSEventsObserver (macOS default) fails after fork in Gunicorn workers
@@ -22,9 +20,7 @@ if sys.platform == 'darwin':
 else:
     from watchdog.observers import Observer
 
-from watchdog.events import FileSystemEventHandler, FileModifiedEvent, FileCreatedEvent
-
-from .exceptions import FileManagerError, WebSocketError
+from watchdog.events import FileSystemEventHandler
 
 
 logger = logging.getLogger(__name__)

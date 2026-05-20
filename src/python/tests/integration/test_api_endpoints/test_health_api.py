@@ -5,9 +5,6 @@ Tests the /health endpoint which provides basic health monitoring
 for the Flask application.
 """
 
-import pytest
-
-
 class TestHealthAPI:
     """Integration tests for health check endpoints."""
 

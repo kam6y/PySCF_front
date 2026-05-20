@@ -5,7 +5,6 @@ Tests the SMILES-to-XYZ conversion endpoint, ensuring proper
 handling of various SMILES strings and error conditions.
 """
 
-import pytest
 from services.exceptions import ValidationError, ServiceError
 
 

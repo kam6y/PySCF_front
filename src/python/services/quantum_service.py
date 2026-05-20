@@ -8,9 +8,8 @@ providing a unified interface for both API endpoints and AI agent tools.
 import logging
 import os
 import shutil
-import time
 from datetime import datetime
-from typing import Optional, Dict, Any, Tuple, List
+from typing import Optional, Dict, Any
 
 from quantum_calc import (
     get_process_manager, get_all_supported_parameters, get_current_settings,
@@ -824,7 +823,7 @@ class QuantumService:
             process_manager = get_process_manager()
 
             # Resume calculation (returns simple confirmation dict)
-            resume_result = process_manager.resume_calculation(calculation_id)
+            process_manager.resume_calculation(calculation_id)
 
             logger.info(f"Calculation resumed successfully: {calculation_id}")
 

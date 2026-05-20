@@ -6,7 +6,7 @@ parameter handling, and method selection without running expensive computations.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 from quantum_calc.dft_calculator import DFTCalculator
 

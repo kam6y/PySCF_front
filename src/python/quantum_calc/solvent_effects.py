@@ -1,7 +1,7 @@
 """Solvent effects setup for quantum chemistry calculations using PySCF."""
 
 import logging
-from typing import Union, Any
+from typing import Union
 from pyscf import scf, dft
 from data.solvent_properties import SOLVENT_DIELECTRIC
 

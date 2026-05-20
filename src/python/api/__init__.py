@@ -2,7 +2,6 @@
 # This module contains all API endpoint definitions organized by responsibility
 
 import os
-from flask import Blueprint
 
 # Import all blueprint modules
 from .health import health_bp
