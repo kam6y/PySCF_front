@@ -119,6 +119,38 @@ class TestCalculationSubmissionAPI:
         # ASSERT
         assert response.status_code in [400, 422]  # Bad Request or Unprocessable Entity
 
+    @pytest.mark.parametrize("invalid_field,invalid_value", [
+        ('charges', -11),
+        ('charges', 11),
+        ('spin', 11),
+        ('cpu_cores', 33),
+        ('memory_mb', 511),
+        ('memory_mb', 32769),
+    ])
+    def test_start_calculation_rejects_openapi_numeric_bounds(
+        self,
+        client,
+        valid_dft_params,
+        invalid_field,
+        invalid_value,
+    ):
+        """
+        GIVEN calculation parameters outside OpenAPI numeric bounds
+        WHEN POST /api/quantum/calculate is called
+        THEN 400 Bad Request is returned
+        """
+        # ARRANGE
+        invalid_params = {**valid_dft_params, invalid_field: invalid_value}
+
+        # ACT
+        response = client.post('/api/quantum/calculate', json=invalid_params)
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert invalid_field in data['error']
+
     def test_start_calculation_missing_required_fields(self, client):
         """
         GIVEN request is missing required fields

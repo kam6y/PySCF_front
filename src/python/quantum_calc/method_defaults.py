@@ -151,8 +151,19 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
         'description': 'Number of CPU cores to use (1-32)'
     },
     'memory_mb': {
-        'min': 128,
-        'description': 'Memory allocation in megabytes (minimum 128 MB)'
+        'min': 512,
+        'max': 32768,
+        'description': 'Memory allocation in megabytes (512-32768 MB)'
+    },
+    'charges': {
+        'min': -10,
+        'max': 10,
+        'description': 'Molecular charge (-10 to 10)'
+    },
+    'spin': {
+        'min': 0,
+        'max': 10,
+        'description': 'Spin (2S), number of unpaired electrons (0-10)'
     }
 }
 

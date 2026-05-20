@@ -460,7 +460,7 @@ def test_validate_negative_spin():
     """
     GIVEN parameters with negative spin
     WHEN validate_calculation_parameters is called
-    THEN it should return error message
+    THEN it should return OpenAPI-aligned bounds error message
     """
     # ARRANGE
     service = QuantumService()
@@ -476,29 +476,32 @@ def test_validate_negative_spin():
     
     # ASSERT
     assert result is not None
-    assert 'cannot be negative' in result.lower()
+    assert 'spin' in result
+    assert 'below minimum' in result.lower()
 
 
-def test_validate_high_charge_warning(caplog):
+def test_validate_high_charge_rejected():
     """
-    GIVEN parameters with very high molecular charge
+    GIVEN parameters with charge above the OpenAPI maximum
     WHEN validate_calculation_parameters is called
-    THEN it should log a warning but pass validation
+    THEN it should return error message
     """
     # ARRANGE
     service = QuantumService()
     params = {
         'calculation_method': 'HF',
         'basis_function': 'sto-3g',
-        'charges': 12,  # High charge, should trigger warning
+        'charges': 11,
         'spin': 0
     }
     
     # ACT
     result = service.validate_calculation_parameters(params)
-    
+
     # ASSERT
-    assert result is None  # Still passes
+    assert result is not None
+    assert 'charges' in result
+    assert 'exceeds maximum' in result.lower()
 
 
 @pytest.mark.parametrize("method", ['HF', 'DFT', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF'])

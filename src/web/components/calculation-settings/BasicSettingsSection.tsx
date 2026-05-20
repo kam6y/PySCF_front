@@ -8,6 +8,19 @@ import {
 } from '../../types/api-types';
 import { DistributiveKeyOf } from '../../hooks/useCalculationForm';
 import { isCalculationEditable } from '../../utils/calculationStatus';
+import { clampIntegerInput } from '../../utils/numberInput';
+
+const CHARGE_INPUT = {
+  min: -10,
+  max: 10,
+  fallback: 0,
+} as const;
+
+const SPIN_INPUT = {
+  min: 0,
+  max: 10,
+  fallback: 0,
+} as const;
 
 interface BasicSettingsSectionProps {
   params: CalculationParameters;
@@ -123,8 +136,16 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <label>Charge</label>
           <input
             type="number"
-            value={params.charges || 0}
-            onChange={e => onParamChange('charges', Number(e.target.value))}
+            value={params.charges ?? CHARGE_INPUT.fallback}
+            onChange={e =>
+              onParamChange(
+                'charges',
+                clampIntegerInput(e.target.value, CHARGE_INPUT)
+              )
+            }
+            min={CHARGE_INPUT.min}
+            max={CHARGE_INPUT.max}
+            step={1}
             className={`${styles.numberInput} ${styles.withSpinner}`}
             disabled={!isCalculationEditable(calculationStatus)}
           />
@@ -133,9 +154,12 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
           <label>Spin (2S)</label>
           <input
             type="number"
-            value={params.spin || 0}
-            onChange={e => onParamChange('spin', Number(e.target.value))}
-            min={0}
+            value={params.spin ?? SPIN_INPUT.fallback}
+            onChange={e =>
+              onParamChange('spin', clampIntegerInput(e.target.value, SPIN_INPUT))
+            }
+            min={SPIN_INPUT.min}
+            max={SPIN_INPUT.max}
             step={1}
             className={`${styles.numberInput} ${styles.withSpinner}`}
             disabled={!isCalculationEditable(calculationStatus)}

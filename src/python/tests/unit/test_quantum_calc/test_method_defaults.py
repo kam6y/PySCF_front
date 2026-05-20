@@ -166,7 +166,22 @@ class TestParameterConstraints:
         """Test memory_mb parameter constraint."""
         constraints = get_parameter_constraints()
         assert 'memory_mb' in constraints
-        assert constraints['memory_mb']['min'] == 128
+        assert constraints['memory_mb']['min'] == 512
+        assert constraints['memory_mb']['max'] == 32768
+
+    def test_charges_constraint(self):
+        """Test charges parameter constraint."""
+        constraints = get_parameter_constraints()
+        assert 'charges' in constraints
+        assert constraints['charges']['min'] == -10
+        assert constraints['charges']['max'] == 10
+
+    def test_spin_constraint(self):
+        """Test spin parameter constraint."""
+        constraints = get_parameter_constraints()
+        assert 'spin' in constraints
+        assert constraints['spin']['min'] == 0
+        assert constraints['spin']['max'] == 10
 
 
 class TestParameterApplicability:
@@ -270,6 +285,19 @@ class TestParameterValidation:
         assert is_valid is True
         assert error == ''
 
+    def test_validate_cpu_cores_at_bounds(self):
+        """Test validating cpu_cores boundary values."""
+        for value in (1, 32):
+            is_valid, error = validate_parameter_value('cpu_cores', value)
+            assert is_valid is True
+            assert error == ''
+
+    def test_validate_cpu_cores_below_min(self):
+        """Test validating cpu_cores below minimum."""
+        is_valid, error = validate_parameter_value('cpu_cores', 0)
+        assert is_valid is False
+        assert 'below minimum' in error
+
     def test_validate_cpu_cores_above_max(self):
         """Test validating cpu_cores above maximum."""
         is_valid, error = validate_parameter_value('cpu_cores', 64)
@@ -282,11 +310,52 @@ class TestParameterValidation:
         assert is_valid is True
         assert error == ''
 
+    def test_validate_memory_mb_at_bounds(self):
+        """Test validating memory_mb boundary values."""
+        for value in (512, 32768):
+            is_valid, error = validate_parameter_value('memory_mb', value)
+            assert is_valid is True
+            assert error == ''
+
     def test_validate_memory_mb_below_min(self):
         """Test validating memory_mb below minimum."""
-        is_valid, error = validate_parameter_value('memory_mb', 64)
+        is_valid, error = validate_parameter_value('memory_mb', 511)
         assert is_valid is False
         assert 'below minimum' in error
+
+    def test_validate_memory_mb_above_max(self):
+        """Test validating memory_mb above maximum."""
+        is_valid, error = validate_parameter_value('memory_mb', 32769)
+        assert is_valid is False
+        assert 'exceeds maximum' in error
+
+    def test_validate_charges_at_bounds(self):
+        """Test validating charges boundary values."""
+        for value in (-10, 0, 10):
+            is_valid, error = validate_parameter_value('charges', value)
+            assert is_valid is True
+            assert error == ''
+
+    def test_validate_charges_out_of_bounds(self):
+        """Test validating charges outside supported bounds."""
+        for value, expected_error in ((-11, 'below minimum'), (11, 'exceeds maximum')):
+            is_valid, error = validate_parameter_value('charges', value)
+            assert is_valid is False
+            assert expected_error in error
+
+    def test_validate_spin_at_bounds(self):
+        """Test validating spin boundary values."""
+        for value in (0, 10):
+            is_valid, error = validate_parameter_value('spin', value)
+            assert is_valid is True
+            assert error == ''
+
+    def test_validate_spin_out_of_bounds(self):
+        """Test validating spin outside supported bounds."""
+        for value, expected_error in ((-1, 'below minimum'), (11, 'exceeds maximum')):
+            is_valid, error = validate_parameter_value('spin', value)
+            assert is_valid is False
+            assert expected_error in error
 
     def test_validate_unknown_parameter(self):
         """Test validating an unknown parameter (should always pass)."""
@@ -322,7 +391,8 @@ class TestDataIntegrity:
         for method, defaults in METHOD_DEFAULTS.items():
             assert 'memory_mb' in defaults, f"Method {method} missing memory_mb"
             assert isinstance(defaults['memory_mb'], int)
-            assert defaults['memory_mb'] >= 128
+            assert defaults['memory_mb'] >= 512
+            assert defaults['memory_mb'] <= 32768
 
     def test_method_defaults_optimize_geometry(self):
         """Test that only DFT, HF, and MP2 specify optimize_geometry."""
@@ -449,13 +519,17 @@ class TestValidateParametersForMethod:
             'calculation_method': 'DFT',
             'basis_function': '6-31G(d)',
             'cpu_cores': 64,
-            'memory_mb': 64
+            'memory_mb': 64,
+            'charges': 11,
+            'spin': 11
         }
 
         is_valid, error = validate_parameters_for_method('DFT', params)
         assert is_valid is False
         assert 'cpu_cores' in error
         assert 'memory_mb' in error
+        assert 'charges' in error
+        assert 'spin' in error
 
     def test_casci_rejects_tddft_parameters(self):
         """Test that CASCI rejects TDDFT-specific parameters."""

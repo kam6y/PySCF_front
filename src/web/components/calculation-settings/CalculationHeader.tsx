@@ -8,6 +8,19 @@ import {
 } from '../../types/api-types';
 import { DistributiveKeyOf } from '../../hooks/useCalculationForm';
 import { isCalculationEditable } from '../../utils/calculationStatus';
+import { clampIntegerInput } from '../../utils/numberInput';
+
+const CPU_CORES_INPUT = {
+  min: 1,
+  max: 32,
+  fallback: 1,
+} as const;
+
+const MEMORY_MB_INPUT = {
+  min: 512,
+  max: 32768,
+  fallback: 2000,
+} as const;
 
 interface CalculationHeaderProps {
   activeCalculation?: CalculationInstance;
@@ -84,15 +97,16 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                   <div className={styles.cpuInputContainer}>
                     <input
                       type="number"
-                      value={params.cpu_cores || 1}
+                      value={params.cpu_cores ?? CPU_CORES_INPUT.fallback}
                       onChange={e =>
                         onParamChange(
                           'cpu_cores',
-                          Math.max(1, Number(e.target.value))
+                          clampIntegerInput(e.target.value, CPU_CORES_INPUT)
                         )
                       }
-                      min="1"
-                      max="32"
+                      min={CPU_CORES_INPUT.min}
+                      max={CPU_CORES_INPUT.max}
+                      step={1}
                       className={styles.cpuCoresInput}
                       disabled={!isCalculationEditable(calculationStatus)}
                     />
@@ -103,7 +117,11 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                         onClick={() =>
                           onParamChange(
                             'cpu_cores',
-                            Math.min(32, (params.cpu_cores || 1) + 1)
+                            Math.min(
+                              CPU_CORES_INPUT.max,
+                              (params.cpu_cores ?? CPU_CORES_INPUT.fallback) +
+                                1
+                            )
                           )
                         }
                         disabled={!isCalculationEditable(calculationStatus)}
@@ -116,7 +134,11 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                         onClick={() =>
                           onParamChange(
                             'cpu_cores',
-                            Math.max(1, (params.cpu_cores || 1) - 1)
+                            Math.max(
+                              CPU_CORES_INPUT.min,
+                              (params.cpu_cores ?? CPU_CORES_INPUT.fallback) -
+                                1
+                            )
                           )
                         }
                         disabled={!isCalculationEditable(calculationStatus)}
@@ -131,14 +153,16 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                   <div className={styles.memoryInputContainer}>
                     <input
                       type="number"
-                      value={params.memory_mb || 2000}
+                      value={params.memory_mb ?? MEMORY_MB_INPUT.fallback}
                       onChange={e =>
                         onParamChange(
                           'memory_mb',
-                          Math.max(128, Number(e.target.value))
+                          clampIntegerInput(e.target.value, MEMORY_MB_INPUT)
                         )
                       }
-                      min="128"
+                      min={MEMORY_MB_INPUT.min}
+                      max={MEMORY_MB_INPUT.max}
+                      step={1}
                       className={styles.memoryValueInput}
                       disabled={!isCalculationEditable(calculationStatus)}
                     />
