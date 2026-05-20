@@ -42,7 +42,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       number | null
     >(null);
     const [viewerOptions, setViewerOptions] = useState<ViewerOptions>({
-      gridSize: 120,
+      gridSize: 80,
       isovaluePos: 0.02,
       isovalueNeg: -0.02,
     });
@@ -74,12 +74,25 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       error: orbitalsError,
     } = useGetOrbitals(calculationId);
 
+    const hasOrbitalIndex = useCallback(
+      (orbitalIndex: number) =>
+        orbitalsData?.orbitals?.some(
+          (orbital: OrbitalInfo) => orbital.index === orbitalIndex
+        ) ?? false,
+      [orbitalsData]
+    );
+
+    const cubeOrbitalIndex =
+      selectedOrbitalIndex !== null && hasOrbitalIndex(selectedOrbitalIndex)
+        ? selectedOrbitalIndex
+        : null;
+
     // 選択された軌道のCUBEファイルを取得
     const {
       data: cubeData,
       isLoading: cubeLoading,
       error: cubeError,
-    } = useGetOrbitalCube(calculationId, selectedOrbitalIndex, viewerOptions);
+    } = useGetOrbitalCube(calculationId, cubeOrbitalIndex, viewerOptions);
 
     // ビューアーのリサイズ処理
     const handleViewerResize = useCallback(() => {
@@ -259,29 +272,68 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       }
     }, [calculationId, queryClient, viewer]);
 
-    // HOMOを初期選択として設定
-    useEffect(() => {
-      if (orbitalsData && selectedOrbitalIndex === null) {
-        const homoOrbital = orbitalsData.orbitals.find(
-          (orbital: OrbitalInfo) => orbital.orbital_type === 'homo'
-        );
-        if (homoOrbital) {
-          setSelectedOrbitalIndex(homoOrbital.index);
-          onOrbitalSelect?.(homoOrbital.index);
-        }
-      }
-    }, [orbitalsData, selectedOrbitalIndex, calculationId, onOrbitalSelect]);
-
     // 外部から渡された選択軌道を内部状態に同期
     useEffect(() => {
+      if (!orbitalsData) {
+        return;
+      }
+
+      if (externalSelectedOrbitalIndex === null) {
+        if (selectedOrbitalIndex !== null) {
+          setSelectedOrbitalIndex(null);
+        }
+        return;
+      }
+
+      if (externalSelectedOrbitalIndex === undefined) {
+        return;
+      }
+
+      if (!hasOrbitalIndex(externalSelectedOrbitalIndex)) {
+        if (selectedOrbitalIndex === externalSelectedOrbitalIndex) {
+          setSelectedOrbitalIndex(null);
+        }
+        return;
+      }
+
+      if (externalSelectedOrbitalIndex !== selectedOrbitalIndex) {
+        setSelectedOrbitalIndex(externalSelectedOrbitalIndex);
+      }
+    }, [
+      externalSelectedOrbitalIndex,
+      hasOrbitalIndex,
+      orbitalsData,
+      selectedOrbitalIndex,
+    ]);
+
+    // HOMOを初期選択として設定
+    useEffect(() => {
+      if (!orbitalsData || selectedOrbitalIndex !== null) {
+        return;
+      }
+
       if (
         externalSelectedOrbitalIndex !== undefined &&
         externalSelectedOrbitalIndex !== null &&
-        externalSelectedOrbitalIndex !== selectedOrbitalIndex
+        hasOrbitalIndex(externalSelectedOrbitalIndex)
       ) {
-        setSelectedOrbitalIndex(externalSelectedOrbitalIndex);
+        return;
       }
-    }, [externalSelectedOrbitalIndex, selectedOrbitalIndex]);
+
+      const homoOrbital = orbitalsData.orbitals.find(
+        (orbital: OrbitalInfo) => orbital.orbital_type === 'homo'
+      );
+      if (homoOrbital) {
+        setSelectedOrbitalIndex(homoOrbital.index);
+        onOrbitalSelect?.(homoOrbital.index);
+      }
+    }, [
+      externalSelectedOrbitalIndex,
+      hasOrbitalIndex,
+      orbitalsData,
+      selectedOrbitalIndex,
+      onOrbitalSelect,
+    ]);
 
     // CUBEデータが更新されたときに分子軌道を表示
     useEffect(() => {
@@ -504,7 +556,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
               </label>
               <select
                 id="orbital-select"
-                value={selectedOrbitalIndex || ''}
+                value={selectedOrbitalIndex ?? ''}
                 onChange={handleOrbitalChange}
                 className={styles.controlSelect}
               >

@@ -40,6 +40,8 @@ export const CalculationResultsPage = ({
   const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
     number | null
   >(null);
+  const [selectedOrbitalCalculationId, setSelectedOrbitalCalculationId] =
+    useState<string | null>(null);
 
   // Molecule viewer state for optimized structure section
   const [currentStyle, setCurrentStyle] = useState<StyleSpec | null>({
@@ -76,9 +78,15 @@ export const CalculationResultsPage = ({
     setError(detailsError);
   }, [detailsError]);
 
+  useEffect(() => {
+    setSelectedOrbitalIndex(null);
+    setSelectedOrbitalCalculationId(null);
+  }, [activeCalculation?.id]);
+
   const handleOrbitalSelect = useCallback((orbitalIndex: number) => {
     setSelectedOrbitalIndex(orbitalIndex);
-  }, []);
+    setSelectedOrbitalCalculationId(activeCalculation?.id ?? null);
+  }, [activeCalculation?.id]);
 
   const handleIRPeakSelect = useCallback((peak: IRPeak, peakIndex: number) => {
     setSelectedIRPeakIndex(peakIndex);
@@ -271,7 +279,11 @@ export const CalculationResultsPage = ({
 
         <MolecularOrbitalsSection
           calculationId={activeCalculation.id}
-          selectedOrbitalIndex={selectedOrbitalIndex}
+          selectedOrbitalIndex={
+            selectedOrbitalCalculationId === activeCalculation.id
+              ? selectedOrbitalIndex
+              : null
+          }
           onOrbitalSelect={handleOrbitalSelect}
           onError={setError}
         />

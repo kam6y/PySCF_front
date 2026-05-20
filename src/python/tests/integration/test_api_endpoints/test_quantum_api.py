@@ -626,6 +626,33 @@ class TestMolecularOrbitalsAPI:
         assert data['success'] is False
         assert 'grid_size' in data['error']
 
+    def test_generate_orbital_cube_invalid_orbital_index_returns_400(
+        self, client, mocker
+    ):
+        """
+        GIVEN service rejects an unavailable orbital index
+        WHEN GET /orbitals/<index>/cube is called
+        THEN 400 Bad Request is returned
+        """
+        # ARRANGE
+        calc_id = 'calc-123'
+        orbital_index = 999
+        mock_service = mocker.patch('api.quantum.get_quantum_service')
+        mock_service.return_value.generate_orbital_cube.side_effect = ValidationError(
+            'Invalid orbital index: 999. Available range: 0-5'
+        )
+
+        # ACT
+        response = client.get(
+            f'/api/quantum/calculations/{calc_id}/orbitals/{orbital_index}/cube'
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'Invalid orbital index' in data['error']
+
     def test_list_cube_files_success(self, client, mocker):
         """
         GIVEN calculation has CUBE files

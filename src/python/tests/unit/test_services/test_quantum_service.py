@@ -7,6 +7,7 @@ Focuses on validate_calculation_parameters() which is core business logic.
 
 import pytest
 
+from quantum_calc import CalculationError
 from quantum_calc._calculation_repository import CalculationRepository
 from services.quantum_service import QuantumService
 from services.exceptions import ServiceError, ValidationError
@@ -875,6 +876,66 @@ def test_generate_orbital_cube_accepts_contract_boundary_parameters(tmp_path, mo
         save_to_disk=True,
     )
     assert result["generation_params"]["file_size_kb"] == 1.0
+
+
+def test_generate_orbital_cube_invalid_orbital_index_returns_validation_error(
+    tmp_path, mocker
+):
+    """
+    GIVEN the orbital generator rejects an unavailable orbital index
+    WHEN generate_orbital_cube is called
+    THEN the service maps it to a validation error instead of a 500 error
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "completed-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), "completed")
+
+    generator = mocker.Mock()
+    generator.validate_calculation.return_value = True
+    generator.generate_cube_file.side_effect = CalculationError(
+        "Invalid orbital index: 12. Available range: 0-5"
+    )
+    mocker.patch(
+        "services.quantum_service.MolecularOrbitalGenerator",
+        return_value=generator,
+    )
+
+    with pytest.raises(ValidationError, match="Invalid orbital index"):
+        service.generate_orbital_cube(calc_id, 12)
+
+
+def test_generate_orbital_cube_generation_error_stays_service_error(tmp_path, mocker):
+    """
+    GIVEN the orbital generator fails for a non-validation reason
+    WHEN generate_orbital_cube is called
+    THEN the service keeps the error mapped to a service error
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "completed-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), "completed")
+
+    generator = mocker.Mock()
+    generator.validate_calculation.return_value = True
+    generator.generate_cube_file.side_effect = CalculationError(
+        "Failed to generate CUBE file"
+    )
+    mocker.patch(
+        "services.quantum_service.MolecularOrbitalGenerator",
+        return_value=generator,
+    )
+
+    with pytest.raises(ServiceError, match="Failed to generate CUBE file") as exc_info:
+        service.generate_orbital_cube(calc_id, 2)
+
+    assert exc_info.value.status_code == 500
 
 
 def test_resume_calculation_returns_updated_waiting_status(tmp_path, mocker):

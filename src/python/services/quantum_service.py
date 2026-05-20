@@ -636,6 +636,8 @@ class QuantumService:
             
         except CalculationError as e:
             logger.error(f"Calculation error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}")
+            if "invalid orbital index" in str(e).lower():
+                raise ValidationError(str(e))
             raise ServiceError(str(e))
         except FileManagerError as e:
             logger.error(f"File manager error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}")
