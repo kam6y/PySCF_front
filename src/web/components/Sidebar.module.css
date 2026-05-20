@@ -451,6 +451,17 @@
   color: #dc2626;
 }
 
+.deleteBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.deleteBtn:disabled:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #6b7280;
+}
+
 /* Bottom Section - User Info */
 .sidebarBottomSection {
   border-top: 1px solid #e0e0e0;

@@ -10,6 +10,39 @@ import json
 import shutil
 from pathlib import Path
 
+from app import socketio
+
+
+class TestWebSocketAuthentication:
+    """Integration tests for Socket.IO connection authentication."""
+
+    def test_connect_without_token_rejected_when_auth_token_configured(self, app, monkeypatch):
+        """
+        GIVEN PYSCF_AUTH_TOKEN is configured
+        WHEN a Socket.IO client connects without auth.token
+        THEN the connection is rejected
+        """
+        monkeypatch.setenv("PYSCF_AUTH_TOKEN", "socket-secret")
+
+        client = socketio.test_client(app, namespace=None)
+
+        assert not client.is_connected()
+
+    def test_connect_with_token_allowed_when_auth_token_configured(self, app, monkeypatch):
+        """
+        GIVEN PYSCF_AUTH_TOKEN is configured
+        WHEN a Socket.IO client connects with matching auth.token
+        THEN the connection is accepted
+        """
+        monkeypatch.setenv("PYSCF_AUTH_TOKEN", "socket-secret")
+
+        client = socketio.test_client(
+            app, namespace=None, auth={"token": "socket-secret"}
+        )
+
+        assert client.is_connected()
+        client.disconnect()
+
 
 class TestJoinCalculationWebSocket:
     """Integration tests for join_calculation WebSocket event."""

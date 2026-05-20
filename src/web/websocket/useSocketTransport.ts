@@ -91,13 +91,13 @@ export const useSocketTransport = ({
       return;
     }
 
-    // 接続処理を開始
-    isConnectingRef.current = true;
-
     // 既存の接続があれば切断
     disconnect();
 
-    try {
+    // 接続処理を開始
+    isConnectingRef.current = true;
+
+    void (async () => {
       const port = window.flaskPort;
       if (!port) {
         console.error('[UnifiedWebSocket] Flask port not set. Cannot connect.');
@@ -107,99 +107,107 @@ export const useSocketTransport = ({
       const serverUrl = `http://127.0.0.1:${port}`;
       console.log(`[UnifiedWebSocket] Connecting to ${serverUrl}`);
 
-      const socket = io(serverUrl, {
-        transports: ['websocket', 'polling'],
-        timeout: 15000,
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        reconnectionAttempts: 5,
-        randomizationFactor: 0.5,
-        forceNew: true,
-        upgrade: true,
-        rememberUpgrade: false,
-        autoConnect: true,
-        withCredentials: false,
-        extraHeaders: {
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache',
-        },
-      });
-
-      socketRef.current = socket;
-
-      socket.on('connect', () => {
-        isConnectingRef.current = false;
-        if (isMountedRef.current) {
-          setIsConnected(true);
-        }
-        onConnectRef.current?.(socket);
-      });
-
-      socket.on('disconnect', (reason: string) => {
-        console.log(`[UnifiedWebSocket] Disconnected, reason: ${reason}`);
-        if (isMountedRef.current) {
-          setIsConnected(false);
-        }
-        onDisconnectRef.current?.(reason);
-        if (socketRef.current === socket) {
-          socketRef.current = null;
-        }
-      });
-
-      socket.on('reconnect', attemptNumber => {
-        const handler = onReconnectRef.current;
-        if (!handler) return;
-        Promise.resolve(handler(socket, attemptNumber)).catch(error => {
-          console.error('[UnifiedWebSocket] Reconnect handler failed:', error);
-        });
-      });
-
-      socket.on('reconnect_error', (error: Error) => {
-        console.error('[UnifiedWebSocket] Reconnection failed:', error);
-      });
-
-      socket.on('connect_error', (error: Error) => {
-        console.error('[UnifiedWebSocket] Connection error:', error);
-        isConnectingRef.current = false;
-
-        // ネットワーク切断やサーバー一時停止など、自動再接続されるエラーは通知しない
-        const isTransientError =
-          error.message.includes('websocket error') ||
-          error.message.includes('502') ||
-          error.message.includes('503');
-
-        if (isTransientError) {
-          console.log(
-            '[UnifiedWebSocket] Transient error, auto-reconnecting...'
-          );
+      try {
+        const authToken = await window.electronAPI?.getAuthToken?.();
+        if (!isConnectingRef.current) {
           return;
         }
 
-        onConnectErrorRef.current?.(error);
-      });
+        const socket = io(serverUrl, {
+          auth: { token: authToken ?? undefined },
+          transports: ['websocket', 'polling'],
+          timeout: 15000,
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          reconnectionAttempts: 5,
+          randomizationFactor: 0.5,
+          forceNew: true,
+          upgrade: true,
+          rememberUpgrade: false,
+          autoConnect: true,
+          withCredentials: false,
+          extraHeaders: {
+            Accept: 'application/json',
+            'Cache-Control': 'no-cache',
+          },
+        });
 
-      socket.on('error', (errorData: unknown) => {
-        onErrorRef.current?.(errorData);
-      });
+        socketRef.current = socket;
 
-      const initialListeners = dataListenersRef.current;
-      if (initialListeners) {
-        for (const eventName of Object.keys(initialListeners)) {
-          socket.on(eventName, (data: unknown) => {
-            const latestListener = dataListenersRef.current?.[eventName];
-            latestListener?.(data);
+        socket.on('connect', () => {
+          isConnectingRef.current = false;
+          if (isMountedRef.current) {
+            setIsConnected(true);
+          }
+          onConnectRef.current?.(socket);
+        });
+
+        socket.on('disconnect', (reason: string) => {
+          console.log(`[UnifiedWebSocket] Disconnected, reason: ${reason}`);
+          if (isMountedRef.current) {
+            setIsConnected(false);
+          }
+          onDisconnectRef.current?.(reason);
+          if (socketRef.current === socket) {
+            socketRef.current = null;
+          }
+        });
+
+        socket.on('reconnect', attemptNumber => {
+          const handler = onReconnectRef.current;
+          if (!handler) return;
+          Promise.resolve(handler(socket, attemptNumber)).catch(error => {
+            console.error('[UnifiedWebSocket] Reconnect handler failed:', error);
           });
-        }
-      }
-    } catch (error) {
-      console.error('[UnifiedWebSocket] Failed to create connection:', error);
-      isConnectingRef.current = false;
+        });
 
-      const connectError =
-        error instanceof Error ? error : new Error(String(error));
-      onConnectErrorRef.current?.(connectError);
-    }
+        socket.on('reconnect_error', (error: Error) => {
+          console.error('[UnifiedWebSocket] Reconnection failed:', error);
+        });
+
+        socket.on('connect_error', (error: Error) => {
+          console.error('[UnifiedWebSocket] Connection error:', error);
+          isConnectingRef.current = false;
+
+          // ネットワーク切断やサーバー一時停止など、自動再接続されるエラーは通知しない
+          const isTransientError =
+            error.message.includes('websocket error') ||
+            error.message.includes('502') ||
+            error.message.includes('503');
+
+          if (isTransientError) {
+            console.log(
+              '[UnifiedWebSocket] Transient error, auto-reconnecting...'
+            );
+            return;
+          }
+
+          onConnectErrorRef.current?.(error);
+        });
+
+        socket.on('error', (errorData: unknown) => {
+          onErrorRef.current?.(errorData);
+        });
+
+        const initialListeners = dataListenersRef.current;
+        if (initialListeners) {
+          for (const eventName of Object.keys(initialListeners)) {
+            socket.on(eventName, (data: unknown) => {
+              const latestListener = dataListenersRef.current?.[eventName];
+              latestListener?.(data);
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[UnifiedWebSocket] Failed to create connection:', error);
+        isConnectingRef.current = false;
+
+        const connectError =
+          error instanceof Error ? error : new Error(String(error));
+        onConnectErrorRef.current?.(connectError);
+      }
+    })();
   }, [disconnect]);
 
   // WebSocket接続の管理（StrictMode考慮）

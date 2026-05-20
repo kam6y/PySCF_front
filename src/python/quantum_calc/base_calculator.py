@@ -46,6 +46,7 @@ class BaseCalculator(
         self.geomopt_maxsteps = geomopt_maxsteps
         self.geomopt_conv_energy = geomopt_conv_energy
         self.gpu_enabled = False
+        self._force_cpu_fallback = False
         self._gpu4pyscf_available: Optional[bool] = None
         self._cuda_supported: Optional[bool] = None
 
@@ -83,31 +84,27 @@ class BaseCalculator(
 
     def _require_gpu4pyscf_available(self) -> bool:
         """
-        Require GPU4PySCF when GPU acceleration is enabled.
+        Return whether GPU4PySCF can be used when GPU acceleration is enabled.
 
         Returns False when GPU acceleration is disabled. Returns True when it is
-        enabled and all prerequisites are available. Raises instead of silently
-        falling back to CPU when GPU was explicitly enabled.
+        enabled and all prerequisites are available. If prerequisites are missing,
+        logs a warning and falls back to CPU.
         """
-        if not self._is_gpu_acceleration_enabled():
+        if self._force_cpu_fallback or not self._is_gpu_acceleration_enabled():
             self.gpu_enabled = False
             return False
         if self._is_gpu4pyscf_available():
             return True
 
         reason = self._get_gpu4pyscf_unavailable_reason()
-        raise CalculationError(
-            "GPU acceleration is enabled but GPU4PySCF is unavailable: "
-            f"{reason}. Disable GPU acceleration to run this calculation on CPU."
+        logger.warning(
+            "GPU acceleration is enabled but GPU4PySCF is unavailable: %s. "
+            "Falling back to CPU.",
+            reason,
         )
-
-    def _raise_gpu_calculation_error(self, error: Exception) -> None:
-        """Raise a consistent error for GPU execution failures."""
-        raise CalculationError(
-            "GPU4PySCF calculation failed. GPU acceleration is enabled, so the "
-            "calculation was stopped instead of falling back to CPU. Disable GPU "
-            f"acceleration to run this calculation on CPU. Original error: {error}"
-        ) from error
+        self.gpu_enabled = False
+        self._force_cpu_fallback = True
+        return False
 
     def _is_cuda_supported(self) -> bool:
         """Check whether a supported CUDA Toolkit is available (via nvcc)."""
@@ -480,12 +477,46 @@ class BaseCalculator(
         logger.info(f"Running {self._get_base_method_description()} calculation...")
         try:
             energy = self.mf.kernel()
+        except PauseRequestedException:
+            raise
         except Exception as exc:
             if self.gpu_enabled:
-                self._raise_gpu_calculation_error(exc)
-            raise
+                logger.warning(
+                    "GPU4PySCF calculation failed: %s. Falling back to CPU.",
+                    exc,
+                )
+                energy = self._retry_base_scf_on_cpu_after_gpu_failure(exc)
+            else:
+                raise
         logger.info(f"{self._get_base_method_description()} calculation completed")
         return energy
+
+    def _retry_base_scf_on_cpu_after_gpu_failure(self, error: Exception) -> float:
+        """Recreate the mean-field object on CPU and rerun SCF after GPU failure."""
+        self.gpu_enabled = False
+        self._force_cpu_fallback = True
+
+        mol = getattr(self.mf, "mol", None) or getattr(self, "mol", None)
+        if mol is None:
+            raise CalculationError(
+                f"GPU4PySCF calculation failed and CPU fallback could not be prepared: {error}"
+            ) from error
+
+        try:
+            self.mf = self._create_scf_method(mol)
+            if getattr(self, 'density_fitting', False):
+                auxbasis = getattr(self, 'auxiliary_basis', None) or None
+                self.mf = self.mf.density_fit(auxbasis=auxbasis)
+            self.mf = self._apply_solvent_effects(self.mf)
+            self._apply_calculation_settings()
+            return self.mf.kernel()
+        except PauseRequestedException:
+            raise
+        except Exception as fallback_error:
+            raise CalculationError(
+                "GPU4PySCF calculation failed, and CPU fallback also failed: "
+                f"{fallback_error}"
+            ) from fallback_error
     
     def _verify_scf_convergence(self) -> None:
         """Verify SCF convergence and orbital data."""

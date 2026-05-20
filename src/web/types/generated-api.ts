@@ -1533,7 +1533,7 @@ export interface components {
              */
             timezone: "UTC" | "Asia/Tokyo" | "Asia/Shanghai" | "Asia/Seoul" | "Asia/Singapore" | "Asia/Kolkata" | "Australia/Sydney" | "Europe/London" | "Europe/Paris" | "Europe/Berlin" | "America/New_York" | "America/Chicago" | "America/Denver" | "America/Los_Angeles";
             /**
-             * @description Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
+             * @description Google Gemini API key required for AI agent chat functionality.
              * @example null
              */
             gemini_api_key?: string | null;

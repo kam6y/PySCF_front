@@ -179,10 +179,11 @@ export const ElectronicPropertiesSection =
               {/* Right Column: 3D Charge Distribution Visualization */}
               {(results.optimized_geometry || parameters.xyz) && (
                 <div className={styles.chargeVisualizationColumn}>
-                  <h3>3D Charge Distribution Visualization</h3>
+                  <h3>3D Mulliken Charge Visualization</h3>
                   <div className={styles.sectionDescription}>
-                    Interactive 3D visualization of the electrostatic potential
-                    on the molecular surface.
+                    Mulliken charge-colored van der Waals surface. This is a
+                    qualitative atom-charge view, not an electrostatic potential
+                    map.
                   </div>
                   <LazyViewer>
                     <MullikenChargeViewer

@@ -93,12 +93,12 @@ class HFCalculator(BaseCalculator):
                 self.gpu_enabled = True
                 return mf
             except Exception as exc:
+                logger.warning(
+                    "GPU4PySCF HF setup failed: %s. Falling back to CPU.",
+                    exc,
+                )
                 self.gpu_enabled = False
-                raise CalculationError(
-                    "GPU4PySCF HF setup failed. GPU acceleration is enabled, so "
-                    "the calculation was stopped instead of falling back to CPU. "
-                    f"Disable GPU acceleration to run on CPU. Original error: {exc}"
-                ) from exc
+                self._force_cpu_fallback = True
 
         if spin == 0:
             mf = scf.RHF(mol)

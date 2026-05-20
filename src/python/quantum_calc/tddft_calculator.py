@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from pyscf import gto, dft, tddft, tdscf
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError
+from .exceptions import CalculationError, ConvergenceError, InputError, PauseRequestedException
 from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
@@ -148,13 +148,16 @@ class TDDFTCalculator(BaseCalculator):
         # Run TDDFT calculation
         try:
             self.mytd.kernel()
+        except PauseRequestedException:
+            raise
         except Exception as e:
             if self.gpu_enabled:
-                raise CalculationError(
-                    "GPU4PySCF TDDFT calculation failed. GPU acceleration is enabled, "
-                    "so the calculation was stopped instead of falling back to CPU. "
-                    f"Disable GPU acceleration to run on CPU. Original error: {e}"
-                ) from e
+                logger.warning(
+                    "GPU4PySCF TDDFT calculation failed: %s. Falling back to CPU.",
+                    e,
+                )
+                cpu_base_energy = self._retry_base_scf_on_cpu_after_gpu_failure(e)
+                return self._perform_specific_calculation(cpu_base_energy)
             error_msg = str(e).lower()
             if "singular" in error_msg or "convergence" in error_msg:
                 raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
@@ -204,12 +207,12 @@ class TDDFTCalculator(BaseCalculator):
                 self.gpu_enabled = True
                 return mf
             except Exception as exc:
+                logger.warning(
+                    "GPU4PySCF TDDFT setup failed: %s. Falling back to CPU.",
+                    exc,
+                )
                 self.gpu_enabled = False
-                raise CalculationError(
-                    "GPU4PySCF TDDFT setup failed. GPU acceleration is enabled, so "
-                    "the calculation was stopped instead of falling back to CPU. "
-                    f"Disable GPU acceleration to run on CPU. Original error: {exc}"
-                ) from exc
+                self._force_cpu_fallback = True
 
         if spin == 0:
             mf = dft.RKS(mol)

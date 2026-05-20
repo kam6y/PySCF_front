@@ -62,6 +62,20 @@ def register_websocket_handlers(socketio):
             logger.debug("WebSocket handlers already registered; skipping.")
             return
         setattr(socketio, '_pyscf_handlers_registered', True)
+
+    @socketio.on('connect')
+    def on_connect(auth):
+        """Authenticate Socket.IO connections when an auth token is configured."""
+        expected_token = os.getenv('PYSCF_AUTH_TOKEN')
+        if not expected_token:
+            return True
+
+        client_token = auth.get('token') if isinstance(auth, dict) else None
+        if client_token != expected_token:
+            logger.warning("Unauthorized Socket.IO connection attempt")
+            return False
+
+        return True
     
     @socketio.on('join_calculation')
     def on_join_calculation(data):

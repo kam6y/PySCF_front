@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
+from uuid import uuid4
 
 logger = logging.getLogger(__name__)
 
@@ -30,18 +31,23 @@ class CalculationRepository:
         self.base_dir.mkdir(parents=True, exist_ok=True)
 
     def create_calculation_dir(self, molecule_name: Optional[str] = None) -> str:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        clean_name = (
+            "".join(c for c in molecule_name if c.isalnum() or c in "._-").strip()
+            if molecule_name
+            else "calculation"
+        ) or "unnamed"
 
-        if molecule_name:
-            clean_name = "".join(c for c in molecule_name if c.isalnum() or c in "._-").strip() or "unnamed"
-            dir_name = f"{clean_name}_{timestamp}"
-        else:
-            dir_name = f"calculation_{timestamp}"
+        for _ in range(5):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            suffix = uuid4().hex[:8]
+            calc_dir = self.base_dir / f"{clean_name}_{timestamp}_{suffix}"
+            try:
+                calc_dir.mkdir(exist_ok=False)
+                return str(calc_dir)
+            except FileExistsError:
+                logger.warning("Calculation directory collision detected: %s", calc_dir)
 
-        calc_dir = self.base_dir / dir_name
-        calc_dir.mkdir(exist_ok=True)
-
-        return str(calc_dir)
+        raise FileExistsError("Failed to create a unique calculation directory")
 
     def rename_calculation(self, calculation_id: str, new_name: str) -> Optional[str]:
         """Updates the display name of a calculation without changing the directory name."""

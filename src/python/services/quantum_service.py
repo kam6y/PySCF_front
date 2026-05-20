@@ -385,6 +385,24 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
+
+            if not os.path.isdir(calc_path):
+                raise NotFoundError(f'Calculation "{calculation_id}" not found.')
+
+            status, _ = self.repository.read_calculation_status_details(calc_path)
+            non_deletable_statuses = {'pending', 'running', 'waiting', 'pausing'}
+            if status in non_deletable_statuses:
+                logger.warning(
+                    "Cannot delete calculation %s with non-terminal status %s",
+                    calculation_id,
+                    status,
+                )
+                raise ValidationError(
+                    f'Cannot delete calculation "{calculation_id}" while it is {status}. '
+                    'Please pause or wait for the calculation to complete first.'
+                )
+
             process_manager = get_process_manager()
 
             # Prevent deletion of running calculations
@@ -394,11 +412,6 @@ class QuantumService:
                     f'Cannot delete calculation "{calculation_id}" while it is running. '
                     'Please pause or wait for the calculation to complete first.'
                 )
-
-            calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
-            
-            if not os.path.isdir(calc_path):
-                raise NotFoundError(f'Calculation "{calculation_id}" not found.')
             
             # Delete the directory
             shutil.rmtree(calc_path)

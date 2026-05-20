@@ -2,13 +2,19 @@
 Unit tests for BaseCalculator GPU detection helpers.
 """
 
+import sys
+import types
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from pyscf import gto, dft, scf
 import quantum_calc.base_calculator as base_calculator
 from quantum_calc.base_calculator import BaseCalculator
-from quantum_calc.exceptions import CalculationError
+from quantum_calc.dft_calculator import DFTCalculator
+from quantum_calc.exceptions import PauseRequestedException
+from quantum_calc.hf_calculator import HFCalculator
+from quantum_calc.tddft_calculator import TDDFTCalculator
 
 
 class DummyCalculator(BaseCalculator):
@@ -25,13 +31,6 @@ class DummyCalculator(BaseCalculator):
 
     def _get_base_method_description(self) -> str:
         return "Dummy"
-
-
-class FailingKernel:
-    """Mean-field stand-in that fails during kernel execution."""
-
-    def kernel(self):
-        raise RuntimeError("CUDA execution failed")
 
 
 def test_gpu_disabled_returns_false(monkeypatch):
@@ -107,29 +106,137 @@ def test_gpu_available_when_cuda_supported_and_module_present(monkeypatch):
     assert calculator._is_gpu4pyscf_available() is True
 
 
-def test_gpu_required_raises_when_enabled_but_unavailable(monkeypatch):
+def test_gpu_required_returns_false_when_enabled_but_unavailable(monkeypatch):
     """
     GIVEN GPU acceleration enabled on an unsupported platform
     WHEN GPU execution is required
-    THEN a calculation error is raised instead of falling back to CPU
+    THEN it returns False and falls back to CPU
     """
     calculator = DummyCalculator(optimize_geometry=False)
     monkeypatch.setattr(calculator, "_is_gpu_acceleration_enabled", lambda: True)
     monkeypatch.setattr(base_calculator.sys, "platform", "darwin")
 
-    with pytest.raises(CalculationError, match="GPU acceleration is enabled"):
-        calculator._require_gpu4pyscf_available()
+    assert calculator._require_gpu4pyscf_available() is False
+    assert calculator.gpu_enabled is False
 
 
-def test_gpu_runtime_failure_is_reported_as_calculation_error():
+def test_hf_gpu_setup_failure_falls_back_to_cpu(tmp_path, monkeypatch):
     """
-    GIVEN a GPU-backed mean-field object
-    WHEN the PySCF kernel fails during execution
-    THEN the error is surfaced as a GPU calculation error
+    GIVEN GPU prerequisites are available but GPU4PySCF HF setup fails
+    WHEN the SCF method is created
+    THEN a CPU PySCF method is returned
+    """
+    gpu_scf = types.ModuleType("gpu4pyscf.scf")
+    gpu_scf.RHF = MagicMock(side_effect=RuntimeError("GPU setup failed"))
+    gpu_scf.UHF = MagicMock(side_effect=RuntimeError("GPU setup failed"))
+    gpu4pyscf = types.ModuleType("gpu4pyscf")
+    gpu4pyscf.scf = gpu_scf
+    monkeypatch.setitem(sys.modules, "gpu4pyscf", gpu4pyscf)
+    monkeypatch.setitem(sys.modules, "gpu4pyscf.scf", gpu_scf)
+
+    calculator = HFCalculator(working_dir=str(tmp_path), optimize_geometry=False)
+    calculator.results["spin"] = 0
+    monkeypatch.setattr(calculator, "_require_gpu4pyscf_available", lambda: True)
+    mol = gto.M(atom="H 0 0 0; H 0 0 0.74", basis="sto-3g", verbose=0)
+
+    mf = calculator._create_scf_method(mol)
+
+    assert isinstance(mf, scf.hf.RHF)
+    assert calculator.gpu_enabled is False
+
+
+def test_dft_gpu_setup_failure_falls_back_to_cpu(tmp_path, monkeypatch):
+    """
+    GIVEN GPU prerequisites are available but GPU4PySCF DFT setup fails
+    WHEN the SCF method is created
+    THEN a CPU PySCF method is returned
+    """
+    gpu_dft = types.ModuleType("gpu4pyscf.dft")
+    gpu_dft.RKS = MagicMock(side_effect=RuntimeError("GPU setup failed"))
+    gpu_dft.UKS = MagicMock(side_effect=RuntimeError("GPU setup failed"))
+    gpu4pyscf = types.ModuleType("gpu4pyscf")
+    gpu4pyscf.dft = gpu_dft
+    monkeypatch.setitem(sys.modules, "gpu4pyscf", gpu4pyscf)
+    monkeypatch.setitem(sys.modules, "gpu4pyscf.dft", gpu_dft)
+
+    calculator = DFTCalculator(working_dir=str(tmp_path), optimize_geometry=False)
+    calculator.results["spin"] = 0
+    calculator.xc_functional = "B3LYP"
+    monkeypatch.setattr(calculator, "_require_gpu4pyscf_available", lambda: True)
+    mol = gto.M(atom="H 0 0 0; H 0 0 0.74", basis="sto-3g", verbose=0)
+
+    mf = calculator._create_scf_method(mol)
+
+    assert isinstance(mf, dft.rks.RKS)
+    assert mf.xc == "B3LYP"
+    assert calculator.gpu_enabled is False
+
+
+def test_gpu_base_scf_pause_propagates_without_cpu_fallback(monkeypatch):
+    """
+    GIVEN GPU execution is active and base SCF kernel requests pause
+    WHEN _run_base_scf_calculation is called
+    THEN the pause exception propagates without CPU fallback
     """
     calculator = DummyCalculator(optimize_geometry=False)
-    calculator.mf = FailingKernel()
+    pause_error = PauseRequestedException("pause requested")
     calculator.gpu_enabled = True
+    calculator.mf = SimpleNamespace(kernel=MagicMock(side_effect=pause_error))
+    fallback = MagicMock(side_effect=AssertionError("CPU fallback should not run"))
+    monkeypatch.setattr(calculator, "_retry_base_scf_on_cpu_after_gpu_failure", fallback)
 
-    with pytest.raises(CalculationError, match="GPU4PySCF calculation failed"):
+    with pytest.raises(PauseRequestedException) as exc_info:
         calculator._run_base_scf_calculation()
+
+    assert exc_info.value is pause_error
+    fallback.assert_not_called()
+
+
+def test_cpu_fallback_base_scf_pause_propagates_without_wrapping(monkeypatch):
+    """
+    GIVEN CPU fallback is retrying after a GPU failure
+    WHEN the fallback SCF kernel requests pause
+    THEN the pause exception propagates without CalculationError wrapping
+    """
+    calculator = DummyCalculator(optimize_geometry=False)
+    pause_error = PauseRequestedException("pause requested")
+    mol = object()
+    cpu_mf = SimpleNamespace(kernel=MagicMock(side_effect=pause_error))
+    calculator.gpu_enabled = True
+    calculator.mf = SimpleNamespace(mol=mol)
+    monkeypatch.setattr(calculator, "_create_scf_method", MagicMock(return_value=cpu_mf))
+
+    with pytest.raises(PauseRequestedException) as exc_info:
+        calculator._retry_base_scf_on_cpu_after_gpu_failure(RuntimeError("gpu failed"))
+
+    assert exc_info.value is pause_error
+
+
+def test_tddft_gpu_kernel_pause_propagates_without_cpu_fallback(tmp_path, monkeypatch):
+    """
+    GIVEN GPU TDDFT execution is active and TDDFT kernel requests pause
+    WHEN _perform_specific_calculation is called
+    THEN the pause exception propagates without CPU fallback
+    """
+    calculator = TDDFTCalculator(working_dir=str(tmp_path), optimize_geometry=False)
+    pause_error = PauseRequestedException("pause requested")
+    mytd = SimpleNamespace(
+        nstates=1,
+        kernel=MagicMock(side_effect=pause_error),
+    )
+    calculator.gpu_enabled = True
+    calculator.tddft_nstates = 1
+    calculator.tddft_method = "TDDFT"
+    calculator.mf = SimpleNamespace(
+        mo_energy=[-0.5, -0.1, 0.2, 0.4],
+        mo_occ=[2, 2, 0, 0],
+        TDDFT=MagicMock(return_value=mytd),
+    )
+    fallback = MagicMock(side_effect=AssertionError("CPU fallback should not run"))
+    monkeypatch.setattr(calculator, "_retry_base_scf_on_cpu_after_gpu_failure", fallback)
+
+    with pytest.raises(PauseRequestedException) as exc_info:
+        calculator._perform_specific_calculation(-1.0)
+
+    assert exc_info.value is pause_error
+    fallback.assert_not_called()

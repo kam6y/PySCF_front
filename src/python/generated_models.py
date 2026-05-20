@@ -932,7 +932,7 @@ class AppSettings(BaseModel):
     )
     gemini_api_key: Optional[str] = Field(
         None,
-        description='Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.',
+        description='Google Gemini API key required for AI agent chat functionality.',
         examples=[None],
     )
     research_email: Optional[str] = Field(

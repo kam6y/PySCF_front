@@ -658,9 +658,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             <div className={styles.settingLabel}>
               <label htmlFor="geminiApiKey">Google Gemini API Key</label>
               <p className={styles.settingHelp}>
-                API key for Google Gemini AI to enable intelligent molecular
-                analysis and assistance. Leave empty to use fallback responses
-                without AI features.
+                Required API key for the Gemini-based AI agent. Chat assistance
+                is unavailable until a valid key is configured.
               </p>
             </div>
 

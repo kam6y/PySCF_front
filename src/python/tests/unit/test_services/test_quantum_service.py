@@ -7,8 +7,9 @@ Focuses on validate_calculation_parameters() which is core business logic.
 
 import pytest
 
+from quantum_calc._calculation_repository import CalculationRepository
 from services.quantum_service import QuantumService
-from services.exceptions import ServiceError
+from services.exceptions import ServiceError, ValidationError
 
 
 # ============================================================================
@@ -575,6 +576,76 @@ def test_get_supported_parameters_error(mocker):
     # ACT & ASSERT
     with pytest.raises(ServiceError, match="Failed to retrieve supported parameters"):
         service.get_supported_parameters()
+
+
+@pytest.mark.parametrize("status", ["pending", "running", "waiting", "pausing"])
+def test_delete_calculation_rejects_non_terminal_status(tmp_path, mocker, status):
+    """
+    GIVEN a calculation directory has a non-terminal status
+    WHEN delete_calculation is called
+    THEN deletion is rejected and the directory remains
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = f"calc-{status}"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_parameters(
+        str(calc_dir),
+        {"name": "Queued Calc", "created_at": "2026-05-20T00:00:00"},
+    )
+    if status != "pending":
+        service.repository.save_calculation_status(str(calc_dir), status)
+
+    process_manager = mocker.Mock()
+    process_manager.is_running.return_value = False
+    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+
+    with pytest.raises(ValidationError, match="Cannot delete calculation"):
+        service.delete_calculation(calc_id)
+
+    assert calc_dir.is_dir()
+
+
+def test_resume_calculation_returns_updated_waiting_status(tmp_path, mocker):
+    """
+    GIVEN a paused calculation is resumed and queued
+    WHEN resume_calculation returns
+    THEN the response calculation reflects waiting status and reason
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "paused-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    params = {
+        "name": "Paused Calc",
+        "created_at": "2026-05-20T00:00:00",
+        "calculation_method": "HF",
+    }
+    service.repository.save_calculation_parameters(str(calc_dir), params)
+    service.repository.save_calculation_status(str(calc_dir), "paused")
+
+    def resume_and_queue(calculation_id):
+        service.repository.save_calculation_status(
+            str(calc_dir), "waiting", "All slots are busy"
+        )
+        return {
+            "calculation_id": calculation_id,
+            "status": "waiting",
+            "waiting_reason": "All slots are busy",
+        }
+
+    process_manager = mocker.Mock()
+    process_manager.resume_calculation.side_effect = resume_and_queue
+    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+
+    response = service.resume_calculation(calc_id)
+
+    assert response["calculation"]["status"] == "waiting"
+    assert response["calculation"]["waitingReason"] == "All slots are busy"
 
 
 # ============================================================================

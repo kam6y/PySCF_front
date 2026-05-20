@@ -357,8 +357,14 @@ class CalculationProcessManager:
         if not success:
             raise ValueError(f"Failed to resume calculation: {message}")
 
+        if message in {'waiting', 'running'}:
+            repository.save_calculation_status(calc_dir, message, waiting_reason)
+
         logger.info(f"Calculation resumed: {calculation_id}")
-        return {'calculation_id': calculation_id, 'status': message}
+        result = {'calculation_id': calculation_id, 'status': message}
+        if waiting_reason is not None:
+            result['waiting_reason'] = waiting_reason
+        return result
 
     # --- Query methods ---
 
