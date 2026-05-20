@@ -2718,6 +2718,15 @@ export interface operations {
                     "application/json": components["schemas"]["CalculationDeleteResponse"];
                 };
             };
+            /** @description Calculation cannot be deleted while it is non-terminal */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Calculation not found */
             404: {
                 headers: {

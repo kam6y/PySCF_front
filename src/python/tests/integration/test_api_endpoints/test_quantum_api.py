@@ -6,7 +6,7 @@ monitoring, results retrieval, and orbital/spectrum analysis.
 """
 
 import pytest
-from services.exceptions import NotFoundError, ServiceError
+from services.exceptions import NotFoundError, ServiceError, ValidationError
 
 
 class TestSupportedParametersAPI:
@@ -410,6 +410,28 @@ class TestCalculationDeletionAPI:
         # ASSERT
         assert response.status_code == 404
 
+    def test_delete_calculation_validation_error_returns_400(self, client, mocker):
+        """
+        GIVEN service rejects deletion for a non-terminal calculation
+        WHEN DELETE /api/quantum/calculations/<id> is called
+        THEN 400 Bad Request is returned
+        """
+        # ARRANGE
+        calc_id = 'running-calc'
+        mock_service = mocker.patch('api.quantum.get_quantum_service')
+        mock_service.return_value.delete_calculation.side_effect = ValidationError(
+            f'Cannot delete calculation "{calc_id}" while it is running.'
+        )
+
+        # ACT
+        response = client.delete(f'/api/quantum/calculations/{calc_id}')
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'Cannot delete calculation' in data['error']
+
 
 class TestMolecularOrbitalsAPI:
     """Integration tests for orbital-related endpoints."""
@@ -497,6 +519,31 @@ class TestMolecularOrbitalsAPI:
             isovalue_pos=0.05,
             isovalue_neg=-0.05
         )
+
+    def test_generate_orbital_cube_validation_error_returns_400(self, client, mocker):
+        """
+        GIVEN service rejects out-of-range CUBE query parameters
+        WHEN GET /orbitals/<index>/cube is called
+        THEN 400 Bad Request is returned
+        """
+        # ARRANGE
+        calc_id = 'calc-123'
+        orbital_index = 5
+        mock_service = mocker.patch('api.quantum.get_quantum_service')
+        mock_service.return_value.generate_orbital_cube.side_effect = ValidationError(
+            'grid_size must be between 40 and 120.'
+        )
+
+        # ACT
+        response = client.get(
+            f'/api/quantum/calculations/{calc_id}/orbitals/{orbital_index}/cube?gridSize=121'
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'grid_size' in data['error']
 
     def test_list_cube_files_success(self, client, mocker):
         """

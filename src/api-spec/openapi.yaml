@@ -395,6 +395,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CalculationDeleteResponse'
+        '400':
+          description: Calculation cannot be deleted while it is non-terminal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Calculation not found
           content:

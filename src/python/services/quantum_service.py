@@ -30,6 +30,18 @@ logger = logging.getLogger(__name__)
 class QuantumService:
     """Service for quantum chemistry calculation operations."""
 
+    TERMINAL_STATUSES = frozenset({'completed', 'error', 'paused'})
+    NON_TERMINAL_STATUSES = frozenset({'pending', 'running', 'waiting', 'pausing'})
+    RESTART_INTERRUPTED_MESSAGE = (
+        'Calculation interrupted because the backend was restarted.'
+    )
+    ORBITAL_CUBE_GRID_SIZE_MIN = 40
+    ORBITAL_CUBE_GRID_SIZE_MAX = 120
+    ORBITAL_CUBE_ISOVALUE_POS_MIN = 0.001
+    ORBITAL_CUBE_ISOVALUE_POS_MAX = 0.1
+    ORBITAL_CUBE_ISOVALUE_NEG_MIN = -0.1
+    ORBITAL_CUBE_ISOVALUE_NEG_MAX = -0.001
+
     def __init__(self):
         """Initialize QuantumService."""
         # Load calculations directory from settings
@@ -145,6 +157,17 @@ class QuantumService:
             if validation_error:
                 logger.warning(f"Parameter validation failed: {validation_error}")
                 raise ValidationError(f'Invalid parameters: {validation_error}')
+
+            try:
+                process_manager = get_process_manager()
+                self._recover_stale_non_terminal_calculations(process_manager)
+            except ProcessManagerError as e:
+                logger.error(f"Process manager error: {e}")
+                raise ResourceUnavailableError('System initialization error: Unable to initialize calculation system. Please check system resources and try again.')
+            except Exception as submit_error:
+                error_message = f'Failed to submit calculation: {str(submit_error)}'
+                logger.error(f"Unexpected error during calculation submission: {submit_error}")
+                raise ServiceError(error_message)
             
             # Initialize calculation directory
             try:
@@ -160,8 +183,6 @@ class QuantumService:
             
             # Submit to process manager
             try:
-                process_manager = get_process_manager()
-                
                 # Apply current settings
                 try:
                     from quantum_calc import update_process_manager_settings
@@ -186,7 +207,24 @@ class QuantumService:
                     error_instance['error'] = error_message
                     return error_instance
                 
-                # Set initial status
+                # Set initial status unless a synchronous worker already reached
+                # a terminal state during submit.
+                current_status, current_waiting_reason = (
+                    self.repository.read_calculation_status_details(calc_dir)
+                )
+                if current_status in self.TERMINAL_STATUSES:
+                    logger.info(
+                        "Calculation %s already reached terminal status %s during submit",
+                        calculation_id,
+                        current_status,
+                    )
+                    return self._build_calculation_instance(
+                        calculation_id,
+                        params,
+                        current_status,
+                        current_waiting_reason,
+                    )
+
                 self.repository.save_calculation_status(calc_dir, initial_status, waiting_reason)
                 logger.info(f"Queued calculation {calculation_id} for molecule '{params['name']}'")
                 
@@ -247,6 +285,8 @@ class QuantumService:
             ServiceError: If listing fails
         """
         try:
+            self._recover_stale_non_terminal_calculations()
+
             calculations = self.repository.list_calculations(
                 name_query=name_query,
                 status=status,
@@ -287,6 +327,8 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            self._recover_stale_non_terminal_calculations()
+
             calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
@@ -385,6 +427,8 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            self._recover_stale_non_terminal_calculations()
+
             calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
 
             if not os.path.isdir(calc_path):
@@ -547,6 +591,12 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            self._validate_orbital_cube_parameters(
+                grid_size=grid_size,
+                isovalue_pos=isovalue_pos,
+                isovalue_neg=isovalue_neg,
+            )
+
             calc_path = os.path.join(self.repository.get_base_directory(), calculation_id)
             
             if not os.path.isdir(calc_path):
@@ -883,3 +933,86 @@ class QuantumService:
             instance['waitingReason'] = waiting_reason
         
         return instance
+
+    def _validate_orbital_cube_parameters(
+        self,
+        grid_size: int,
+        isovalue_pos: Optional[float],
+        isovalue_neg: Optional[float],
+    ) -> None:
+        """Validate orbital CUBE generation parameters against the API contract."""
+        if not self.ORBITAL_CUBE_GRID_SIZE_MIN <= grid_size <= self.ORBITAL_CUBE_GRID_SIZE_MAX:
+            raise ValidationError(
+                "grid_size must be between "
+                f"{self.ORBITAL_CUBE_GRID_SIZE_MIN} and {self.ORBITAL_CUBE_GRID_SIZE_MAX}."
+            )
+
+        if (
+            isovalue_pos is not None
+            and not (
+                self.ORBITAL_CUBE_ISOVALUE_POS_MIN
+                <= isovalue_pos
+                <= self.ORBITAL_CUBE_ISOVALUE_POS_MAX
+            )
+        ):
+            raise ValidationError(
+                "isovalue_pos must be between "
+                f"{self.ORBITAL_CUBE_ISOVALUE_POS_MIN} and {self.ORBITAL_CUBE_ISOVALUE_POS_MAX}."
+            )
+
+        if (
+            isovalue_neg is not None
+            and not (
+                self.ORBITAL_CUBE_ISOVALUE_NEG_MIN
+                <= isovalue_neg
+                <= self.ORBITAL_CUBE_ISOVALUE_NEG_MAX
+            )
+        ):
+            raise ValidationError(
+                "isovalue_neg must be between "
+                f"{self.ORBITAL_CUBE_ISOVALUE_NEG_MIN} and {self.ORBITAL_CUBE_ISOVALUE_NEG_MAX}."
+            )
+
+    def _recover_stale_non_terminal_calculations(
+        self,
+        process_manager: Optional[Any] = None,
+    ) -> None:
+        """Mark persisted non-terminal calculations as error when no worker owns them."""
+        try:
+            manager = process_manager or get_process_manager()
+            active_ids = set(manager.get_active_calculations() or [])
+            queued_ids = set(manager.get_queued_calculations() or [])
+        except Exception as e:
+            logger.warning(f"Skipping stale calculation recovery: {e}")
+            return
+
+        managed_ids = active_ids | queued_ids
+        base_directory = self.repository.get_base_directory()
+
+        for calculation in self.repository.list_calculations():
+            calculation_id = calculation.get('id')
+            if not calculation_id or calculation_id in managed_ids:
+                continue
+
+            calc_dir = os.path.join(base_directory, calculation_id)
+            try:
+                status, _ = self.repository.read_calculation_status_details(calc_dir)
+                if status not in self.NON_TERMINAL_STATUSES:
+                    continue
+
+                logger.warning(
+                    "Recovering stale calculation %s from status %s to error",
+                    calculation_id,
+                    status,
+                )
+                self.repository.save_calculation_status(calc_dir, 'error')
+                self.repository.save_calculation_results(
+                    calc_dir,
+                    {'error': self.RESTART_INTERRUPTED_MESSAGE},
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to recover stale calculation %s: %s",
+                    calculation_id,
+                    e,
+                )

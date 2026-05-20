@@ -271,3 +271,13 @@ def test_list_calculations_method_filter_matches_calculation_method_schema() -> 
     calculation_method_schema = spec["components"]["schemas"]["CalculationMethod"]
 
     assert parameter_schema["enum"] == calculation_method_schema["enum"]
+
+
+def test_delete_calculation_documents_validation_error_response() -> None:
+    """DELETE calculation must document the 400 response used for non-terminal statuses."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    responses = spec["paths"]["/api/quantum/calculations/{calculationId}"]["delete"]["responses"]
+
+    assert responses["400"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
