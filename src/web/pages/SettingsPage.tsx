@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAppSettings, useGpu4Pyscf } from '../hooks';
+import { useAppSettings, useGetCalculations, useGpu4Pyscf } from '../hooks';
 import {
   TIMEZONE_LABELS,
   TIMEZONE_GROUPS,
@@ -15,6 +15,12 @@ type Timezone = components['schemas']['AppSettings']['timezone'];
 const DEFAULT_MAX_PARALLEL_INSTANCES = 4;
 const DEFAULT_MAX_CPU_UTILIZATION = 95.0;
 const DEFAULT_MAX_MEMORY_UTILIZATION = 95.0;
+const DIRECTORY_CHANGE_BLOCKING_STATUSES = [
+  'pending',
+  'running',
+  'waiting',
+  'pausing',
+] as const;
 
 interface SettingsPageProps {
   // Props will be added when integrating with the main app
@@ -47,6 +53,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
   const { settings, isLoading, isUpdating, error, updateSettingsAsync } =
     useAppSettings();
+  const { data: calculationsData } = useGetCalculations();
   const {
     status: gpuStatus,
     isLoading: isGpuStatusLoading,
@@ -97,7 +104,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     }
   }, [settings]);
 
+  const hasBlockingCalculations = useMemo(
+    () =>
+      calculationsData?.calculations?.some(calculation =>
+        DIRECTORY_CHANGE_BLOCKING_STATUSES.includes(
+          calculation.status as (typeof DIRECTORY_CHANGE_BLOCKING_STATUSES)[number]
+        )
+      ) ?? false,
+    [calculationsData]
+  );
+
+  const calculationsDirectoryChanged =
+    formValues.calculationsDirectory !==
+    (originalValues.calculationsDirectory || '');
+  const blockSaveForDirectoryChange =
+    hasBlockingCalculations && calculationsDirectoryChanged;
+
   const handleSave = async () => {
+    if (blockSaveForDirectoryChange) {
+      return;
+    }
+
     try {
       await updateSettingsAsync({
         max_parallel_instances:
@@ -127,6 +154,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   };
 
   const handleSelectFolder = async () => {
+    if (hasBlockingCalculations) {
+      return;
+    }
+
     setIsSelectingFolder(true);
     try {
       const result = await window.electronAPI.selectFolder();
@@ -267,7 +298,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             <button
               onClick={handleSave}
               className={styles.saveButton}
-              disabled={isUpdating}
+              disabled={isUpdating || blockSaveForDirectoryChange}
             >
               {isUpdating ? (
                 <>
@@ -789,11 +820,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 <button
                   onClick={handleSelectFolder}
                   className={styles.selectButton}
-                  disabled={isUpdating || isSelectingFolder}
+                  disabled={
+                    isUpdating || isSelectingFolder || hasBlockingCalculations
+                  }
                 >
                   {isSelectingFolder ? 'Selecting...' : 'Change Folder...'}
                 </button>
               </div>
+              {hasBlockingCalculations && (
+                <div className={styles.warningBox}>
+                  <span className={styles.warningIcon}>⚠</span>
+                  <span className={styles.warningText}>
+                    Calculation data folder cannot be changed while calculations
+                    are running or queued.
+                  </span>
+                </div>
+              )}
               {formValues.calculationsDirectory !==
                 originalValues.calculationsDirectory && (
                 <div className={styles.warningBox}>

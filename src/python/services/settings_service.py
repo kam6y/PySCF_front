@@ -21,6 +21,11 @@ logger = logging.getLogger(__name__)
 class SettingsService:
     """Service for application settings management."""
 
+    DIRECTORY_CHANGE_BLOCKED_MESSAGE = (
+        "計算中またはキュー中は計算ディレクトリを変更できません。"
+        "計算が完了してから再度お試しください。"
+    )
+
     @staticmethod
     def _raise_for_failed_migration(move_result: Dict[str, Any]) -> None:
         """Convert a failed directory migration result into a service exception."""
@@ -41,6 +46,16 @@ class SettingsService:
         if is_user_fixable_conflict:
             raise ValidationError(error_message)
         raise ServiceError(error_message)
+
+    @staticmethod
+    def _raise_if_calculations_directory_change_blocked() -> None:
+        """Reject directory changes while calculations are managed in memory."""
+        process_manager = get_process_manager()
+        active_calculations = process_manager.get_active_calculations() or []
+        queued_calculations = process_manager.get_queued_calculations() or []
+
+        if active_calculations or queued_calculations:
+            raise ValidationError(SettingsService.DIRECTORY_CHANGE_BLOCKED_MESSAGE)
     
     def get_settings(self) -> Dict[str, Any]:
         """
@@ -91,6 +106,7 @@ class SettingsService:
             move_result = None
             if new_calc_dir and new_calc_dir != current_calc_dir:
                 logger.info(f"Calculations directory changing from {current_calc_dir} to {new_calc_dir}")
+                self._raise_if_calculations_directory_change_blocked()
 
                 try:
                     migration = CalculationDirectoryMigration(base_dir=current_calc_dir)
