@@ -58,17 +58,33 @@ Primary references checked:
 - `sio`: the `socketio.AsyncServer` instance, useful for Socket.IO handlers.
 - `app`: the top-level ASGI application, built with `socketio.ASGIApp(sio, fastapi_app)`.
 
+The numerical thread-control block that currently starts `src/python/app.py`
+must remain the first executable code in the ASGI entry point. Set defaults for
+`OMP_NUM_THREADS`, `MKL_NUM_THREADS`, `OPENBLAS_NUM_THREADS`,
+`BLIS_NUM_THREADS`, `VECLIB_MAXIMUM_THREADS`, and `NUMEXPR_NUM_THREADS` before
+importing FastAPI routers, services, PySCF, NumPy, or any module that can import
+numerical libraries. This preserves the current BLAS/PySCF startup invariant.
+
 The application factory should:
 
 1. Load `ServerConfig`.
 2. Determine the server port from `PYSCF_SERVER_PORT`, CLI argument, or config.
 3. Store framework-neutral settings on `fastapi_app.state`.
-4. Register common middleware and exception handlers.
+4. Register CORS/auth middleware and exception handlers.
 5. Include all API routers.
 6. Register Socket.IO handlers.
 7. Bind the notification service.
 8. Initialize the process manager callback.
 9. Register lifespan cleanup for process manager and websocket watcher shutdown.
+
+Create the FastAPI app with default documentation routes disabled:
+
+```python
+FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
+```
+
+The existing development-only `/api-docs` and `/api-docs/spec.json` endpoints
+remain the only documentation surface.
 
 ## HTTP API Design
 
@@ -79,6 +95,9 @@ All existing public paths remain unchanged:
 - `/api/smiles/*`
 - `/api/settings`
 - `/api/system/*`
+- `/api/debug/system-diagnostics`
+- `/api/debug/process-manager-diagnostics`
+- `/api/debug/resource-manager-diagnostics`
 - `/api/quantum/*`
 - `/api/agent/chat`
 - `/api/chat-history/*`
@@ -101,6 +120,37 @@ routes currently use `flask_pydantic`.
 The existing OpenAPI source of truth remains `src/api-spec/openapi.yaml`.
 FastAPI's auto-generated OpenAPI is not the contract source for this app.
 
+FastAPI validation and parse errors must be normalized to the existing envelope
+contract. Add exception handlers for:
+
+- `fastapi.exceptions.RequestValidationError`
+- malformed JSON/body parse errors
+- Pydantic `ValidationError` raised by manual model validation
+
+These handlers should return HTTP `400` with:
+
+```json
+{"success": false, "error": "Validation failed: ..."}
+```
+
+Do not allow FastAPI's default `422` validation response to leak through public
+API endpoints. Add regression tests for missing required fields, malformed JSON,
+and invalid query parameter types.
+
+`POST /api/quantum/calculate` must preserve its current raw-body validation
+order:
+
+1. Read the raw JSON body.
+2. Return `400` if the body is missing.
+3. Extract and require `calculation_method`.
+4. Run `validate_parameters_for_method(calculation_method, raw_data)` before
+   Pydantic model validation so inapplicable method parameters cannot be silently
+   ignored.
+5. Validate with `QuantumCalculationRequest`.
+
+Cover this order with regression tests for missing `calculation_method` and an
+inapplicable parameter that Pydantic would otherwise ignore.
+
 ## Authentication
 
 Replace Flask `before_request` with a single FastAPI HTTP middleware.
@@ -117,11 +167,30 @@ Behavior must match the current contract:
 - In test/development mode without a token, protected requests are allowed with a
   warning-level log.
 
+HTTP CORS behavior must remain compatible with the Electron renderer calling the
+local backend from `file://` and `http://127.0.0.1:<port>`. Add
+`CORSMiddleware` with:
+
+- allowed localhost/loopback origins for HTTP and WebSocket development traffic,
+- support for `file://` origins where Starlette can represent them,
+- all current HTTP methods,
+- headers including `Content-Type` and `X-Auth-Token`,
+- unauthenticated `OPTIONS` handling.
+
+Add CORS preflight tests that assert `OPTIONS` succeeds without a token and that
+`X-Auth-Token` is allowed.
+
 Socket.IO authentication remains auth-payload based:
 
 - If `PYSCF_AUTH_TOKEN` is unset, connection is allowed.
 - If set, `auth.token` must match.
 - Rejected connections must preserve the current frontend behavior.
+
+Keep the endpoint-specific GPU4PySCF install guard. `POST
+/api/system/gpu4pyscf-install` must reject non-loopback clients with the existing
+`403` response envelope even when token auth succeeds. Use `Request.client.host`
+with the current IPv4/IPv6 loopback helper logic, including IPv4-mapped IPv6
+addresses. Add a regression test for the non-loopback `403` envelope.
 
 ## SSE Design
 
@@ -161,6 +230,18 @@ File watcher callbacks are synchronous today. When they need to emit from a
 non-async callback, use an event-loop-safe bridge rather than blocking in the
 watcher thread. Keep the bridge small and covered by tests.
 
+The bridge must be a single shared implementation used by websocket handlers and
+`NotificationService`. It should:
+
+1. Capture the running event loop during FastAPI lifespan startup.
+2. Schedule async emits from synchronous watcher/process callbacks with
+   `asyncio.run_coroutine_threadsafe`.
+3. Log failures from the returned future.
+4. Clear the stored loop during shutdown.
+
+Do not make notification delivery depend on an opportunistic "loop is available"
+check that silently drops calculation updates during normal ASGI runtime.
+
 ## Notification Service
 
 `NotificationService` should bind to the Socket.IO async server and support
@@ -178,8 +259,11 @@ def send_calculation_update(
     ...
 ```
 
-Internally it can schedule the async emit on the ASGI event loop when available.
-If no loop/server is bound, it should log and return, matching current behavior.
+Internally it should submit the async emit through the shared ASGI event-loop
+bridge. During normal app lifespan, the loop must be bound. If notification is
+called before startup or after shutdown, it should log and return, matching
+current behavior. Tests should cover notification scheduling from a background
+thread.
 
 ## Configuration
 
@@ -207,11 +291,26 @@ Gunicorn arguments change from WSGI sync worker to ASGI worker:
 - worker class becomes `uvicorn.workers.UvicornWorker`
 - keep host, port, timeout, access log, log level, and preload behavior from
   `config/server-config.json` where meaningful.
+- keep `workers` at `1` unless an external Socket.IO client manager/message queue
+  is added, because in-memory Socket.IO rooms and file-watcher state are not
+  safe across multiple workers.
 
 Rename user-facing diagnostics from Flask-specific wording to Python/FastAPI
 backend wording. The frontend can continue using `window.flaskPort` for now only
 if changing preload/global names would cause unnecessary blast radius; however,
 new backend code and diagnostics should avoid adding more Flask naming.
+
+Update all local/package smoke scripts that currently assume Flask/Gunicorn sync
+startup:
+
+- `package.json` `test:gunicorn-local`
+- `scripts/test-python-standalone.js`
+- `scripts/validate-build-completeness.py`
+- `scripts/build-python-linux.sh`
+
+These checks should import FastAPI/uvicorn, verify the Uvicorn worker is
+available, and start `app:app` through Gunicorn with
+`uvicorn.workers.UvicornWorker`.
 
 ## Dependencies
 
@@ -242,10 +341,21 @@ Test fixture migration:
 
 - Replace Flask `app.test_client()` with FastAPI `TestClient(fastapi_app)`.
 - Replace `app.app_context()` usage with explicit fixture setup.
-- Replace Flask-SocketIO test client usage with Socket.IO ASGI/client tests or a
-  focused handler-level async test harness.
+- Replace Flask-SocketIO test client usage with at least one real ASGI Socket.IO
+  smoke test using `socketio.AsyncClient`.
 - Update OpenAPI contract tests to parse FastAPI router definitions instead of
   Flask `@blueprint.route` decorators.
+
+The Socket.IO smoke test must cover:
+
+- connection rejected with missing/wrong token when `PYSCF_AUTH_TOKEN` is set,
+- connection accepted with the correct token,
+- `join_global_updates`,
+- `join_calculation`,
+- receipt of a `calculation_update` event.
+
+Handler-level tests may still be added for edge cases, but they are not a
+substitute for the ASGI protocol smoke test.
 
 Minimum verification before completion:
 
@@ -254,6 +364,8 @@ Minimum verification before completion:
 - `~/miniforge3/envs/pyscf-env/bin/python -m pytest src/python/tests/integration/test_api_endpoints -v`
 - `~/miniforge3/envs/pyscf-env/bin/python -m pytest src/python/tests/integration/test_auth_security.py src/python/tests/integration/test_auth_production.py -v`
 - `~/miniforge3/envs/pyscf-env/bin/python -m pytest src/python/tests/integration/test_websocket_handlers.py -v`
+- `npm run test:gunicorn-local`
+- `npm run test:python-standalone`
 - `npm run verify-env`
 - `npm run verify-build-env`
 
