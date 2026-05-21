@@ -13,25 +13,38 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+from fastapi.routing import APIRoute
 import yaml
+from app import create_fastapi_app
 from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
 
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
-FASTAPI_DECORATOR_METHODS = {
-    "get": "GET",
-    "post": "POST",
-    "put": "PUT",
-    "patch": "PATCH",
-    "delete": "DELETE",
+PENDING_FASTAPI_MIGRATION_ROUTES = {
+    ("DELETE", "/api/quantum/calculations/{}"),
+    ("DELETE", "/api/quantum/calculations/{}/orbitals/cube-files"),
+    ("GET", "/api/quantum/calculations"),
+    ("GET", "/api/quantum/calculations/{}"),
+    ("GET", "/api/quantum/calculations/{}/ir-spectrum"),
+    ("GET", "/api/quantum/calculations/{}/orbitals"),
+    ("GET", "/api/quantum/calculations/{}/orbitals/{}/cube"),
+    ("GET", "/api/quantum/calculations/{}/orbitals/cube-files"),
+    ("GET", "/api/quantum/status"),
+    ("GET", "/api/quantum/supported-parameters"),
+    ("GET", "/api/system/gpu4pyscf-status"),
+    ("GET", "/api/system/resource-status"),
+    ("POST", "/api/agent/chat"),
+    ("POST", "/api/quantum/calculate"),
+    ("POST", "/api/quantum/calculations/{}/pause"),
+    ("POST", "/api/quantum/calculations/{}/resume"),
+    ("POST", "/api/system/gpu4pyscf-install"),
+    ("PUT", "/api/quantum/calculations/{}"),
 }
 
 PYTHON_DIR = Path(__file__).resolve().parents[3]
-API_DIR = PYTHON_DIR / "api"
 OPENAPI_PATH = PYTHON_DIR.parent / "api-spec" / "openapi.yaml"
 ORBITAL_GENERATOR_PATH = PYTHON_DIR / "quantum_calc" / "orbital_generator.py"
 
-_IMPL_PATH_PARAM_PATTERN = re.compile(r"<[^>]+>")
 _OPENAPI_PATH_PARAM_PATTERN = re.compile(r"\{[^}]+\}")
 
 
@@ -47,7 +60,6 @@ def _is_public_contract_path(path: str) -> bool:
 
 
 def _normalize_impl_path(path: str) -> str:
-    path = _IMPL_PATH_PARAM_PATTERN.sub("{}", path)
     return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
 
 
@@ -55,175 +67,12 @@ def _normalize_openapi_path(path: str) -> str:
     return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
 
 
-def _constant_string(node: ast.expr) -> str | None:
-    if isinstance(node, ast.Constant) and isinstance(node.value, str):
-        return node.value
-    return None
-
-
-def _join_paths(prefix: str, path: str) -> str:
-    if not prefix:
-        return path or "/"
-    if not path:
-        return prefix
-    return f"{prefix.rstrip('/')}/{path.lstrip('/')}"
-
-
-def _is_apirouter_call(node: ast.expr) -> bool:
-    if not isinstance(node, ast.Call):
-        return False
-    if isinstance(node.func, ast.Name):
-        return node.func.id == "APIRouter"
-    if isinstance(node.func, ast.Attribute):
-        return node.func.attr == "APIRouter"
-    return False
-
-
-def _extract_fastapi_router_prefixes(tree: ast.Module) -> dict[str, str]:
-    prefixes: dict[str, str] = {}
-
-    for node in tree.body:
-        if not isinstance(node, ast.Assign) or not _is_apirouter_call(node.value):
-            continue
-
-        prefix = ""
-        for keyword in node.value.keywords:
-            if keyword.arg == "prefix":
-                prefix = _constant_string(keyword.value) or ""
-
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                prefixes[target.id] = prefix
-
-    return prefixes
-
-
-def _get_fastapi_decorator_path(decorator: ast.Call) -> str | None:
-    if decorator.args:
-        path = _constant_string(decorator.args[0])
-        if path is not None:
-            return path
-
-    for keyword in decorator.keywords:
-        if keyword.arg == "path":
-            return _constant_string(keyword.value)
-
-    return None
-
-
-def _parse_flask_route_decorator(
-    decorator: ast.expr,
-) -> tuple[str, set[str]] | None:
-    if not isinstance(decorator, ast.Call):
-        return None
-
-    if not isinstance(decorator.func, ast.Attribute) or decorator.func.attr != "route":
-        return None
-
-    if not decorator.args:
-        return None
-
-    path = _constant_string(decorator.args[0])
-    if path is None:
-        return None
-
-    methods: set[str] = {"GET"}
-    for keyword in decorator.keywords:
-        if keyword.arg != "methods":
-            continue
-
-        if not isinstance(keyword.value, (ast.List, ast.Tuple)):
-            continue
-
-        parsed_methods = set()
-        for item in keyword.value.elts:
-            if isinstance(item, ast.Constant) and isinstance(item.value, str):
-                upper_method = item.value.upper()
-                if upper_method in HTTP_METHODS:
-                    parsed_methods.add(upper_method)
-
-        if parsed_methods:
-            methods = parsed_methods
-
-    return path, methods
-
-
-def _parse_fastapi_route_decorator(
-    decorator: ast.expr,
-    router_prefixes: dict[str, str],
-) -> tuple[str, set[str]] | None:
-    if not isinstance(decorator, ast.Call):
-        return None
-    if not isinstance(decorator.func, ast.Attribute):
-        return None
-    if decorator.func.attr not in FASTAPI_DECORATOR_METHODS:
-        return None
-    if not isinstance(decorator.func.value, ast.Name):
-        return None
-
-    router_name = decorator.func.value.id
-    if router_name not in router_prefixes:
-        return None
-
-    path = _get_fastapi_decorator_path(decorator)
-    if path is None:
-        return None
-
-    method = FASTAPI_DECORATOR_METHODS[decorator.func.attr]
-    return _join_paths(router_prefixes[router_name], path), {method}
-
-
-def _parse_route_decorator(
-    decorator: ast.expr,
-    router_prefixes: dict[str, str],
-) -> tuple[str, set[str]] | None:
-    return (
-        _parse_flask_route_decorator(decorator)
-        or _parse_fastapi_route_decorator(decorator, router_prefixes)
-    )
-
-
-class _RequestArgsVisitor(ast.NodeVisitor):
-    def __init__(self) -> None:
-        self.query_names: set[str] = set()
-
-    def visit_Call(self, node: ast.Call) -> None:
-        if (
-            isinstance(node.func, ast.Attribute)
-            and node.func.attr == "get"
-            and isinstance(node.func.value, ast.Attribute)
-            and node.func.value.attr == "args"
-            and isinstance(node.func.value.value, ast.Name)
-            and node.func.value.value.id == "request"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            self.query_names.add(node.args[0].value)
-
-        self.generic_visit(node)
-
-
-def _is_fastapi_query_default(node: ast.expr) -> bool:
-    if not isinstance(node, ast.Call):
-        return False
-    if isinstance(node.func, ast.Name):
-        return node.func.id == "Query"
-    if isinstance(node.func, ast.Attribute):
-        return node.func.attr == "Query"
-    return False
-
-
-def _extract_fastapi_query_params(node: ast.FunctionDef) -> set[str]:
-    args = node.args.args
-    defaults = node.args.defaults
-    default_offset = len(args) - len(defaults)
-
+def _extract_route_query_params(route: APIRoute) -> set[str]:
     query_params: set[str] = set()
-    for index, default in enumerate(defaults, start=default_offset):
-        if _is_fastapi_query_default(default):
-            query_params.add(args[index].arg)
-
+    for field in route.dependant.query_params:
+        name = getattr(field, "alias", None) or getattr(field, "name", None)
+        if isinstance(name, str):
+            query_params.add(name)
     return query_params
 
 
@@ -232,41 +81,20 @@ def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple
     routes: set[tuple[str, str]] = set()
     query_params_by_route: dict[tuple[str, str], set[str]] = {}
 
-    for api_file in sorted(API_DIR.glob("*.py")):
-        if api_file.name == "__init__.py":
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
             continue
 
-        tree = ast.parse(api_file.read_text(encoding="utf-8"), filename=str(api_file))
-        router_prefixes = _extract_fastapi_router_prefixes(tree)
+        if not _is_public_contract_path(route.path):
+            continue
 
-        for node in tree.body:
-            if not isinstance(node, ast.FunctionDef):
-                continue
-
-            route_specs: list[tuple[str, set[str]]] = []
-            for decorator in node.decorator_list:
-                route_spec = _parse_route_decorator(decorator, router_prefixes)
-                if route_spec:
-                    route_specs.append(route_spec)
-
-            if not route_specs:
-                continue
-
-            visitor = _RequestArgsVisitor()
-            visitor.visit(node)
-            fastapi_query_params = _extract_fastapi_query_params(node)
-
-            for raw_path, methods in route_specs:
-                if not _is_public_contract_path(raw_path):
-                    continue
-
-                normalized_path = _normalize_impl_path(raw_path)
-                for method in methods:
-                    key = (method, normalized_path)
-                    routes.add(key)
-                    query_params_by_route.setdefault(key, set()).update(
-                        visitor.query_names | fastapi_query_params
-                    )
+        normalized_path = _normalize_impl_path(route.path)
+        query_params = _extract_route_query_params(route)
+        for method in (route.methods or set()) & HTTP_METHODS:
+            key = (method, normalized_path)
+            routes.add(key)
+            query_params_by_route[key] = query_params
 
     return routes, query_params_by_route
 
@@ -348,7 +176,9 @@ def test_openapi_and_implementation_have_same_public_routes() -> None:
     openapi_routes, _ = _extract_openapi_contract()
 
     only_in_impl = sorted(impl_routes - openapi_routes)
-    only_in_openapi = sorted(openapi_routes - impl_routes)
+    only_in_openapi = sorted(
+        openapi_routes - impl_routes - PENDING_FASTAPI_MIGRATION_ROUTES
+    )
 
     issues = []
     if only_in_impl:
@@ -359,6 +189,28 @@ def test_openapi_and_implementation_have_same_public_routes() -> None:
         issues.append(f"Defined in OpenAPI but missing in implementation: {formatted}")
 
     assert not issues, "\n".join(issues)
+
+
+def test_pending_fastapi_migration_routes_are_defined_in_openapi() -> None:
+    openapi_routes, _ = _extract_openapi_contract()
+
+    missing_from_openapi = sorted(PENDING_FASTAPI_MIGRATION_ROUTES - openapi_routes)
+
+    assert not missing_from_openapi, (
+        "Pending migration allowlist routes must exist in OpenAPI: "
+        + ", ".join(_format_route(route) for route in missing_from_openapi)
+    )
+
+
+def test_pending_fastapi_migration_routes_are_not_registered() -> None:
+    impl_routes, _ = _extract_implementation_contract()
+
+    registered_routes = sorted(PENDING_FASTAPI_MIGRATION_ROUTES & impl_routes)
+
+    assert not registered_routes, (
+        "Registered routes must be removed from PENDING_FASTAPI_MIGRATION_ROUTES: "
+        + ", ".join(_format_route(route) for route in registered_routes)
+    )
 
 
 def test_openapi_and_implementation_have_same_query_parameter_names() -> None:
