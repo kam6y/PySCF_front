@@ -20,6 +20,10 @@ def _state_for(sid: str) -> dict[str, Any]:
     return _sid_state.setdefault(sid, {"callbacks": {}})
 
 
+def _is_current_state(sid: str, state: dict[str, Any]) -> bool:
+    return _sid_state.get(sid) is state
+
+
 def build_calculation_instance(
     calc_id: str,
     calc_path: str,
@@ -142,7 +146,6 @@ def register_websocket_handlers(sio: Any) -> None:
             return
 
         room = f"calculation_{calculation_id}"
-        await sio.enter_room(sid, room)
         state = _state_for(sid)
 
         def on_file_change(file_data: dict[str, Any]) -> None:
@@ -173,27 +176,59 @@ def register_websocket_handlers(sio: Any) -> None:
 
             schedule_coroutine(emit_update())
 
-        callback_added = False
+        watcher = None
+        room_entered = False
+        new_callback_add_attempted = False
         try:
-            watcher = get_websocket_watcher(file_manager.get_base_directory())
             initial_instance = build_calculation_instance(
                 calculation_id,
                 calc_path,
                 file_manager,
             )
 
-            existing_callback = state["callbacks"].pop(calculation_id, None)
-            if existing_callback is not None:
-                watcher.remove_connection(calculation_id, existing_callback)
+            if calculation_id in state["callbacks"]:
+                await sio.emit("calculation_update", initial_instance, to=sid)
+                return
 
+            watcher = get_websocket_watcher(file_manager.get_base_directory())
+            new_callback_add_attempted = True
             watcher.add_connection(calculation_id, on_file_change)
             state["callbacks"][calculation_id] = on_file_change
-            callback_added = True
+
+            await sio.enter_room(sid, room)
+            room_entered = True
+            if not _is_current_state(sid, state):
+                watcher.remove_connection(calculation_id, on_file_change)
+                state["callbacks"].pop(calculation_id, None)
+                await sio.leave_room(sid, room)
+                return
+
             await sio.emit("calculation_update", initial_instance, to=sid)
         except Exception:
-            if callback_added:
+            tracked_callback = state["callbacks"].get(calculation_id)
+            if tracked_callback is on_file_change:
                 state["callbacks"].pop(calculation_id, None)
-                watcher.remove_connection(calculation_id, on_file_change)
+            if watcher is not None:
+                callbacks_to_remove = [on_file_change]
+                if not new_callback_add_attempted:
+                    callbacks_to_remove = []
+
+                for callback in callbacks_to_remove:
+                    try:
+                        watcher.remove_connection(calculation_id, callback)
+                    except Exception:
+                        logger.exception(
+                            "Error cleaning up file watcher for failed setup of %s",
+                            calculation_id,
+                        )
+            if room_entered:
+                try:
+                    await sio.leave_room(sid, room)
+                except Exception:
+                    logger.exception(
+                        "Error leaving room after failed setup for %s",
+                        calculation_id,
+                    )
             logger.exception(
                 "Error setting up Socket.IO monitoring for %s",
                 calculation_id,
@@ -213,7 +248,10 @@ def register_websocket_handlers(sio: Any) -> None:
 
         room = f"calculation_{calculation_id}"
         await sio.leave_room(sid, room)
-        state = _state_for(sid)
+        state = _sid_state.get(sid)
+        if state is None:
+            logger.info("Client left calculation %s after disconnect", calculation_id)
+            return
         callback = state["callbacks"].pop(calculation_id, None)
         if callback is not None:
             from quantum_calc import get_current_settings

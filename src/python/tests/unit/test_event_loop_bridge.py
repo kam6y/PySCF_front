@@ -1,8 +1,13 @@
 import asyncio
 import inspect
 import threading
+from concurrent.futures import Future
 
-from websocket.event_loop_bridge import bind_event_loop, clear_event_loop, schedule_coroutine
+from websocket.event_loop_bridge import (
+    bind_event_loop,
+    clear_event_loop,
+    schedule_coroutine,
+)
 
 
 def test_schedule_coroutine_from_background_thread():
@@ -64,3 +69,30 @@ def test_schedule_coroutine_runtime_error_returns_none(mocker, caplog):
         clear_event_loop()
 
     asyncio.run(main())
+
+
+def test_schedule_coroutine_uses_bound_loop_snapshot(mocker):
+    class ClearingLoop:
+        def is_closed(self):
+            clear_event_loop()
+            return False
+
+    async def noop():
+        return None
+
+    loop = ClearingLoop()
+    scheduled_future = Future()
+    scheduled_future.set_result(None)
+    run_threadsafe = mocker.patch(
+        "asyncio.run_coroutine_threadsafe",
+        return_value=scheduled_future,
+    )
+
+    bind_event_loop(loop)
+    coro = noop()
+    future = schedule_coroutine(coro)
+
+    assert future is scheduled_future
+    run_threadsafe.assert_called_once_with(coro, loop)
+    coro.close()
+    clear_event_loop()

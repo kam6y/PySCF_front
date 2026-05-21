@@ -22,13 +22,14 @@ def clear_event_loop() -> None:
 
 
 def schedule_coroutine(coro: Coroutine[object, object, T]) -> Future[T] | None:
-    if _loop is None or _loop.is_closed():
+    loop = _loop
+    if loop is None or loop.is_closed():
         logger.warning("ASGI event loop is not bound; dropping scheduled coroutine")
         coro.close()
         return None
 
     try:
-        future = asyncio.run_coroutine_threadsafe(coro, _loop)
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
     except RuntimeError:
         logger.exception("Failed to schedule ASGI coroutine")
         coro.close()

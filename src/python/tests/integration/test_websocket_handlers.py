@@ -25,6 +25,7 @@ class FakeAsyncSocketIO:
         self.left_rooms: list[tuple[str, str]] = []
         self.emitted: list[dict[str, Any]] = []
         self.fail_emit_events: set[str] = set()
+        self.enter_room_hook: Any = None
 
     def event(self, handler: Any) -> Any:
         self.handlers[handler.__name__] = handler
@@ -32,6 +33,8 @@ class FakeAsyncSocketIO:
 
     async def enter_room(self, sid: str, room: str) -> None:
         self.entered_rooms.append((sid, room))
+        if self.enter_room_hook is not None:
+            await self.enter_room_hook(sid, room)
 
     async def leave_room(self, sid: str, room: str) -> None:
         self.left_rooms.append((sid, room))
@@ -54,9 +57,12 @@ class FakeWatcher:
     def __init__(self) -> None:
         self.callbacks: dict[str, list[Any]] = {}
         self.removed: list[tuple[str, Any]] = []
+        self.fail_after_add = False
 
     def add_connection(self, calculation_id: str, callback: Any) -> None:
         self.callbacks.setdefault(calculation_id, []).append(callback)
+        if self.fail_after_add:
+            raise RuntimeError("watcher registration failed")
 
     def remove_connection(self, calculation_id: str, callback: Any) -> None:
         self.removed.append((calculation_id, callback))
@@ -202,6 +208,139 @@ class TestJoinCalculationWebSocket:
         assert watcher.callbacks[calc_id] == []
         assert _sid_state["sid-1"]["callbacks"] == {}
 
+    def test_repeated_join_setup_failure_keeps_existing_callback_tracked(
+        self,
+        sio,
+        calculations_dir,
+        watcher,
+        mocker,
+    ):
+        calc_id = "test-calc-repeat-failure"
+        write_calculation(calculations_dir, calc_id)
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+        assert len(watcher.callbacks[calc_id]) == 1
+        existing_callback = watcher.callbacks[calc_id][0]
+
+        sio.emitted.clear()
+        mocker.patch(
+            "websocket.handlers.build_calculation_instance",
+            side_effect=RuntimeError("read failed"),
+        )
+
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+
+        assert watcher.callbacks.get(calc_id, []) == [existing_callback]
+        assert _sid_state["sid-1"]["callbacks"][calc_id] is existing_callback
+        assert ("sid-1", f"calculation_{calc_id}") not in sio.left_rooms
+        error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
+        assert len(error_events) == 1
+        assert error_events[0]["args"][0]["id"] == calc_id
+
+    def test_repeated_join_with_existing_callback_does_not_require_watcher_lookup(
+        self,
+        sio,
+        calculations_dir,
+        watcher,
+        mocker,
+    ):
+        calc_id = "test-calc-repeat-watcher-lookup-failure"
+        write_calculation(calculations_dir, calc_id)
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+        assert len(watcher.callbacks[calc_id]) == 1
+        existing_callback = watcher.callbacks[calc_id][0]
+
+        sio.emitted.clear()
+        mocker.patch(
+            "websocket.handlers.get_websocket_watcher",
+            side_effect=RuntimeError("watcher unavailable"),
+        )
+
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+
+        assert watcher.callbacks.get(calc_id, []) == [existing_callback]
+        assert _sid_state["sid-1"]["callbacks"][calc_id] is existing_callback
+        assert ("sid-1", f"calculation_{calc_id}") not in sio.left_rooms
+        update_events = [
+            msg for msg in sio.emitted if msg["name"] == "calculation_update"
+        ]
+        assert len(update_events) == 1
+        assert update_events[0]["args"][0]["id"] == calc_id
+        error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
+        assert error_events == []
+
+    def test_repeated_join_initial_emit_failure_keeps_existing_callback_tracked(
+        self,
+        sio,
+        calculations_dir,
+        watcher,
+    ):
+        calc_id = "test-calc-repeat-emit-failure"
+        write_calculation(calculations_dir, calc_id)
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+        assert len(watcher.callbacks[calc_id]) == 1
+        existing_callback = watcher.callbacks[calc_id][0]
+
+        sio.emitted.clear()
+        sio.fail_emit_events.add("calculation_update")
+
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+
+        assert watcher.callbacks.get(calc_id, []) == [existing_callback]
+        assert _sid_state["sid-1"]["callbacks"][calc_id] is existing_callback
+        assert ("sid-1", f"calculation_{calc_id}") not in sio.left_rooms
+        error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
+        assert len(error_events) == 1
+        assert error_events[0]["args"][0]["id"] == calc_id
+
+    def test_repeated_join_with_existing_callback_does_not_replace_callback(
+        self,
+        sio,
+        calculations_dir,
+        watcher,
+    ):
+        calc_id = "test-calc-repeat-watcher-partial-failure"
+        write_calculation(calculations_dir, calc_id)
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+        assert len(watcher.callbacks[calc_id]) == 1
+        existing_callback = watcher.callbacks[calc_id][0]
+
+        sio.emitted.clear()
+        watcher.fail_after_add = True
+
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+
+        assert watcher.callbacks.get(calc_id, []) == [existing_callback]
+        assert _sid_state["sid-1"]["callbacks"][calc_id] is existing_callback
+        assert ("sid-1", f"calculation_{calc_id}") not in sio.left_rooms
+        update_events = [
+            msg for msg in sio.emitted if msg["name"] == "calculation_update"
+        ]
+        assert len(update_events) == 1
+        assert update_events[0]["args"][0]["id"] == calc_id
+        error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
+        assert error_events == []
+
+    def test_join_disconnect_during_room_entry_does_not_register_callback(
+        self,
+        sio,
+        calculations_dir,
+        watcher,
+    ):
+        calc_id = "test-calc-disconnect-during-join"
+        write_calculation(calculations_dir, calc_id)
+
+        async def disconnect_during_enter(sid: str, room: str) -> None:
+            await sio.handlers["disconnect"](sid)
+
+        sio.enter_room_hook = disconnect_during_enter
+
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+
+        assert "sid-1" not in _sid_state
+        assert watcher.callbacks.get(calc_id, []) == []
+        assert ("sid-1", f"calculation_{calc_id}") in sio.left_rooms
+        assert [msg for msg in sio.emitted if msg["name"] == "error"] == []
+
     def test_join_setup_failure_does_not_leave_callback_or_state(
         self,
         sio,
@@ -220,6 +359,7 @@ class TestJoinCalculationWebSocket:
 
         assert watcher.callbacks.get(calc_id, []) == []
         assert _sid_state["sid-1"]["callbacks"] == {}
+        assert ("sid-1", f"calculation_{calc_id}") not in sio.left_rooms
         error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
         assert len(error_events) == 1
         assert error_events[0]["args"][0]["id"] == calc_id
@@ -238,6 +378,26 @@ class TestJoinCalculationWebSocket:
 
         assert watcher.callbacks.get(calc_id, []) == []
         assert _sid_state["sid-1"]["callbacks"] == {}
+        assert ("sid-1", f"calculation_{calc_id}") in sio.left_rooms
+        error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
+        assert len(error_events) == 1
+        assert error_events[0]["args"][0]["id"] == calc_id
+
+    def test_join_watcher_partial_registration_failure_removes_callback(
+        self,
+        sio,
+        calculations_dir,
+        watcher,
+    ):
+        calc_id = "test-calc-watcher-failure"
+        write_calculation(calculations_dir, calc_id)
+        watcher.fail_after_add = True
+
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+
+        assert watcher.callbacks.get(calc_id, []) == []
+        assert _sid_state["sid-1"]["callbacks"] == {}
+        assert ("sid-1", f"calculation_{calc_id}") not in sio.left_rooms
         error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
         assert len(error_events) == 1
         assert error_events[0]["args"][0]["id"] == calc_id
@@ -291,6 +451,20 @@ class TestLeaveCalculationWebSocket:
         error_events = [msg for msg in sio.emitted if msg["name"] == "error"]
         assert len(error_events) == 1
         assert error_events[0]["args"][0]["error"] == "calculation_id is required"
+
+    def test_leave_after_disconnect_does_not_recreate_sid_state(
+        self,
+        sio,
+        calculations_dir,
+    ):
+        calc_id = "test-calc-leave-after-disconnect"
+        write_calculation(calculations_dir, calc_id, status="running")
+        run(sio.handlers["join_calculation"], "sid-1", {"calculation_id": calc_id})
+        run(sio.handlers["disconnect"], "sid-1")
+
+        run(sio.handlers["leave_calculation"], "sid-1", {"calculation_id": calc_id})
+
+        assert "sid-1" not in _sid_state
 
 
 class TestGlobalUpdatesWebSocket:
