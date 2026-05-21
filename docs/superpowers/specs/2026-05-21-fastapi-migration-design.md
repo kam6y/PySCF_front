@@ -171,7 +171,7 @@ HTTP CORS behavior must remain compatible with the Electron renderer calling the
 local backend from `file://` and `http://127.0.0.1:<port>`. Add
 `CORSMiddleware` with:
 
-- allowed localhost/loopback origins for HTTP and WebSocket development traffic,
+- allowed localhost/loopback origins for HTTP development traffic,
 - support for `file://` origins where Starlette can represent them,
 - all current HTTP methods,
 - headers including `Content-Type` and `X-Auth-Token`,
@@ -209,6 +209,12 @@ rewriting Gemini chat behavior unless required for framework integration.
 ## Socket.IO Design
 
 Use `python-socketio.AsyncServer(async_mode="asgi")`.
+
+Configure Socket.IO origin handling on the Socket.IO server itself, not through
+FastAPI `CORSMiddleware`. Pass `cors_allowed_origins` from the existing
+`socketio.cors_allowed_origins` settings into `socketio.AsyncServer` so
+Electron-like `file://` and loopback origins keep working for Socket.IO traffic
+handled by `socketio.ASGIApp` before FastAPI middleware.
 
 Keep event names and payloads stable:
 
@@ -314,7 +320,8 @@ available, and start `app:app` through Gunicorn with
 
 ## Dependencies
 
-Update `.github/environment.yml`:
+Update `.github/environment.yml` with pinned/resolved versions consistent with
+the existing environment file style:
 
 - Add `fastapi`.
 - Add `uvicorn`.
@@ -350,6 +357,7 @@ The Socket.IO smoke test must cover:
 
 - connection rejected with missing/wrong token when `PYSCF_AUTH_TOKEN` is set,
 - connection accepted with the correct token,
+- an Electron-like `Origin` header allowed by the Socket.IO CORS settings,
 - `join_global_updates`,
 - `join_calculation`,
 - receipt of a `calculation_update` event.
