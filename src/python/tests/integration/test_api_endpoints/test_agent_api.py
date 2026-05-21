@@ -7,7 +7,30 @@ responses from the Gemini API.
 
 import json
 
-from api.agent import _create_simple_chat_stream
+from generated_models import AgentChatRequest
+from api.agent import stream_chat_response
+
+
+def test_agent_chat_stream_preserves_sse_format(client, mocker):
+    def fake_stream(*args, **kwargs):
+        yield {'type': 'agent_status', 'payload': {'status': 'started'}}
+        yield {'type': 'chunk', 'payload': {'text': 'hello'}}
+        yield {'type': 'done', 'payload': {'message_id': 'msg-1'}}
+
+    mocker.patch('api.agent.stream_chat_response', side_effect=fake_stream)
+
+    with client.stream(
+        'POST',
+        '/api/agent/chat',
+        json={'message': 'Hello', 'history': [], 'session_id': 'session-1'},
+    ) as response:
+        chunks = ''.join(response.iter_text())
+
+    assert response.status_code == 200
+    assert response.headers['content-type'].startswith('text/event-stream')
+    assert 'data: {"type": "agent_status", "payload": {"status": "started"}}\n\n' in chunks
+    assert 'data: {"type": "chunk", "payload": {"text": "hello"}}\n\n' in chunks
+    assert 'data: {"type": "done", "payload": {"message_id": "msg-1"}}\n\n' in chunks
 
 
 class TestAgentChatAPI:
@@ -106,7 +129,7 @@ class TestAgentChatAPI:
         }
 
         # Mock Gemini model by injecting into sys.modules
-        # This ensures the import statement inside _create_simple_chat_stream gets the mock
+        # This ensures the import statement inside stream_chat_response gets the mock
         mock_genai = mocker.MagicMock()
         mock_model = mocker.MagicMock()
         mock_chat = mocker.MagicMock()
@@ -210,7 +233,12 @@ class TestAgentChatAPI:
         mock_genai.GenerativeModel.return_value = mock_model
         mocker.patch.dict("sys.modules", {"google.generativeai": mock_genai})
 
-        generator = _create_simple_chat_stream("What is water?", [], session_id)
+        request = AgentChatRequest(
+            message="What is water?",
+            history=[],
+            session_id=session_id,
+        )
+        generator = stream_chat_response(request)
 
         # ACT
         status_event = next(generator)
@@ -218,8 +246,8 @@ class TestAgentChatAPI:
         generator.close()
 
         # ASSERT
-        assert json.loads(status_event.replace("data: ", ""))["type"] == "agent_status"
-        assert json.loads(chunk_event.replace("data: ", ""))["type"] == "chunk"
+        assert status_event["type"] == "agent_status"
+        assert chunk_event["type"] == "chunk"
         mock_chat_service.add_message.assert_any_call(
             session_id,
             "user",

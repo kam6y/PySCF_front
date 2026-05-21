@@ -20,9 +20,7 @@ from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
 
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
-PENDING_FASTAPI_MIGRATION_ROUTES = {
-    ("POST", "/api/agent/chat"),
-}
+PENDING_FASTAPI_MIGRATION_ROUTES = set()
 
 PYTHON_DIR = Path(__file__).resolve().parents[3]
 OPENAPI_PATH = PYTHON_DIR.parent / "api-spec" / "openapi.yaml"

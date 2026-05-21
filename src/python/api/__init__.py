@@ -3,6 +3,7 @@ import os
 
 from fastapi import FastAPI
 
+from .agent import router as agent_router
 from .chat_history import router as chat_history_router
 from .health import router as health_router
 from .pubchem import router as pubchem_router
@@ -22,6 +23,7 @@ def register_routers(app: FastAPI) -> None:
     app.include_router(settings_router)
     app.include_router(system_router)
     app.include_router(quantum_router)
+    app.include_router(agent_router)
     app.include_router(chat_history_router)
     is_packaged = os.getenv('PYSCF_RESOURCES_PATH') is not None
     if not is_packaged:

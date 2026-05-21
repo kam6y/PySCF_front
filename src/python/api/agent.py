@@ -5,9 +5,10 @@ Handles chat interactions using simple Gemini API for molecular analysis assista
 
 import logging
 import json
-from typing import Iterator, Dict, Any
-from flask import Blueprint, jsonify, Response, stream_with_context
-from flask_pydantic import validate
+from typing import Any, Iterator
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from generated_models import AgentChatRequest
 from services.chat_history_service import get_chat_history_service
@@ -18,23 +19,20 @@ logger = logging.getLogger(__name__)
 
 # Constants
 MAX_MESSAGE_LENGTH = 100000  # Maximum allowed message length in characters
+router = APIRouter(prefix='/api/agent')
 
 
-def _format_sse_event(event_type: str, payload: Dict[str, Any] = None) -> str:
+def _format_sse_event(event: dict[str, Any]) -> str:
     """
     Format a Server-Sent Event message.
 
     Args:
-        event_type: Type of event ('chunk', 'done', 'error')
-        payload: Optional payload data
+        event: Event data to serialize
 
     Returns:
         Formatted SSE message string
     """
-    event_data = {"type": event_type}
-    if payload:
-        event_data["payload"] = payload
-    return f"data: {json.dumps(event_data)}\n\n"
+    return f"data: {json.dumps(event)}\n\n"
 
 
 def _extract_history_role(message: Any) -> str:
@@ -95,18 +93,33 @@ def _convert_history_to_gemini_format(history: list) -> list:
     return converted
 
 
-def _create_simple_chat_stream(message: str, history: list, session_id: str = None) -> Iterator[str]:
+def _validate_chat_request(request: AgentChatRequest) -> None:
+    if not request.message or not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    if len(request.message) > MAX_MESSAGE_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Message is too long (maximum {MAX_MESSAGE_LENGTH} characters)",
+        )
+
+
+def stream_chat_response(request: AgentChatRequest) -> Iterator[dict[str, Any]]:
     """
-    Create an SSE stream for simple Gemini API chat responses.
+    Create event data for simple Gemini API chat responses.
 
     Args:
-        message: User's message
-        history: Chat history in frontend format (dict list)
-        session_id: Optional session ID for persisting conversation history
+        request: Chat request body
 
     Yields:
-        SSE formatted strings
+        Event dictionaries to be formatted as SSE messages by the route
     """
+    _validate_chat_request(request)
+
+    message = request.message
+    history = request.history or []
+    session_id = request.session_id
+
     # Save user message to database if session_id is provided
     if session_id:
         try:
@@ -132,7 +145,7 @@ def _create_simple_chat_stream(message: str, history: list, session_id: str = No
         if not api_key:
             error_msg = "Gemini API key is not configured. Please set it in Settings."
             logger.error(error_msg)
-            yield _format_sse_event("error", {"message": error_msg})
+            yield {"type": "error", "payload": {"message": error_msg}}
             return
 
         # Import and configure Gemini
@@ -156,10 +169,13 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
         chat = model.start_chat(history=gemini_history)
 
         # Send agent status
-        yield _format_sse_event("agent_status", {
-            "status": "responding",
-            "agent": "chat"
-        })
+        yield {
+            "type": "agent_status",
+            "payload": {
+                "status": "responding",
+                "agent": "chat",
+            },
+        }
 
         # Stream response
         response = chat.send_message(message, stream=True)
@@ -167,7 +183,7 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
         for chunk in response:
             if chunk.text:
                 accumulated_response.append(chunk.text)
-                yield _format_sse_event("chunk", {"text": chunk.text})
+                yield {"type": "chunk", "payload": {"text": chunk.text}}
 
         logger.debug("Stream completed successfully")
 
@@ -183,7 +199,7 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
                 logger.error(f"Failed to save AI response to session {session_id}: {e}", exc_info=True)
 
         # Send completion event
-        yield _format_sse_event("done")
+        yield {"type": "done"}
 
     except GeneratorExit:
         # Client disconnected - clean up gracefully
@@ -202,7 +218,10 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
         accumulated_response.append(f"\n\n[Error: {str(e)}]")
 
         try:
-            yield _format_sse_event("error", {"message": f"An error occurred during the stream: {str(e)}"})
+            yield {
+                "type": "error",
+                "payload": {"message": f"An error occurred during the stream: {str(e)}"},
+            }
         except (BrokenPipeError, ConnectionResetError, GeneratorExit):
             logger.debug("Unable to send error message - connection closed")
 
@@ -218,41 +237,21 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
                 logger.error(f"Fallback save failed for session {session_id}: {e}", exc_info=True)
 
 
-# Create agent blueprint
-agent_bp = Blueprint('agent', __name__)
-
-
-@agent_bp.route('/api/agent/chat', methods=['POST'])
-@validate()
-def chat_with_agent(body: AgentChatRequest):
+@router.post('/chat')
+def chat(request: AgentChatRequest):
     """Chat with AI agent using simple Gemini API with Server-Sent Events."""
-    try:
-        # Input validation
-        if not body.message or not body.message.strip():
-            raise ValueError("Message cannot be empty")
+    _validate_chat_request(request)
 
-        if len(body.message) > MAX_MESSAGE_LENGTH:
-            raise ValueError(f"Message is too long (maximum {MAX_MESSAGE_LENGTH} characters)")
+    session_id = request.session_id
+    logger.info(
+        "Processing chat request - Message length: %s, History entries: %s, Session ID: %s",
+        len(request.message),
+        len(request.history or []),
+        session_id,
+    )
 
-        session_id = body.session_id if hasattr(body, 'session_id') else None
-        logger.info(f"Processing chat request - Message length: {len(body.message)}, History entries: {len(body.history or [])}, Session ID: {session_id}")
+    def event_generator() -> Iterator[str]:
+        for event in stream_chat_response(request):
+            yield _format_sse_event(event)
 
-        # Use simple Gemini chat
-        return Response(
-            stream_with_context(_create_simple_chat_stream(body.message, body.history or [], session_id)),
-            content_type='text/event-stream'
-        )
-
-    except ValueError as e:
-        logger.warning(f"Validation error in agent chat: {e}")
-        return jsonify({
-            'success': False,
-            'error': f'Invalid input: {str(e)}'
-        }), 400
-
-    except Exception as e:
-        logger.error(f"Unexpected error in agent chat endpoint: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred. Please check your API key settings.'
-        }), 500
+    return StreamingResponse(event_generator(), media_type='text/event-stream')
