@@ -3,7 +3,7 @@ Handler-level tests for Socket.IO calculation monitoring.
 
 Task 9 adds end-to-end ASGI smoke coverage. These tests call the registered
 async handlers directly so the migration can validate handler behavior without
-Flask-SocketIO's test client.
+the end-to-end ASGI Socket.IO client.
 """
 
 import asyncio

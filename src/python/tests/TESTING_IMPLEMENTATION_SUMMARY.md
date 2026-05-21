@@ -358,7 +358,7 @@ def test_start_calculation_success(self, client, mocker, valid_dft_params):
 
     # THEN - レスポンス検証
     assert response.status_code == 202
-    assert response.get_json()['success'] is True
+    assert response.json()['success'] is True
 ```
 
 ### 2. サービス層のモッキング
@@ -415,7 +415,7 @@ response = client.post('/api/agent/chat', json={
 
 ### 3. Query Parameter のBoolean処理
 ```python
-# Flask's request.args.get with type=bool handles '0'/'1'
+# FastAPI query parsing handles '0'/'1' boolean values
 ?show_peaks=0  # → False
 ?show_peaks=1  # → True
 ```

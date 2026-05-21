@@ -156,7 +156,6 @@ def validate_conda_functionality(project_root: Path) -> bool:
     required_modules = [
         "pyscf",
         "rdkit",
-        "flask",
         "fastapi",
         "uvicorn",
         "socketio",

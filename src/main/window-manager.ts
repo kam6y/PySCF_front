@@ -12,7 +12,7 @@ export const setMainWindow = (window: BrowserWindow | null): void => {
 };
 
 export const createWindow = (
-  flaskPort: number,
+  backendPort: number,
   authToken: string
 ): BrowserWindow => {
   // Create the browser window.
@@ -89,7 +89,7 @@ export const createWindow = (
   const htmlPath = path.join(__dirname, 'index.html');
   newWindow.loadFile(htmlPath, {
     query: {
-      flask_port: String(flaskPort),
+      flask_port: String(backendPort),
     },
   });
 
@@ -100,7 +100,7 @@ export const createWindow = (
     console.log('[Main] Auth token sent via IPC');
   });
 
-  console.log(`[Main] Loading window with Flask port: ${flaskPort}`);
+  console.log(`[Main] Loading window with backend port: ${backendPort}`);
 
   mainWindow = newWindow;
   return newWindow;

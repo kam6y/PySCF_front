@@ -57,10 +57,10 @@ const queryClient = new QueryClient({
 const root = createRoot(document.getElementById('root') as Element);
 
 // URLパラメータ経由で取得したポート番号（preloadで設定済み）
-const flaskPort = window.electronAPI?.flaskPort;
+const backendPort = window.electronAPI?.flaskPort;
 
-if (!flaskPort) {
-  console.error('[index.tsx] CRITICAL: Flask port not available from preload.');
+if (!backendPort) {
+  console.error('[index.tsx] CRITICAL: Backend port not available from preload.');
 
   // ポート未取得時はエラーUIをレンダリングし、アプリを起動しない（fail-fast）
   root.render(
@@ -91,9 +91,9 @@ if (!flaskPort) {
   );
 } else {
   // グローバル変数に保存（WebSocket接続用）
-  window.flaskPort = flaskPort;
+  window.flaskPort = backendPort;
 
-  console.log('[index.tsx] Rendering app with Flask port:', window.flaskPort);
+  console.log('[index.tsx] Rendering app with backend port:', window.flaskPort);
 
   root.render(
     <StrictMode>

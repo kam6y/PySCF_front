@@ -54,17 +54,17 @@ def _wait_for_server_start(
 
 @pytest.fixture(autouse=True)
 def _configure_application():
-    """Disable pytest-flask app.config mutation for FastAPI tests."""
+    """Disable legacy test plugin application mutation for FastAPI tests."""
 
 
 @pytest.fixture(autouse=True)
 def _monkeypatch_response_class():
-    """Disable pytest-flask response_class patching for FastAPI tests."""
+    """Disable legacy response_class patching for FastAPI tests."""
 
 
 @pytest.fixture(autouse=True)
 def _push_request_context():
-    """Disable pytest-flask request-context setup for FastAPI tests."""
+    """Disable legacy request-context setup for FastAPI tests."""
 
 
 class DummyExecutor(Executor):
@@ -284,7 +284,7 @@ def client(app):
     """
     Create a test client for making HTTP requests to the application.
 
-    This fixture provides a Flask test client that can be used to simulate
+    This fixture provides a FastAPI TestClient that can be used to simulate
     HTTP requests without running a real server. It's function-scoped to
     ensure each test gets a fresh client.
 

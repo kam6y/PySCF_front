@@ -215,7 +215,7 @@ def configure_fastapi_app(app, config: ServerConfig, server_port: int) -> None:
     Configure FastAPI application state from ServerConfig.
 
     FastAPI has no app.config dict, so application settings are stored on
-    app.state with the same logical keys the Flask runtime used.
+    app.state with stable keys used by the backend services.
     """
     app.state.SERVER_CONFIG = config.to_dict()
     app.state.SERVER_CONFIG_OBJECT = config

@@ -1,6 +1,6 @@
 # PySCF_front
 
-This is a quantum chemistry application built with **Electron**, **React (TypeScript)**, and **Python (Flask)**. It leverages PySCF and RDKit on the backend, providing a desktop application for molecular structure visualization, data retrieval from PubChem, and the execution of quantum chemistry calculations such as Density Functional Theory (DFT).
+This is a quantum chemistry application built with **Electron**, **React (TypeScript)**, and a **Python FastAPI/ASGI backend**. It leverages PySCF and RDKit on the backend, providing a desktop application for molecular structure visualization, data retrieval from PubChem, and the execution of quantum chemistry calculations such as Density Functional Theory (DFT).
 
 ---
 
@@ -30,7 +30,7 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
 ## Tech Stack
 
 -   **Frontend**: React, TypeScript, TanStack Query, Zustand
--   **Backend**: Python, Flask, Gunicorn, PySCF, RDKit, GPU4PySCF (optional, Linux)
+-   **Backend**: Python, FastAPI, Gunicorn/Uvicorn, PySCF, RDKit, GPU4PySCF (optional, Linux)
 -   **Desktop Framework**: Electron
 -   **Build Tools**: Webpack, Electron Builder, conda-pack
 -   **Package Management**: npm (Node.js), conda (Python)
@@ -309,7 +309,7 @@ These commands provide detailed diagnostic information and troubleshooting steps
 
 # PySCF_front (日本語)
 
-これは、**Electron**、**React (TypeScript)**、**Python (Flask)** を使用して構築された、量子化学計算アプリケーションです。
+これは、**Electron**、**React (TypeScript)**、**Python FastAPI/ASGI バックエンド**を使用して構築された、量子化学計算アプリケーションです。
 
 PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubChemからの分子データ取得、そしてDFT（密度汎関数理論）、HF（ハートリー・フォック法）、MP2、CCSD、TDDFT計算などを実行できるデスクトップアプリケーションを目指して開発しています。
 
@@ -337,7 +337,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 ## 技術スタック
 
 -   **フロントエンド:** React, TypeScript, TanStack Query, Zustand
--   **バックエンド:** Python, Flask, Gunicorn, PySCF, RDKit, GPU4PySCF (オプション、Linux)
+-   **バックエンド:** Python, FastAPI, Gunicorn/Uvicorn, PySCF, RDKit, GPU4PySCF (オプション、Linux)
 -   **デスクトップフレームワーク:** Electron
 -   **ビルドツール:** Webpack, Electron Builder, conda-pack
 -   **パッケージ管理:** npm (Node.js), conda (Python)

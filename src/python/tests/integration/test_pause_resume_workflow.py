@@ -27,7 +27,7 @@ def wait_for_status(client, calc_id, expected_status, timeout=300, poll_interval
     Poll the calculation status until it matches expected_status or timeout.
 
     Args:
-        client: Flask test client
+        client: FastAPI test client
         calc_id: Calculation ID
         expected_status: Expected status string (or list of strings)
         timeout: Maximum wait time in seconds

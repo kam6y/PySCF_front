@@ -100,7 +100,7 @@ export const useSocketTransport = ({
     void (async () => {
       const port = window.flaskPort;
       if (!port) {
-        console.error('[UnifiedWebSocket] Flask port not set. Cannot connect.');
+        console.error('[UnifiedWebSocket] Backend port not set. Cannot connect.');
         isConnectingRef.current = false;
         return;
       }

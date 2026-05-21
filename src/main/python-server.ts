@@ -191,7 +191,7 @@ const attachLifecycleHandlers = (
 };
 
 let pythonProcess: ChildProcess | null = null;
-let flaskPort: number | null = null;
+let backendPort: number | null = null;
 let isQuitting = false;
 
 /**
@@ -278,9 +278,9 @@ export const startPythonServer = async (
 ): Promise<number> => {
   return new Promise(async (resolve, reject) => {
     // 重複実行防止: 既にサーバーが起動している場合はスキップ
-    if (pythonProcess && !pythonProcess.killed && flaskPort) {
+    if (pythonProcess && !pythonProcess.killed && backendPort) {
       console.log('Python server already running, skipping startup');
-      resolve(flaskPort);
+      resolve(backendPort);
       return;
     }
 
@@ -317,12 +317,12 @@ export const startPythonServer = async (
         : 5000;
 
     try {
-      flaskPort = await resolveServerPort(defaultPort);
+      backendPort = await resolveServerPort(defaultPort);
     } catch (e) {
       reject(e);
       return;
     }
-    const serverPort = flaskPort;
+    const serverPort = backendPort;
     console.log(`Using server port: ${serverPort}`);
 
     // Python作業ディレクトリの決定
@@ -394,15 +394,15 @@ export const startPythonServer = async (
     // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
     setTimeout(() => {
       console.log(
-        `Starting health check for Gunicorn server on port ${flaskPort}`
+        `Starting health check for Gunicorn server on port ${backendPort}`
       );
       checkServerHealth(
-        flaskPort!,
+        backendPort!,
         authToken,
         healthCheckRetries,
         healthCheckInterval
       )
-        .then(() => resolve(flaskPort!))
+        .then(() => resolve(backendPort!))
         .catch(reject);
     }, initialDelay);
   });

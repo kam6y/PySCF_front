@@ -2,7 +2,7 @@ from config import get_server_config
 from quantum_calc.config_manager import QuantumCalculationConfigManager
 
 
-def test_quantum_config_manager_does_not_import_flask():
+def test_quantum_config_manager_has_no_framework_global_dependency():
     import quantum_calc.config_manager as module
 
     assert not hasattr(module, "current_app")
