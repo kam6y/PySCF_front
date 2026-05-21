@@ -1,7 +1,7 @@
 """
 OpenAPI contract tests.
 
-These tests ensure that public Flask API routes and OpenAPI definitions stay aligned:
+These tests ensure that public API routes and OpenAPI definitions stay aligned:
 - HTTP method + path contracts
 - Query parameter names
 """
@@ -18,6 +18,13 @@ from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
 
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
+FASTAPI_DECORATOR_METHODS = {
+    "get": "GET",
+    "post": "POST",
+    "put": "PUT",
+    "patch": "PATCH",
+    "delete": "DELETE",
+}
 
 PYTHON_DIR = Path(__file__).resolve().parents[3]
 API_DIR = PYTHON_DIR / "api"
@@ -40,14 +47,71 @@ def _is_public_contract_path(path: str) -> bool:
 
 
 def _normalize_impl_path(path: str) -> str:
-    return _IMPL_PATH_PARAM_PATTERN.sub("{}", path)
+    path = _IMPL_PATH_PARAM_PATTERN.sub("{}", path)
+    return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
 
 
 def _normalize_openapi_path(path: str) -> str:
     return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
 
 
-def _parse_route_decorator(
+def _constant_string(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return node.value
+    return None
+
+
+def _join_paths(prefix: str, path: str) -> str:
+    if not prefix:
+        return path or "/"
+    if not path:
+        return prefix
+    return f"{prefix.rstrip('/')}/{path.lstrip('/')}"
+
+
+def _is_apirouter_call(node: ast.expr) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    if isinstance(node.func, ast.Name):
+        return node.func.id == "APIRouter"
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr == "APIRouter"
+    return False
+
+
+def _extract_fastapi_router_prefixes(tree: ast.Module) -> dict[str, str]:
+    prefixes: dict[str, str] = {}
+
+    for node in tree.body:
+        if not isinstance(node, ast.Assign) or not _is_apirouter_call(node.value):
+            continue
+
+        prefix = ""
+        for keyword in node.value.keywords:
+            if keyword.arg == "prefix":
+                prefix = _constant_string(keyword.value) or ""
+
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                prefixes[target.id] = prefix
+
+    return prefixes
+
+
+def _get_fastapi_decorator_path(decorator: ast.Call) -> str | None:
+    if decorator.args:
+        path = _constant_string(decorator.args[0])
+        if path is not None:
+            return path
+
+    for keyword in decorator.keywords:
+        if keyword.arg == "path":
+            return _constant_string(keyword.value)
+
+    return None
+
+
+def _parse_flask_route_decorator(
     decorator: ast.expr,
 ) -> tuple[str, set[str]] | None:
     if not isinstance(decorator, ast.Call):
@@ -59,8 +123,8 @@ def _parse_route_decorator(
     if not decorator.args:
         return None
 
-    path_arg = decorator.args[0]
-    if not isinstance(path_arg, ast.Constant) or not isinstance(path_arg.value, str):
+    path = _constant_string(decorator.args[0])
+    if path is None:
         return None
 
     methods: set[str] = {"GET"}
@@ -81,7 +145,42 @@ def _parse_route_decorator(
         if parsed_methods:
             methods = parsed_methods
 
-    return path_arg.value, methods
+    return path, methods
+
+
+def _parse_fastapi_route_decorator(
+    decorator: ast.expr,
+    router_prefixes: dict[str, str],
+) -> tuple[str, set[str]] | None:
+    if not isinstance(decorator, ast.Call):
+        return None
+    if not isinstance(decorator.func, ast.Attribute):
+        return None
+    if decorator.func.attr not in FASTAPI_DECORATOR_METHODS:
+        return None
+    if not isinstance(decorator.func.value, ast.Name):
+        return None
+
+    router_name = decorator.func.value.id
+    if router_name not in router_prefixes:
+        return None
+
+    path = _get_fastapi_decorator_path(decorator)
+    if path is None:
+        return None
+
+    method = FASTAPI_DECORATOR_METHODS[decorator.func.attr]
+    return _join_paths(router_prefixes[router_name], path), {method}
+
+
+def _parse_route_decorator(
+    decorator: ast.expr,
+    router_prefixes: dict[str, str],
+) -> tuple[str, set[str]] | None:
+    return (
+        _parse_flask_route_decorator(decorator)
+        or _parse_fastapi_route_decorator(decorator, router_prefixes)
+    )
 
 
 class _RequestArgsVisitor(ast.NodeVisitor):
@@ -105,6 +204,29 @@ class _RequestArgsVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
 
+def _is_fastapi_query_default(node: ast.expr) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    if isinstance(node.func, ast.Name):
+        return node.func.id == "Query"
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr == "Query"
+    return False
+
+
+def _extract_fastapi_query_params(node: ast.FunctionDef) -> set[str]:
+    args = node.args.args
+    defaults = node.args.defaults
+    default_offset = len(args) - len(defaults)
+
+    query_params: set[str] = set()
+    for index, default in enumerate(defaults, start=default_offset):
+        if _is_fastapi_query_default(default):
+            query_params.add(args[index].arg)
+
+    return query_params
+
+
 @lru_cache(maxsize=1)
 def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple[str, str], set[str]]]:
     routes: set[tuple[str, str]] = set()
@@ -115,6 +237,7 @@ def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple
             continue
 
         tree = ast.parse(api_file.read_text(encoding="utf-8"), filename=str(api_file))
+        router_prefixes = _extract_fastapi_router_prefixes(tree)
 
         for node in tree.body:
             if not isinstance(node, ast.FunctionDef):
@@ -122,7 +245,7 @@ def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple
 
             route_specs: list[tuple[str, set[str]]] = []
             for decorator in node.decorator_list:
-                route_spec = _parse_route_decorator(decorator)
+                route_spec = _parse_route_decorator(decorator, router_prefixes)
                 if route_spec:
                     route_specs.append(route_spec)
 
@@ -131,6 +254,7 @@ def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple
 
             visitor = _RequestArgsVisitor()
             visitor.visit(node)
+            fastapi_query_params = _extract_fastapi_query_params(node)
 
             for raw_path, methods in route_specs:
                 if not _is_public_contract_path(raw_path):
@@ -140,7 +264,9 @@ def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple
                 for method in methods:
                     key = (method, normalized_path)
                     routes.add(key)
-                    query_params_by_route.setdefault(key, set()).update(visitor.query_names)
+                    query_params_by_route.setdefault(key, set()).update(
+                        visitor.query_names | fastapi_query_params
+                    )
 
     return routes, query_params_by_route
 

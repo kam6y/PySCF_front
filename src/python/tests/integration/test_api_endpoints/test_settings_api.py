@@ -25,16 +25,17 @@ class TestSettingsAPI:
         assert response.json()['data']['settings'] == mock_settings
 
     def test_update_settings_success(self, client, mocker):
+        payload = self._settings_payload('/tmp/pyscf-updated')
         updated = self._settings_payload('/tmp/pyscf-updated')
         mock_service = mocker.patch('api.settings.get_settings_service')
         mock_service.return_value.update_settings.return_value = updated
 
         response = client.put(
             '/api/settings',
-            json=self._settings_payload('/tmp/pyscf-updated'),
+            json=payload,
         )
 
         assert response.status_code == 200
         assert response.json()['success'] is True
         assert response.json()['data']['settings'] == updated
-        mock_service.return_value.update_settings.assert_called_once()
+        mock_service.return_value.update_settings.assert_called_once_with(payload)

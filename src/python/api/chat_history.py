@@ -21,8 +21,8 @@ def create_chat_session(body: CreateChatSessionRequest) -> dict:
     return {'success': True, 'data': {'session': session}}
 
 
-@router.get('/sessions/{session_id}')
-def get_chat_session(session_id: str) -> dict:
+@router.get('/sessions/{session_id}', response_model=None)
+def get_chat_session(session_id: str) -> dict | JSONResponse:
     session_data = get_chat_history_service().get_session_with_messages(session_id)
     if session_data is None:
         return JSONResponse(
@@ -32,11 +32,11 @@ def get_chat_session(session_id: str) -> dict:
     return {'success': True, 'data': session_data}
 
 
-@router.patch('/sessions/{session_id}')
+@router.patch('/sessions/{session_id}', response_model=None)
 def update_chat_session(
     session_id: str,
     body: UpdateChatSessionRequest,
-) -> dict:
+) -> dict | JSONResponse:
     session = get_chat_history_service().update_session(session_id, body.name)
     if session is None:
         return JSONResponse(
@@ -46,8 +46,8 @@ def update_chat_session(
     return {'success': True, 'data': {'session': session}}
 
 
-@router.delete('/sessions/{session_id}')
-def delete_chat_session(session_id: str) -> dict:
+@router.delete('/sessions/{session_id}', response_model=None)
+def delete_chat_session(session_id: str) -> dict | JSONResponse:
     deleted = get_chat_history_service().delete_session(session_id)
     if not deleted:
         return JSONResponse(
