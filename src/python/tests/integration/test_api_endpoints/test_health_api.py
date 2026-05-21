@@ -2,7 +2,7 @@
 Integration tests for Health Check API endpoints.
 
 Tests the /health endpoint which provides basic health monitoring
-for the Flask application.
+for the FastAPI application.
 """
 
 class TestHealthAPI:
@@ -10,7 +10,7 @@ class TestHealthAPI:
 
     def test_health_check_returns_ok(self, client):
         """
-        GIVEN the Flask application is running
+        GIVEN the FastAPI application is running
         WHEN GET /health is called
         THEN it returns 200 OK with health status
         """
@@ -29,7 +29,7 @@ class TestHealthAPI:
 
     def test_health_check_json_format(self, client):
         """
-        GIVEN the Flask application is running
+        GIVEN the FastAPI application is running
         WHEN GET /health is called
         THEN it returns valid JSON with expected fields
         """
@@ -46,7 +46,7 @@ class TestHealthAPI:
 
     def test_health_check_version_field(self, client):
         """
-        GIVEN the Flask application is running
+        GIVEN the FastAPI application is running
         WHEN GET /health is called
         THEN the version field is present (even if 'unknown')
         """

@@ -2,7 +2,8 @@
 
 import logging
 from typing import Dict, Any, Tuple
-from flask import current_app
+
+from config import get_server_config
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ class QuantumCalculationConfigManager:
     Manager for quantum calculation configuration settings.
 
     This class provides convenient access to quantum calculation settings
-    stored in Flask's app.config, which serves as the single source of truth
+    stored in ServerConfig, which serves as the single source of truth
     for all application configuration.
     """
 
@@ -20,30 +21,24 @@ class QuantumCalculationConfigManager:
         """
         Initialize configuration manager.
 
-        Configuration is retrieved from Flask's app.config at runtime,
+        Configuration is retrieved from ServerConfig at runtime,
         eliminating the need for duplicate file loading and caching.
         """
         pass
 
     def _get_config(self) -> Dict[str, Any]:
         """
-        Get quantum calculation configuration from Flask app.config.
+        Get quantum calculation configuration from ServerConfig.
 
         Returns:
             Dictionary containing quantum calculation defaults, or fallback values.
         """
-        try:
-            # Get configuration from Flask app.config (single source of truth)
-            config = current_app.config.get('QUANTUM_CALCULATION_DEFAULTS', {})
-            if config:
-                return {'quantum_calculation_defaults': config}
-            else:
-                logger.warning("Quantum calculation defaults not found in app.config, using fallback")
-                return self._get_fallback_config()
-        except RuntimeError:
-            # Outside Flask application context - use fallback
-            logger.warning("Outside Flask context, using fallback quantum calculation configuration")
-            return self._get_fallback_config()
+        server_config = get_server_config()
+        config = server_config.get('quantum_calculation_defaults', {})
+        if config:
+            return {'quantum_calculation_defaults': config}
+        logger.warning("Quantum calculation defaults not found in ServerConfig, using fallback")
+        return self._get_fallback_config()
 
     def _get_fallback_config(self) -> Dict[str, Any]:
         """Get fallback configuration when app.config is not available."""
@@ -75,13 +70,13 @@ class QuantumCalculationConfigManager:
 
     def reload_config(self) -> None:
         """
-        Reload configuration from Flask app.config.
+        Reload configuration from ServerConfig.
 
-        Note: Since configuration is now read directly from app.config at runtime,
+        Note: Since configuration is read directly from ServerConfig at runtime,
         this method is kept for backwards compatibility but has no effect.
-        Configuration changes should be made directly to Flask's app.config.
+        Configuration changes should be made directly to the server config file.
         """
-        logger.info("Configuration reload requested (configuration is now read from app.config at runtime)")
+        logger.info("Configuration reload requested (configuration is read from ServerConfig at runtime)")
     
     def get_memory_setting(self, calculation_method: str) -> int:
         """
@@ -197,19 +192,13 @@ class QuantumCalculationConfigManager:
         Returns:
             Dictionary with configuration source information.
         """
-        try:
-            has_config = current_app.config.get('QUANTUM_CALCULATION_DEFAULTS') is not None
-            return {
-                "config_source": "Flask app.config",
-                "config_available": has_config,
-                "using_fallback": not has_config
-            }
-        except RuntimeError:
-            return {
-                "config_source": "fallback (outside Flask context)",
-                "config_available": False,
-                "using_fallback": True
-            }
+        server_config = get_server_config()
+        has_config = bool(server_config.get('quantum_calculation_defaults', {}))
+        return {
+            "config_source": "ServerConfig",
+            "config_available": has_config,
+            "using_fallback": not has_config
+        }
 
 
 # Global instance for easy access
