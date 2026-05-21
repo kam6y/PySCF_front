@@ -21,24 +21,7 @@ from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 PENDING_FASTAPI_MIGRATION_ROUTES = {
-    ("DELETE", "/api/quantum/calculations/{}"),
-    ("DELETE", "/api/quantum/calculations/{}/orbitals/cube-files"),
-    ("GET", "/api/quantum/calculations"),
-    ("GET", "/api/quantum/calculations/{}"),
-    ("GET", "/api/quantum/calculations/{}/ir-spectrum"),
-    ("GET", "/api/quantum/calculations/{}/orbitals"),
-    ("GET", "/api/quantum/calculations/{}/orbitals/{}/cube"),
-    ("GET", "/api/quantum/calculations/{}/orbitals/cube-files"),
-    ("GET", "/api/quantum/status"),
-    ("GET", "/api/quantum/supported-parameters"),
-    ("GET", "/api/system/gpu4pyscf-status"),
-    ("GET", "/api/system/resource-status"),
     ("POST", "/api/agent/chat"),
-    ("POST", "/api/quantum/calculate"),
-    ("POST", "/api/quantum/calculations/{}/pause"),
-    ("POST", "/api/quantum/calculations/{}/resume"),
-    ("POST", "/api/system/gpu4pyscf-install"),
-    ("PUT", "/api/quantum/calculations/{}"),
 }
 
 PYTHON_DIR = Path(__file__).resolve().parents[3]

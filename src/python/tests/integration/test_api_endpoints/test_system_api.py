@@ -92,7 +92,7 @@ class TestGpu4PyscfStatusAPI:
 class TestGpu4PyscfInstallAPI:
     """Integration tests for /api/system/gpu4pyscf-install endpoint."""
 
-    def test_install_gpu4pyscf_local_success(self, client, mocker):
+    def test_install_gpu4pyscf_local_success(self, client, mocker, monkeypatch):
         """
         GIVEN a local request and SystemService installs GPU4PySCF
         WHEN POST /api/system/gpu4pyscf-install is called
@@ -111,13 +111,13 @@ class TestGpu4PyscfInstallAPI:
             "pip_stdout": "",
             "pip_stderr": "",
         }
+        import api.system as system_api
+
+        monkeypatch.setattr(system_api, "_get_client_host", lambda request: "127.0.0.1")
         mock_service = mocker.patch("api.system.get_system_service")
         mock_service.return_value.install_gpu4pyscf.return_value = mock_result
 
-        response = client.post(
-            "/api/system/gpu4pyscf-install",
-            environ_base={"REMOTE_ADDR": "127.0.0.1"},
-        )
+        response = client.post("/api/system/gpu4pyscf-install")
 
         assert response.status_code == 200
         data = response.json()
@@ -128,18 +128,18 @@ class TestGpu4PyscfInstallAPI:
             force_reinstall=False,
         )
 
-    def test_install_gpu4pyscf_blocks_remote(self, client, mocker):
+    def test_install_gpu4pyscf_blocks_remote(self, client, mocker, monkeypatch):
         """
         GIVEN a non-local request
         WHEN POST /api/system/gpu4pyscf-install is called
         THEN 403 Forbidden is returned
         """
+        import api.system as system_api
+
+        monkeypatch.setattr(system_api, "_get_client_host", lambda request: "10.10.10.10")
         mock_service = mocker.patch("api.system.get_system_service")
 
-        response = client.post(
-            "/api/system/gpu4pyscf-install",
-            environ_base={"REMOTE_ADDR": "10.10.10.10"},
-        )
+        response = client.post("/api/system/gpu4pyscf-install")
 
         assert response.status_code == 403
         data = response.json()
