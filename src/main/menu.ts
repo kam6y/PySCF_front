@@ -21,7 +21,7 @@ Key Features:
 
 Tech Stack:
 Frontend: Electron, React, TypeScript
-Backend: Python, Flask, PySCF, RDKit
+Backend: Python, FastAPI, PySCF, RDKit
 
 License: ${packageJson.license}
 Author: ${packageJson.author}

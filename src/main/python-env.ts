@@ -131,8 +131,8 @@ export const detectPythonEnvironmentPath = async (): Promise<string | null> => {
  * This prevents user's local Python environment (pyenv, conda, venv) from interfering.
  *
  * @param condaBinDir - The bin directory of the conda environment to use
- * @param serverPort - The port number for the Flask server
- * @param authToken - The authentication token for the Flask server
+ * @param serverPort - The port number for the Python backend server
+ * @param authToken - The authentication token for the Python backend server
  * @returns A clean environment object
  */
 export const createCleanEnvironment = (
