@@ -1,5 +1,6 @@
 import importlib
 import os
+from unittest import mock
 
 from fastapi import FastAPI
 
@@ -23,6 +24,22 @@ def test_thread_control_vars_are_set_before_app_import(monkeypatch):
     assert hasattr(module, 'fastapi_app')
     assert hasattr(module, 'sio')
     assert hasattr(module, 'app')
+
+
+def test_app_import_does_not_initialize_process_manager(monkeypatch):
+    import app as app_module
+    import quantum_calc
+
+    initialize_mock = mock.Mock()
+    monkeypatch.setattr(
+        quantum_calc,
+        'initialize_process_manager_with_callback',
+        initialize_mock,
+    )
+
+    importlib.reload(app_module)
+
+    initialize_mock.assert_not_called()
 
 
 def test_create_fastapi_app_disables_default_docs():

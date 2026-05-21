@@ -73,12 +73,26 @@ def _get_state(app: FastAPI, name: str, default: Any = None) -> Any:
 @asynccontextmanager
 async def lifespan(fastapi_app: FastAPI):
     bind_event_loop(asyncio.get_running_loop())
+    initialize_process_manager_notifications()
     try:
         yield
     finally:
         clear_event_loop()
         shutdown_websocket_watcher()
         shutdown_process_manager()
+
+
+def initialize_process_manager_notifications() -> None:
+    from quantum_calc import initialize_process_manager_with_callback
+    from services.notification_service import get_notification_service
+
+    try:
+        notification_service = get_notification_service()
+        initialize_process_manager_with_callback(
+            notification_callback=notification_service.send_calculation_update
+        )
+    except Exception as exc:
+        logger.error("Failed to initialize process manager with callback: %s", exc)
 
 
 def create_socketio_server(socketio_config: dict[str, Any] | None = None) -> socketio.AsyncServer:
@@ -126,18 +140,9 @@ def create_fastapi_app(server_port: int | None = None, test_config: dict[str, An
 def compose_asgi_app(fastapi_instance: FastAPI, socketio_instance: socketio.AsyncServer):
     register_websocket_handlers(socketio_instance)
 
-    from quantum_calc import initialize_process_manager_with_callback
-    from services.notification_service import bind_notification_service, get_notification_service
+    from services.notification_service import bind_notification_service
 
     bind_notification_service(socketio_instance)
-    try:
-        notification_service = get_notification_service()
-        initialize_process_manager_with_callback(
-            notification_callback=notification_service.send_calculation_update
-        )
-    except Exception as exc:
-        logger.error("Failed to initialize process manager with callback: %s", exc)
-
     fastapi_instance.state.socketio = socketio_instance
     return socketio.ASGIApp(socketio_instance, fastapi_instance)
 
