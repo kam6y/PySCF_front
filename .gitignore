@@ -120,3 +120,6 @@ data/settings.json
 # Codebase visualization output
 # コードベース可視化スクリプトの出力
 code.txt
+
+# Local git worktrees
+.worktrees/
