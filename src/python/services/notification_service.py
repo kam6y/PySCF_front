@@ -3,6 +3,8 @@ import logging
 from typing import Optional
 from datetime import datetime
 
+from websocket.event_loop_bridge import schedule_coroutine
+
 logger = logging.getLogger(__name__)
 
 
@@ -16,7 +18,7 @@ class NotificationService:
     def bind_socketio(self, socketio) -> None:
         """Bind SocketIO instance to this service."""
         self._socketio = socketio
-        logger.info("SocketIO instance bound to NotificationService")
+        logger.info("Socket.IO AsyncServer bound to NotificationService")
 
     def send_calculation_update(
         self,
@@ -26,7 +28,10 @@ class NotificationService:
     ) -> None:
         """Send immediate WebSocket notification for calculation status changes."""
         if self._socketio is None:
-            logger.warning(f"Cannot send notification for {calculation_id}: SocketIO not bound")
+            logger.warning(
+                "Cannot send notification for %s: Socket.IO not bound",
+                calculation_id,
+            )
             return
 
         try:
@@ -43,7 +48,7 @@ class NotificationService:
             )
 
             if not os.path.exists(calc_dir):
-                logger.warning(f"Calculation directory not found: {calc_dir}")
+                logger.warning("Calculation directory not found: %s", calc_dir)
                 return
 
             # Read current data
@@ -67,18 +72,22 @@ class NotificationService:
                 calculation_instance['error'] = error_message
                 calculation_instance['errorMessage'] = error_message
 
-            # Send to global updates room
-            # (calculation-specific room is handled by file_watcher via handlers.py)
+        except Exception:
+            logger.exception("Error building WebSocket notification payload")
+            return
+
+        schedule_coroutine(
             self._socketio.emit(
-                'calculation_update',
+                "calculation_update",
                 calculation_instance,
-                room='global_updates'
+                room="global_updates",
             )
-
-            logger.debug(f"Sent WebSocket notification for {calculation_id} with status {status}")
-
-        except Exception as e:
-            logger.error(f"Error sending WebSocket notification: {e}", exc_info=True)
+        )
+        logger.debug(
+            "Scheduled WebSocket notification for %s with status %s",
+            calculation_id,
+            status,
+        )
 
 
 # Global singleton
@@ -97,4 +106,4 @@ def bind_notification_service(socketio) -> None:
     """Bind SocketIO instance to the global NotificationService."""
     service = get_notification_service()
     service.bind_socketio(socketio)
-    logger.info("Global NotificationService bound to SocketIO")
+    logger.info("Global NotificationService bound to Socket.IO")

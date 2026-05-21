@@ -92,7 +92,7 @@ class TestGpu4PyscfStatusAPI:
 class TestGpu4PyscfInstallAPI:
     """Integration tests for /api/system/gpu4pyscf-install endpoint."""
 
-    def test_install_gpu4pyscf_local_success(self, client, mocker, monkeypatch):
+    def test_install_gpu4pyscf_local_success(self, client, mocker):
         """
         GIVEN a local request and SystemService installs GPU4PySCF
         WHEN POST /api/system/gpu4pyscf-install is called
@@ -111,14 +111,16 @@ class TestGpu4PyscfInstallAPI:
             "pip_stdout": "",
             "pip_stderr": "",
         }
-        import api.system as system_api
-
-        monkeypatch.setattr(system_api, "_get_client_host", lambda request: "127.0.0.1")
+        mock_get_host = mocker.patch(
+            "api.system._get_client_host",
+            return_value="127.0.0.1",
+        )
         mock_service = mocker.patch("api.system.get_system_service")
         mock_service.return_value.install_gpu4pyscf.return_value = mock_result
 
         response = client.post("/api/system/gpu4pyscf-install")
 
+        mock_get_host.assert_called_once()
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -128,15 +130,13 @@ class TestGpu4PyscfInstallAPI:
             force_reinstall=False,
         )
 
-    def test_install_gpu4pyscf_blocks_remote(self, client, mocker, monkeypatch):
+    def test_install_gpu4pyscf_blocks_remote(self, client, mocker):
         """
         GIVEN a non-local request
         WHEN POST /api/system/gpu4pyscf-install is called
         THEN 403 Forbidden is returned
         """
-        import api.system as system_api
-
-        monkeypatch.setattr(system_api, "_get_client_host", lambda request: "10.10.10.10")
+        mocker.patch("api.system._get_client_host", return_value="10.10.10.10")
         mock_service = mocker.patch("api.system.get_system_service")
 
         response = client.post("/api/system/gpu4pyscf-install")
