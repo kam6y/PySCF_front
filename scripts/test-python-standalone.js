@@ -77,8 +77,12 @@ console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
     console.log('\n=== Test 3: Gunicorn Import Test ===');
     await testPythonCommand([pythonExecutablePath, '-c', 'import gunicorn; print("Gunicorn version:", gunicorn.__version__)']);
     
-    console.log('\n=== Test 4: Flask Import Test ===');
-    await testPythonCommand([pythonExecutablePath, '-c', 'import flask; print("Flask import successful")']);
+    console.log('\n=== Test 4: FastAPI ASGI Import Test ===');
+    await testPythonCommand([
+      pythonExecutablePath,
+      '-c',
+      'import fastapi, uvicorn, socketio; from uvicorn.workers import UvicornWorker; print("FastAPI ASGI import successful")'
+    ]);
 
     // Test 5: App import test (if conda environment)
     if (pythonExecutablePath.includes('conda_env')) {
@@ -93,16 +97,12 @@ console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
     console.log('\n=== Test 6: Gunicorn Startup Simulation ===');
     const gunicornArgs = [
       '-m', 'gunicorn',
+      '--bind', '127.0.0.1:0',
       '--workers', '1',
-      '--threads', '4',
-      '--worker-class', 'sync',
-      '--bind', '127.0.0.1:5001',  // Use different port to avoid conflicts
-      '--timeout', '0',
-      '--keep-alive', '30',
-      '--access-logfile', '-',
-      '--log-level', 'info',
-      '--preload',
-      'app:app'
+      '--worker-class', 'uvicorn.workers.UvicornWorker',
+      '--timeout', '5',
+      '--log-level', 'warning',
+      'app:app',
     ];
     
     const workDir = pythonExecutablePath.includes('conda_env') 

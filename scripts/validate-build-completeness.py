@@ -153,61 +153,35 @@ def validate_conda_functionality(project_root: Path) -> bool:
         log_error("conda環境のPython実行ファイルが見つかりません")
         return False
 
-    # 簡単なインポートテスト
-    test_imports = [
-        "pyscf",
-        "rdkit",
-        "flask",
+    required_modules = [
+        "fastapi",
+        "uvicorn",
+        "socketio",
         "gunicorn",
-        "conda_pack"
+        "pydantic",
     ]
 
-    # 環境変数でPySCFテストをスキップ可能にする
-    skip_pyscf_test = os.environ.get('SKIP_PYSCF_TEST', '').lower() in ('true', '1', 'yes')
-
     all_success = True
-    for module_name in test_imports:
-        # PySCFテストをスキップする場合
-        if module_name == "pyscf" and skip_pyscf_test:
-            log_warning(f"⚠ {module_name} import test skipped (SKIP_PYSCF_TEST set)")
-            continue
-
+    for module_name in required_modules:
         try:
-            # PySCFは大型ライブラリなので特に長いタイムアウトを設定 (30秒→60秒)
-            timeout_duration = 60 if module_name == "pyscf" else 10
             result = subprocess.run([
                 str(python_exe),
                 "-c",
                 f"import {module_name}; print(f'{module_name}: OK')"
-            ], capture_output=True, text=True, timeout=timeout_duration)
+            ], capture_output=True, text=True, timeout=10)
 
             if result.returncode == 0:
                 log_success(f"✓ {module_name} import successful")
             else:
-                if module_name == "pyscf":
-                    # PySCFのテストは警告レベルに変更（エラーでビルド停止しない）
-                    log_warning(f"⚠ {module_name} import failed: {result.stderr.strip()}")
-                    log_warning("PySCF import failed but continuing with build validation")
-                else:
-                    log_error(f"✗ {module_name} import failed: {result.stderr.strip()}")
-                    all_success = False
+                log_error(f"✗ {module_name} import failed: {result.stderr.strip()}")
+                all_success = False
 
         except subprocess.TimeoutExpired:
-            if module_name == "pyscf":
-                # PySCFのテストは警告レベルに変更（エラーでビルド停止しない）
-                log_warning(f"⚠ {module_name} import timeout")
-                log_warning("PySCF import timed out but continuing with build validation")
-            else:
-                log_error(f"✗ {module_name} import timeout")
-                all_success = False
+            log_error(f"✗ {module_name} import timeout")
+            all_success = False
         except Exception as e:
-            if module_name == "pyscf":
-                # PySCFのテストは警告レベルに変更（エラーでビルド停止しない）
-                log_warning(f"⚠ {module_name} import error: {e}")
-                log_warning("PySCF import error but continuing with build validation")
-            else:
-                log_error(f"✗ {module_name} import error: {e}")
-                all_success = False
+            log_error(f"✗ {module_name} import error: {e}")
+            all_success = False
 
     return all_success
 
