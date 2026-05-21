@@ -30,7 +30,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import socketio
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -68,6 +68,112 @@ def _is_development_api_docs_path(path: str) -> bool:
 
 def _get_state(app: FastAPI, name: str, default: Any = None) -> Any:
     return getattr(app.state, name, default)
+
+
+def register_auth_middleware(fastapi_app: FastAPI) -> None:
+    @fastapi_app.middleware('http')
+    async def verify_auth_token(request: Request, call_next):
+        if _is_development_api_docs_path(request.url.path) and os.getenv('PYSCF_ENV') == 'development':
+            return await call_next(request)
+
+        if request.method == 'OPTIONS':
+            return await call_next(request)
+
+        auth_token = os.getenv('PYSCF_AUTH_TOKEN')
+        if auth_token:
+            client_token = request.headers.get('X-Auth-Token')
+            if client_token != auth_token:
+                client_host = request.client.host if request.client else 'unknown'
+                logger.warning("Unauthorized access attempt from %s", client_host)
+                return JSONResponse({'success': False, 'error': 'Unauthorized'}, status_code=401)
+        else:
+            is_testing = bool(getattr(request.app.state, 'TESTING', False))
+            env = os.getenv('PYSCF_ENV')
+            if is_testing and env != 'production':
+                return await call_next(request)
+            if env not in {'development', 'test'}:
+                logger.warning("Unauthorized access attempt: Missing authentication token in production mode")
+                return JSONResponse(
+                    {'success': False, 'error': 'Unauthorized: Missing authentication token'},
+                    status_code=401,
+                )
+            logger.warning("Running without authentication token in debug/development mode!")
+
+        return await call_next(request)
+
+
+def register_cors_middleware(fastapi_app: FastAPI) -> None:
+    fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            'http://127.0.0.1',
+            'http://localhost',
+            'file://',
+            'null',
+        ],
+        allow_origin_regex=r'^(https?://(127\.0\.0\.1|localhost)(:\d+)?)$',
+        allow_credentials=True,
+        allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allow_headers=['Content-Type', 'X-Auth-Token'],
+    )
+
+
+def _format_validation_errors(errors: list[dict[str, Any]]) -> str:
+    messages: list[str] = []
+    for err in errors:
+        loc = '.'.join(str(part) for part in err.get('loc', []))
+        msg = err.get('msg', 'Invalid value')
+        messages.append(f"{loc}: {msg}" if loc else msg)
+    return 'Validation failed: ' + '; '.join(messages)
+
+
+def register_exception_handlers(fastapi_app: FastAPI) -> None:
+    @fastapi_app.exception_handler(json.JSONDecodeError)
+    async def json_decode_error_handler(request: Request, error: json.JSONDecodeError):
+        message = f"Validation failed: malformed JSON body: {error.msg}"
+        logger.warning("Malformed JSON on %s: %s", request.url.path, message)
+        return JSONResponse({'success': False, 'error': message}, status_code=400)
+
+    @fastapi_app.exception_handler(RequestValidationError)
+    async def request_validation_error_handler(request: Request, error: RequestValidationError):
+        message = _format_validation_errors(error.errors())
+        logger.warning("Validation error on %s: %s", request.url.path, message)
+        return JSONResponse({'success': False, 'error': message}, status_code=400)
+
+    @fastapi_app.exception_handler(ValidationError)
+    async def pydantic_validation_error_handler(request: Request, error: ValidationError):
+        message = _format_validation_errors(error.errors())
+        logger.warning("Pydantic validation error on %s: %s", request.url.path, message)
+        return JSONResponse({'success': False, 'error': message}, status_code=400)
+
+    @fastapi_app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, error: StarletteHTTPException):
+        if error.status_code == 404:
+            return JSONResponse({'success': False, 'error': 'Not Found'}, status_code=404)
+        if error.status_code == 400:
+            return JSONResponse(
+                {'success': False, 'error': f'Validation failed: {error.detail}'},
+                status_code=400,
+            )
+        return JSONResponse(
+            {'success': False, 'error': str(error.detail)},
+            status_code=error.status_code,
+        )
+
+    @fastapi_app.exception_handler(ServiceError)
+    async def service_error_handler(request: Request, error: ServiceError):
+        return JSONResponse(
+            {'success': False, 'error': error.message},
+            status_code=error.status_code,
+        )
+
+    @fastapi_app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: Request, error: Exception):
+        logger.error("Unhandled exception on %s: %s", request.url.path, error, exc_info=True)
+        return JSONResponse(
+            {'success': False, 'error': 'An internal server error occurred.'},
+            status_code=500,
+        )
 
 
 @asynccontextmanager
@@ -128,6 +234,9 @@ def create_fastapi_app(server_port: int | None = None, test_config: dict[str, An
 
     fastapi_app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     configure_fastapi_app(fastapi_app, server_config, server_port)
+    register_auth_middleware(fastapi_app)
+    register_cors_middleware(fastapi_app)
+    register_exception_handlers(fastapi_app)
 
     if test_config:
         for key, value in test_config.items():
