@@ -85,8 +85,8 @@ class TestAgentChatAPI:
         # ACT
         response = client.post(
             '/api/agent/chat',
-            data='invalid json',
-            content_type='application/json'
+            content=b'invalid json',
+            headers={'Content-Type': 'application/json'},
         )
 
         # ASSERT
@@ -135,10 +135,10 @@ class TestAgentChatAPI:
 
         # ASSERT
         assert response.status_code == 200
-        assert response.content_type == 'text/event-stream'
+        assert response.headers['content-type'].startswith('text/event-stream')
         
         # Parse SSE stream
-        data_str = response.data.decode('utf-8')
+        data_str = response.content.decode('utf-8')
         lines = [line for line in data_str.split('\n') if line.startswith('data:')]
         
         # Should have chunk events and a done event
@@ -168,10 +168,10 @@ class TestAgentChatAPI:
 
         # ASSERT
         assert response.status_code == 200
-        assert response.content_type == 'text/event-stream'
+        assert response.headers['content-type'].startswith('text/event-stream')
         
         # Parse SSE stream
-        data_str = response.data.decode('utf-8')
+        data_str = response.content.decode('utf-8')
         lines = [line for line in data_str.split('\n') if line.startswith('data:')]
         
         # Should contain error event about missing API key

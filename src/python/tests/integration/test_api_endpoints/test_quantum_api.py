@@ -35,7 +35,7 @@ class TestSupportedParametersAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'data' in data
         assert 'basis_sets' in data['data']
@@ -68,7 +68,7 @@ class TestCalculationSubmissionAPI:
 
         # ASSERT
         assert response.status_code == 202
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'calculation' in data['data']
         assert data['data']['calculation']['id'] == 'calc-123'
@@ -96,7 +96,7 @@ class TestCalculationSubmissionAPI:
 
         # ASSERT
         assert response.status_code == 202
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
 
     @pytest.mark.parametrize("invalid_field,invalid_value", [
@@ -147,7 +147,7 @@ class TestCalculationSubmissionAPI:
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert invalid_field in data['error']
 
@@ -183,7 +183,7 @@ class TestCalculationSubmissionAPI:
 
         # ASSERT
         assert response.status_code == 500
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
 
     def test_dft_rejects_casci_parameters(self, client, mocker, sample_h2_xyz):
@@ -208,7 +208,7 @@ class TestCalculationSubmissionAPI:
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert 'error' in data
         error_message = data['error'].lower()
@@ -236,7 +236,7 @@ class TestCalculationSubmissionAPI:
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         # Pydantic validation error is now handled by global errorhandler
         assert 'error' in data
         assert 'optimize_geometry' in data['error'].lower()
@@ -261,7 +261,7 @@ class TestCalculationListAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['calculations'] == []
         assert data['data']['count'] == 0
@@ -287,7 +287,7 @@ class TestCalculationListAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert len(data['data']['calculations']) == 3
         assert data['data']['count'] == 3
@@ -320,7 +320,7 @@ class TestCalculationDetailsAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['calculation']['id'] == calc_id
         assert 'results' in data['data']['calculation']
@@ -341,7 +341,7 @@ class TestCalculationDetailsAPI:
 
         # ASSERT
         assert response.status_code == 404
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
 
 
@@ -374,7 +374,7 @@ class TestCalculationUpdateAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['calculation']['name'] == new_name
         
@@ -423,7 +423,7 @@ class TestCalculationDeletionAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['deleted_id'] == calc_id
 
@@ -462,7 +462,7 @@ class TestCalculationDeletionAPI:
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert 'Cannot delete calculation' in data['error']
 
@@ -541,7 +541,7 @@ class TestCalculationIdValidationAPI:
         response = request_method(path, **kwargs)
 
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         assert data["success"] is False
         assert "Invalid calculation ID" in data["error"]
 
@@ -573,7 +573,7 @@ class TestMolecularOrbitalsAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'homo_index' in data['data']
         assert 'orbitals' in data['data']
@@ -600,7 +600,7 @@ class TestMolecularOrbitalsAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['orbital_index'] == orbital_index
 
@@ -654,7 +654,7 @@ class TestMolecularOrbitalsAPI:
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert 'grid_size' in data['error']
 
@@ -681,7 +681,7 @@ class TestMolecularOrbitalsAPI:
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert 'Invalid orbital index' in data['error']
 
@@ -708,7 +708,7 @@ class TestMolecularOrbitalsAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['total_files'] == 2
 
@@ -732,7 +732,7 @@ class TestMolecularOrbitalsAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['deleted_files'] == 5
 
@@ -789,7 +789,7 @@ class TestIRSpectrumAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'spectrum' in data['data']
 
@@ -867,6 +867,6 @@ class TestCalculationStatusAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'process_pool' in data['data']

@@ -35,7 +35,7 @@ class TestPubChemSearchAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'data' in data
         assert data['data']['xyz'] == mock_result['xyz']
@@ -104,7 +104,7 @@ class TestPubChemSearchAPI:
 
         # ASSERT
         assert response.status_code == 404
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert 'error' in data
         assert 'not found' in data['error'].lower()
@@ -130,7 +130,7 @@ class TestPubChemSearchAPI:
 
         # ASSERT
         assert response.status_code == 503
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert 'error' in data
 
@@ -157,8 +157,8 @@ class TestPubChemSearchAPI:
         # ACT
         response = client.post(
             '/api/pubchem/search',
-            data='invalid json',
-            content_type='application/json'
+            content=b'invalid json',
+            headers={'Content-Type': 'application/json'},
         )
 
         # ASSERT
@@ -191,7 +191,7 @@ class TestPubChemValidateAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['valid'] is True
         assert data['data']['atom_count'] == 2
@@ -220,7 +220,7 @@ class TestPubChemValidateAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert data['data']['valid'] is False
 

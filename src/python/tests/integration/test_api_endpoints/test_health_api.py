@@ -19,7 +19,7 @@ class TestHealthAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         
         assert 'status' in data
         assert data['status'] == 'ok'
@@ -38,9 +38,9 @@ class TestHealthAPI:
 
         # ASSERT
         assert response.status_code == 200
-        assert response.content_type == 'application/json'
+        assert response.headers['content-type'] == 'application/json'
         
-        data = response.get_json()
+        data = response.json()
         assert isinstance(data, dict)
         assert len(data) >= 3  # At least status, service, version
 
@@ -54,7 +54,7 @@ class TestHealthAPI:
         response = client.get('/health')
 
         # ASSERT
-        data = response.get_json()
+        data = response.json()
         assert 'version' in data
         assert isinstance(data['version'], str)
         # Version should be non-empty string (either version number or 'unknown')

@@ -1,53 +1,21 @@
-"""
-Settings management API endpoints.
-Handles application settings retrieval and updates.
-"""
+"""Settings management API endpoints."""
 
-import logging
-from flask import Blueprint, jsonify
-from flask_pydantic import validate
+from fastapi import APIRouter
 
-from services import get_settings_service
 from generated_models import SettingsUpdateRequest
+from services import get_settings_service
 
-# Set up logging
-logger = logging.getLogger(__name__)
-
-# Create settings blueprint
-settings_bp = Blueprint('settings', __name__)
+router = APIRouter(prefix='/api/settings')
 
 
-@settings_bp.route('/api/settings', methods=['GET'])
-def get_settings():
-    """Get current application settings."""
-    settings_service = get_settings_service()
-
-    # Call service layer
-    settings = settings_service.get_settings()
-
-    return jsonify({
-        'success': True,
-        'data': {
-            'settings': settings
-        }
-    })
+@router.get('')
+def get_settings() -> dict:
+    settings = get_settings_service().get_settings()
+    return {'success': True, 'data': {'settings': settings}}
 
 
-@settings_bp.route('/api/settings', methods=['PUT'])
-@validate()
-def update_settings(body: SettingsUpdateRequest):
-    """Update application settings."""
-    settings_service = get_settings_service()
-
-    # Extract settings from root model
+@router.put('')
+def update_settings(body: SettingsUpdateRequest) -> dict:
     new_settings = body.root if hasattr(body, 'root') else body
-
-    # Call service layer
-    updated_settings = settings_service.update_settings(new_settings.model_dump())
-
-    return jsonify({
-        'success': True,
-        'data': {
-            'settings': updated_settings
-        }
-    })
+    updated_settings = get_settings_service().update_settings(new_settings.model_dump())
+    return {'success': True, 'data': {'settings': updated_settings}}

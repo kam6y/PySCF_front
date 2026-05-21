@@ -43,8 +43,8 @@ class TestSystemDiagnosticsAPI:
         response = client.get("/api/debug/system-diagnostics")
 
         assert response.status_code == 200
-        response_text = response.get_data(as_text=True)
-        data = response.get_json()
+        response_text = response.text
+        data = response.json()
         settings_payload = data["data"]["settings"]["settings"]
         assert data["success"] is True
         assert settings_payload["gemini_api_key"] == "***"
@@ -83,7 +83,7 @@ class TestGpu4PyscfStatusAPI:
         response = client.get("/api/system/gpu4pyscf-status")
 
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data["success"] is True
         assert data["data"]["cuda_supported"] is True
         assert data["data"]["gpu4pyscf_installed"] is True
@@ -120,7 +120,7 @@ class TestGpu4PyscfInstallAPI:
         )
 
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data["success"] is True
         assert data["data"]["status"]["gpu4pyscf_installed"] is True
         mock_service.return_value.install_gpu4pyscf.assert_called_once_with(
@@ -142,6 +142,6 @@ class TestGpu4PyscfInstallAPI:
         )
 
         assert response.status_code == 403
-        data = response.get_json()
+        data = response.json()
         assert data["success"] is False
         mock_service.assert_not_called()

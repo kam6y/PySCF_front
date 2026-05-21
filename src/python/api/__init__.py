@@ -3,7 +3,11 @@ import os
 
 from fastapi import FastAPI
 
+from .chat_history import router as chat_history_router
 from .health import router as health_router
+from .pubchem import router as pubchem_router
+from .settings import router as settings_router
+from .smiles import router as smiles_router
 from .swagger_ui import router as swagger_router
 
 logger = logging.getLogger(__name__)
@@ -11,6 +15,10 @@ logger = logging.getLogger(__name__)
 
 def register_routers(app: FastAPI) -> None:
     app.include_router(health_router)
+    app.include_router(pubchem_router)
+    app.include_router(smiles_router)
+    app.include_router(settings_router)
+    app.include_router(chat_history_router)
     is_packaged = os.getenv('PYSCF_RESOURCES_PATH') is not None
     if not is_packaged:
         app.include_router(swagger_router)
