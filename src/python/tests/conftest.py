@@ -7,16 +7,44 @@ to all test modules.
 
 import os
 import logging
+import shutil
+import socket
 import tempfile
+import threading
+import time
+from collections.abc import Generator
 from concurrent.futures import Executor, Future
 from unittest import mock
 
 import pytest
+import uvicorn
 from fastapi.testclient import TestClient
 
 from app import create_fastapi_app
 
 logger = logging.getLogger(__name__)
+
+
+def _get_free_port() -> int:
+    """Return an available localhost TCP port for a short-lived test server."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(('127.0.0.1', 0))
+        return int(sock.getsockname()[1])
+
+
+def _wait_for_server_start(
+    server: uvicorn.Server,
+    thread: threading.Thread,
+    timeout: float = 5.0,
+) -> None:
+    """Wait until Uvicorn reports startup or fail with a clear error."""
+    deadline = time.monotonic() + timeout
+    while not server.started:
+        if not thread.is_alive():
+            raise RuntimeError('Uvicorn server thread exited before startup.')
+        if time.monotonic() >= deadline:
+            raise TimeoutError('Timed out waiting for Uvicorn server startup.')
+        time.sleep(0.05)
 
 
 # ============================================================================
@@ -155,6 +183,100 @@ def app():
 
     import shutil
     shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@pytest.fixture(scope='function')
+def asgi_server() -> Generator[str, None, None]:
+    """Run the real Socket.IO ASGI app on a local Uvicorn server."""
+    port = _get_free_port()
+    temp_dir = tempfile.mkdtemp(prefix='pyscf_asgi_test_')
+    test_config = {
+        'TESTING': True,
+        'CALCULATIONS_DIR': temp_dir,
+        'WEBSOCKET_WATCHER_ENABLED': False,
+        'SOCKETIO': {
+            'cors_allowed_origins': [
+                'http://127.0.0.1:3000',
+                'http://localhost:3000',
+                'file://',
+            ],
+            'logger': False,
+            'engineio_logger': False,
+        },
+    }
+
+    import services as services_module
+    import services.notification_service as notification_service_module
+    import quantum_calc.settings_manager as settings_manager_module
+    from app import create_app
+    from quantum_calc import shutdown_websocket_watcher
+    from quantum_calc.process_manager import shutdown_process_manager
+    from quantum_calc.settings_manager import SettingsManager
+    from websocket.handlers import _sid_state
+
+    test_settings_manager = SettingsManager(
+        settings_file=os.path.join(temp_dir, 'app-settings.json')
+    )
+    test_settings = test_settings_manager.get_default_settings().model_copy(
+        update={'calculations_directory': temp_dir}
+    )
+    test_settings_manager.save_settings(test_settings)
+
+    try:
+        with (
+            mock.patch.dict(
+                os.environ,
+                {'PYSCF_AUTH_TOKEN': 'socket-token', 'PYSCF_ENV': 'development'},
+            ),
+            mock.patch(
+                'quantum_calc.process_manager.ProcessPoolExecutor',
+                new=DummyExecutor,
+            ),
+            mock.patch.object(
+                settings_manager_module,
+                '_settings_manager',
+                test_settings_manager,
+            ),
+            mock.patch.object(notification_service_module, '_notification_service', None),
+            mock.patch.multiple(
+                services_module,
+                _quantum_service=None,
+                _pubchem_service=None,
+                _smiles_service=None,
+                _settings_service=None,
+                _system_service=None,
+            ),
+        ):
+            shutdown_process_manager()
+            _sid_state.clear()
+            uvicorn_app = create_app(server_port=port, test_config=test_config)
+            config = uvicorn.Config(
+                uvicorn_app,
+                host='127.0.0.1',
+                port=port,
+                log_level='warning',
+                access_log=False,
+                lifespan='on',
+                timeout_graceful_shutdown=1,
+            )
+            server = uvicorn.Server(config)
+            thread = threading.Thread(target=server.run, daemon=True)
+            thread.start()
+
+            try:
+                _wait_for_server_start(server, thread)
+                yield f'http://127.0.0.1:{port}'
+            finally:
+                server.should_exit = True
+                thread.join(timeout=5)
+                if thread.is_alive():
+                    server.force_exit = True
+                    thread.join(timeout=1)
+                shutdown_process_manager()
+                shutdown_websocket_watcher()
+                _sid_state.clear()
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope='function')
