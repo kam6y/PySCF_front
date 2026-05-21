@@ -68,7 +68,8 @@ def register_websocket_handlers(sio: Any) -> None:
     @sio.event
     async def connect(sid: str, environ: dict[str, Any], auth: dict[str, Any] | None):
         expected_token = os.getenv("PYSCF_AUTH_TOKEN")
-        if expected_token and (not auth or auth.get("token") != expected_token):
+        client_token = auth.get("token") if isinstance(auth, dict) else None
+        if expected_token and client_token != expected_token:
             logger.warning("Unauthorized Socket.IO connection attempt")
             return False
         _state_for(sid)
@@ -172,17 +173,27 @@ def register_websocket_handlers(sio: Any) -> None:
 
             schedule_coroutine(emit_update())
 
+        callback_added = False
         try:
             watcher = get_websocket_watcher(file_manager.get_base_directory())
-            watcher.add_connection(calculation_id, on_file_change)
-            state["callbacks"][calculation_id] = on_file_change
             initial_instance = build_calculation_instance(
                 calculation_id,
                 calc_path,
                 file_manager,
             )
+
+            existing_callback = state["callbacks"].pop(calculation_id, None)
+            if existing_callback is not None:
+                watcher.remove_connection(calculation_id, existing_callback)
+
+            watcher.add_connection(calculation_id, on_file_change)
+            state["callbacks"][calculation_id] = on_file_change
+            callback_added = True
             await sio.emit("calculation_update", initial_instance, to=sid)
         except Exception:
+            if callback_added:
+                state["callbacks"].pop(calculation_id, None)
+                watcher.remove_connection(calculation_id, on_file_change)
             logger.exception(
                 "Error setting up Socket.IO monitoring for %s",
                 calculation_id,

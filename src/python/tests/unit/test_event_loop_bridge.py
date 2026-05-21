@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import threading
 
 from websocket.event_loop_bridge import bind_event_loop, clear_event_loop, schedule_coroutine
@@ -39,3 +40,27 @@ def test_schedule_coroutine_without_bound_loop_returns_none(caplog):
 
     assert future is None
     assert "ASGI event loop is not bound" in caplog.text
+
+
+def test_schedule_coroutine_runtime_error_returns_none(mocker, caplog):
+    async def main():
+        loop = asyncio.get_running_loop()
+        bind_event_loop(loop)
+
+        async def noop():
+            return None
+
+        mocker.patch(
+            "asyncio.run_coroutine_threadsafe",
+            side_effect=RuntimeError("loop unavailable"),
+        )
+
+        coro = noop()
+        future = schedule_coroutine(coro)
+
+        assert future is None
+        assert inspect.getcoroutinestate(coro) == inspect.CORO_CLOSED
+        assert "Failed to schedule ASGI coroutine" in caplog.text
+        clear_event_loop()
+
+    asyncio.run(main())

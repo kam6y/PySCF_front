@@ -76,13 +76,20 @@ class NotificationService:
             logger.exception("Error building WebSocket notification payload")
             return
 
-        schedule_coroutine(
+        scheduled_future = schedule_coroutine(
             self._socketio.emit(
                 "calculation_update",
                 calculation_instance,
                 room="global_updates",
             )
         )
+        if scheduled_future is None:
+            logger.warning(
+                "Dropped WebSocket notification for %s because scheduling failed",
+                calculation_id,
+            )
+            return
+
         logger.debug(
             "Scheduled WebSocket notification for %s with status %s",
             calculation_id,

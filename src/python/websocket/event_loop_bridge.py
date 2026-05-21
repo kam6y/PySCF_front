@@ -27,7 +27,12 @@ def schedule_coroutine(coro: Coroutine[object, object, T]) -> Future[T] | None:
         coro.close()
         return None
 
-    future = asyncio.run_coroutine_threadsafe(coro, _loop)
+    try:
+        future = asyncio.run_coroutine_threadsafe(coro, _loop)
+    except RuntimeError:
+        logger.exception("Failed to schedule ASGI coroutine")
+        coro.close()
+        return None
 
     def log_failure(done_future: Future[T]) -> None:
         try:
