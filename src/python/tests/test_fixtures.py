@@ -14,9 +14,8 @@ def test_app_fixture(app):
     WHEN the application is accessed
     THEN it should be in TESTING mode with correct configuration
     """
-    assert app.config['TESTING'] is True
-    assert 'CALCULATIONS_DIR' in app.config
-    assert app.config['WTF_CSRF_ENABLED'] is False
+    assert app.state.TESTING is True
+    assert hasattr(app.state, 'CALCULATIONS_DIR')
 
 
 def test_app_fixture_isolates_current_settings_directory(app):
@@ -29,7 +28,7 @@ def test_app_fixture_isolates_current_settings_directory(app):
 
     settings = get_current_settings()
 
-    assert settings.calculations_directory == app.config['CALCULATIONS_DIR']
+    assert settings.calculations_directory == app.state.CALCULATIONS_DIR
 
 
 def test_client_fixture(client):
@@ -42,16 +41,6 @@ def test_client_fixture(client):
     assert response is not None
     # Health endpoint should return 200
     assert response.status_code == 200
-
-
-def test_socketio_client_fixture(socketio_client):
-    """
-    GIVEN the socketio_client fixture
-    WHEN the client is accessed
-    THEN it should be properly initialized and connected
-    """
-    assert socketio_client is not None
-    assert socketio_client.is_connected()
 
 
 def test_sample_data_fixtures(sample_h2_xyz, sample_water_xyz):

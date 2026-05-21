@@ -2,8 +2,7 @@
 Central test configuration and fixtures for PySCF Front backend tests.
 
 This module contains reusable pytest fixtures that are automatically available
-to all test modules. Fixtures defined here follow best practices for Flask
-application testing using the Application Factory pattern.
+to all test modules.
 """
 
 import os
@@ -13,9 +12,9 @@ from concurrent.futures import Executor, Future
 from unittest import mock
 
 import pytest
+from fastapi.testclient import TestClient
 
-# Import application factory and socketio instance
-from app import create_app, socketio
+from app import create_fastapi_app
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +22,22 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Core Application Fixtures
 # ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def _configure_application():
+    """Disable pytest-flask app.config mutation for FastAPI tests."""
+
+
+@pytest.fixture(autouse=True)
+def _monkeypatch_response_class():
+    """Disable pytest-flask response_class patching for FastAPI tests."""
+
+
+@pytest.fixture(autouse=True)
+def _push_request_context():
+    """Disable pytest-flask request-context setup for FastAPI tests."""
+
 
 class DummyExecutor(Executor):
     """
@@ -90,37 +105,23 @@ def reset_process_manager_between_tests():
 @pytest.fixture(scope='function')
 def app():
     """
-    Create and configure a Flask application instance for testing.
-
-    This is a session-scoped fixture, meaning it's created once per test session.
-    The application is configured with TESTING=True and uses a temporary directory
-    for calculations to ensure test isolation.
+    Create and configure a FastAPI application instance for testing.
 
     Yields:
-        Flask: A configured Flask application instance in TESTING mode.
+        FastAPI: A configured FastAPI application instance in TESTING mode.
     """
-    # Create a temporary directory for test calculations
     temp_dir = tempfile.mkdtemp(prefix='pyscf_test_')
-
-    # Test configuration
     test_config = {
         'TESTING': True,
         'CALCULATIONS_DIR': temp_dir,
-        'WTF_CSRF_ENABLED': False,  # Disable CSRF for testing
-        'SERVER_NAME': 'localhost:5000',  # Required for url_for() in tests
-        # Disable WebSocket file watcher in tests
         'WEBSOCKET_WATCHER_ENABLED': False,
-        # Use simple SocketIO configuration for testing
         'SOCKETIO': {
-            'cors_allowed_origins': '*',
-            'async_mode': 'threading',
-            'logger': False,  # Reduce noise in test output
+            'cors_allowed_origins': ['http://127.0.0.1:*', 'http://localhost:*', 'file://'],
+            'logger': False,
             'engineio_logger': False,
-        }
+        },
     }
 
-    # Mock environment variables for testing
-    # This ensures consistent behavior in CI and local environments
     import services as services_module
     import quantum_calc.settings_manager as settings_manager_module
     from quantum_calc.settings_manager import SettingsManager
@@ -135,9 +136,7 @@ def app():
     test_settings_manager.save_settings(test_settings)
 
     with (
-        mock.patch.dict(os.environ, {
-            'PYSCF_ENV': 'development',
-        }),
+        mock.patch.dict(os.environ, {'PYSCF_ENV': 'development'}),
         mock.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor),
         mock.patch.object(settings_manager_module, "_settings_manager", test_settings_manager),
         mock.patch.multiple(
@@ -150,26 +149,12 @@ def app():
         ),
     ):
         shutdown_process_manager()
-        # Create app using Application Factory with test configuration
-        _app = create_app(server_port=5000, test_config=test_config)
-
-        # Establish application context for the test session
-        with _app.app_context():
-            yield _app
-
-    # Cleanup: Shutdown process manager first to prevent "cannot schedule new futures after shutdown" errors
-    try:
+        _app = create_fastapi_app(server_port=5000, test_config=test_config)
+        yield _app
         shutdown_process_manager()
-        logger.info("Process manager shut down successfully")
-    except Exception as e:
-        print(f"Warning: Failed to shutdown process manager: {e}")
 
-    # Cleanup: Remove temporary directory
     import shutil
-    try:
-        shutil.rmtree(temp_dir)
-    except Exception as e:
-        print(f"Warning: Failed to cleanup temp directory {temp_dir}: {e}")
+    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope='function')
@@ -182,45 +167,13 @@ def client(app):
     ensure each test gets a fresh client.
 
     Args:
-        app: The Flask application instance (from app fixture).
+        app: The FastAPI application instance (from app fixture).
 
     Returns:
-        FlaskClient: A test client for the application.
+        TestClient: A test client for the application.
     """
-    return app.test_client()
-
-
-@pytest.fixture(scope='function')
-def socketio_client(app):
-    """
-    Create a SocketIO test client for testing WebSocket functionality.
-
-    This fixture provides a SocketIO test client that can simulate WebSocket
-    connections, emit events, and receive messages without a running server.
-
-    Args:
-        app: The Flask application instance (from app fixture).
-
-    Returns:
-        SocketIOTestClient: A test client for WebSocket communication.
-    """
-    return socketio.test_client(app, namespace=None)
-
-
-@pytest.fixture
-def runner(app):
-    """
-    Create a test runner for Flask CLI commands.
-
-    This fixture is useful for testing custom Flask CLI commands.
-
-    Args:
-        app: The Flask application instance (from app fixture).
-
-    Returns:
-        FlaskCliRunner: A test runner for CLI commands.
-    """
-    return app.test_cli_runner()
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 # ============================================================================

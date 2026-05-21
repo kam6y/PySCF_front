@@ -5,7 +5,7 @@ This module serves as the single source of truth for all application configurati
 loading settings from config/server-config.json and providing a unified interface
 for accessing configuration values throughout the application.
 
-Configuration is loaded once at application startup and stored in Flask's app.config,
+Configuration is loaded once at application startup and stored on FastAPI app.state,
 ensuring consistent configuration access across all modules.
 """
 
@@ -210,57 +210,34 @@ def determine_server_port(config: ServerConfig, port_arg: Optional[int] = None,
     return default_port
 
 
-def configure_flask_app(app, config: ServerConfig, server_port: int) -> None:
+def configure_fastapi_app(app, config: ServerConfig, server_port: int) -> None:
     """
-    Configure Flask application with settings from ServerConfig.
+    Configure FastAPI application state from ServerConfig.
 
-    This function populates Flask's app.config with all necessary configuration
-    values, establishing app.config as the single source of truth for configuration
-    access throughout the application.
-
-    Args:
-        app: Flask application instance.
-        config: ServerConfig instance.
-        server_port: Determined server port number.
+    FastAPI has no app.config dict, so application settings are stored on
+    app.state with the same logical keys the Flask runtime used.
     """
-    # Store entire configuration in app.config
-    app.config['SERVER_CONFIG'] = config.to_dict()
+    app.state.SERVER_CONFIG = config.to_dict()
+    app.state.SERVER_CONFIG_OBJECT = config
+    app.state.SERVER_HOST = config.get_server_host()
+    app.state.SERVER_PORT = server_port
+    app.state.DEBUG = config.get('server.debug', False)
+    app.state.TESTING = False
 
-    # Store commonly used values for easy access
-    app.config['SERVER_HOST'] = config.get_server_host()
-    app.config['SERVER_PORT'] = server_port
-    app.config['DEBUG'] = config.get('server.debug', False)
+    app.state.GUNICORN = config.get('gunicorn', {})
+    app.state.SOCKETIO = config.get('socketio', {})
+    app.state.DEVELOPMENT = config.get('development', {})
+    app.state.PRODUCTION = config.get('production', {})
+    app.state.QUANTUM_CALCULATIONS = config.get('quantum_calculations', {})
+    app.state.QUANTUM_CALCULATION_DEFAULTS = config.get('quantum_calculation_defaults', {})
+    app.state.APP_INFO = config.get('app_info', {})
+    app.state.APP_VERSION = config.get('app_info.version', 'unknown')
+    app.state.EXTERNAL_SERVICES = config.get('external_services', {})
+    app.state.LOGGING = config.get('logging', {})
+    app.state.AI_AGENT = config.get('ai_agent', {})
+    app.state.VERSION = config.get('app_info.version', 'unknown')
 
-    # Gunicorn settings
-    app.config['GUNICORN'] = config.get('gunicorn', {})
-
-    # SocketIO settings
-    app.config['SOCKETIO'] = config.get('socketio', {})
-
-    # Development settings
-    app.config['DEVELOPMENT'] = config.get('development', {})
-
-    # Production settings
-    app.config['PRODUCTION'] = config.get('production', {})
-
-    # Quantum calculation settings
-    app.config['QUANTUM_CALCULATIONS'] = config.get('quantum_calculations', {})
-    app.config['QUANTUM_CALCULATION_DEFAULTS'] = config.get('quantum_calculation_defaults', {})
-
-    # App info
-    app.config['APP_INFO'] = config.get('app_info', {})
-    app.config['APP_VERSION'] = config.get('app_info.version', 'unknown')
-
-    # External services
-    app.config['EXTERNAL_SERVICES'] = config.get('external_services', {})
-
-    # Logging settings
-    app.config['LOGGING'] = config.get('logging', {})
-
-    # AI Agent settings
-    app.config['AI_AGENT'] = config.get('ai_agent', {})
-
-    logger.info(f"Flask app configured with server port: {server_port}")
+    logger.info(f"FastAPI app configured with server port: {server_port}")
 
 
 # Global configuration instance (lazy-loaded)
