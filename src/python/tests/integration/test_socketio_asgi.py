@@ -125,13 +125,17 @@ def _run(coro: Any) -> Any:
     return asyncio.run(coro)
 
 
-async def _connect(base_url: str, token: str | None) -> socketio.AsyncClient:
+async def _connect(
+    base_url: str,
+    token: str | None,
+    origin: str = ORIGIN,
+) -> socketio.AsyncClient:
     client = socketio.AsyncClient(logger=False, engineio_logger=False)
     auth = {"token": token} if token is not None else None
     await client.connect(
         base_url,
         auth=auth,
-        headers={"Origin": ORIGIN},
+        headers={"Origin": origin},
         transports=["websocket"],
         wait_timeout=2,
     )
@@ -200,6 +204,14 @@ def test_socketio_rejects_wrong_token(asgi_server: str) -> None:
         finally:
             if client.connected:
                 await client.disconnect()
+
+    _run(main())
+
+
+def test_socketio_accepts_null_origin_with_token(asgi_server: str) -> None:
+    async def main() -> None:
+        client = await _connect(asgi_server, AUTH_TOKEN, origin="null")
+        await client.disconnect()
 
     _run(main())
 

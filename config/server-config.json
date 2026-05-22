@@ -22,7 +22,8 @@
     "cors_allowed_origins": [
       "http://127.0.0.1:*",
       "ws://127.0.0.1:*",
-      "file://"
+      "file://",
+      "null"
     ],
     "async_mode": "asgi",
     "ping_timeout": 60,

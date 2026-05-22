@@ -224,7 +224,7 @@ npm run package:linux
 
 The built AppImage will be available in the `dist/` directory.
 
-**Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, PyInstaller, and electron-builder) in the Linux environment.
+**Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, packaged backend source verification, and electron-builder) in the Linux environment.
 
 ---
 

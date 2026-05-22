@@ -199,6 +199,7 @@ def asgi_server() -> Generator[str, None, None]:
                 'http://127.0.0.1:3000',
                 'http://localhost:3000',
                 'file://',
+                'null',
             ],
             'logger': False,
             'engineio_logger': False,

@@ -37,15 +37,18 @@ console.log(`Packaged mode: ${isPackaged}`);
 
 let pythonExecutablePath;
 let pythonWorkingDir;
+let resourcesPath;
+let packagedPythonSourceDir;
 
 if (isPackaged) {
   // Test packaged conda environment first
-  const resourcesPath = platform === 'darwin'
+  resourcesPath = platform === 'darwin'
     ? path.join(appPath, 'Contents/Resources')
     : path.resolve(`./dist/${platformArch}/resources`); // Windows/Linux の場合
 
   const condaPythonPath = path.join(resourcesPath, 'conda_env', 'bin', 'python');
   const condaGunicornPath = path.join(resourcesPath, 'conda_env', 'bin', 'gunicorn');
+  packagedPythonSourceDir = path.join(resourcesPath, 'src', 'python');
   
   if (fs.existsSync(condaPythonPath) && fs.existsSync(condaGunicornPath)) {
     pythonExecutablePath = path.resolve(condaPythonPath);
@@ -62,8 +65,16 @@ if (isPackaged) {
 
 console.log(`Python executable: ${pythonExecutablePath}`);
 console.log(`Working directory: ${pythonWorkingDir}`);
+console.log(`Packaged resources: ${resourcesPath}`);
+console.log(`Packaged Python source: ${packagedPythonSourceDir}`);
 console.log(`Executable exists: ${fs.existsSync(pythonExecutablePath)}`);
 console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
+console.log(`Python source exists: ${fs.existsSync(packagedPythonSourceDir)}`);
+
+if (!fs.existsSync(packagedPythonSourceDir)) {
+  console.log('✗ Packaged Python source directory not found.');
+  process.exit(1);
+}
 
 // Main test execution using async/await
 (async () => {
@@ -87,10 +98,8 @@ console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
     // Test 5: App import test (if conda environment)
     if (pythonExecutablePath.includes('conda_env')) {
       console.log('\n=== Test 5: App Import Test ===');
-      // Need to change working directory to where app.py is located
-      const appWorkingDir = pythonExecutablePath.includes('conda_env') 
-        ? './src/python'  // Development app.py location
-        : './src/python';  // Development app.py location
+      // Need to change working directory to where packaged app.py is located
+      const appWorkingDir = packagedPythonSourceDir;
       await testPythonCommand([pythonExecutablePath, '-c', 'import app; print("App import successful")'], appWorkingDir);
     }
 
@@ -105,9 +114,7 @@ console.log(`Working dir exists: ${fs.existsSync(pythonWorkingDir)}`);
       'app:app',
     ];
     
-    const workDir = pythonExecutablePath.includes('conda_env') 
-      ? './src/python'  // Development app.py location
-      : './src/python';  // Development app.py location
+    const workDir = packagedPythonSourceDir;
       
     console.log(`Command: ${pythonExecutablePath} ${gunicornArgs.join(' ')}`);
     console.log(`Working directory: ${workDir}`);
@@ -130,7 +137,11 @@ function testPythonCommand(command, cwd = null, timeout = 10000) {
     const childProcess = spawn(command[0], command.slice(1), {
       cwd: cwd || pythonWorkingDir,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, CONDA_DEFAULT_ENV: 'pyscf-env' }
+      env: {
+        ...process.env,
+        CONDA_DEFAULT_ENV: 'pyscf-env',
+        PYSCF_RESOURCES_PATH: resourcesPath,
+      }
     });
     
     let stdout = '';

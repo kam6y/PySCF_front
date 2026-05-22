@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-# Cleanup previous build
-rm -rf python_dist
-
 cd src/python
 
 # Detect Conda base
@@ -23,7 +20,7 @@ python -c "import uvicorn; print(f\"Uvicorn: {uvicorn.__version__}\")"
 python -c "import socketio; print('python-socketio: available')"
 python -c "import pyscf; print(f\"PySCF: {pyscf.__version__}\")"
 
-echo "=== Dependencies verified, starting PyInstaller ==="
-pyinstaller --distpath ../../python_dist --workpath ../../build/pyinstaller --noconfirm pyscf_front_api.spec
+echo "=== Verifying packaged FastAPI backend source ==="
+python -c "import app; assert hasattr(app, 'app'); print('FastAPI ASGI app import successful')"
 
-echo "✓ Python build for Linux completed successfully"
+echo "✓ Python backend source verification for Linux completed successfully"

@@ -34,7 +34,6 @@ dependencies:
     - git+https://github.com/pyscf/properties  # IR/Raman intensity calculations
     # Code generation and build tools
     - datamodel-code-generator==0.33.0
-    - pyinstaller==6.11.1
     # File system monitoring
     - watchdog==6.0.0
     # YAML parsing for OpenAPI spec

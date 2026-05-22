@@ -218,7 +218,12 @@ def create_socketio_server(socketio_config: dict[str, Any] | None = None) -> soc
         ])
     return socketio.AsyncServer(
         async_mode='asgi',
-        cors_allowed_origins=cors_allowed_origins or ['file://', 'http://127.0.0.1:3000', 'http://localhost:3000'],
+        cors_allowed_origins=cors_allowed_origins or [
+            'file://',
+            'null',
+            'http://127.0.0.1:3000',
+            'http://localhost:3000',
+        ],
         ping_timeout=socketio_config.get('ping_timeout', 60),
         ping_interval=socketio_config.get('ping_interval', 25),
         logger=socketio_config.get('logger', True),

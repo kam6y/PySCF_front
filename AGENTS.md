@@ -1,7 +1,7 @@
 This file defines operating instructions for coding agents in this repository.
 
 ## 目的
-- このプロジェクトは `PySCF_front`（Electron + React + Flask）です。
+- このプロジェクトは `PySCF_front`（Electron + React + FastAPI/ASGI）です。
 - 主機能は分子可視化、量子化学計算、計算結果管理、AIチャット支援です。
 - 本ドキュメントの目的は、実装現状に一致した最小限かつ実用的な作業規約を提供することです。
 - 仕様の一次情報は実装コードと `src/api-spec/openapi.yaml` です。古い文書よりコードを優先します。
@@ -105,7 +105,7 @@ python -m pytest tests/ -v
 
 ## 外部ライブラリ調査規約
 - 外部ライブラリを使う実装前に、最新APIを確認してからコードを書く。
-- 特に更新頻度が高い領域（LLM周辺、フロントエンド、Flask拡張）は毎回確認する。
+- 特に更新頻度が高い領域（LLM周辺、フロントエンド、FastAPI/ASGI周辺）は毎回確認する。
 
 必須確認項目:
 1. APIシグネチャ（引数名・戻り値・型）
