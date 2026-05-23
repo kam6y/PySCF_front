@@ -6,12 +6,12 @@ PySCF_front - ビルド完了後検証スクリプト
 このスクリプトは、ビルド完了後にbundled環境の完全性を検証します
 """
 
+import json
 import os
 import sys
-from pathlib import Path
-from typing import List, Tuple, Dict, Any
 import subprocess
-import glob
+from pathlib import Path
+from typing import List, Tuple
 
 # カラー出力用の定数
 class Colors:
@@ -116,6 +116,101 @@ def check_config_files(project_root: Path) -> bool:
             all_exist = False
     
     return all_exist
+
+def _display_path(project_root: Path, target_path: Path) -> str:
+    """プロジェクトルートからの相対パスを表示用に返す"""
+    try:
+        return str(target_path.relative_to(project_root))
+    except ValueError:
+        return str(target_path)
+
+
+def _load_extra_resource_targets(project_root: Path) -> List[Tuple[str, str]]:
+    """electron-builder extraResources の from/to 対応を取得"""
+    package_json_path = project_root / "package.json"
+
+    try:
+        with package_json_path.open("r", encoding="utf-8") as handle:
+            package_data = json.load(handle)
+    except Exception as e:
+        log_error(f"package.json の読み込みに失敗しました: {e}")
+        return []
+
+    extra_resources = package_data.get("build", {}).get("extraResources", [])
+    targets: List[Tuple[str, str]] = []
+
+    for resource in extra_resources:
+        if not isinstance(resource, dict):
+            continue
+
+        source = resource.get("from")
+        target = resource.get("to")
+        if not isinstance(source, str) or not isinstance(target, str):
+            continue
+
+        normalized_source = source.replace("\\", "/").rstrip("/")
+        normalized_target = target.replace("\\", "/").rstrip("/")
+        targets.append((normalized_source, normalized_target))
+
+    return targets
+
+
+def _find_packaged_resource_dirs(project_root: Path) -> List[Path]:
+    """既存の packaged app から Electron resources ディレクトリを探す"""
+    release_path = project_root / "release"
+    if not release_path.exists():
+        return []
+
+    resource_dirs: List[Path] = []
+    for dirname in ("Resources", "resources"):
+        for candidate in release_path.rglob(dirname):
+            if candidate.is_dir() and (candidate / "app.asar").exists():
+                resource_dirs.append(candidate)
+
+    return sorted(set(resource_dirs))
+
+
+def check_packaged_resource_layout(project_root: Path) -> bool:
+    """packaged app で参照される extraResources 配置をチェック"""
+    log_info("packaged resource layout をチェック中...")
+
+    source_root = "src/api-spec"
+    target_root = "src/api-spec"
+    openapi_source_path = project_root / source_root / "openapi.yaml"
+    packaged_openapi_path = Path(target_root) / "openapi.yaml"
+
+    all_success = True
+
+    if openapi_source_path.exists():
+        log_success(f"✓ {_display_path(project_root, openapi_source_path)}")
+    else:
+        log_error(f"✗ {_display_path(project_root, openapi_source_path)} が見つかりません")
+        all_success = False
+
+    extra_resource_targets = _load_extra_resource_targets(project_root)
+    if (source_root, target_root) in extra_resource_targets:
+        log_success(f"✓ extraResources: {source_root} -> {target_root}")
+    else:
+        log_error(f"✗ extraResources に {source_root} -> {target_root} がありません")
+        all_success = False
+
+    resource_dirs = _find_packaged_resource_dirs(project_root)
+    if not resource_dirs:
+        log_warning("既存の packaged app は見つかりません。extraResources 設定のみ検証しました")
+        return all_success
+
+    for resource_dir in resource_dirs:
+        expected_path = resource_dir / packaged_openapi_path
+        if expected_path.exists():
+            log_success(f"✓ {_display_path(project_root, expected_path)}")
+        else:
+            log_warning(
+                f"⚠ {_display_path(project_root, expected_path)} が見つかりません "
+                "(既存の package は再作成前の可能性があります)"
+            )
+
+    return all_success
+
 
 def check_frontend_build(project_root: Path) -> bool:
     """フロントエンドビルドの確認"""
@@ -222,6 +317,7 @@ def main() -> None:
     tests = [
         ("bundled conda環境", lambda: check_conda_environment(project_root)),
         ("設定ファイル", lambda: check_config_files(project_root)),
+        ("packaged resource layout", lambda: check_packaged_resource_layout(project_root)),
         ("フロントエンドビルド", lambda: check_frontend_build(project_root)),
         ("conda環境機能", lambda: validate_conda_functionality(project_root)),
     ]

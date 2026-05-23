@@ -20,7 +20,7 @@
     "build:linux": "npm run verify-env && npm run clean:build-artifacts && npm run codegen && npm run build:webpack && npm run build:conda-pack:linux && npm run build:python:linux && npm run validate-build",
     "build:conda-pack:linux": "npm run verify-build-env && bash scripts/build-conda-pack.sh",
     "build:python:linux": "npm run verify-build-env && bash scripts/build-python-linux.sh",
-    "docker:build": "docker build -t pyscf-front-builder .",
+    "docker:build": "docker build --platform linux/amd64 -t pyscf-front-builder .",
     "docker:clean": "docker builder prune -f",
     "docker:package": "node scripts/docker-run.js",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
@@ -32,6 +32,7 @@
     "validate-build": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/validate-build-completeness.py'",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "typecheck": "tsc --noEmit",
+    "test:web": "ts-node --files src/web/api/agent.test.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "my-review": "bash scripts/my-review.sh",
@@ -159,6 +160,13 @@
       {
         "from": "config",
         "to": "config",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "src/api-spec",
+        "to": "src/api-spec",
         "filter": [
           "**/*"
         ]

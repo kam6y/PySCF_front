@@ -1,8 +1,18 @@
 #!/bin/bash
 set -e
 
-# Cleanup previous build
-rm -rf conda_env
+clean_directory_contents() {
+  local target="$1"
+
+  if [ -d "$target" ]; then
+    find "$target" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+  else
+    mkdir -p "$target"
+  fi
+}
+
+# Cleanup previous build without deleting a possible Docker mount point
+clean_directory_contents conda_env
 
 # Detect Conda base
 CONDA_BASE=$(conda info --base 2>/dev/null || echo "$HOME/miniforge3")
