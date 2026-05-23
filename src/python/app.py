@@ -185,7 +185,7 @@ async def lifespan(fastapi_app: FastAPI):
     finally:
         clear_event_loop()
         shutdown_websocket_watcher()
-        shutdown_process_manager()
+        shutdown_process_manager(wait=False, force=True)
 
 
 def initialize_process_manager_notifications() -> None:

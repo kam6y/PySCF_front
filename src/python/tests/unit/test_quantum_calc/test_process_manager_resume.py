@@ -41,6 +41,49 @@ class FailedFuture:
         return self._exception
 
 
+class RunningFuture:
+    def __init__(self):
+        self.cancel_called = False
+
+    def done(self):
+        return False
+
+    def cancel(self):
+        self.cancel_called = True
+        return False
+
+
+class FakeWorkerProcess:
+    def __init__(self):
+        self.terminate_called = False
+        self.kill_called = False
+        self.join_calls = []
+        self._alive = True
+
+    def is_alive(self):
+        return self._alive
+
+    def terminate(self):
+        self.terminate_called = True
+        self._alive = False
+
+    def kill(self):
+        self.kill_called = True
+        self._alive = False
+
+    def join(self, timeout=None):
+        self.join_calls.append(timeout)
+
+
+class FakeProcessPoolExecutor:
+    def __init__(self, process):
+        self._processes = {123: process}
+        self.shutdown_calls = []
+
+    def shutdown(self, wait=True, *, cancel_futures=False):
+        self.shutdown_calls.append((wait, cancel_futures))
+
+
 def test_resume_calculation_persists_waiting_status(tmp_path, monkeypatch):
     """
     GIVEN a paused calculation is resumed but queued
@@ -121,3 +164,58 @@ def test_cleanup_future_with_worker_exception_persists_error_transition():
     assert callback_calls == [(calc_id, False, "boom")]
     assert scheduler.unregistered_calculation_ids == [calc_id]
     assert scheduler.processed is True
+
+
+def test_shutdown_force_terminates_running_worker_without_waiting():
+    """
+    GIVEN a running calculation future during application shutdown
+    WHEN process manager shutdown is forced without waiting
+    THEN worker processes are terminated and executor shutdown does not block.
+    """
+    future = RunningFuture()
+    process = FakeWorkerProcess()
+    executor = FakeProcessPoolExecutor(process)
+
+    manager = object.__new__(CalculationProcessManager)
+    manager.active_futures = {"running-calc": future}
+    manager.executor = executor
+    manager._resource_monitor_thread = None
+    manager._shutdown = False
+
+    manager.shutdown(wait=False, timeout=0.1, force=True)
+
+    assert future.cancel_called is True
+    assert process.terminate_called is True
+    assert process.kill_called is False
+    assert executor.shutdown_calls == [(False, True)]
+    assert manager.executor is None
+    assert manager.active_futures == {}
+    assert manager._shutdown is True
+
+
+def test_shutdown_process_manager_forwards_force_options(monkeypatch):
+    """
+    GIVEN the global process manager is initialized
+    WHEN shutdown_process_manager receives forced shutdown options
+    THEN they are forwarded to the concrete manager.
+    """
+    import quantum_calc.process_manager as process_manager_module
+
+    class FakeManager:
+        def __init__(self):
+            self.shutdown_calls = []
+
+        def shutdown(self, wait=True, timeout=None, force=False):
+            self.shutdown_calls.append((wait, timeout, force))
+
+    fake_manager = FakeManager()
+    monkeypatch.setattr(process_manager_module, "_process_manager", fake_manager)
+
+    process_manager_module.shutdown_process_manager(
+        wait=False,
+        timeout=0.2,
+        force=True,
+    )
+
+    assert fake_manager.shutdown_calls == [(False, 0.2, True)]
+    assert process_manager_module._process_manager is None
