@@ -179,7 +179,13 @@ const attachLifecycleHandlers = (
     console.log(`Python executable: ${pythonExecutablePath}`);
     console.log(`Working directory: ${pythonPath}`);
 
-    pythonProcess = null;
+    if (pythonForceKillTimer !== null) {
+      clearTimeout(pythonForceKillTimer);
+      pythonForceKillTimer = null;
+    }
+    if (pythonProcess === proc) {
+      pythonProcess = null;
+    }
 
     if (!isQuitting) {
       const errorMessage = `The Python backend process has unexpectedly stopped (exit code: ${code})${signal ? `, signal: ${signal}` : ''}.\n\nDebugging Information:\n• Python executable: ${pythonExecutablePath}\n• Working directory: ${pythonPath}\n• Server port: ${serverPort}\n• Packaged mode: ${app.isPackaged}\n\nPlease check the console output for detailed error messages and restart the application.`;
@@ -193,6 +199,7 @@ const attachLifecycleHandlers = (
 let pythonProcess: ChildProcess | null = null;
 let backendPort: number | null = null;
 let isQuitting = false;
+let pythonForceKillTimer: NodeJS.Timeout | null = null;
 
 /**
  * Pythonサーバーのヘルスチェックを行い、起動完了を待つ関数
@@ -412,16 +419,21 @@ export const startPythonServer = async (
  * Python/FastAPI backend serverを停止する関数
  */
 export const stopPythonServer = (): void => {
-  if (pythonProcess && !pythonProcess.killed) {
+  const processToStop = pythonProcess;
+  if (processToStop && processToStop.exitCode === null) {
     console.log('Stopping Python/FastAPI backend...');
     isQuitting = true;
-    pythonProcess.kill('SIGTERM');
+    processToStop.kill('SIGTERM');
 
-    setTimeout(() => {
-      if (pythonProcess && !pythonProcess.killed) {
+    if (pythonForceKillTimer !== null) {
+      clearTimeout(pythonForceKillTimer);
+    }
+    pythonForceKillTimer = setTimeout(() => {
+      if (processToStop.exitCode === null) {
         console.log('Force killing Python server...');
-        pythonProcess.kill('SIGKILL');
+        processToStop.kill('SIGKILL');
       }
+      pythonForceKillTimer = null;
     }, 5000);
   }
 };

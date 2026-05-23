@@ -132,12 +132,9 @@
         "to": "conda_env",
         "filter": [
           "**/*",
-          "!share/terminfo/**",
-          "!share/man/**",
           "!share/doc/**",
           "!share/info/**",
           "!share/gtk-doc/**",
-          "!**/*.a",
           "!**/*.la"
         ]
       },

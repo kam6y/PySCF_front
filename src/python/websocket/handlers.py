@@ -76,6 +76,14 @@ def register_websocket_handlers(sio: Any) -> None:
         if expected_token and client_token != expected_token:
             logger.warning("Unauthorized Socket.IO connection attempt")
             return False
+        if not expected_token:
+            env = os.getenv("PYSCF_ENV")
+            if env not in {"development", "test"}:
+                logger.warning(
+                    "Unauthorized Socket.IO connection attempt: Missing authentication token"
+                )
+                return False
+            logger.warning("Running Socket.IO without authentication token in development mode!")
         _state_for(sid)
         return True
 

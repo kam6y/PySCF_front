@@ -170,6 +170,32 @@ class TestWebSocketAuthentication:
         assert connected is True
         assert "sid-1" in _sid_state
 
+    def test_connect_without_auth_token_rejected_in_production(
+        self,
+        sio,
+        monkeypatch,
+    ):
+        monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
+        monkeypatch.setenv("PYSCF_ENV", "production")
+
+        connected = run(sio.handlers["connect"], "sid-1", {}, None)
+
+        assert connected is False
+        assert "sid-1" not in _sid_state
+
+    def test_connect_without_auth_token_allowed_in_development(
+        self,
+        sio,
+        monkeypatch,
+    ):
+        monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
+        monkeypatch.setenv("PYSCF_ENV", "development")
+
+        connected = run(sio.handlers["connect"], "sid-1", {}, None)
+
+        assert connected is True
+        assert "sid-1" in _sid_state
+
 
 class TestJoinCalculationWebSocket:
     def test_join_calculation_success(self, sio, calculations_dir, watcher):
