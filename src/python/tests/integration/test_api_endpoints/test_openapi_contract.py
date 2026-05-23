@@ -9,6 +9,7 @@ These tests ensure that public API routes and OpenAPI definitions stay aligned:
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -27,6 +28,10 @@ OPENAPI_PATH = PYTHON_DIR.parent / "api-spec" / "openapi.yaml"
 ORBITAL_GENERATOR_PATH = PYTHON_DIR / "quantum_calc" / "orbital_generator.py"
 
 _OPENAPI_PATH_PARAM_PATTERN = re.compile(r"\{[^}]+\}")
+AUTH_SECURITY_SCHEME_NAME = "AuthToken"
+AUTH_SECURITY_REQUIREMENT = [{AUTH_SECURITY_SCHEME_NAME: []}]
+AUTH_TOKEN_HEADER_PARAMETER_REF = "#/components/parameters/AuthTokenHeader"
+UNAUTHORIZED_RESPONSE_REF = "#/components/responses/UnauthorizedError"
 
 
 def _is_public_contract_path(path: str) -> bool:
@@ -121,6 +126,22 @@ def _extract_openapi_contract() -> tuple[set[tuple[str, str]], dict[tuple[str, s
     return routes, query_params_by_route
 
 
+def _iter_openapi_public_operations(
+    spec: dict,
+) -> Iterator[tuple[tuple[str, str], dict, dict]]:
+    for raw_path, path_item in spec.get("paths", {}).items():
+        if not _is_public_contract_path(raw_path):
+            continue
+
+        normalized_path = _normalize_openapi_path(raw_path)
+        for method, operation in path_item.items():
+            upper_method = method.upper()
+            if upper_method not in HTTP_METHODS:
+                continue
+
+            yield (upper_method, normalized_path), path_item, operation
+
+
 def _format_route(route: tuple[str, str]) -> str:
     method, path = route
     return f"{method} {path}"
@@ -192,6 +213,73 @@ def test_pending_fastapi_migration_routes_are_not_registered() -> None:
         "Registered routes must be removed from PENDING_FASTAPI_MIGRATION_ROUTES: "
         + ", ".join(_format_route(route) for route in registered_routes)
     )
+
+
+def test_openapi_defines_auth_token_security_contract() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    components = spec["components"]
+
+    auth_scheme = components["securitySchemes"][AUTH_SECURITY_SCHEME_NAME]
+    assert auth_scheme["type"] == "apiKey"
+    assert auth_scheme["in"] == "header"
+    assert auth_scheme["name"] == "X-Auth-Token"
+
+    auth_header = components["parameters"]["AuthTokenHeader"]
+    assert auth_header["name"] == "X-Auth-Token"
+    assert auth_header["in"] == "header"
+    assert auth_header["required"] is False
+    assert auth_header["schema"] == {"type": "string"}
+
+    unauthorized_response = components["responses"]["UnauthorizedError"]
+    assert unauthorized_response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
+
+
+def test_openapi_public_operations_require_auth_token_and_document_401() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    missing_security = []
+    missing_header = []
+    missing_unauthorized_response = []
+
+    for route, path_item, operation in _iter_openapi_public_operations(spec):
+        if operation.get("security") != AUTH_SECURITY_REQUIREMENT:
+            missing_security.append(_format_route(route))
+
+        path_parameters = path_item.get("parameters", [])
+        operation_parameters = operation.get("parameters", [])
+        has_auth_header = any(
+            parameter.get("$ref") == AUTH_TOKEN_HEADER_PARAMETER_REF
+            for parameter in [*path_parameters, *operation_parameters]
+            if isinstance(parameter, dict)
+        )
+        if not has_auth_header:
+            missing_header.append(_format_route(route))
+
+        responses = operation.get("responses", {})
+        if responses.get("401") != {"$ref": UNAUTHORIZED_RESPONSE_REF}:
+            missing_unauthorized_response.append(_format_route(route))
+
+    issues = []
+    if missing_security:
+        issues.append("Missing AuthToken security: " + ", ".join(missing_security))
+    if missing_header:
+        issues.append("Missing X-Auth-Token header parameter: " + ", ".join(missing_header))
+    if missing_unauthorized_response:
+        issues.append(
+            "Missing 401 Unauthorized response: "
+            + ", ".join(missing_unauthorized_response)
+        )
+
+    assert not issues, "\n".join(issues)
+
+
+def test_openapi_excludes_development_api_docs_routes_from_public_contract() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    assert "/api-docs" not in spec["paths"]
+    assert "/api-docs/spec.json" not in spec["paths"]
 
 
 def test_openapi_and_implementation_have_same_query_parameter_names() -> None:

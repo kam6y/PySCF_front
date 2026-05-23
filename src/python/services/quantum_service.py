@@ -847,6 +847,11 @@ class QuantumService:
 
             # Get process manager
             process_manager = get_process_manager()
+            self._recover_stale_non_terminal_calculations(process_manager)
+
+            status, _ = self.repository.read_calculation_status_details(calc_path)
+            if status != 'running':
+                raise ValidationError(f"Calculation is not running (status: {status})")
 
             # Request pause
             success = process_manager.pause_calculation(calculation_id)

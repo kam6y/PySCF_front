@@ -400,6 +400,60 @@ class TestCalculationUpdateAPI:
         assert response.status_code == 404
 
 
+class TestCalculationPauseAPI:
+    """Integration tests for POST /api/quantum/calculations/<id>/pause."""
+
+    def test_pause_stale_running_calculation_returns_400_and_recovers_error(
+        self,
+        client,
+        mocker,
+        tmp_path,
+    ):
+        """
+        GIVEN status.json says running but the process manager owns no worker
+        WHEN the pause endpoint is called
+        THEN the API rejects the pause and persists error status
+        """
+        base_dir = tmp_path / "calculations"
+        base_dir.mkdir()
+        service = QuantumService()
+        service.repository = CalculationRepository(base_dir=str(base_dir))
+
+        calc_id = "stale-running-calc"
+        calc_dir = base_dir / calc_id
+        calc_dir.mkdir()
+        service.repository.save_calculation_parameters(
+            str(calc_dir),
+            {"name": "Stale Running Calc", "created_at": "2026-05-20T00:00:00"},
+        )
+        service.repository.save_calculation_status(str(calc_dir), "running")
+
+        process_manager = mocker.Mock()
+        process_manager.get_active_calculations.return_value = []
+        process_manager.get_queued_calculations.return_value = []
+        process_manager.pause_calculation.return_value = True
+        mocker.patch(
+            "services.quantum_service.get_process_manager",
+            return_value=process_manager,
+        )
+        mocker.patch("api.quantum.get_quantum_service", return_value=service)
+
+        response = client.post(f"/api/quantum/calculations/{calc_id}/pause")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["success"] is False
+        assert "status: error" in data["error"]
+        process_manager.pause_calculation.assert_not_called()
+        assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+            "error",
+            None,
+        )
+        assert service.repository.read_calculation_results(str(calc_dir)) == {
+            "error": QuantumService.RESTART_INTERRUPTED_MESSAGE,
+        }
+
+
 class TestCalculationDeletionAPI:
     """Integration tests for DELETE /api/quantum/calculations/<id> endpoint."""
 

@@ -4,6 +4,8 @@ Unit tests for CalculationProcessManager pause/resume persistence.
 
 from types import SimpleNamespace
 
+import pytest
+
 from quantum_calc._status_transition import CalculationStatus
 from quantum_calc._calculation_repository import CalculationRepository
 from quantum_calc.process_manager import CalculationProcessManager
@@ -82,6 +84,39 @@ class FakeProcessPoolExecutor:
 
     def shutdown(self, wait=True, *, cancel_futures=False):
         self.shutdown_calls.append((wait, cancel_futures))
+
+
+def test_pause_calculation_requires_active_future(tmp_path, monkeypatch):
+    """
+    GIVEN a persisted running calculation is not owned by an active future
+    WHEN the process manager is asked to pause it directly
+    THEN no pause flag or pausing transition is written
+    """
+    repository = CalculationRepository(base_dir=str(tmp_path))
+    calc_id = "stale-running-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    repository.save_calculation_status(str(calc_dir), "running")
+
+    manager = object.__new__(CalculationProcessManager)
+    manager.active_futures = {}
+    manager.status_manager = FakeStatusManager()
+    manager._shutdown = True
+
+    monkeypatch.setattr(
+        "quantum_calc.get_current_settings",
+        lambda: SimpleNamespace(calculations_directory=str(tmp_path)),
+    )
+
+    with pytest.raises(ValueError, match="no active worker"):
+        manager.pause_calculation(calc_id)
+
+    assert repository.read_calculation_status_details(str(calc_dir)) == (
+        "running",
+        None,
+    )
+    assert not (calc_dir / ".pause_requested").exists()
+    assert manager.status_manager.transitions == []
 
 
 def test_resume_calculation_persists_waiting_status(tmp_path, monkeypatch):

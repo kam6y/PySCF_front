@@ -325,6 +325,12 @@ class CalculationProcessManager:
         if status != 'running':
             raise ValueError(f"Calculation is not running (status: {status})")
 
+        future = self.active_futures.get(calculation_id)
+        if future is None or future.done():
+            raise ValueError(
+                f"Calculation has no active worker (calculation_id: {calculation_id})"
+            )
+
         pause_manager.create_pause_flag_file(calc_dir)
         pause_manager.request_pause(calculation_id)
 
