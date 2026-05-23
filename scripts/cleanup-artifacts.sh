@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+echo "Cleaning webpack and packaging artifacts..."
+rm -rf dist release
+
 echo "Cleaning development artifacts from src/python..."
 
 find src/python -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true

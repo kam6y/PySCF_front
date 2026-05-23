@@ -11,13 +11,13 @@
     "build": "npm run verify-env && npm run clean:build-artifacts && npm run codegen && npm run build:webpack && npm run build:conda-pack && npm run validate-build",
     "build:webpack": "cross-env NODE_ENV=\"production\" NODE_OPTIONS=\"--max-old-space-size=4096\" webpack --progress",
     "build:conda-pack": "npm run verify-build-env && bash scripts/build-conda-pack.sh",
-    "package": "npm run build && electron-builder",
+    "package": "npm run build && electron-builder && npm run verify:asar-artifacts",
     "clean:build-artifacts": "bash scripts/cleanup-artifacts.sh",
-    "package:linux": "npm run build:linux && electron-builder --linux",
+    "package:linux": "npm run build:linux && electron-builder --linux && npm run verify:asar-artifacts",
     "package:linux:docker": "node scripts/docker-build-linux.js",
     "package:linux:docker:clean": "node scripts/docker-build-linux.js --clean",
     "package:linux:docker:no-cache": "node scripts/docker-build-linux.js --no-cache",
-    "build:linux": "npm run verify-env && npm run codegen && npm run build:webpack && npm run build:conda-pack:linux && npm run build:python:linux && npm run validate-build",
+    "build:linux": "npm run verify-env && npm run clean:build-artifacts && npm run codegen && npm run build:webpack && npm run build:conda-pack:linux && npm run build:python:linux && npm run validate-build",
     "build:conda-pack:linux": "npm run verify-build-env && bash scripts/build-conda-pack.sh",
     "build:python:linux": "npm run verify-build-env && bash scripts/build-python-linux.sh",
     "docker:build": "docker build -t pyscf-front-builder .",
@@ -37,13 +37,14 @@
     "my-review": "bash scripts/my-review.sh",
     "test:build": "npm run build && echo 'Build completed successfully. Testing packaged app...'",
     "test:python-build": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && cd src/python && echo \"Testing Python build...\" && python -c \"import app; print(\\\"Python app imports successfully\\\")\"'",
-    "test:run-packaged": "npm run build && npm run package && echo 'Package created. Check dist/ directory for distributable files.'",
+    "test:run-packaged": "npm run build && npm run package && echo \"Package created. Check release/ directory for distributable files.\"",
     "test:gunicorn-local": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && cd src/python && echo \"Testing Gunicorn/Uvicorn locally...\" && gunicorn --bind 127.0.0.1:5000 --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 0 --log-level info app:app'",
     "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\"",
     "test:python-standalone": "node scripts/test-python-standalone.js",
-    "test:conda-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && export PATH=\"$CONDA_BASE/envs/pyscf-env/bin:$PATH\" && cd dist/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin && echo \"Testing conda environment...\" && ./python --version && ./python -c \"import gunicorn; print('\"'\"'Gunicorn:'\"'\"', gunicorn.__version__)\" && ./python -c \"import fastapi, uvicorn, socketio; print('\"'\"'FastAPI ASGI stack: Available'\"'\"')\" && echo \"Conda environment test completed.\"'",
+    "test:conda-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && export PATH=\"$CONDA_BASE/envs/pyscf-env/bin:$PATH\" && cd release/mac-arm64/Pyscf_front.app/Contents/Resources/conda_env/bin && echo \"Testing conda environment...\" && ./python --version && ./python -c \"import gunicorn; print('\"'\"'Gunicorn:'\"'\"', gunicorn.__version__)\" && ./python -c \"import fastapi, uvicorn, socketio; print('\"'\"'FastAPI ASGI stack: Available'\"'\"')\" && echo \"Conda environment test completed.\"'",
     "release": "node scripts/bump-version.js",
-    "uitnize": "./scripts/uitnize.sh"
+    "uitnize": "./scripts/uitnize.sh",
+    "verify:asar-artifacts": "node scripts/verify-asar-artifacts.js"
   },
   "repository": {
     "type": "git",
@@ -70,6 +71,7 @@
   },
   "homepage": "https://github.com/kam6y/Pyscf_front#readme",
   "devDependencies": {
+    "@electron/asar": "^3.2.18",
     "@types/d3": "^7.4.3",
     "@types/node": "^24.1.0",
     "@types/react": "^19.1.9",
@@ -122,8 +124,24 @@
     "publish": null,
     "appId": "com.kam6y.pyscf_front",
     "productName": "Pyscf_front",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
+      "!dist/**/*.dmg",
+      "!dist/**/*.dmg.blockmap",
+      "!dist/**/*.AppImage",
+      "!dist/**/*.AppImage.blockmap",
+      "!dist/**/*.zip",
+      "!dist/**/*.zip.blockmap",
+      "!dist/**/builder-debug.yml",
+      "!dist/mac-*",
+      "!dist/mac-*/**",
+      "!dist/linux-unpacked",
+      "!dist/linux-unpacked/**",
+      "!dist/*-unpacked",
+      "!dist/*-unpacked/**",
       "!node_modules/**/*"
     ],
     "extraResources": [

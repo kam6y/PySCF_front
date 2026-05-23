@@ -37,7 +37,22 @@ jobs:
           auto-activate-base: false
 
       - name: Install Node.js dependencies
-        run: npm ci
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set fetch-timeout 300000
+
+          for i in 1 2 3; do
+            npm ci --legacy-peer-deps && break || {
+              if [ $i -eq 3 ]; then
+                echo "npm ci failed after 3 attempts"
+                exit 1
+              fi
+              echo "npm ci failed, retrying (attempt $i/3)..."
+              sleep 10
+            }
+          done
 
       - name: Verify conda environment
         shell: bash -l {0}
@@ -64,15 +79,16 @@ jobs:
           else
             npx electron-builder --mac
           fi
+          npm run verify:asar-artifacts
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.platform }}
           path: |
-            dist/*.AppImage
-            dist/*.dmg
-            dist/*.zip
+            release/*.AppImage
+            release/*.dmg
+            release/*.zip
           retention-days: 30
 
   create-release:

@@ -77,7 +77,20 @@ RUN echo "source /root/miniforge3/etc/profile.d/conda.sh && conda activate pyscf
 COPY package*.json ./
 
 # Install Node.js dependencies
-RUN npm ci
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-timeout 300000 && \
+    for i in 1 2 3; do \
+        npm ci --legacy-peer-deps && break || { \
+            if [ "$i" -eq 3 ]; then \
+                echo "npm ci failed after 3 attempts"; \
+                exit 1; \
+            fi; \
+            echo "npm ci failed, retrying (attempt $i/3)..."; \
+            sleep 10; \
+        }; \
+    done
 
 # Copy the entire project
 COPY . .

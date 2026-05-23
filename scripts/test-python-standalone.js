@@ -23,23 +23,53 @@ const CONDA_ENV_MARKER_FILE = '.pyscf-standalone-conda-env';
 const platform = os.platform(); // 'darwin' (macOS), 'win32' (Windows), 'linux'
 const arch = os.arch(); // 'arm64', 'x64'
 
-// Generate platform-specific directory names
-let platformArch;
-if (platform === 'darwin') {
-  platformArch = `mac-${arch}`;
-} else if (platform === 'win32') {
-  platformArch = `win-unpacked`; // Windows の場合の一般的なディレクトリ名
-} else {
-  platformArch = `linux-unpacked`; // Linux の場合
+function getPlatformDirectories() {
+  if (platform === 'darwin') {
+    return [`mac-${arch}`, 'mac'];
+  }
+  if (platform === 'win32') {
+    return ['win-unpacked'];
+  }
+  return ['linux-unpacked'];
 }
 
-// Determine paths
-const appPath =
-  platform === 'darwin'
-    ? `./dist/${platformArch}/Pyscf_front.app`
-    : `./dist/${platformArch}`;
+function getAppPath(outputRoot, platformDirectory) {
+  if (platform === 'darwin') {
+    return path.resolve(outputRoot, platformDirectory, 'Pyscf_front.app');
+  }
+  return path.resolve(outputRoot, platformDirectory);
+}
 
-const isPackaged = fs.existsSync(appPath);
+function getResourcesPath(appPath) {
+  if (platform === 'darwin') {
+    return path.resolve(appPath, 'Contents/Resources');
+  }
+  return path.resolve(appPath, 'resources');
+}
+
+function findPackagedApp() {
+  const outputRoots = ['release', 'dist'];
+  const platformDirectories = getPlatformDirectories();
+
+  for (const outputRoot of outputRoots) {
+    for (const platformDirectory of platformDirectories) {
+      const appPath = getAppPath(outputRoot, platformDirectory);
+      if (fs.existsSync(appPath)) {
+        return {
+          appPath,
+          outputRoot,
+          platformDirectory,
+          resourcesPath: getResourcesPath(appPath),
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
+const packagedApp = findPackagedApp();
+const isPackaged = packagedApp !== null;
 console.log(`Platform: ${platform}-${arch}`);
 console.log(`Packaged mode: ${isPackaged}`);
 
@@ -50,11 +80,12 @@ let packagedPythonSourceDir;
 let runtimeCondaDir;
 
 if (isPackaged) {
+  const { outputRoot, platformDirectory } = packagedApp;
+  console.log(`Packaged output root: ${outputRoot}`);
+  console.log(`Packaged directory: ${platformDirectory}`);
+
   // Test packaged conda environment first
-  resourcesPath =
-    platform === 'darwin'
-      ? path.resolve(appPath, 'Contents/Resources')
-      : path.resolve(`./dist/${platformArch}/resources`); // Windows/Linux の場合
+  resourcesPath = packagedApp.resourcesPath;
 
   const bundledCondaDir = path.join(resourcesPath, 'conda_env');
   runtimeCondaDir = prepareRelocatedCondaEnvironment(bundledCondaDir);
@@ -148,7 +179,7 @@ function prepareRelocatedCondaEnvironment(bundledCondaDir) {
   const runtimeBase = path.join(
     os.tmpdir(),
     'pyscf-front-standalone',
-    platformArch
+    packagedApp.platformDirectory
   );
   const runtimeCondaPath = path.join(runtimeBase, 'conda_env');
   const expectedMarker = getCondaEnvMarker(bundledCondaDir);
