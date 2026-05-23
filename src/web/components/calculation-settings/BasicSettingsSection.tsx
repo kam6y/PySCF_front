@@ -156,7 +156,10 @@ export const BasicSettingsSection = React.memo<BasicSettingsSectionProps>(
             type="number"
             value={params.spin ?? SPIN_INPUT.fallback}
             onChange={e =>
-              onParamChange('spin', clampIntegerInput(e.target.value, SPIN_INPUT))
+              onParamChange(
+                'spin',
+                clampIntegerInput(e.target.value, SPIN_INPUT)
+              )
             }
             min={SPIN_INPUT.min}
             max={SPIN_INPUT.max}

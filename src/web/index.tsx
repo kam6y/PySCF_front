@@ -60,7 +60,9 @@ const root = createRoot(document.getElementById('root') as Element);
 const backendPort = window.electronAPI?.flaskPort;
 
 if (!backendPort) {
-  console.error('[index.tsx] CRITICAL: Backend port not available from preload.');
+  console.error(
+    '[index.tsx] CRITICAL: Backend port not available from preload.'
+  );
 
   // ポート未取得時はエラーUIをレンダリングし、アプリを起動しない（fail-fast）
   root.render(

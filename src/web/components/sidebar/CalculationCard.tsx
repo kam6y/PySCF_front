@@ -14,9 +14,12 @@ export interface CalculationCardProps {
 export const CalculationCard = React.memo<CalculationCardProps>(
   ({ calculation, isActive, onSelect, onRequestDelete }) => {
     const { settings } = useAppSettings();
-    const deleteDisabled = ['pending', 'running', 'waiting', 'pausing'].includes(
-      calculation.status
-    );
+    const deleteDisabled = [
+      'pending',
+      'running',
+      'waiting',
+      'pausing',
+    ].includes(calculation.status);
     const deleteTitle = deleteDisabled
       ? 'Calculation cannot be deleted until it is completed, errored, or paused.'
       : `Delete ${calculation.name}`;

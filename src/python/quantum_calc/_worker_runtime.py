@@ -4,6 +4,7 @@ import os
 import logging
 
 from .config_manager import get_memory_for_method
+from .method_defaults import get_defaults_for_method
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +146,10 @@ def _import_calculator_classes(process_logger):
 def _create_calculator_instance(calculation_method: str, parameters: dict,
                                 calc_dir: str, calculator_classes: dict, process_logger):
     """Create and return appropriate calculator instance."""
-    optimize_geometry = parameters.get('optimize_geometry', True)
     molecule_name = parameters['name']
 
     calculator_class = calculator_classes.get(calculation_method)
+    effective_method = calculation_method
 
     if calculator_class is None:
         if calculation_method in ['CASCI', 'CASSCF']:
@@ -158,7 +159,13 @@ def _create_calculator_instance(calculation_method: str, parameters: dict,
             )
         # Default to DFT if unknown method
         calculator_class = calculator_classes['DFT']
+        effective_method = 'DFT'
         process_logger.warning(f"Unknown calculation method '{calculation_method}', defaulting to DFT")
+
+    optimize_geometry = parameters.get('optimize_geometry')
+    if optimize_geometry is None:
+        method_defaults = get_defaults_for_method(effective_method)
+        optimize_geometry = method_defaults.get('optimize_geometry', False)
 
     geomopt_kwargs = {}
     if calculation_method in ['DFT', 'HF', 'MP2']:

@@ -437,16 +437,13 @@ H    1.4671  1.1550  0.0848"""
         """
         GIVEN a non-existent calculation ID
         WHEN pause is requested
-        THEN a 400 error is returned
-
-        NOTE: The implementation returns 400 (ValidationError) instead of 404
-        because the error occurs during validation before checking existence.
+        THEN a 404 error is returned
         """
         # ACT
         pause_response = client.post('/api/quantum/calculations/nonexistent_id_12345/pause')
 
         # ASSERT
-        assert pause_response.status_code == 400
+        assert pause_response.status_code == 404
         error_data = pause_response.json()
         assert error_data['success'] is False
         assert 'not found' in error_data['error'].lower()
@@ -455,16 +452,13 @@ H    1.4671  1.1550  0.0848"""
         """
         GIVEN a non-existent calculation ID
         WHEN resume is requested
-        THEN a 400 error is returned
-
-        NOTE: The implementation returns 400 (ValidationError) instead of 404
-        because the error occurs during validation before checking existence.
+        THEN a 404 error is returned
         """
         # ACT
         resume_response = client.post('/api/quantum/calculations/nonexistent_id_12345/resume')
 
         # ASSERT
-        assert resume_response.status_code == 400
+        assert resume_response.status_code == 404
         error_data = resume_response.json()
         assert error_data['success'] is False
         assert 'not found' in error_data['error'].lower()
