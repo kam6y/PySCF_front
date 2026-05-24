@@ -27,7 +27,7 @@ def wait_for_status(client, calc_id, expected_status, timeout=300, poll_interval
     Poll the calculation status until it matches expected_status or timeout.
 
     Args:
-        client: Flask test client
+        client: FastAPI test client
         calc_id: Calculation ID
         expected_status: Expected status string (or list of strings)
         timeout: Maximum wait time in seconds
@@ -47,9 +47,9 @@ def wait_for_status(client, calc_id, expected_status, timeout=300, poll_interval
 
     while time.time() - start_time < timeout:
         response = client.get(f'/api/quantum/calculations/{calc_id}')
-        assert response.status_code == 200, f"Failed to get calculation: {response.get_json()}"
+        assert response.status_code == 200, f"Failed to get calculation: {response.json()}"
 
-        data = response.get_json()
+        data = response.json()
         calc = data['data']['calculation']
         current_status = calc['status']
 
@@ -281,7 +281,7 @@ H    1.4671  1.1550  0.0848"""
         response = client.post('/api/quantum/calculate', json=quick_DFT_params)
         assert response.status_code == 202
 
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         calc_id = data['data']['calculation']['id']
         print(f"Calculation ID: {calc_id}")
@@ -300,7 +300,7 @@ H    1.4671  1.1550  0.0848"""
         time.sleep(0.5)
 
         # Check current status before attempting to pause
-        current_calc = client.get(f'/api/quantum/calculations/{calc_id}').get_json()['data']['calculation']
+        current_calc = client.get(f'/api/quantum/calculations/{calc_id}').json()['data']['calculation']
         if current_calc['status'] in ['completed', 'error']:
             pytest.skip(
                 f"Calculation finished too quickly (status: {current_calc['status']}) to test pause/resume workflow. "
@@ -310,7 +310,7 @@ H    1.4671  1.1550  0.0848"""
         pause_response = client.post(f'/api/quantum/calculations/{calc_id}/pause')
         assert pause_response.status_code == 202
 
-        pause_data = pause_response.get_json()
+        pause_data = pause_response.json()
         assert pause_data['success'] is True
         assert 'pause' in pause_data['data']['message'].lower()
 
@@ -333,7 +333,7 @@ H    1.4671  1.1550  0.0848"""
         if not pause_state_exists:
             # If pause_state.json doesn't exist, the calculation might have completed too quickly
             # Check if calculation is still paused or already completed
-            current_calc = client.get(f'/api/quantum/calculations/{calc_id}').get_json()['data']['calculation']
+            current_calc = client.get(f'/api/quantum/calculations/{calc_id}').json()['data']['calculation']
             print(f"WARNING: pause_state.json not found. Current status: {current_calc['status']}")
 
             # For this test to be meaningful, we need the calculation to actually pause
@@ -358,7 +358,7 @@ H    1.4671  1.1550  0.0848"""
         resume_response = client.post(f'/api/quantum/calculations/{calc_id}/resume')
         assert resume_response.status_code == 202
 
-        resume_data = resume_response.get_json()
+        resume_data = resume_response.json()
         assert resume_data['success'] is True
         assert 'resume' in resume_data['data']['message'].lower()
 
@@ -393,7 +393,7 @@ H    1.4671  1.1550  0.0848"""
 
         # Submit and wait for completion
         response = client.post('/api/quantum/calculate', json=quick_DFT_params)
-        calc_id = response.get_json()['data']['calculation']['id']
+        calc_id = response.json()['data']['calculation']['id']
 
         # Wait for completion
         calc = wait_for_status(client, calc_id, ['completed', 'error'], timeout=300)
@@ -404,7 +404,7 @@ H    1.4671  1.1550  0.0848"""
 
         # ASSERT
         assert pause_response.status_code == 400
-        error_data = pause_response.get_json()
+        error_data = pause_response.json()
         assert error_data['success'] is False
         assert 'not running' in error_data['error'].lower() or 'cannot pause' in error_data['error'].lower()
 
@@ -419,7 +419,7 @@ H    1.4671  1.1550  0.0848"""
 
         # Submit and wait for completion
         response = client.post('/api/quantum/calculate', json=quick_DFT_params)
-        calc_id = response.get_json()['data']['calculation']['id']
+        calc_id = response.json()['data']['calculation']['id']
 
         calc = wait_for_status(client, calc_id, ['completed', 'error'], timeout=300)
         assert calc['status'] == 'completed'
@@ -429,7 +429,7 @@ H    1.4671  1.1550  0.0848"""
 
         # ASSERT
         assert resume_response.status_code == 400
-        error_data = resume_response.get_json()
+        error_data = resume_response.json()
         assert error_data['success'] is False
         assert 'not paused' in error_data['error'].lower() or 'cannot resume' in error_data['error'].lower()
 
@@ -437,17 +437,14 @@ H    1.4671  1.1550  0.0848"""
         """
         GIVEN a non-existent calculation ID
         WHEN pause is requested
-        THEN a 400 error is returned
-
-        NOTE: The implementation returns 400 (ValidationError) instead of 404
-        because the error occurs during validation before checking existence.
+        THEN a 404 error is returned
         """
         # ACT
         pause_response = client.post('/api/quantum/calculations/nonexistent_id_12345/pause')
 
         # ASSERT
-        assert pause_response.status_code == 400
-        error_data = pause_response.get_json()
+        assert pause_response.status_code == 404
+        error_data = pause_response.json()
         assert error_data['success'] is False
         assert 'not found' in error_data['error'].lower()
 
@@ -455,16 +452,13 @@ H    1.4671  1.1550  0.0848"""
         """
         GIVEN a non-existent calculation ID
         WHEN resume is requested
-        THEN a 400 error is returned
-
-        NOTE: The implementation returns 400 (ValidationError) instead of 404
-        because the error occurs during validation before checking existence.
+        THEN a 404 error is returned
         """
         # ACT
         resume_response = client.post('/api/quantum/calculations/nonexistent_id_12345/resume')
 
         # ASSERT
-        assert resume_response.status_code == 400
-        error_data = resume_response.get_json()
+        assert resume_response.status_code == 404
+        error_data = resume_response.json()
         assert error_data['success'] is False
         assert 'not found' in error_data['error'].lower()

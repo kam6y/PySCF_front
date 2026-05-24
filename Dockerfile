@@ -1,7 +1,7 @@
 # Dockerfile for building PySCF_front Linux distribution
 # This creates a complete build environment with Miniforge, Node.js, and all dependencies
 
-FROM ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:22.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -41,8 +41,9 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Miniforge
-RUN curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" && \
+# Install Miniforge for the linux/amd64 AppImage target
+RUN test "$(uname -m)" = "x86_64" && \
+    curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" && \
     bash Miniforge3-Linux-x86_64.sh -b -p /root/miniforge3 && \
     rm Miniforge3-Linux-x86_64.sh
 
@@ -77,7 +78,20 @@ RUN echo "source /root/miniforge3/etc/profile.d/conda.sh && conda activate pyscf
 COPY package*.json ./
 
 # Install Node.js dependencies
-RUN npm ci
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-timeout 300000 && \
+    for i in 1 2 3; do \
+        npm ci --legacy-peer-deps && break || { \
+            if [ "$i" -eq 3 ]; then \
+                echo "npm ci failed after 3 attempts"; \
+                exit 1; \
+            fi; \
+            echo "npm ci failed, retrying (attempt $i/3)..."; \
+            sleep 10; \
+        }; \
+    done
 
 # Copy the entire project
 COPY . .

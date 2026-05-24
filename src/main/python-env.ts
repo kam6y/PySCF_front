@@ -5,6 +5,94 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 
 const execFilePromise = promisify(execFile);
+const CONDA_ENV_MARKER_FILE = '.pyscf-conda-env-runtime';
+
+const condaEnvExists = (condaPath: string): boolean => {
+  return (
+    fs.existsSync(path.join(condaPath, 'bin', 'python')) &&
+    fs.existsSync(path.join(condaPath, 'bin', 'gunicorn'))
+  );
+};
+
+const getCondaEnvMarker = (sourceCondaPath: string): string => {
+  const historyPath = path.join(sourceCondaPath, 'conda-meta', 'history');
+  const historyStat = fs.existsSync(historyPath)
+    ? fs.statSync(historyPath)
+    : fs.statSync(path.join(sourceCondaPath, 'bin', 'python'));
+  return [
+    app.getVersion(),
+    process.platform,
+    process.arch,
+    historyStat.size,
+    Math.trunc(historyStat.mtimeMs),
+  ].join(':');
+};
+
+const runCondaUnpack = async (condaPath: string): Promise<void> => {
+  const condaUnpackPath = path.join(condaPath, 'bin', 'conda-unpack');
+  if (!fs.existsSync(condaUnpackPath)) {
+    console.log('conda-unpack not found; using copied conda environment as-is');
+    return;
+  }
+
+  const binDir = path.join(condaPath, 'bin');
+  console.log(`Running conda-unpack in relocated environment: ${condaPath}`);
+  await execFilePromise(condaUnpackPath, [], {
+    cwd: condaPath,
+    timeout: 180000,
+    env: {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH || ''}`,
+      CONDA_DEFAULT_ENV: 'pyscf-env',
+    },
+  });
+};
+
+const prepareBundledCondaEnvironment = async (): Promise<string | null> => {
+  const bundledCondaPath = path.join(process.resourcesPath, 'conda_env');
+  const runtimeCondaPath = path.join(app.getPath('userData'), 'conda_env');
+
+  console.log(`Checking bundled conda environment: ${bundledCondaPath}`);
+  if (!condaEnvExists(bundledCondaPath)) {
+    console.log(`✗ Bundled conda environment incomplete or missing`);
+    console.log(
+      `  - Python exists: ${fs.existsSync(path.join(bundledCondaPath, 'bin', 'python'))}`
+    );
+    console.log(
+      `  - Gunicorn exists: ${fs.existsSync(path.join(bundledCondaPath, 'bin', 'gunicorn'))}`
+    );
+    return null;
+  }
+
+  const expectedMarker = getCondaEnvMarker(bundledCondaPath);
+  const markerPath = path.join(runtimeCondaPath, CONDA_ENV_MARKER_FILE);
+  const currentMarker = fs.existsSync(markerPath)
+    ? fs.readFileSync(markerPath, 'utf8').trim()
+    : null;
+
+  if (currentMarker === expectedMarker && condaEnvExists(runtimeCondaPath)) {
+    console.log(`✓ Using relocated conda environment: ${runtimeCondaPath}`);
+    return runtimeCondaPath;
+  }
+
+  console.log(`Preparing relocated conda environment: ${runtimeCondaPath}`);
+  await fs.promises.rm(runtimeCondaPath, { recursive: true, force: true });
+  await fs.promises.mkdir(path.dirname(runtimeCondaPath), { recursive: true });
+  await fs.promises.cp(bundledCondaPath, runtimeCondaPath, {
+    recursive: true,
+    force: true,
+  });
+  await runCondaUnpack(runtimeCondaPath);
+  await fs.promises.writeFile(markerPath, `${expectedMarker}\n`);
+
+  if (!condaEnvExists(runtimeCondaPath)) {
+    console.log(`✗ Relocated conda environment incomplete after preparation`);
+    return null;
+  }
+
+  console.log(`✓ Relocated conda environment ready: ${runtimeCondaPath}`);
+  return runtimeCondaPath;
+};
 
 /**
  * 開発時conda環境のPythonパスを簡素化して検出する
@@ -88,28 +176,14 @@ export const detectPythonEnvironmentPath = async (): Promise<string | null> => {
 
   // 1. パッケージ時：同梱conda環境のみ
   if (app.isPackaged) {
-    const bundledCondaPath = path.join(
-      process.resourcesPath,
-      'conda_env',
-      'bin',
-      'python'
-    );
-    const bundledGunicornPath = path.join(
-      process.resourcesPath,
-      'conda_env',
-      'bin',
-      'gunicorn'
-    );
-
-    console.log(`Checking bundled conda environment: ${bundledCondaPath}`);
-
-    if (fs.existsSync(bundledCondaPath) && fs.existsSync(bundledGunicornPath)) {
-      console.log(`✓ Using bundled conda environment: ${bundledCondaPath}`);
-      return bundledCondaPath;
-    } else {
-      console.log(`✗ Bundled conda environment incomplete or missing`);
-      console.log(`  - Python exists: ${fs.existsSync(bundledCondaPath)}`);
-      console.log(`  - Gunicorn exists: ${fs.existsSync(bundledGunicornPath)}`);
+    try {
+      const condaPath = await prepareBundledCondaEnvironment();
+      if (condaPath !== null) {
+        return path.join(condaPath, 'bin', 'python');
+      }
+      return null;
+    } catch (error) {
+      console.log(`✗ Failed to prepare bundled conda environment: ${error}`);
       return null;
     }
   }
@@ -131,8 +205,8 @@ export const detectPythonEnvironmentPath = async (): Promise<string | null> => {
  * This prevents user's local Python environment (pyenv, conda, venv) from interfering.
  *
  * @param condaBinDir - The bin directory of the conda environment to use
- * @param serverPort - The port number for the Flask server
- * @param authToken - The authentication token for the Flask server
+ * @param serverPort - The port number for the Python backend server
+ * @param authToken - The authentication token for the Python backend server
  * @returns A clean environment object
  */
 export const createCleanEnvironment = (

@@ -6,7 +6,6 @@ export interface ServerConfig {
   server: { host: string; port: number };
   gunicorn: {
     workers: number;
-    threads: number;
     worker_class: string;
     timeout: number;
     keep_alive: number;

@@ -13,7 +13,7 @@ import {
   closeSplashWindowWhenReady,
 } from './main/splash-window-manager';
 
-let flaskPort: number | null = null;
+let backendPort: number | null = null;
 let authToken: string = '';
 let isCreatingWindow = false;
 let isQuitting = false;
@@ -59,9 +59,9 @@ const initializeApp = async () => {
     // Python環境検出開始を通知
     updateSplashStatus('detecting-env', 'Detecting Python environment...');
 
-    flaskPort = await startPythonServer(serverConfig, authToken);
-    if (!flaskPort) {
-      throw new Error('Could not determine Flask server port.');
+    backendPort = await startPythonServer(serverConfig, authToken);
+    if (!backendPort) {
+      throw new Error('Could not determine backend server port.');
     }
     console.log('Python server started successfully.');
 
@@ -80,7 +80,7 @@ const initializeApp = async () => {
     isCreatingWindow = false;
   }
 
-  const mainWindow = createWindow(flaskPort, authToken);
+  const mainWindow = createWindow(backendPort, authToken);
 
   // メインウィンドウの準備完了を待ってスプラッシュをクローズ
   closeSplashWindowWhenReady(mainWindow);

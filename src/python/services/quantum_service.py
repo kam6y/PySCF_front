@@ -841,10 +841,17 @@ class QuantumService:
         """
         try:
             logger.info(f"Pausing calculation: {calculation_id}")
-            self._resolve_calculation_path(calculation_id)
+            calc_path = self._resolve_calculation_path(calculation_id)
+            if not os.path.isdir(calc_path):
+                raise NotFoundError(f'Calculation "{calculation_id}" not found.')
 
             # Get process manager
             process_manager = get_process_manager()
+            self._recover_stale_non_terminal_calculations(process_manager)
+
+            status, _ = self.repository.read_calculation_status_details(calc_path)
+            if status != 'running':
+                raise ValidationError(f"Calculation is not running (status: {status})")
 
             # Request pause
             success = process_manager.pause_calculation(calculation_id)
@@ -860,9 +867,12 @@ class QuantumService:
             }
 
         except ValueError as e:
-            logger.error(f"Cannot pause calculation {calculation_id}: {e}")
-            raise ValidationError(str(e))
-        except ValidationError:
+            message = str(e)
+            logger.error(f"Cannot pause calculation {calculation_id}: {message}")
+            if 'not found' in message.lower():
+                raise NotFoundError(f'Calculation "{calculation_id}" not found.') from e
+            raise ValidationError(message) from e
+        except (NotFoundError, ValidationError):
             raise
         except Exception as e:
             logger.error(f"Error pausing calculation {calculation_id}: {e}", exc_info=True)
@@ -885,7 +895,9 @@ class QuantumService:
         """
         try:
             logger.info(f"Resuming calculation: {calculation_id}")
-            self._resolve_calculation_path(calculation_id)
+            calc_path = self._resolve_calculation_path(calculation_id)
+            if not os.path.isdir(calc_path):
+                raise NotFoundError(f'Calculation "{calculation_id}" not found.')
 
             # Get process manager
             process_manager = get_process_manager()
@@ -904,9 +916,12 @@ class QuantumService:
             }
 
         except ValueError as e:
-            logger.error(f"Cannot resume calculation {calculation_id}: {e}")
-            raise ValidationError(str(e))
-        except ValidationError:
+            message = str(e)
+            logger.error(f"Cannot resume calculation {calculation_id}: {message}")
+            if 'not found' in message.lower():
+                raise NotFoundError(f'Calculation "{calculation_id}" not found.') from e
+            raise ValidationError(message) from e
+        except (NotFoundError, ValidationError):
             raise
         except Exception as e:
             logger.error(f"Error resuming calculation {calculation_id}: {e}", exc_info=True)

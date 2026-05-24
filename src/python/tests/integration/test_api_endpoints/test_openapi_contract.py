@@ -1,7 +1,7 @@
 """
 OpenAPI contract tests.
 
-These tests ensure that public Flask API routes and OpenAPI definitions stay aligned:
+These tests ensure that public API routes and OpenAPI definitions stay aligned:
 - HTTP method + path contracts
 - Query parameter names
 """
@@ -9,23 +9,29 @@ These tests ensure that public Flask API routes and OpenAPI definitions stay ali
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 import re
 from functools import lru_cache
 from pathlib import Path
 
+from fastapi.routing import APIRoute
 import yaml
+from app import create_fastapi_app
 from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
 
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
+PENDING_FASTAPI_MIGRATION_ROUTES = set()
 
 PYTHON_DIR = Path(__file__).resolve().parents[3]
-API_DIR = PYTHON_DIR / "api"
 OPENAPI_PATH = PYTHON_DIR.parent / "api-spec" / "openapi.yaml"
 ORBITAL_GENERATOR_PATH = PYTHON_DIR / "quantum_calc" / "orbital_generator.py"
 
-_IMPL_PATH_PARAM_PATTERN = re.compile(r"<[^>]+>")
 _OPENAPI_PATH_PARAM_PATTERN = re.compile(r"\{[^}]+\}")
+AUTH_SECURITY_SCHEME_NAME = "AuthToken"
+AUTH_SECURITY_REQUIREMENT = [{AUTH_SECURITY_SCHEME_NAME: []}]
+AUTH_TOKEN_HEADER_PARAMETER_REF = "#/components/parameters/AuthTokenHeader"
+UNAUTHORIZED_RESPONSE_REF = "#/components/responses/UnauthorizedError"
 
 
 def _is_public_contract_path(path: str) -> bool:
@@ -40,69 +46,20 @@ def _is_public_contract_path(path: str) -> bool:
 
 
 def _normalize_impl_path(path: str) -> str:
-    return _IMPL_PATH_PARAM_PATTERN.sub("{}", path)
+    return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
 
 
 def _normalize_openapi_path(path: str) -> str:
     return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
 
 
-def _parse_route_decorator(
-    decorator: ast.expr,
-) -> tuple[str, set[str]] | None:
-    if not isinstance(decorator, ast.Call):
-        return None
-
-    if not isinstance(decorator.func, ast.Attribute) or decorator.func.attr != "route":
-        return None
-
-    if not decorator.args:
-        return None
-
-    path_arg = decorator.args[0]
-    if not isinstance(path_arg, ast.Constant) or not isinstance(path_arg.value, str):
-        return None
-
-    methods: set[str] = {"GET"}
-    for keyword in decorator.keywords:
-        if keyword.arg != "methods":
-            continue
-
-        if not isinstance(keyword.value, (ast.List, ast.Tuple)):
-            continue
-
-        parsed_methods = set()
-        for item in keyword.value.elts:
-            if isinstance(item, ast.Constant) and isinstance(item.value, str):
-                upper_method = item.value.upper()
-                if upper_method in HTTP_METHODS:
-                    parsed_methods.add(upper_method)
-
-        if parsed_methods:
-            methods = parsed_methods
-
-    return path_arg.value, methods
-
-
-class _RequestArgsVisitor(ast.NodeVisitor):
-    def __init__(self) -> None:
-        self.query_names: set[str] = set()
-
-    def visit_Call(self, node: ast.Call) -> None:
-        if (
-            isinstance(node.func, ast.Attribute)
-            and node.func.attr == "get"
-            and isinstance(node.func.value, ast.Attribute)
-            and node.func.value.attr == "args"
-            and isinstance(node.func.value.value, ast.Name)
-            and node.func.value.value.id == "request"
-            and node.args
-            and isinstance(node.args[0], ast.Constant)
-            and isinstance(node.args[0].value, str)
-        ):
-            self.query_names.add(node.args[0].value)
-
-        self.generic_visit(node)
+def _extract_route_query_params(route: APIRoute) -> set[str]:
+    query_params: set[str] = set()
+    for field in route.dependant.query_params:
+        name = getattr(field, "alias", None) or getattr(field, "name", None)
+        if isinstance(name, str):
+            query_params.add(name)
+    return query_params
 
 
 @lru_cache(maxsize=1)
@@ -110,37 +67,20 @@ def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple
     routes: set[tuple[str, str]] = set()
     query_params_by_route: dict[tuple[str, str], set[str]] = {}
 
-    for api_file in sorted(API_DIR.glob("*.py")):
-        if api_file.name == "__init__.py":
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
             continue
 
-        tree = ast.parse(api_file.read_text(encoding="utf-8"), filename=str(api_file))
+        if not _is_public_contract_path(route.path):
+            continue
 
-        for node in tree.body:
-            if not isinstance(node, ast.FunctionDef):
-                continue
-
-            route_specs: list[tuple[str, set[str]]] = []
-            for decorator in node.decorator_list:
-                route_spec = _parse_route_decorator(decorator)
-                if route_spec:
-                    route_specs.append(route_spec)
-
-            if not route_specs:
-                continue
-
-            visitor = _RequestArgsVisitor()
-            visitor.visit(node)
-
-            for raw_path, methods in route_specs:
-                if not _is_public_contract_path(raw_path):
-                    continue
-
-                normalized_path = _normalize_impl_path(raw_path)
-                for method in methods:
-                    key = (method, normalized_path)
-                    routes.add(key)
-                    query_params_by_route.setdefault(key, set()).update(visitor.query_names)
+        normalized_path = _normalize_impl_path(route.path)
+        query_params = _extract_route_query_params(route)
+        for method in (route.methods or set()) & HTTP_METHODS:
+            key = (method, normalized_path)
+            routes.add(key)
+            query_params_by_route[key] = query_params
 
     return routes, query_params_by_route
 
@@ -186,6 +126,22 @@ def _extract_openapi_contract() -> tuple[set[tuple[str, str]], dict[tuple[str, s
     return routes, query_params_by_route
 
 
+def _iter_openapi_public_operations(
+    spec: dict,
+) -> Iterator[tuple[tuple[str, str], dict, dict]]:
+    for raw_path, path_item in spec.get("paths", {}).items():
+        if not _is_public_contract_path(raw_path):
+            continue
+
+        normalized_path = _normalize_openapi_path(raw_path)
+        for method, operation in path_item.items():
+            upper_method = method.upper()
+            if upper_method not in HTTP_METHODS:
+                continue
+
+            yield (upper_method, normalized_path), path_item, operation
+
+
 def _format_route(route: tuple[str, str]) -> str:
     method, path = route
     return f"{method} {path}"
@@ -222,7 +178,9 @@ def test_openapi_and_implementation_have_same_public_routes() -> None:
     openapi_routes, _ = _extract_openapi_contract()
 
     only_in_impl = sorted(impl_routes - openapi_routes)
-    only_in_openapi = sorted(openapi_routes - impl_routes)
+    only_in_openapi = sorted(
+        openapi_routes - impl_routes - PENDING_FASTAPI_MIGRATION_ROUTES
+    )
 
     issues = []
     if only_in_impl:
@@ -233,6 +191,95 @@ def test_openapi_and_implementation_have_same_public_routes() -> None:
         issues.append(f"Defined in OpenAPI but missing in implementation: {formatted}")
 
     assert not issues, "\n".join(issues)
+
+
+def test_pending_fastapi_migration_routes_are_defined_in_openapi() -> None:
+    openapi_routes, _ = _extract_openapi_contract()
+
+    missing_from_openapi = sorted(PENDING_FASTAPI_MIGRATION_ROUTES - openapi_routes)
+
+    assert not missing_from_openapi, (
+        "Pending migration allowlist routes must exist in OpenAPI: "
+        + ", ".join(_format_route(route) for route in missing_from_openapi)
+    )
+
+
+def test_pending_fastapi_migration_routes_are_not_registered() -> None:
+    impl_routes, _ = _extract_implementation_contract()
+
+    registered_routes = sorted(PENDING_FASTAPI_MIGRATION_ROUTES & impl_routes)
+
+    assert not registered_routes, (
+        "Registered routes must be removed from PENDING_FASTAPI_MIGRATION_ROUTES: "
+        + ", ".join(_format_route(route) for route in registered_routes)
+    )
+
+
+def test_openapi_defines_auth_token_security_contract() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    components = spec["components"]
+
+    auth_scheme = components["securitySchemes"][AUTH_SECURITY_SCHEME_NAME]
+    assert auth_scheme["type"] == "apiKey"
+    assert auth_scheme["in"] == "header"
+    assert auth_scheme["name"] == "X-Auth-Token"
+
+    auth_header = components["parameters"]["AuthTokenHeader"]
+    assert auth_header["name"] == "X-Auth-Token"
+    assert auth_header["in"] == "header"
+    assert auth_header["required"] is False
+    assert auth_header["schema"] == {"type": "string"}
+
+    unauthorized_response = components["responses"]["UnauthorizedError"]
+    assert unauthorized_response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
+
+
+def test_openapi_public_operations_require_auth_token_and_document_401() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    missing_security = []
+    missing_header = []
+    missing_unauthorized_response = []
+
+    for route, path_item, operation in _iter_openapi_public_operations(spec):
+        if operation.get("security") != AUTH_SECURITY_REQUIREMENT:
+            missing_security.append(_format_route(route))
+
+        path_parameters = path_item.get("parameters", [])
+        operation_parameters = operation.get("parameters", [])
+        has_auth_header = any(
+            parameter.get("$ref") == AUTH_TOKEN_HEADER_PARAMETER_REF
+            for parameter in [*path_parameters, *operation_parameters]
+            if isinstance(parameter, dict)
+        )
+        if not has_auth_header:
+            missing_header.append(_format_route(route))
+
+        responses = operation.get("responses", {})
+        if responses.get("401") != {"$ref": UNAUTHORIZED_RESPONSE_REF}:
+            missing_unauthorized_response.append(_format_route(route))
+
+    issues = []
+    if missing_security:
+        issues.append("Missing AuthToken security: " + ", ".join(missing_security))
+    if missing_header:
+        issues.append("Missing X-Auth-Token header parameter: " + ", ".join(missing_header))
+    if missing_unauthorized_response:
+        issues.append(
+            "Missing 401 Unauthorized response: "
+            + ", ".join(missing_unauthorized_response)
+        )
+
+    assert not issues, "\n".join(issues)
+
+
+def test_openapi_excludes_development_api_docs_routes_from_public_contract() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    assert "/api-docs" not in spec["paths"]
+    assert "/api-docs/spec.json" not in spec["paths"]
 
 
 def test_openapi_and_implementation_have_same_query_parameter_names() -> None:

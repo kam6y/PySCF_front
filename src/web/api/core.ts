@@ -2,7 +2,7 @@ const initialPort = window.electronAPI?.flaskPort;
 
 if (!initialPort) {
   console.error(
-    '[API Client] Flask port not available. API calls will fail explicitly.'
+    '[API Client] Backend port not available. API calls will fail explicitly.'
   );
 }
 

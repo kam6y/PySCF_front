@@ -18,54 +18,78 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        miniforge-version: latest
-        activate-environment: pyscf-env
-        environment-file: .github/environment.yml
-        python-version: 3.12
-        auto-activate-base: false
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: pyscf-env
+          environment-file: .github/environment.yml
+          python-version: 3.12
+          auto-activate-base: false
 
-    - name: Install Node.js dependencies
-      run: npm ci
+      - name: Install Node.js dependencies
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set fetch-timeout 300000
 
-    - name: Verify conda environment
-      shell: bash -l {0}
-      run: |
-        conda activate pyscf-env
-        npm run verify-env
+          for i in 1 2 3; do
+            npm ci --legacy-peer-deps && break || {
+              if [ $i -eq 3 ]; then
+                echo "npm ci failed after 3 attempts"
+                exit 1
+              fi
+              echo "npm ci failed, retrying (attempt $i/3)..."
+              sleep 10
+            }
+          done
 
-    - name: Build application
-      shell: bash -l {0}
-      run: |
-        conda activate pyscf-env
-        npm run build
+      - name: Verify conda environment
+        shell: bash -l {0}
+        run: |
+          conda activate pyscf-env
+          npm run verify-env
 
-    - name: Package application
-      shell: bash -l {0}
-      run: |
-        conda activate pyscf-env
-        npx electron-builder
+      - name: Build application
+        shell: bash -l {0}
+        run: |
+          conda activate pyscf-env
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            npm run build:linux
+          else
+            npm run build
+          fi
 
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-${{ matrix.platform }}
-        path: |
-          dist/*.AppImage
-          dist/*.dmg
-          dist/*.zip
-        retention-days: 30
+      - name: Package application
+        shell: bash -l {0}
+        run: |
+          conda activate pyscf-env
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            npx electron-builder --linux
+          else
+            npx electron-builder --mac
+          fi
+          npm run verify:asar-artifacts
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            release/*.AppImage
+            release/*.dmg
+            release/*.zip
+          retention-days: 30
 
   create-release:
     needs: release
@@ -75,21 +99,21 @@ jobs:
       contents: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./artifacts
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        draft: false
-        prerelease: ${{ contains(github.ref, '-') }}
-        files: |
-          ./artifacts/release-*/*
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          files: |
+            ./artifacts/release-*/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

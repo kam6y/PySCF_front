@@ -100,7 +100,9 @@ export const useSocketTransport = ({
     void (async () => {
       const port = window.flaskPort;
       if (!port) {
-        console.error('[UnifiedWebSocket] Flask port not set. Cannot connect.');
+        console.error(
+          '[UnifiedWebSocket] Backend port not set. Cannot connect.'
+        );
         isConnectingRef.current = false;
         return;
       }
@@ -159,7 +161,10 @@ export const useSocketTransport = ({
           const handler = onReconnectRef.current;
           if (!handler) return;
           Promise.resolve(handler(socket, attemptNumber)).catch(error => {
-            console.error('[UnifiedWebSocket] Reconnect handler failed:', error);
+            console.error(
+              '[UnifiedWebSocket] Reconnect handler failed:',
+              error
+            );
           });
         });
 

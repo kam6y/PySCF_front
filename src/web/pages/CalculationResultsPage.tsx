@@ -83,10 +83,13 @@ export const CalculationResultsPage = ({
     setSelectedOrbitalCalculationId(null);
   }, [activeCalculation?.id]);
 
-  const handleOrbitalSelect = useCallback((orbitalIndex: number) => {
-    setSelectedOrbitalIndex(orbitalIndex);
-    setSelectedOrbitalCalculationId(activeCalculation?.id ?? null);
-  }, [activeCalculation?.id]);
+  const handleOrbitalSelect = useCallback(
+    (orbitalIndex: number) => {
+      setSelectedOrbitalIndex(orbitalIndex);
+      setSelectedOrbitalCalculationId(activeCalculation?.id ?? null);
+    },
+    [activeCalculation?.id]
+  );
 
   const handleIRPeakSelect = useCallback((peak: IRPeak, peakIndex: number) => {
     setSelectedIRPeakIndex(peakIndex);

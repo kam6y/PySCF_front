@@ -32,7 +32,7 @@ class TestSMILESConvertAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'data' in data
         assert 'xyz' in data['data']
@@ -64,7 +64,7 @@ class TestSMILESConvertAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
         assert 'C' in data['data']['xyz']
 
@@ -108,7 +108,7 @@ class TestSMILESConvertAPI:
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
         assert 'error' in data
 
@@ -158,7 +158,7 @@ class TestSMILESConvertAPI:
 
         # ASSERT
         assert response.status_code == 500
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is False
 
     def test_convert_whitespace_only_smiles(self, client):
@@ -195,7 +195,7 @@ class TestSMILESConvertAPI:
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data['success'] is True
 
     def test_convert_invalid_json(self, client):
@@ -207,8 +207,8 @@ class TestSMILESConvertAPI:
         # ACT
         response = client.post(
             '/api/smiles/convert',
-            data='invalid json',
-            content_type='application/json'
+            content=b'invalid json',
+            headers={'Content-Type': 'application/json'},
         )
 
         # ASSERT

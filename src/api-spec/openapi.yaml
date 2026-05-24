@@ -70,6 +70,11 @@ info:
     - ❌ Rejects: TDDFT request with `optimize_geometry: true` (disabled for TDDFT)
     
     See the `/api/quantum/supported-parameters` endpoint for runtime parameter constraints and method defaults.
+
+    ### Authentication
+
+    Runtime API routes are protected by the `X-Auth-Token` header when `PYSCF_AUTH_TOKEN` is configured.
+    Development-only API documentation routes (`/api-docs` and `/api-docs/spec.json`) are intentionally not part of this OpenAPI contract.
     
   version: 0.1.7-beta
   license:
@@ -82,11 +87,17 @@ servers:
 
 paths:
   /health:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Health check endpoint
       description: Check if the API server is running
       operationId: healthCheck
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Server is healthy
           content:
@@ -95,7 +106,11 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
 
   /api/pubchem/search:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Search PubChem for compounds
       description: Search PubChem by name, CID, or formula and return 3D structure in XYZ format
       operationId: searchPubChem
@@ -106,6 +121,8 @@ paths:
             schema:
               $ref: '#/components/schemas/PubChemSearchRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Compound found and XYZ generated
           content:
@@ -132,7 +149,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/smiles/convert:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Convert SMILES to XYZ format
       description: Convert a SMILES string to 3D XYZ molecular structure
       operationId: convertSmiles
@@ -143,6 +164,8 @@ paths:
             schema:
               $ref: '#/components/schemas/SMILESConvertRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: SMILES converted successfully
           content:
@@ -163,7 +186,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/pubchem/validate:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Validate XYZ format
       description: Validate an XYZ format string
       operationId: validateXYZ
@@ -174,6 +201,8 @@ paths:
             schema:
               $ref: '#/components/schemas/XYZValidateRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: XYZ validation result
           content:
@@ -188,7 +217,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculate:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Start quantum chemistry calculation
       description: Start a calculation in the background
       operationId: startCalculation
@@ -199,6 +232,8 @@ paths:
             schema:
               $ref: '#/components/schemas/QuantumCalculationRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '202':
           description: Calculation queued successfully
           content:
@@ -219,7 +254,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: List calculations with optional filtering
       description: Get a list of calculation directories with optional filtering by name, status, method, basis set, and date range. Filtering is performed at the file system level for optimal performance.
       operationId: listCalculations
@@ -264,6 +303,8 @@ paths:
             format: date
           description: End date for date range filtering (ISO format YYYY-MM-DD)
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: List of calculations matching filter criteria
           content:
@@ -278,11 +319,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/status:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get calculation system status
       description: Get current process pool and host system status for quantum calculations
       operationId: getCalculationStatus
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Calculation system status retrieved successfully
           content:
@@ -303,7 +350,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get calculation details
       description: Get detailed information about a specific calculation
       operationId: getCalculationDetails
@@ -316,6 +367,8 @@ paths:
             type: string
             pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Calculation details
           content:
@@ -336,6 +389,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     put:
+      security:
+        - AuthToken: []
       summary: Update calculation metadata
       description: Update calculation name and other metadata
       operationId: updateCalculation
@@ -354,6 +409,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CalculationUpdateRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Calculation updated successfully
           content:
@@ -380,6 +437,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     delete:
+      security:
+        - AuthToken: []
       summary: Delete calculation
       description: Delete a calculation and all its associated files
       operationId: deleteCalculation
@@ -392,6 +451,8 @@ paths:
             type: string
             pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Calculation deleted successfully
           content:
@@ -418,7 +479,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/pause:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Pause a running calculation
       description: Safely pause a running calculation after the current SCF iteration completes. The calculation can be resumed later from the checkpoint.
       operationId: pauseCalculation
@@ -431,6 +496,8 @@ paths:
             type: string
             pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '202':
           description: Pause request accepted
           content:
@@ -457,7 +524,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/resume:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Resume a paused calculation
       description: Resume a paused calculation from its checkpoint file. The calculation will continue from where it was paused.
       operationId: resumeCalculation
@@ -470,6 +541,8 @@ paths:
             type: string
             pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '202':
           description: Resume request accepted
           content:
@@ -496,7 +569,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/orbitals:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get molecular orbital information
       description: Get list of all molecular orbitals with energies and indices
       operationId: getOrbitals
@@ -509,6 +586,8 @@ paths:
             type: string
             pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Molecular orbital information
           content:
@@ -529,7 +608,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/orbitals/{orbitalIndex}/cube:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Generate and get molecular orbital CUBE file
       description: Generate CUBE file for specific molecular orbital visualization
       operationId: getOrbitalCube
@@ -576,6 +659,8 @@ paths:
             maximum: -0.001
             default: -0.02
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Orbital CUBE file data
           content:
@@ -596,7 +681,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/orbitals/cube-files:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: List CUBE files for a calculation
       description: List all saved CUBE files for molecular orbitals in a calculation
       operationId: listCubeFiles
@@ -609,6 +698,8 @@ paths:
             type: string
             pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: CUBE files list retrieved successfully
           content:
@@ -629,6 +720,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     delete:
+      security:
+        - AuthToken: []
       summary: Delete CUBE files for a calculation
       description: Delete CUBE files for specific orbital or all orbitals in a calculation
       operationId: deleteCubeFiles
@@ -647,6 +740,8 @@ paths:
           schema:
             type: integer
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: CUBE files deleted successfully
           content:
@@ -667,7 +762,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/ir-spectrum:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Generate IR spectrum for a calculation
       description: Generate theoretical IR spectrum from vibrational frequency data with scale factor corrections and Lorentzian broadening
       operationId: getIRSpectrum
@@ -716,6 +815,8 @@ paths:
             type: boolean
             default: true
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: IR spectrum generated successfully
           content:
@@ -742,11 +843,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/supported-parameters:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get supported quantum chemistry parameters
       description: Get lists of supported calculation methods, basis functions, exchange-correlation functionals, and solvents
       operationId: getSupportedParameters
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Supported parameters retrieved successfully
           content:
@@ -761,11 +868,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/settings:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get application settings
       description: Retrieve current application settings including parallel processing limits
       operationId: getSettings
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Settings retrieved successfully
           content:
@@ -780,6 +893,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     put:
+      security:
+        - AuthToken: []
       summary: Update application settings
       description: Update application settings including parallel processing limits
       operationId: updateSettings
@@ -790,6 +905,8 @@ paths:
             schema:
               $ref: '#/components/schemas/SettingsUpdateRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Settings updated successfully
           content:
@@ -810,11 +927,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/system/resource-status:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get system resource status
       description: Get current system resource information, constraints, and allocation status
       operationId: getSystemResourceStatus
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: System resource status retrieved successfully
           content:
@@ -829,11 +952,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/system/gpu4pyscf-status:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get GPU4PySCF status
       description: Detect CUDA version and GPU4PySCF installation status (Linux only)
       operationId: getGpu4PyscfStatus
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: GPU4PySCF status retrieved successfully
           content:
@@ -848,7 +977,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/system/gpu4pyscf-install:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Install GPU4PySCF
       description: Install GPU4PySCF and recommended cuTENSOR for detected CUDA version (Linux only)
       operationId: installGpu4Pyscf
@@ -859,6 +992,8 @@ paths:
             schema:
               $ref: '#/components/schemas/Gpu4PyscfInstallRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: GPU4PySCF installed successfully
           content:
@@ -885,11 +1020,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/chat-history/sessions:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get all chat sessions
       description: Retrieve a list of all chat history sessions, ordered by most recent update
       operationId: getChatSessions
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat sessions retrieved successfully
           content:
@@ -904,6 +1045,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     post:
+      security:
+        - AuthToken: []
       summary: Create a new chat session
       description: Create a new chat history session with an optional name
       operationId: createChatSession
@@ -914,6 +1057,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateChatSessionRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '201':
           description: Chat session created successfully
           content:
@@ -934,7 +1079,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/chat-history/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get chat session details
       description: Retrieve a specific chat session with all messages
       operationId: getChatSession
@@ -946,6 +1095,8 @@ paths:
           schema:
             type: string
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat session retrieved successfully
           content:
@@ -966,6 +1117,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     patch:
+      security:
+        - AuthToken: []
       summary: Update chat session
       description: Update chat session metadata (e.g., name)
       operationId: updateChatSession
@@ -983,6 +1136,8 @@ paths:
             schema:
               $ref: '#/components/schemas/UpdateChatSessionRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat session updated successfully
           content:
@@ -1003,6 +1158,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     delete:
+      security:
+        - AuthToken: []
       summary: Delete chat session
       description: Delete a chat session and all its messages
       operationId: deleteChatSession
@@ -1014,6 +1171,8 @@ paths:
           schema:
             type: string
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat session deleted successfully
           content:
@@ -1034,7 +1193,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/agent/chat:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Chat with AI assistant
       description: >
         Send a message to the AI assistant and receive a streaming response using Server-Sent Events (SSE).
@@ -1058,6 +1221,8 @@ paths:
             schema:
               $ref: '#/components/schemas/AgentChatRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: >
             Successfully initiated a streaming connection.
@@ -1094,6 +1259,27 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
 components:
+  securitySchemes:
+    AuthToken:
+      type: apiKey
+      in: header
+      name: X-Auth-Token
+      description: Authentication token passed from the Electron shell. Required when `PYSCF_AUTH_TOKEN` is configured.
+  responses:
+    UnauthorizedError:
+      description: Authentication token is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  parameters:
+    AuthTokenHeader:
+      name: X-Auth-Token
+      in: header
+      required: false
+      description: Required when `PYSCF_AUTH_TOKEN` is configured.
+      schema:
+        type: string
   schemas:
     # Enums
     SearchType:

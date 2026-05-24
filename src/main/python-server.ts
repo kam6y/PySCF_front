@@ -18,7 +18,7 @@ const buildDiagnosticMessage = (
 ): string => {
   return app.isPackaged
     ? `Python backend failed to start after ${retries} attempts.\n\nDiagnostic information:\n- Port: ${port}\n- Health endpoint: ${url}\n\nThis may indicate:\n1. Bundled Python environment is corrupted\n2. Port ${port} is blocked by firewall\n3. Python dependencies are missing\n\nPlease report this issue with the console output.`
-    : `Python backend failed to start after ${retries} attempts.\n\nDiagnostic information:\n- Port: ${port}\n- Health endpoint: ${url}\n- Environment: Development mode\n\nTroubleshooting steps:\n1. Check if conda environment 'pyscf-env' is activated\n2. Verify all dependencies are installed: conda env create -f .github/environment.yml\n3. Test the Flask server manually: cd src/python && python app.py\n4. Check if port ${port} is available\n\nFor more details, see CLAUDE.md`;
+    : `Python backend failed to start after ${retries} attempts.\n\nDiagnostic information:\n- Port: ${port}\n- Health endpoint: ${url}\n- Environment: Development mode\n\nTroubleshooting steps:\n1. Check if conda environment 'pyscf-env' is activated\n2. Verify all dependencies are installed: conda env create -f .github/environment.yml\n3. Test the backend manually: cd src/python && python app.py\n4. Check if port ${port} is available\n\nFor more details, see CLAUDE.md`;
 };
 const resolveServerPort = async (defaultPort: number): Promise<number> => {
   const portRangeEnd = 5100;
@@ -69,8 +69,6 @@ const buildGunicornArgs = (
     'gunicorn',
     '--workers',
     String(gunicornSettings.workers),
-    '--threads',
-    String(gunicornSettings.threads),
     '--worker-class',
     gunicornSettings.worker_class,
     '--bind',
@@ -104,7 +102,7 @@ const attachOutputHandlers = (proc: ChildProcess, serverPort: number): void => {
       console.log('✓ Gunicorn worker is starting...');
     }
     if (output.includes('Application object must be callable')) {
-      console.log('✗ CRITICAL: Flask application object error detected');
+      console.log('✗ CRITICAL: Python/FastAPI backend object error detected');
     }
     if (
       output.includes('ModuleNotFoundError') ||
@@ -126,8 +124,8 @@ const attachOutputHandlers = (proc: ChildProcess, serverPort: number): void => {
     if (errorOutput.includes('gunicorn')) {
       console.log(`⚠️  Gunicorn-related error - ${errorOutput}`);
     }
-    if (errorOutput.includes('flask')) {
-      console.log(`⚠️  Flask-related error - ${errorOutput}`);
+    if (errorOutput.toLowerCase().includes('fastapi')) {
+      console.log(`⚠️  FastAPI-related error - ${errorOutput}`);
     }
     if (errorOutput.includes('Address already in use')) {
       console.log(`✗ CRITICAL: Port ${serverPort} is already in use`);
@@ -181,7 +179,13 @@ const attachLifecycleHandlers = (
     console.log(`Python executable: ${pythonExecutablePath}`);
     console.log(`Working directory: ${pythonPath}`);
 
-    pythonProcess = null;
+    if (pythonForceKillTimer !== null) {
+      clearTimeout(pythonForceKillTimer);
+      pythonForceKillTimer = null;
+    }
+    if (pythonProcess === proc) {
+      pythonProcess = null;
+    }
 
     if (!isQuitting) {
       const errorMessage = `The Python backend process has unexpectedly stopped (exit code: ${code})${signal ? `, signal: ${signal}` : ''}.\n\nDebugging Information:\n• Python executable: ${pythonExecutablePath}\n• Working directory: ${pythonPath}\n• Server port: ${serverPort}\n• Packaged mode: ${app.isPackaged}\n\nPlease check the console output for detailed error messages and restart the application.`;
@@ -193,8 +197,9 @@ const attachLifecycleHandlers = (
 };
 
 let pythonProcess: ChildProcess | null = null;
-let flaskPort: number | null = null;
+let backendPort: number | null = null;
 let isQuitting = false;
+let pythonForceKillTimer: NodeJS.Timeout | null = null;
 
 /**
  * Pythonサーバーのヘルスチェックを行い、起動完了を待つ関数
@@ -271,7 +276,7 @@ export const checkServerHealth = (
 };
 
 /**
- * Python/Flaskサーバーを起動する統一関数
+ * Python/FastAPI backend serverを起動する統一関数
  * 設定ファイルに基づいて開発・本番環境で同一の起動方法を使用
  */
 export const startPythonServer = async (
@@ -280,13 +285,13 @@ export const startPythonServer = async (
 ): Promise<number> => {
   return new Promise(async (resolve, reject) => {
     // 重複実行防止: 既にサーバーが起動している場合はスキップ
-    if (pythonProcess && !pythonProcess.killed && flaskPort) {
+    if (pythonProcess && !pythonProcess.killed && backendPort) {
       console.log('Python server already running, skipping startup');
-      resolve(flaskPort);
+      resolve(backendPort);
       return;
     }
 
-    console.log('Starting Python Flask server...');
+    console.log('Starting Python/FastAPI backend...');
 
     // 統一されたPython環境検出
     const pythonExecutablePath = await detectPythonEnvironmentPath();
@@ -319,12 +324,12 @@ export const startPythonServer = async (
         : 5000;
 
     try {
-      flaskPort = await resolveServerPort(defaultPort);
+      backendPort = await resolveServerPort(defaultPort);
     } catch (e) {
       reject(e);
       return;
     }
-    const serverPort = flaskPort;
+    const serverPort = backendPort;
     console.log(`Using server port: ${serverPort}`);
 
     // Python作業ディレクトリの決定
@@ -396,34 +401,39 @@ export const startPythonServer = async (
     // Gunicorn使用時は事前にポートが決まっているので、少し待ってからヘルスチェック開始
     setTimeout(() => {
       console.log(
-        `Starting health check for Gunicorn server on port ${flaskPort}`
+        `Starting health check for Gunicorn server on port ${backendPort}`
       );
       checkServerHealth(
-        flaskPort!,
+        backendPort!,
         authToken,
         healthCheckRetries,
         healthCheckInterval
       )
-        .then(() => resolve(flaskPort!))
+        .then(() => resolve(backendPort!))
         .catch(reject);
     }, initialDelay);
   });
 };
 
 /**
- * Python/Flaskサーバーを停止する関数
+ * Python/FastAPI backend serverを停止する関数
  */
 export const stopPythonServer = (): void => {
-  if (pythonProcess && !pythonProcess.killed) {
-    console.log('Stopping Python Flask server...');
+  const processToStop = pythonProcess;
+  if (processToStop && processToStop.exitCode === null) {
+    console.log('Stopping Python/FastAPI backend...');
     isQuitting = true;
-    pythonProcess.kill('SIGTERM');
+    processToStop.kill('SIGTERM');
 
-    setTimeout(() => {
-      if (pythonProcess && !pythonProcess.killed) {
+    if (pythonForceKillTimer !== null) {
+      clearTimeout(pythonForceKillTimer);
+    }
+    pythonForceKillTimer = setTimeout(() => {
+      if (processToStop.exitCode === null) {
         console.log('Force killing Python server...');
-        pythonProcess.kill('SIGKILL');
+        processToStop.kill('SIGKILL');
       }
+      pythonForceKillTimer = null;
     }, 5000);
   }
 };

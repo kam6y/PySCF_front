@@ -59,11 +59,11 @@ def _get_package_version(package_name: str) -> str:
         'pyscf': 'pyscf',
         'rdkit': 'rdkit',
         'geometric': 'geometric',
-        'flask': 'flask',
-        'flask_cors': 'flask-cors',
-        'flask_sock': 'flask-sock',
+        'fastapi': 'fastapi',
+        'uvicorn': 'uvicorn',
+        'socketio': 'python-socketio',
         'pydantic': 'pydantic',
-        'gevent': 'gevent',
+        'gunicorn': 'gunicorn',
         'requests': 'requests',
     }
     dist_name = dist_name_map.get(package_name, package_name.replace('_', '-'))
@@ -85,11 +85,11 @@ def check_required_packages() -> bool:
         ('pyscf', 'PySCF - 量子化学計算'),
         ('rdkit', 'RDKit - 化学情報学'),
         ('geometric', 'geometric - 分子幾何最適化'),
-        ('flask', 'Flask - ウェブフレームワーク'),
-        ('flask_cors', 'Flask-CORS - CORS対応'),
-        ('flask_sock', 'Flask-Sock - WebSocket対応'),
+        ('fastapi', 'FastAPI - ASGI Web フレームワーク'),
+        ('uvicorn', 'Uvicorn - ASGI サーバー'),
+        ('socketio', 'python-socketio - Socket.IO ASGI対応'),
         ('pydantic', 'Pydantic - データバリデーション'),
-        ('gevent', 'Gevent - 非同期処理'),
+        ('gunicorn', 'Gunicorn - 本番プロセスマネージャ'),
         ('requests', 'Requests - HTTP クライアント'),
     ]
 
@@ -179,35 +179,33 @@ def check_rdkit_functionality() -> bool:
         log_error(f"RDKit テストに失敗: {e}")
         return False
 
-def check_flask_functionality() -> bool:
-    """Flask の基本機能をテスト"""
-    log_info("Flask の基本機能をテスト中...")
-    
+def check_fastapi_functionality() -> bool:
+    """FastAPI の基本機能をテスト"""
+    log_info("FastAPI の基本機能をテスト中...")
     try:
-        from flask import Flask
-        from flask_cors import CORS
-        import flask_sock
-        
-        # 簡単なFlaskアプリケーション作成テスト
-        app = Flask(__name__)
-        CORS(app)
-        
-        @app.route('/test')
-        def test():
-            return {'message': 'Flask test successful'}
-        
-        # テストクライアントで簡単なテスト
-        with app.test_client() as client:
-            response = client.get('/test')
-            if response.status_code == 200:
-                log_success("Flask 機能テスト成功 ✓")
-                return True
-            else:
-                log_error(f"Flask テスト失敗: ステータスコード {response.status_code}")
-                return False
-                
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from uvicorn.workers import UvicornWorker
+        import socketio
+
+        app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+        @app.get('/test')
+        def test_endpoint():
+            return {'message': 'FastAPI test successful'}
+
+        client = TestClient(app)
+        response = client.get('/test')
+        server = socketio.AsyncServer(async_mode='asgi')
+
+        if response.status_code == 200 and server.async_mode == 'asgi' and UvicornWorker is not None:
+            log_success("FastAPI ASGI 機能テスト成功 ✓")
+            return True
+
+        log_error(f"FastAPI テスト失敗: ステータスコード {response.status_code}")
+        return False
     except Exception as e:
-        log_error(f"Flask テストに失敗: {e}")
+        log_error(f"FastAPI テストに失敗: {e}")
         return False
 
 def check_conda_environment() -> bool:
@@ -265,7 +263,7 @@ def main() -> None:
         ("必須パッケージ", check_required_packages),
         ("PySCF 機能", check_pyscf_functionality),
         ("RDKit 機能", check_rdkit_functionality),
-        ("Flask 機能", check_flask_functionality),
+        ("FastAPI ASGI 機能", check_fastapi_functionality),
         ("conda 環境", check_conda_environment),
         ("プロジェクト構造", check_project_structure),
     ]

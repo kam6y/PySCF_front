@@ -6,28 +6,41 @@ Handles client connections for calculation status updates and progress monitorin
 import logging
 import os
 from datetime import datetime
-from typing import Dict
-from flask import session
-from flask_socketio import emit, join_room, leave_room
+from typing import Any
 
-from quantum_calc import get_websocket_watcher, CalculationRepository
+from quantum_calc import CalculationRepository, get_websocket_watcher
+from websocket.event_loop_bridge import schedule_coroutine
 
-# Set up logging
 logger = logging.getLogger(__name__)
 
+_sid_state: dict[str, dict[str, Any]] = {}
 
-def build_calculation_instance(calc_id: str, calc_path: str, file_manager: CalculationRepository) -> Dict:
+
+def _state_for(sid: str) -> dict[str, Any]:
+    return _sid_state.setdefault(sid, {"callbacks": {}})
+
+
+def _is_current_state(sid: str, state: dict[str, Any]) -> bool:
+    return _sid_state.get(sid) is state
+
+
+def build_calculation_instance(
+    calc_id: str,
+    calc_path: str,
+    file_manager: CalculationRepository,
+) -> dict[str, Any]:
     """Build a complete calculation instance from file system data."""
     try:
         parameters = file_manager.read_calculation_parameters(calc_path) or {}
         results = file_manager.read_calculation_results(calc_path)
-        status = file_manager.read_calculation_status(calc_path) or 'pending'
+        status = file_manager.read_calculation_status(calc_path) or "pending"
         display_name = file_manager.get_display_name(calc_id, parameters)
-        
-        # Safe date retrieval
+
         try:
-            creation_date = parameters.get('created_at', 
-                datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
+            creation_date = parameters.get(
+                "created_at",
+                datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat(),
+            )
             updated_date = datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat()
         except OSError:
             current_time = datetime.now().isoformat()
@@ -35,188 +48,242 @@ def build_calculation_instance(calc_id: str, calc_path: str, file_manager: Calcu
             updated_date = current_time
 
         return {
-            'id': calc_id,
-            'name': display_name,
-            'status': status,
-            'createdAt': creation_date,
-            'updatedAt': updated_date,
-            'parameters': parameters,
-            'results': results,
-            'workingDirectory': calc_path,
+            "id": calc_id,
+            "name": display_name,
+            "status": status,
+            "createdAt": creation_date,
+            "updatedAt": updated_date,
+            "parameters": parameters,
+            "results": results,
+            "workingDirectory": calc_path,
         }
-    except Exception as e:
-        logger.error(f"Error building calculation instance for {calc_id}: {e}")
+    except Exception:
+        logger.exception("Error building calculation instance for %s", calc_id)
         raise
 
 
-def register_websocket_handlers(socketio):
-    """Register all WebSocket event handlers with the SocketIO instance."""
-    server = getattr(socketio, 'server', None)
-    if server is not None:
-        if getattr(server, '_pyscf_handlers_registered', False):
-            logger.debug("WebSocket handlers already registered for this server; skipping.")
-            return
-        setattr(server, '_pyscf_handlers_registered', True)
-    else:
-        if getattr(socketio, '_pyscf_handlers_registered', False):
-            logger.debug("WebSocket handlers already registered; skipping.")
-            return
-        setattr(socketio, '_pyscf_handlers_registered', True)
+def register_websocket_handlers(sio: Any) -> None:
+    """Register all WebSocket event handlers with the Socket.IO AsyncServer."""
+    if getattr(sio, "_pyscf_handlers_registered", False):
+        logger.debug("WebSocket handlers already registered; skipping.")
+        return
+    setattr(sio, "_pyscf_handlers_registered", True)
 
-    @socketio.on('connect')
-    def on_connect(auth):
-        """Authenticate Socket.IO connections when an auth token is configured."""
-        expected_token = os.getenv('PYSCF_AUTH_TOKEN')
-        if not expected_token:
-            return True
-
-        client_token = auth.get('token') if isinstance(auth, dict) else None
-        if client_token != expected_token:
+    @sio.event
+    async def connect(sid: str, environ: dict[str, Any], auth: dict[str, Any] | None):
+        expected_token = os.getenv("PYSCF_AUTH_TOKEN")
+        client_token = auth.get("token") if isinstance(auth, dict) else None
+        if expected_token and client_token != expected_token:
             logger.warning("Unauthorized Socket.IO connection attempt")
             return False
-
+        if not expected_token:
+            env = os.getenv("PYSCF_ENV")
+            if env not in {"development", "test"}:
+                logger.warning(
+                    "Unauthorized Socket.IO connection attempt: Missing authentication token"
+                )
+                return False
+            logger.warning("Running Socket.IO without authentication token in development mode!")
+        _state_for(sid)
         return True
-    
-    @socketio.on('join_calculation')
-    def on_join_calculation(data):
-        """Join a calculation room to receive real-time updates."""
-        calculation_id = data.get('calculation_id')
+
+    @sio.event
+    async def join_global_updates(sid: str) -> None:
+        await sio.enter_room(sid, "global_updates")
+        logger.info(
+            "Client joined global_updates room for real-time monitoring of all calculations"
+        )
+
+    @sio.event
+    async def leave_global_updates(sid: str) -> None:
+        await sio.leave_room(sid, "global_updates")
+        logger.info("Client left global_updates room")
+
+    @sio.event
+    async def join_calculation(sid: str, data: dict[str, Any] | None) -> None:
+        calculation_id = (data or {}).get("calculation_id")
         if not calculation_id:
-            emit('error', {'error': 'calculation_id is required'})
+            await sio.emit("error", {"error": "calculation_id is required"}, to=sid)
             return
-        
-        # 一時的IDの場合は特別なログメッセージを出力
-        if calculation_id.startswith('new-calculation-'):
-            logger.info(f"SocketIO connection attempt for temporary calculation ID: {calculation_id}")
+
+        if calculation_id.startswith("new-calculation-"):
+            logger.info(
+                "Socket.IO connection attempt for temporary calculation ID: %s",
+                calculation_id,
+            )
         else:
-            logger.info(f"SocketIO connection established for calculation {calculation_id}")
+            logger.info(
+                "Socket.IO connection established for calculation %s",
+                calculation_id,
+            )
 
         from quantum_calc import get_current_settings
+
         settings = get_current_settings()
         file_manager = CalculationRepository(base_dir=settings.calculations_directory)
         try:
             calc_path = str(file_manager.resolve_calculation_path(calculation_id))
         except ValueError:
-            logger.warning("Invalid calculation ID for SocketIO monitoring: %s", calculation_id)
-            emit('error', {
-                'error': 'Invalid calculation ID.',
-                'id': calculation_id,
-                'is_temporary': calculation_id.startswith('new-calculation-')
-            })
+            await sio.emit(
+                "error",
+                {
+                    "error": "Invalid calculation ID.",
+                    "id": calculation_id,
+                    "is_temporary": calculation_id.startswith("new-calculation-"),
+                },
+                to=sid,
+            )
             return
-        
-        # Calculation directory existence check
+
         if not os.path.isdir(calc_path):
-            # 一時的IDの場合は特別なログメッセージを出力
-            if calculation_id.startswith('new-calculation-'):
-                logger.info(f"SocketIO connection attempted for temporary calculation ID: {calculation_id}. Sending error.")
-                error_message = f'Temporary calculation ID "{calculation_id}" does not exist on server.'
+            if calculation_id.startswith("new-calculation-"):
+                error_message = (
+                    f'Temporary calculation ID "{calculation_id}" does not exist on server.'
+                )
             else:
-                logger.warning(f"Calculation directory not found: {calc_path}")
                 error_message = f'Calculation "{calculation_id}" not found.'
-            
-            emit('error', {
-                'error': error_message,
-                'id': calculation_id,
-                'is_temporary': calculation_id.startswith('new-calculation-')
-            })
+            await sio.emit(
+                "error",
+                {
+                    "error": error_message,
+                    "id": calculation_id,
+                    "is_temporary": calculation_id.startswith("new-calculation-"),
+                },
+                to=sid,
+            )
             return
 
-        # Join the calculation room
-        room = f'calculation_{calculation_id}'
-        join_room(room)
-        
-        # Store calculation_id in session for cleanup
-        session['calculation_id'] = calculation_id
-        
-        # Define file change callback for this connection
-        def on_file_change(file_data: Dict):
-            """Callback for file system events - sends updated data to SocketIO client."""
-            try:
-                # Build complete calculation instance
-                calculation_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
-                
-                # Send update to all clients in the room
-                socketio.emit('calculation_update', calculation_instance, room=room)
-                
-                # Disconnect clients if calculation is finished
-                if calculation_instance['status'] in ['completed', 'error']:
-                    logger.info(f"Calculation {calculation_id} finished with status '{calculation_instance['status']}'.")
-                    # Note: Don't force disconnect - let client handle completion
-                    
-            except Exception as e:
-                logger.error(f"Error in file change callback for {calculation_id}: {e}")
-                socketio.emit('error', {
-                    'error': 'Failed to read calculation data',
-                    'id': calculation_id
-                }, room=room)
+        room = f"calculation_{calculation_id}"
+        state = _state_for(sid)
 
+        def on_file_change(file_data: dict[str, Any]) -> None:
+            async def emit_update() -> None:
+                try:
+                    calculation_instance = build_calculation_instance(
+                        calculation_id,
+                        calc_path,
+                        file_manager,
+                    )
+                    await sio.emit("calculation_update", calculation_instance, room=room)
+                    if calculation_instance["status"] in ["completed", "error"]:
+                        logger.info(
+                            "Calculation %s finished with status '%s'.",
+                            calculation_id,
+                            calculation_instance["status"],
+                        )
+                except Exception:
+                    logger.exception(
+                        "Error in file change callback for %s",
+                        calculation_id,
+                    )
+                    await sio.emit(
+                        "error",
+                        {"error": "Failed to read calculation data", "id": calculation_id},
+                        room=room,
+                    )
+
+            schedule_coroutine(emit_update())
+
+        watcher = None
+        room_entered = False
+        new_callback_add_attempted = False
         try:
-            # Initialize file watcher and register this connection
-            watcher = get_websocket_watcher(file_manager.get_base_directory())
-            watcher.add_connection(calculation_id, on_file_change)
-            
-            # Send initial state immediately
-            initial_instance = build_calculation_instance(calculation_id, calc_path, file_manager)
-            emit('calculation_update', initial_instance)
-            logger.info(f"Sent initial state for calculation {calculation_id} (status: {initial_instance['status']})")
-            
-            # Store callback reference for cleanup
-            session['file_change_callback'] = on_file_change
-            
-        except Exception as e:
-            logger.error(f"Error setting up SocketIO monitoring for {calculation_id}: {e}")
-            emit('error', {
-                'error': 'Failed to set up calculation monitoring',
-                'id': calculation_id
-            })
+            initial_instance = build_calculation_instance(
+                calculation_id,
+                calc_path,
+                file_manager,
+            )
 
-    @socketio.on('leave_calculation')
-    def on_leave_calculation(data):
-        """Leave a calculation room."""
-        calculation_id = data.get('calculation_id')
+            if calculation_id in state["callbacks"]:
+                await sio.emit("calculation_update", initial_instance, to=sid)
+                return
+
+            watcher = get_websocket_watcher(file_manager.get_base_directory())
+            new_callback_add_attempted = True
+            watcher.add_connection(calculation_id, on_file_change)
+            state["callbacks"][calculation_id] = on_file_change
+
+            await sio.enter_room(sid, room)
+            room_entered = True
+            if not _is_current_state(sid, state):
+                watcher.remove_connection(calculation_id, on_file_change)
+                state["callbacks"].pop(calculation_id, None)
+                await sio.leave_room(sid, room)
+                return
+
+            await sio.emit("calculation_update", initial_instance, to=sid)
+        except Exception:
+            tracked_callback = state["callbacks"].get(calculation_id)
+            if tracked_callback is on_file_change:
+                state["callbacks"].pop(calculation_id, None)
+            if watcher is not None:
+                callbacks_to_remove = [on_file_change]
+                if not new_callback_add_attempted:
+                    callbacks_to_remove = []
+
+                for callback in callbacks_to_remove:
+                    try:
+                        watcher.remove_connection(calculation_id, callback)
+                    except Exception:
+                        logger.exception(
+                            "Error cleaning up file watcher for failed setup of %s",
+                            calculation_id,
+                        )
+            if room_entered:
+                try:
+                    await sio.leave_room(sid, room)
+                except Exception:
+                    logger.exception(
+                        "Error leaving room after failed setup for %s",
+                        calculation_id,
+                    )
+            logger.exception(
+                "Error setting up Socket.IO monitoring for %s",
+                calculation_id,
+            )
+            await sio.emit(
+                "error",
+                {"error": "Failed to set up calculation monitoring", "id": calculation_id},
+                to=sid,
+            )
+
+    @sio.event
+    async def leave_calculation(sid: str, data: dict[str, Any] | None) -> None:
+        calculation_id = (data or {}).get("calculation_id")
         if not calculation_id:
+            await sio.emit("error", {"error": "calculation_id is required"}, to=sid)
             return
 
-        room = f'calculation_{calculation_id}'
-        leave_room(room)
+        room = f"calculation_{calculation_id}"
+        await sio.leave_room(sid, room)
+        state = _sid_state.get(sid)
+        if state is None:
+            logger.info("Client left calculation %s after disconnect", calculation_id)
+            return
+        callback = state["callbacks"].pop(calculation_id, None)
+        if callback is not None:
+            from quantum_calc import get_current_settings
 
-        # Clean up file watcher connection
-        if 'file_change_callback' in session:
-            try:
-                from quantum_calc import get_current_settings
-                settings = get_current_settings()
-                file_manager = CalculationRepository(base_dir=settings.calculations_directory)
-                watcher = get_websocket_watcher(file_manager.get_base_directory())
-                watcher.remove_connection(calculation_id, session['file_change_callback'])
-            except Exception as e:
-                logger.debug(f"Error cleaning up file watcher for {calculation_id}: {e}")
-        
-        logger.info(f"Client left calculation {calculation_id}")
+            settings = get_current_settings()
+            file_manager = CalculationRepository(base_dir=settings.calculations_directory)
+            watcher = get_websocket_watcher(file_manager.get_base_directory())
+            watcher.remove_connection(calculation_id, callback)
+        logger.info("Client left calculation %s", calculation_id)
 
-    @socketio.on('join_global_updates')
-    def on_join_global_updates():
-        """Join global updates room to receive all calculation updates."""
-        join_room('global_updates')
-        logger.info("Client joined global_updates room for real-time monitoring of all calculations")
+    @sio.event
+    async def disconnect(sid: str) -> None:
+        state = _sid_state.pop(sid, {"callbacks": {}})
+        if not state["callbacks"]:
+            return
 
-    @socketio.on('leave_global_updates')
-    def on_leave_global_updates():
-        """Leave global updates room."""
-        leave_room('global_updates')
-        logger.info("Client left global_updates room")
+        from quantum_calc import get_current_settings
 
-    @socketio.on('disconnect')
-    def on_disconnect():
-        """Handle client disconnection."""
-        calculation_id = session.get('calculation_id')
-        if calculation_id and 'file_change_callback' in session:
-            try:
-                from quantum_calc import get_current_settings
-                settings = get_current_settings()
-                file_manager = CalculationRepository(base_dir=settings.calculations_directory)
-                watcher = get_websocket_watcher(file_manager.get_base_directory())
-                watcher.remove_connection(calculation_id, session['file_change_callback'])
-                logger.info(f"Cleaned up file watcher for disconnected client (calculation {calculation_id})")
-            except Exception as e:
-                logger.debug(f"Error cleaning up file watcher on disconnect for {calculation_id}: {e}")
+        settings = get_current_settings()
+        file_manager = CalculationRepository(base_dir=settings.calculations_directory)
+        watcher = get_websocket_watcher(file_manager.get_base_directory())
+        for calculation_id, callback in state["callbacks"].items():
+            watcher.remove_connection(calculation_id, callback)
+            logger.info(
+                "Cleaned up file watcher for disconnected client (calculation %s)",
+                calculation_id,
+            )

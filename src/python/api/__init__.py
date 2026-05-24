@@ -1,48 +1,34 @@
-# API Blueprints for PySCF Front Backend
-# This module contains all API endpoint definitions organized by responsibility
-
+import logging
 import os
 
-# Import all blueprint modules
-from .health import health_bp
-from .pubchem import pubchem_bp
-from .smiles import smiles_bp
-from .settings import settings_bp
-from .system import system_bp
-from .quantum import quantum_bp
-from .agent import agent_bp
-from .chat_history import chat_history_bp
+from fastapi import FastAPI
 
-# List of all blueprints to register with the main app
-all_blueprints = [
-    health_bp,
-    pubchem_bp,
-    smiles_bp,
-    settings_bp,
-    system_bp,
-    quantum_bp,
-    agent_bp,
-    chat_history_bp
-]
+from .agent import router as agent_router
+from .chat_history import router as chat_history_router
+from .health import router as health_router
+from .pubchem import router as pubchem_router
+from .quantum import router as quantum_router
+from .settings import router as settings_router
+from .smiles import router as smiles_router
+from .swagger_ui import router as swagger_router
+from .system import router as system_router
+
+logger = logging.getLogger(__name__)
 
 
-def register_blueprints(app):
-    """
-    Register all API blueprints with the Flask app.
-
-    Swagger UI is conditionally registered in development mode only.
-    Development mode is detected by checking if PYSCF_RESOURCES_PATH
-    environment variable is not set (set only by Electron in packaged mode).
-    """
-    # Register all standard blueprints
-    for blueprint in all_blueprints:
-        app.register_blueprint(blueprint)
-
-    # Conditionally register Swagger UI in development mode only
+def register_routers(app: FastAPI) -> None:
+    app.include_router(health_router)
+    app.include_router(pubchem_router)
+    app.include_router(smiles_router)
+    app.include_router(settings_router)
+    app.include_router(system_router)
+    app.include_router(quantum_router)
+    app.include_router(agent_router)
+    app.include_router(chat_history_router)
     is_packaged = os.getenv('PYSCF_RESOURCES_PATH') is not None
     if not is_packaged:
-        from .swagger_ui import swagger_bp
-        app.register_blueprint(swagger_bp)
-        app.logger.info("✓ Swagger UI registered at /api-docs/ (development mode)")
+        app.include_router(swagger_router)
+        logger.info("Swagger UI registered at /api-docs/ (development mode)")
     else:
-        app.logger.info("✗ Swagger UI not registered (packaged mode)")
+        logger.info("Swagger UI not registered (packaged mode)")
+    logger.info("Registered startup FastAPI routers")

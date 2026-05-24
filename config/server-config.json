@@ -6,12 +6,11 @@
   },
   "gunicorn": {
     "workers": 1,
-    "threads": 4,
-    "worker_class": "sync",
+    "worker_class": "uvicorn.workers.UvicornWorker",
     "timeout": 0,
-    "keep_alive": 30,
+    "keep_alive": 2,
     "preload_app": false,
-    "access_logfile": null,
+    "access_logfile": "-",
     "log_level": "info",
     "max_requests": 0,
     "max_requests_jitter": 0,
@@ -23,12 +22,12 @@
     "cors_allowed_origins": [
       "http://127.0.0.1:*",
       "ws://127.0.0.1:*",
-      "file://"
+      "file://",
+      "null"
     ],
-    "async_mode": "threading",
+    "async_mode": "asgi",
     "ping_timeout": 60,
     "ping_interval": 25,
-    "allow_unsafe_werkzeug": false,
     "logger": true,
     "engineio_logger": false
   },

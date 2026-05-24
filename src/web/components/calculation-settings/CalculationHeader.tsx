@@ -119,8 +119,7 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                             'cpu_cores',
                             Math.min(
                               CPU_CORES_INPUT.max,
-                              (params.cpu_cores ?? CPU_CORES_INPUT.fallback) +
-                                1
+                              (params.cpu_cores ?? CPU_CORES_INPUT.fallback) + 1
                             )
                           )
                         }
@@ -136,8 +135,7 @@ export const CalculationHeader = React.memo<CalculationHeaderProps>(
                             'cpu_cores',
                             Math.max(
                               CPU_CORES_INPUT.min,
-                              (params.cpu_cores ?? CPU_CORES_INPUT.fallback) -
-                                1
+                              (params.cpu_cores ?? CPU_CORES_INPUT.fallback) - 1
                             )
                           )
                         }

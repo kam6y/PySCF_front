@@ -157,5 +157,8 @@ jobs:
     - name: Type check TypeScript
       run: npx tsc --noEmit
     
+    - name: Run frontend tests
+      run: npm run test:web
+
     - name: Check code formatting
       run: npm run format:check

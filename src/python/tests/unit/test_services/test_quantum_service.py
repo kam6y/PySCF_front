@@ -10,7 +10,7 @@ import pytest
 from quantum_calc import CalculationError
 from quantum_calc._calculation_repository import CalculationRepository
 from services.quantum_service import QuantumService
-from services.exceptions import ServiceError, ValidationError
+from services.exceptions import NotFoundError, ServiceError, ValidationError
 
 
 # ============================================================================
@@ -800,6 +800,49 @@ def test_recover_stale_non_terminal_calculations_preserves_existing_results(
     assert service.repository.read_calculation_results(str(calc_dir)) == expected_results
 
 
+def test_pause_calculation_recovers_stale_running_and_rejects_pause(
+    tmp_path,
+    mocker,
+):
+    """
+    GIVEN a persisted running calculation has no active or queued worker
+    WHEN pause is requested
+    THEN stale recovery marks it as error and pause is not accepted
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "stale-running-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_parameters(
+        str(calc_dir),
+        {"name": "Stale Running Calc", "created_at": "2026-05-20T00:00:00"},
+    )
+    service.repository.save_calculation_status(str(calc_dir), "running")
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+    process_manager.pause_calculation.return_value = True
+    mocker.patch(
+        "services.quantum_service.get_process_manager",
+        return_value=process_manager,
+    )
+
+    with pytest.raises(ValidationError, match="status: error"):
+        service.pause_calculation(calc_id)
+
+    process_manager.pause_calculation.assert_not_called()
+    assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+        "error",
+        None,
+    )
+    assert service.repository.read_calculation_results(str(calc_dir)) == {
+        "error": QuantumService.RESTART_INTERRUPTED_MESSAGE,
+    }
+
+
 @pytest.mark.parametrize("status", ["pending", "running", "waiting", "pausing"])
 def test_delete_calculation_rejects_non_terminal_status(tmp_path, mocker, status):
     """
@@ -1018,6 +1061,72 @@ def test_resume_calculation_returns_updated_waiting_status(tmp_path, mocker):
 
     assert response["calculation"]["status"] == "waiting"
     assert response["calculation"]["waitingReason"] == "All slots are busy"
+
+
+@pytest.mark.parametrize(
+    "service_method",
+    ["pause_calculation", "resume_calculation"],
+)
+def test_pause_resume_missing_calculation_raises_not_found(
+    tmp_path,
+    mocker,
+    service_method,
+):
+    """
+    GIVEN the calculation directory does not exist
+    WHEN pause or resume is requested
+    THEN the service raises NotFoundError before contacting the process manager
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+    get_process_manager_mock = mocker.patch(
+        "services.quantum_service.get_process_manager"
+    )
+
+    with pytest.raises(NotFoundError, match='Calculation "missing-calc" not found'):
+        getattr(service, service_method)("missing-calc")
+
+    get_process_manager_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("service_method", "manager_method", "status"),
+    [
+        ("pause_calculation", "pause_calculation", "running"),
+        ("resume_calculation", "resume_calculation", "paused"),
+    ],
+)
+def test_pause_resume_process_manager_not_found_value_error_raises_not_found(
+    tmp_path,
+    mocker,
+    service_method,
+    manager_method,
+    status,
+):
+    """
+    GIVEN the process manager reports a calculation as not found
+    WHEN pause or resume catches the manager ValueError
+    THEN it maps the error to NotFoundError instead of ValidationError
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "existing-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), status)
+
+    process_manager = mocker.Mock()
+    getattr(process_manager, manager_method).side_effect = ValueError(
+        f"Calculation not found: {calc_id}"
+    )
+    mocker.patch(
+        "services.quantum_service.get_process_manager",
+        return_value=process_manager,
+    )
+
+    with pytest.raises(NotFoundError, match=f'Calculation "{calc_id}" not found'):
+        getattr(service, service_method)(calc_id)
 
 
 # ============================================================================

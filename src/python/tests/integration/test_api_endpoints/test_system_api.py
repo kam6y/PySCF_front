@@ -43,8 +43,8 @@ class TestSystemDiagnosticsAPI:
         response = client.get("/api/debug/system-diagnostics")
 
         assert response.status_code == 200
-        response_text = response.get_data(as_text=True)
-        data = response.get_json()
+        response_text = response.text
+        data = response.json()
         settings_payload = data["data"]["settings"]["settings"]
         assert data["success"] is True
         assert settings_payload["gemini_api_key"] == "***"
@@ -83,7 +83,7 @@ class TestGpu4PyscfStatusAPI:
         response = client.get("/api/system/gpu4pyscf-status")
 
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data["success"] is True
         assert data["data"]["cuda_supported"] is True
         assert data["data"]["gpu4pyscf_installed"] is True
@@ -111,16 +111,18 @@ class TestGpu4PyscfInstallAPI:
             "pip_stdout": "",
             "pip_stderr": "",
         }
+        mock_get_host = mocker.patch(
+            "api.system._get_client_host",
+            return_value="127.0.0.1",
+        )
         mock_service = mocker.patch("api.system.get_system_service")
         mock_service.return_value.install_gpu4pyscf.return_value = mock_result
 
-        response = client.post(
-            "/api/system/gpu4pyscf-install",
-            environ_base={"REMOTE_ADDR": "127.0.0.1"},
-        )
+        response = client.post("/api/system/gpu4pyscf-install")
 
+        mock_get_host.assert_called_once()
         assert response.status_code == 200
-        data = response.get_json()
+        data = response.json()
         assert data["success"] is True
         assert data["data"]["status"]["gpu4pyscf_installed"] is True
         mock_service.return_value.install_gpu4pyscf.assert_called_once_with(
@@ -134,14 +136,12 @@ class TestGpu4PyscfInstallAPI:
         WHEN POST /api/system/gpu4pyscf-install is called
         THEN 403 Forbidden is returned
         """
+        mocker.patch("api.system._get_client_host", return_value="10.10.10.10")
         mock_service = mocker.patch("api.system.get_system_service")
 
-        response = client.post(
-            "/api/system/gpu4pyscf-install",
-            environ_base={"REMOTE_ADDR": "10.10.10.10"},
-        )
+        response = client.post("/api/system/gpu4pyscf-install")
 
         assert response.status_code == 403
-        data = response.get_json()
+        data = response.json()
         assert data["success"] is False
         mock_service.assert_not_called()

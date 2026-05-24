@@ -6,6 +6,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, Future
 from typing import Dict, Any, Optional, Callable, List
 import threading
+import time
 
 from .exceptions import ProcessManagerError, PauseRequestedException
 from .pause_manager import pause_manager
@@ -324,6 +325,12 @@ class CalculationProcessManager:
         if status != 'running':
             raise ValueError(f"Calculation is not running (status: {status})")
 
+        future = self.active_futures.get(calculation_id)
+        if future is None or future.done():
+            raise ValueError(
+                f"Calculation has no active worker (calculation_id: {calculation_id})"
+            )
+
         pause_manager.create_pause_flag_file(calc_dir)
         pause_manager.request_pause(calculation_id)
 
@@ -415,15 +422,77 @@ class CalculationProcessManager:
 
     # --- Lifecycle ---
 
-    def shutdown(self, wait: bool = True, timeout: Optional[float] = None):
+    def _cancel_active_futures(self) -> None:
+        for calculation_id, future in list(self.active_futures.items()):
+            if future.done():
+                continue
+            if future.cancel():
+                logger.info(f"Cancelled pending calculation future: {calculation_id}")
+            else:
+                logger.warning(
+                    f"Calculation {calculation_id} is already running; terminating worker process"
+                )
+
+    def _terminate_executor_processes(self, timeout: float) -> None:
+        if self.executor is None:
+            return
+
+        processes = getattr(self.executor, '_processes', None)
+        if not processes:
+            logger.info("No process pool workers to terminate")
+            return
+
+        worker_processes = [process for process in processes.values() if process is not None]
+        if not worker_processes:
+            logger.info("No process pool workers to terminate")
+            return
+
+        logger.warning(f"Terminating {len(worker_processes)} process pool workers")
+        for process in worker_processes:
+            if process.is_alive():
+                process.terminate()
+
+        deadline = time.monotonic() + timeout
+        for process in worker_processes:
+            remaining = max(0.0, deadline - time.monotonic())
+            if process.is_alive():
+                process.join(timeout=remaining)
+
+        stubborn_processes = [process for process in worker_processes if process.is_alive()]
+        if not stubborn_processes:
+            return
+
+        logger.warning(
+            f"Killing {len(stubborn_processes)} process pool workers that ignored SIGTERM"
+        )
+        for process in stubborn_processes:
+            kill = getattr(process, 'kill', None)
+            if kill is not None:
+                kill()
+            else:
+                process.terminate()
+        for process in stubborn_processes:
+            process.join(timeout=1.0)
+
+    def shutdown(
+        self,
+        wait: bool = True,
+        timeout: Optional[float] = None,
+        force: bool = False,
+    ) -> None:
         if self._shutdown:
             return
         self._shutdown = True
         self._stop_resource_monitoring()
         if self.executor:
-            logger.info(f"Shutting down process pool with {len(self.active_futures)} active calculations")
+            logger.info(
+                f"Shutting down process pool with {len(self.active_futures)} active calculations"
+            )
             try:
-                self.executor.shutdown(wait=wait, cancel_futures=not wait)
+                if force:
+                    self._cancel_active_futures()
+                    self._terminate_executor_processes(timeout or 5.0)
+                self.executor.shutdown(wait=wait, cancel_futures=force or not wait)
                 logger.info("Process pool shut down successfully")
             except Exception as e:
                 logger.error(f"Error during process pool shutdown: {e}")
@@ -499,8 +568,12 @@ def update_process_manager_settings():
             logger.warning(f"Failed to update process manager settings: {e}. Keeping current settings.")
 
 
-def shutdown_process_manager():
+def shutdown_process_manager(
+    wait: bool = True,
+    timeout: Optional[float] = None,
+    force: bool = False,
+) -> None:
     global _process_manager
     if _process_manager is not None:
-        _process_manager.shutdown()
+        _process_manager.shutdown(wait=wait, timeout=timeout, force=force)
         _process_manager = None

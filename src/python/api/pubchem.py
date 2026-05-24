@@ -1,54 +1,26 @@
-"""
-PubChem API endpoints.
-Handles molecular data retrieval from PubChem database and XYZ validation.
-"""
+"""PubChem API endpoints."""
 
-import logging
-from flask import Blueprint, jsonify
-from flask_pydantic import validate
+from fastapi import APIRouter
 
-from services import get_pubchem_service
 from generated_models import PubChemSearchRequest, XYZValidateRequest
+from services import get_pubchem_service
 
-# Set up logging
-logger = logging.getLogger(__name__)
-
-# Create pubchem blueprint
-pubchem_bp = Blueprint('pubchem', __name__)
+router = APIRouter(prefix='/api/pubchem')
 
 
-@pubchem_bp.route('/api/pubchem/search', methods=['POST'])
-@validate()
-def search_pubchem(body: PubChemSearchRequest):
-    """Search PubChem for a compound and return its 3D structure in XYZ format."""
-    pubchem_service = get_pubchem_service()
-
-    query = body.query
+@router.post('/search')
+def search_pubchem(body: PubChemSearchRequest) -> dict:
     search_type_value = body.searchType or "name"
     search_type = (
         search_type_value.value
         if hasattr(search_type_value, "value")
         else str(search_type_value)
     )
-
-    # Call service layer
-    result = pubchem_service.search_compound(query, search_type)
-
-    return jsonify({
-        'success': True,
-        'data': result
-    })
+    result = get_pubchem_service().search_compound(body.query, search_type)
+    return {'success': True, 'data': result}
 
 
-@pubchem_bp.route('/api/pubchem/validate', methods=['POST'])
-@validate()
-def validate_xyz_endpoint(body: XYZValidateRequest):
-    """Validate an XYZ format string."""
-    pubchem_service = get_pubchem_service()
-
-    xyz_string = body.xyz
-
-    # Call service layer
-    validation_result = pubchem_service.validate_xyz(xyz_string)
-
-    return jsonify({'success': True, 'data': validation_result})
+@router.post('/validate')
+def validate_xyz_endpoint(body: XYZValidateRequest) -> dict:
+    validation_result = get_pubchem_service().validate_xyz(body.xyz)
+    return {'success': True, 'data': validation_result}

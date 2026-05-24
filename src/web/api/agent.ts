@@ -4,6 +4,18 @@ import { getApiBaseUrl } from './core';
 
 type AgentChatRequest = components['schemas']['AgentChatRequest'];
 
+const isAbortError = (error: unknown, signal: AbortSignal): boolean => {
+  if (signal.aborted) {
+    return true;
+  }
+
+  if (typeof error !== 'object' || error === null || !('name' in error)) {
+    return false;
+  }
+
+  return error.name === 'AbortError';
+};
+
 export const streamChatWithAgent = (
   message: string,
   history: AgentChatRequest['history'],
@@ -41,9 +53,12 @@ export const streamChatWithAgent = (
         onopen: async response => {
           if (!response.ok) {
             const errorText = await response.text();
-            callbacks.onError(
-              new Error(`Failed to connect: ${response.status} ${errorText}`)
-            );
+            if (!isStreamClosed) {
+              isStreamClosed = true;
+              callbacks.onError(
+                new Error(`Failed to connect: ${response.status} ${errorText}`)
+              );
+            }
             ctrl.abort();
           }
         },
@@ -105,6 +120,11 @@ export const streamChatWithAgent = (
         },
 
         onerror(err) {
+          if (isAbortError(err, ctrl.signal)) {
+            isStreamClosed = true;
+            return;
+          }
+
           if (!isStreamClosed) {
             isStreamClosed = true;
             callbacks.onError(
@@ -115,6 +135,11 @@ export const streamChatWithAgent = (
         },
       });
     } catch (error) {
+      if (isAbortError(error, ctrl.signal)) {
+        isStreamClosed = true;
+        return;
+      }
+
       if (!isStreamClosed) {
         isStreamClosed = true;
         callbacks.onError(
@@ -124,5 +149,8 @@ export const streamChatWithAgent = (
     }
   })();
 
-  return () => ctrl.abort();
+  return () => {
+    isStreamClosed = true;
+    ctrl.abort();
+  };
 };

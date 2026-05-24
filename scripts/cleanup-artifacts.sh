@@ -1,6 +1,20 @@
 #!/bin/bash
 set -e
 
+clean_directory_contents() {
+  local target="$1"
+
+  if [ -d "$target" ]; then
+    find "$target" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+  else
+    mkdir -p "$target"
+  fi
+}
+
+echo "Cleaning webpack and packaging artifacts..."
+clean_directory_contents dist
+clean_directory_contents release
+
 echo "Cleaning development artifacts from src/python..."
 
 find src/python -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
