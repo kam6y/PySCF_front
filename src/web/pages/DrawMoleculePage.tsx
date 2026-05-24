@@ -205,6 +205,7 @@ const KetcherEditor = memo<{
       structServiceProvider={structServiceProvider}
       errorHandler={errorHandler}
       onInit={onInit}
+      disableMacromoleculesEditor={true}
     />
   );
 });

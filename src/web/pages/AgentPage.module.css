@@ -16,6 +16,12 @@
   flex-direction: column;
   gap: 12px;
   min-height: 0; /* Allow flexbox to shrink */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chatWindow::-webkit-scrollbar {
+  display: none;
 }
 
 /* Add spacing after the last message to prevent it from being too close to the input */
@@ -97,7 +103,7 @@
 
 .sendButton {
   padding: 12px 20px;
-  background-color: #50D4F5;
+  background-color: #50d4f5;
   color: white;
   border: none;
   border-radius: 8px;
@@ -129,7 +135,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -218,7 +225,9 @@
 }
 
 @keyframes typing {
-  0%, 60%, 100% {
+  0%,
+  60%,
+  100% {
     transform: translateY(0);
     opacity: 0.4;
   }
@@ -238,8 +247,14 @@
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* マークダウンスタイル */
@@ -304,7 +319,9 @@
   background-color: rgba(175, 184, 193, 0.2);
   padding: 2px 4px;
   border-radius: 4px;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
   font-size: 0.9em;
 }
 
@@ -315,7 +332,9 @@
   padding: 16px;
   margin: 12px 0;
   overflow-x: auto;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
   font-size: 0.85em;
   line-height: 1.4;
 }
@@ -542,9 +561,9 @@
 }
 
 .titleSaveButton {
-  background-color: #50D4F5;
+  background-color: #50d4f5;
   color: white;
-  border-color: #50D4F5;
+  border-color: #50d4f5;
 }
 
 .titleSaveButton:hover {
@@ -605,7 +624,7 @@
 
 /* Agent status bar styles */
 .agentStatusBar {
-  background: #50D4F5;
+  background: #50d4f5;
   padding: 10px 20px;
   margin: 0 20px;
   border-radius: 8px;
@@ -679,7 +698,7 @@
 
 .promptCard:hover {
   background-color: #f9fafb;
-  border-color: #50D4F5;
+  border-color: #50d4f5;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(80, 212, 245, 0.2);
 }
@@ -693,7 +712,7 @@
   width: 20px;
   height: 20px;
   flex-shrink: 0;
-  color: #50D4F5;
+  color: #50d4f5;
 }
 
 .promptText {
