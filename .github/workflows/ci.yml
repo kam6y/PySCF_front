@@ -10,7 +10,13 @@ jobs:
   test-and-build:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            conda-platform: linux-64
+            conda-lock-file: .github/conda-locks/pyscf-env-linux-64.lock
+          - os: macos-latest
+            conda-platform: osx-arm64
+            conda-lock-file: .github/conda-locks/pyscf-env-osx-arm64.lock
 
     runs-on: ${{ matrix.os }}
     
@@ -28,20 +34,25 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/conda_pkgs_dir
-        key: ${{ runner.os }}-conda-v1-${{ hashFiles('.github/environment.yml') }}
+        key: ${{ runner.os }}-${{ matrix.conda-platform }}-conda-v2-${{ hashFiles('.github/pyscf-env.conda-lock.yml', matrix.conda-lock-file) }}
         restore-keys: |
-          ${{ runner.os }}-conda-v1-
+          ${{ runner.os }}-${{ matrix.conda-platform }}-conda-v2-
     
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v3
       with:
         miniforge-version: latest
-        activate-environment: pyscf-env
-        environment-file: .github/environment.yml
-        python-version: 3.12
-        auto-activate-base: false
+        activate-environment: ""
+        auto-activate-base: true
         use-only-tar-bz2: true
+        pkgs-dirs: ~/conda_pkgs_dir
         conda-remove-defaults: true
+
+    - name: Install locked conda environment
+      shell: bash -l {0}
+      run: |
+        conda install -n base -c conda-forge conda-lock=3.0.4 -y
+        conda-lock install --name pyscf-env .github/pyscf-env.conda-lock.yml
     
     - name: Install Node.js dependencies
       run: |
@@ -66,22 +77,26 @@ jobs:
     - name: Verify conda environment
       shell: bash -l {0}
       run: |
+        conda activate pyscf-env
         python scripts/verify-environment.py
 
     - name: Generate and check OpenAPI artifacts
       shell: bash -l {0}
       run: |
+        conda activate pyscf-env
         npm run codegen:check
 
     - name: Run Python tests
       shell: bash -l {0}
       run: |
+        conda activate pyscf-env
         cd src/python
         python -m pytest tests/ -v
 
     - name: Build application (production)
       shell: bash -l {0}
       run: |
+        conda activate pyscf-env
         # Clean build artifacts
         npm run clean:build-artifacts
 

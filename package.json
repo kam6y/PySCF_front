@@ -24,6 +24,8 @@
     "docker:package": "node scripts/docker-run.js",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
     "codegen:check": "npm run codegen && git diff --exit-code -- src/python/generated_models.py src/web/types/generated-api.ts",
+    "conda-lock:generate": "conda-lock -f .github/environment.yml --lockfile .github/pyscf-env.conda-lock.yml -p osx-arm64 -p osx-64 -p linux-64 && conda-lock render --kind explicit --filename-template .github/conda-locks/pyscf-env-{platform}.lock .github/pyscf-env.conda-lock.yml",
+    "conda-lock:check": "npm run conda-lock:generate && git diff --exit-code -- .github/pyscf-env.conda-lock.yml .github/conda-locks",
     "codegen:python": "cd src/python && bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description --disable-timestamp'",
     "setup-env": "./scripts/setup-environment.sh",
     "verify-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/verify-environment.py'",

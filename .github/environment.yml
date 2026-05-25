@@ -29,7 +29,7 @@ dependencies:
   - conda-pack=0.8.1
   - pip:
     # PySCF extensions
-    - git+https://github.com/pyscf/properties  # IR/Raman intensity calculations
+    - pyscf-properties @ git+https://github.com/pyscf/properties  # IR/Raman intensity calculations
     # Code generation and build tools
     - datamodel-code-generator==0.33.0
     # File system monitoring

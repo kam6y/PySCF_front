@@ -274,22 +274,27 @@ CI runs the same `npm run codegen:check` path and fails if either generated file
 
 ### Python Environment Reproducibility
 
-`.github/environment.yml` remains the canonical Python environment source. For fully reproducible macOS/Linux dependency resolution, the recommended follow-up is to add `conda-lock` and commit an OS-aware lock artifact generated from `.github/environment.yml`.
+`.github/environment.yml` remains the canonical human-edited Python environment source. Reproducible macOS/Linux dependency resolution is captured in committed conda-lock artifacts:
 
-Recommended target platforms:
+- `.github/pyscf-env.conda-lock.yml` — unified multi-platform lockfile used by CI and release workflows
+- `.github/conda-locks/pyscf-env-linux-64.lock`
+- `.github/conda-locks/pyscf-env-osx-arm64.lock`
+- `.github/conda-locks/pyscf-env-osx-64.lock`
+
+Locked target platforms:
 
 - `osx-arm64` for Apple Silicon macOS development
 - `osx-64` for Intel macOS compatibility if needed
 - `linux-64` for CI, WSL, and Linux packaging
 
-The expected follow-up flow is:
+Install the lock tool and refresh lock artifacts after changing `.github/environment.yml`:
 
 ```bash
-conda-lock -f .github/environment.yml -p osx-arm64 -p osx-64 -p linux-64
-conda-lock render --kind explicit
+conda install -n base -c conda-forge conda-lock=3.0.4
+npm run conda-lock:generate
 ```
 
-`conda-lock` defaults to a unified multi-platform lockfile and can render explicit per-platform lock files for direct conda installation. Lock adoption is tracked separately in issue #18 because it needs platform-specific solve verification and CI cache-key updates.
+CI and release jobs install from the unified lockfile with `conda-lock install` so both conda and pip dependencies are applied. The explicit per-platform lock files are kept for platform-specific cache keys and inspection.
 
 ---
 
@@ -492,22 +497,27 @@ CIも同じ `npm run codegen:check` を実行し、生成後に上記2ファイ�
 
 ### Python環境の再現性
 
-`.github/environment.yml` は引き続きPython環境定義の正本です。macOS/Linuxで依存解決を完全に再現可能にする次のステップとして、`conda-lock` を導入し、`.github/environment.yml` からOS別ロック成果物をコミットする方針を推奨します。
+`.github/environment.yml` は引き続き人が編集するPython環境定義の正本です。macOS/Linuxで再現可能な依存解決は、以下のコミット済みconda-lock成果物で固定します。
 
-推奨対象プラットフォーム:
+- `.github/pyscf-env.conda-lock.yml`: CIとrelease workflowで使う複数platform対応の統合lockfile
+- `.github/conda-locks/pyscf-env-linux-64.lock`
+- `.github/conda-locks/pyscf-env-osx-arm64.lock`
+- `.github/conda-locks/pyscf-env-osx-64.lock`
+
+lock対象プラットフォーム:
 
 - `osx-arm64`: Apple Silicon macOS開発環境
 - `osx-64`: 必要に応じたIntel macOS互換
 - `linux-64`: CI、WSL、Linuxパッケージング
 
-想定フロー:
+`.github/environment.yml` を変更したら、lockツールを用意して成果物を更新します。
 
 ```bash
-conda-lock -f .github/environment.yml -p osx-arm64 -p osx-64 -p linux-64
-conda-lock render --kind explicit
+conda install -n base -c conda-forge conda-lock=3.0.4
+npm run conda-lock:generate
 ```
 
-`conda-lock` はデフォルトで複数プラットフォーム対応の統合lockfileを生成でき、必要に応じてcondaへ直接渡せる明示的なプラットフォーム別lockfileも出力できます。導入時は各OSでのsolve検証とCIキャッシュキー更新が必要なため、issue #18 で別タスクとして追跡します。
+CIとrelease workflowは `conda-lock install` で統合lockfileから環境を作るため、conda依存とpip依存の両方が反映されます。明示的なplatform別lockfileは、platform別キャッシュキーと内容確認のために保持します。
 
 ---
 

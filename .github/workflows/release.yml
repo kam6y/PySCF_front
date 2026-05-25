@@ -12,8 +12,12 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
+            conda-platform: linux-64
+            conda-lock-file: .github/conda-locks/pyscf-env-linux-64.lock
           - os: macos-latest
             platform: darwin
+            conda-platform: osx-arm64
+            conda-lock-file: .github/conda-locks/pyscf-env-osx-arm64.lock
 
     runs-on: ${{ matrix.os }}
 
@@ -27,14 +31,29 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Cache conda environment
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-${{ matrix.conda-platform }}-conda-v2-${{ hashFiles('.github/pyscf-env.conda-lock.yml', matrix.conda-lock-file) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.conda-platform }}-conda-v2-
+
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
-          activate-environment: pyscf-env
-          environment-file: .github/environment.yml
-          python-version: 3.12
-          auto-activate-base: false
+          activate-environment: ""
+          auto-activate-base: true
+          use-only-tar-bz2: true
+          pkgs-dirs: ~/conda_pkgs_dir
+          conda-remove-defaults: true
+
+      - name: Install locked conda environment
+        shell: bash -l {0}
+        run: |
+          conda install -n base -c conda-forge conda-lock=3.0.4 -y
+          conda-lock install --name pyscf-env .github/pyscf-env.conda-lock.yml
 
       - name: Install Node.js dependencies
         run: |
