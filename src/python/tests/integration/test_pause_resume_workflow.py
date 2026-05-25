@@ -200,7 +200,10 @@ class TestPauseResumeWorkflow:
     @pytest.fixture
     def process_manager(self, mocker):
         manager = ControllablePauseResumeProcessManager()
-        mocker.patch('services.quantum_service.get_process_manager', return_value=manager)
+        mocker.patch(
+            'services.calculation_service_context.get_process_manager',
+            return_value=manager,
+        )
         return manager
 
     @pytest.fixture

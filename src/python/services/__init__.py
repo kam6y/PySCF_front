@@ -5,6 +5,11 @@ This module provides singleton instances of all service classes,
 ensuring consistent state across API endpoints and AI agent tools.
 """
 
+from .calculation_analysis_service import CalculationAnalysisService
+from .calculation_artifact_service import CalculationArtifactService
+from .calculation_command_service import CalculationCommandService
+from .calculation_query_service import CalculationQueryService
+from .calculation_service_context import CalculationServiceContext
 from .exceptions import (
     ServiceError,
     NotFoundError,
@@ -13,16 +18,16 @@ from .exceptions import (
     PermissionDeniedError,
     InsufficientResourcesError
 )
-from .quantum_service import QuantumService
-from .pubchem_service import PubChemService
-from .smiles_service import SMILESService
-from .settings_service import SettingsService
-from .system_service import SystemService
 from .notification_service import (
     NotificationService,
     get_notification_service,
     bind_notification_service
 )
+from .pubchem_service import PubChemService
+from .quantum_service import QuantumService
+from .settings_service import SettingsService
+from .smiles_service import SMILESService
+from .system_service import SystemService
 
 # Singleton instances
 _quantum_service = None
@@ -107,6 +112,11 @@ __all__ = [
     'InsufficientResourcesError',
     # Service classes
     'QuantumService',
+    'CalculationAnalysisService',
+    'CalculationArtifactService',
+    'CalculationCommandService',
+    'CalculationQueryService',
+    'CalculationServiceContext',
     'PubChemService',
     'SMILESService',
     'SettingsService',

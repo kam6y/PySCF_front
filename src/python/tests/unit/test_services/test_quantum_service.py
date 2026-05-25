@@ -11,8 +11,80 @@ import pytest
 
 from quantum_calc import CalculationError
 from quantum_calc._calculation_repository import CalculationRepository
-from services.quantum_service import QuantumService
+from services.calculation_analysis_service import CalculationAnalysisService
+from services.calculation_artifact_service import CalculationArtifactService
+from services.calculation_command_service import CalculationCommandService
+from services.calculation_query_service import CalculationQueryService
 from services.exceptions import NotFoundError, ServiceError, ValidationError
+from services.quantum_service import QuantumService
+
+
+def test_quantum_service_wires_focused_services_with_shared_context():
+    """
+    GIVEN QuantumService is initialized
+    WHEN its focused service boundaries are inspected
+    THEN command, query, artifact, and analysis services share one context
+    """
+    service = QuantumService()
+
+    assert isinstance(service.command_service, CalculationCommandService)
+    assert isinstance(service.query_service, CalculationQueryService)
+    assert isinstance(service.artifact_service, CalculationArtifactService)
+    assert isinstance(service.analysis_service, CalculationAnalysisService)
+    assert service.command_service.context is service.query_service.context
+    assert service.artifact_service.context is service.query_service.context
+    assert service.analysis_service.context is service.query_service.context
+
+
+def test_quantum_service_delegates_public_operations_to_focused_services(mocker):
+    """
+    GIVEN focused services are installed behind the QuantumService facade
+    WHEN representative public operations are called
+    THEN QuantumService delegates to the responsibility-specific services
+    """
+    service = QuantumService()
+    service.query_service = mocker.Mock()
+    service.command_service = mocker.Mock()
+    service.artifact_service = mocker.Mock()
+    service.analysis_service = mocker.Mock()
+
+    service.query_service.list_calculations.return_value = {"count": 0}
+    service.command_service.delete_calculation.return_value = {"deleted_id": "calc-1"}
+    service.artifact_service.generate_orbital_cube.return_value = {
+        "generation_params": {"file_size_kb": 1.0}
+    }
+    service.analysis_service.generate_ir_spectrum.return_value = {"spectrum": {}}
+
+    assert service.list_calculations(status="completed") == {"count": 0}
+    assert service.delete_calculation("calc-1") == {"deleted_id": "calc-1"}
+    assert service.generate_orbital_cube("calc-1", 2, grid_size=40) == {
+        "generation_params": {"file_size_kb": 1.0}
+    }
+    assert service.generate_ir_spectrum("calc-1", x_min=500.0) == {"spectrum": {}}
+
+    service.query_service.list_calculations.assert_called_once_with(
+        name_query=None,
+        status="completed",
+        calculation_method=None,
+        basis_function=None,
+        date_from=None,
+        date_to=None,
+    )
+    service.command_service.delete_calculation.assert_called_once_with("calc-1")
+    service.artifact_service.generate_orbital_cube.assert_called_once_with(
+        "calc-1",
+        2,
+        grid_size=40,
+        isovalue_pos=None,
+        isovalue_neg=None,
+    )
+    service.analysis_service.generate_ir_spectrum.assert_called_once_with(
+        "calc-1",
+        broadening_fwhm=100.0,
+        x_min=500.0,
+        x_max=4000.0,
+        show_peaks=True,
+    )
 
 
 # ============================================================================
@@ -490,12 +562,17 @@ def test_validate_gpu_enabled_rejects_unsupported_methods(
     THEN validation fails before a CPU calculation can be submitted
     """
     # ARRANGE
+    settings = SimpleNamespace(
+        calculations_directory=str(tmp_path),
+        gpu_acceleration_enabled=True,
+    )
     mocker.patch(
-        "services.quantum_service.get_current_settings",
-        return_value=SimpleNamespace(
-            calculations_directory=str(tmp_path),
-            gpu_acceleration_enabled=True,
-        ),
+        "services.calculation_service_context.get_current_settings",
+        return_value=settings,
+    )
+    mocker.patch(
+        "services.calculation_command_service.get_current_settings",
+        return_value=settings,
     )
     service = QuantumService()
     params = {
@@ -532,7 +609,10 @@ def test_get_supported_parameters_success(mocker):
         'exchange_correlations': ['B3LYP', 'PBE0', 'M06-2X']
     }
     
-    mocker.patch('services.quantum_service.get_all_supported_parameters', return_value=mock_params)
+    mocker.patch(
+        "services.calculation_query_service.get_all_supported_parameters",
+        return_value=mock_params,
+    )
     
     service = QuantumService()
     
@@ -553,7 +633,7 @@ def test_get_supported_parameters_error(mocker):
     """
     # ARRANGE
     mocker.patch(
-        'services.quantum_service.get_all_supported_parameters',
+        'services.calculation_query_service.get_all_supported_parameters',
         side_effect=RuntimeError('Module error')
     )
     
@@ -595,7 +675,10 @@ def test_start_calculation_preserves_terminal_status_written_during_submit(tmp_p
     process_manager.get_active_calculations.return_value = []
     process_manager.get_queued_calculations.return_value = []
     process_manager.submit_calculation.side_effect = complete_during_submit
-    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
 
     response = service.start_calculation(params)
     calc_dir = tmp_path / response["id"]
@@ -636,7 +719,10 @@ def test_start_calculation_does_not_recover_new_pending_before_submit(
     process_manager.get_active_calculations.return_value = []
     process_manager.get_queued_calculations.return_value = []
     process_manager.submit_calculation.return_value = (True, "running", None)
-    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
 
     response = service.start_calculation(params)
     calc_dir = tmp_path / response["id"]
@@ -657,12 +743,17 @@ def test_start_calculation_saves_gpu_setting_snapshot(tmp_path, mocker):
     WHEN start_calculation persists and submits the job
     THEN the job parameters include that GPU setting snapshot
     """
+    settings = SimpleNamespace(
+        calculations_directory=str(tmp_path),
+        gpu_acceleration_enabled=True,
+    )
     mocker.patch(
-        "services.quantum_service.get_current_settings",
-        return_value=SimpleNamespace(
-            calculations_directory=str(tmp_path),
-            gpu_acceleration_enabled=True,
-        ),
+        "services.calculation_service_context.get_current_settings",
+        return_value=settings,
+    )
+    mocker.patch(
+        "services.calculation_command_service.get_current_settings",
+        return_value=settings,
     )
     service = QuantumService()
 
@@ -680,7 +771,10 @@ def test_start_calculation_saves_gpu_setting_snapshot(tmp_path, mocker):
     process_manager.get_active_calculations.return_value = []
     process_manager.get_queued_calculations.return_value = []
     process_manager.submit_calculation.return_value = (True, "running", None)
-    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
 
     response = service.start_calculation(params)
     calc_dir = tmp_path / response["id"]
@@ -849,7 +943,7 @@ def test_pause_calculation_recovers_stale_running_and_rejects_pause(
     process_manager.get_queued_calculations.return_value = []
     process_manager.pause_calculation.return_value = True
     mocker.patch(
-        "services.quantum_service.get_process_manager",
+        "services.calculation_service_context.get_process_manager",
         return_value=process_manager,
     )
 
@@ -887,8 +981,13 @@ def test_delete_calculation_rejects_non_terminal_status(tmp_path, mocker, status
         service.repository.save_calculation_status(str(calc_dir), status)
 
     process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = [calc_id]
+    process_manager.get_queued_calculations.return_value = []
     process_manager.is_running.return_value = False
-    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
 
     with pytest.raises(ValidationError, match="Cannot delete calculation"):
         service.delete_calculation(calc_id)
@@ -927,7 +1026,9 @@ def test_generate_orbital_cube_rejects_out_of_range_parameters(
     calc_dir = tmp_path / calc_id
     calc_dir.mkdir()
     service.repository.save_calculation_status(str(calc_dir), "completed")
-    orbital_generator = mocker.patch("services.quantum_service.MolecularOrbitalGenerator")
+    orbital_generator = mocker.patch(
+        "services.calculation_artifact_service.MolecularOrbitalGenerator"
+    )
 
     with pytest.raises(ValidationError, match=match):
         service.generate_orbital_cube(
@@ -962,7 +1063,7 @@ def test_generate_orbital_cube_accepts_contract_boundary_parameters(tmp_path, mo
         "cached": False,
     }
     orbital_generator = mocker.patch(
-        "services.quantum_service.MolecularOrbitalGenerator",
+        "services.calculation_artifact_service.MolecularOrbitalGenerator",
         return_value=generator,
     )
 
@@ -1008,7 +1109,7 @@ def test_generate_orbital_cube_invalid_orbital_index_returns_validation_error(
         "Invalid orbital index: 12. Available range: 0-5"
     )
     mocker.patch(
-        "services.quantum_service.MolecularOrbitalGenerator",
+        "services.calculation_artifact_service.MolecularOrbitalGenerator",
         return_value=generator,
     )
 
@@ -1036,7 +1137,7 @@ def test_generate_orbital_cube_generation_error_stays_service_error(tmp_path, mo
         "Failed to generate CUBE file"
     )
     mocker.patch(
-        "services.quantum_service.MolecularOrbitalGenerator",
+        "services.calculation_artifact_service.MolecularOrbitalGenerator",
         return_value=generator,
     )
 
@@ -1077,8 +1178,13 @@ def test_resume_calculation_returns_updated_waiting_status(tmp_path, mocker):
         }
 
     process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = [calc_id]
     process_manager.resume_calculation.side_effect = resume_and_queue
-    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
 
     response = service.resume_calculation(calc_id)
 
@@ -1103,7 +1209,7 @@ def test_pause_resume_missing_calculation_raises_not_found(
     service = QuantumService()
     service.repository = CalculationRepository(base_dir=str(tmp_path))
     get_process_manager_mock = mocker.patch(
-        "services.quantum_service.get_process_manager"
+        "services.calculation_service_context.get_process_manager"
     )
 
     with pytest.raises(NotFoundError, match='Calculation "missing-calc" not found'):
@@ -1144,7 +1250,7 @@ def test_pause_resume_process_manager_not_found_value_error_raises_not_found(
         f"Calculation not found: {calc_id}"
     )
     mocker.patch(
-        "services.quantum_service.get_process_manager",
+        "services.calculation_service_context.get_process_manager",
         return_value=process_manager,
     )
 

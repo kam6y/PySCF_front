@@ -433,7 +433,7 @@ class TestCalculationPauseAPI:
         process_manager.get_queued_calculations.return_value = []
         process_manager.pause_calculation.return_value = True
         mocker.patch(
-            "services.quantum_service.get_process_manager",
+            "services.calculation_service_context.get_process_manager",
             return_value=process_manager,
         )
         mocker.patch("api.quantum.get_quantum_service", return_value=service)
@@ -543,7 +543,10 @@ class TestCalculationDeletionAPI:
         process_manager = mocker.Mock()
         process_manager.get_active_calculations.return_value = []
         process_manager.get_queued_calculations.return_value = []
-        mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+        mocker.patch(
+            "services.calculation_service_context.get_process_manager",
+            return_value=process_manager,
+        )
         mocker.patch("api.quantum.get_quantum_service", return_value=service)
 
         response = client.delete("/api/quantum/calculations/%2e%2e")

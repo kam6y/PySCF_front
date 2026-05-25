@@ -360,7 +360,7 @@ class TestCalculationWorkflowSync:
             side_effect=completed_worker,
         )
         mock_orbital_generator = mocker.patch(
-            'services.quantum_service.MolecularOrbitalGenerator',
+            'services.calculation_artifact_service.MolecularOrbitalGenerator',
         )
         mock_orbital_generator.return_value.validate_calculation.return_value = True
         mock_orbital_generator.return_value.get_orbital_summary.return_value = (
