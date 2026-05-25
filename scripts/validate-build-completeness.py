@@ -223,9 +223,15 @@ def check_frontend_build(project_root: Path) -> bool:
     
     required_files = [
         "index.html",
+        "splash.html",
         "main.js",
         "preload.js",
-        "app.js",
+        "splashPreload.js",
+    ]
+
+    required_asset_patterns = [
+        "assets/index-*.js",
+        "assets/splash-*.js",
     ]
     
     all_exist = True
@@ -235,6 +241,15 @@ def check_frontend_build(project_root: Path) -> bool:
             log_success(f"✓ {file_name}")
         else:
             log_error(f"✗ {file_name} が見つかりません")
+            all_exist = False
+
+    for pattern in required_asset_patterns:
+        matches = sorted(dist_path.glob(pattern))
+        if matches:
+            for match in matches:
+                log_success(f"✓ {_display_path(project_root, match)}")
+        else:
+            log_error(f"✗ {pattern} に一致するファイルが見つかりません")
             all_exist = False
     
     return all_exist
@@ -353,7 +368,7 @@ def main() -> None:
         print("2. 該当するビルドステップを再実行:")
         print("   - conda環境: npm run build:conda-pack")
   
-        print("   - フロントエンド: npm run build:webpack")
+        print("   - フロントエンド: npm run build:electron")
         print("3. 再度検証: npm run validate-build")
         sys.exit(1)
 

@@ -100,8 +100,8 @@ jobs:
         # Clean build artifacts
         npm run clean:build-artifacts
 
-        # Build webpack
-        npm run build:webpack
+        # Build Electron renderer/main bundles
+        npm run build:electron
 
         # Build conda-pack (CI version - without conda.sh sourcing)
         # Ensure setuptools is available (conda-pack requires pkg_resources)
@@ -169,6 +169,9 @@ jobs:
     
     - name: Type check TypeScript
       run: npx tsc --noEmit
+
+    - name: Run Electron main tests
+      run: npm run test:main
     
     - name: Run frontend tests
       run: npm run test:web

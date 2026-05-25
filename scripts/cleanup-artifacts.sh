@@ -11,7 +11,7 @@ clean_directory_contents() {
   fi
 }
 
-echo "Cleaning webpack and packaging artifacts..."
+echo "Cleaning electron-vite and packaging artifacts..."
 clean_directory_contents dist
 clean_directory_contents release
 

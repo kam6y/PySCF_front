@@ -1,6 +1,7 @@
 import { BrowserWindow, app } from 'electron';
 import path from 'path';
 import type { SplashStage, SplashStatusUpdate } from '../types/splash';
+import { getSplashRendererEntry } from './renderer-entry';
 
 let splashWindow: BrowserWindow | null = null;
 
@@ -31,9 +32,18 @@ export const createSplashWindow = (): void => {
     },
   });
 
-  // splash.htmlを読み込み
   const splashPath = path.join(__dirname, 'splash.html');
-  splashWindow.loadFile(splashPath);
+  const rendererEntry = getSplashRendererEntry({
+    htmlPath: splashPath,
+    isPackaged: app.isPackaged,
+    rendererUrl: process.env.ELECTRON_RENDERER_URL,
+  });
+
+  if (rendererEntry.type === 'url') {
+    splashWindow.loadURL(rendererEntry.url);
+  } else {
+    splashWindow.loadFile(rendererEntry.path);
+  }
 
   // 開発環境でのみDevToolsを自動で開く（オプション）
   if (!app.isPackaged && process.env.DEBUG_SPLASH === 'true') {

@@ -1,13 +1,11 @@
 import { app, Menu, shell, dialog } from 'electron';
 import path from 'node:path';
+import packageJson from '../../package.json';
 
 /**
  * Aboutダイアログを表示する関数
  */
 export const showAboutDialog = (): void => {
-  // In dev: dist/main/menu.js -> ../../package.json
-  const packageJson = require('../../package.json');
-
   const aboutMessage = `${packageJson.description}
 
 Version: ${packageJson.version}
@@ -145,14 +143,12 @@ export const createApplicationMenu = (): void => {
         {
           label: 'Learn More',
           click: async () => {
-            const packageJson = require('../../package.json');
             await shell.openExternal(packageJson.homepage);
           },
         },
         {
           label: 'Report Issue',
           click: async () => {
-            const packageJson = require('../../package.json');
             await shell.openExternal(packageJson.bugs.url);
           },
         },

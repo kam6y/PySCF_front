@@ -235,7 +235,7 @@ def check_project_structure() -> bool:
     required_files = [
         'package.json',
         'tsconfig.json',
-        'webpack.config.ts',
+        'electron.vite.config.ts',
         '.github/environment.yml',
         'src/main.ts',
         'src/python/app.py',

@@ -1,5 +1,6 @@
 import { BrowserWindow, app } from 'electron';
 import path from 'node:path';
+import { getMainRendererEntry } from './renderer-entry';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -85,13 +86,21 @@ export const createWindow = (
 
   // ポート番号をURLパラメータとして渡す
   // 認証トークンはセキュリティのためIPC経由で送信
-  // dist/index.html
   const htmlPath = path.join(__dirname, 'index.html');
-  newWindow.loadFile(htmlPath, {
-    query: {
-      backend_port: String(backendPort),
-    },
+  const rendererEntry = getMainRendererEntry({
+    backendPort,
+    htmlPath,
+    isPackaged: app.isPackaged,
+    rendererUrl: process.env.ELECTRON_RENDERER_URL,
   });
+
+  if (rendererEntry.type === 'url') {
+    newWindow.loadURL(rendererEntry.url);
+  } else {
+    newWindow.loadFile(rendererEntry.path, {
+      query: rendererEntry.query,
+    });
+  }
 
   // ウィンドウのロード完了後にIPCで認証トークンを送信
   // リロード時にもトークンを送信するため 'on' を使用

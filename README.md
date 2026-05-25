@@ -32,7 +32,7 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
 -   **Frontend**: React, TypeScript, TanStack Query, Zustand
 -   **Backend**: Python, FastAPI, Gunicorn/Uvicorn, PySCF, RDKit, GPU4PySCF (optional, Linux)
 -   **Desktop Framework**: Electron
--   **Build Tools**: Webpack, Electron Builder, conda-pack
+-   **Build Tools**: electron-vite, Electron Builder, conda-pack
 -   **Package Management**: npm (Node.js), conda (Python)
 -   **API Specification**: OpenAPI (Swagger)
 
@@ -78,6 +78,7 @@ Follow these steps to set up the development environment easily:
     conda activate pyscf-env
     npm run dev
     ```
+    `npm run dev` starts the electron-vite development server without regenerating OpenAPI artifacts. After editing `src/api-spec/openapi.yaml`, run `npm run dev:codegen` once, or run `npm run codegen` separately before starting dev.
 
 ### Manual Setup
 
@@ -224,7 +225,7 @@ npm run package:linux
 
 The built AppImage will be available in the `dist/` directory.
 
-**Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, packaged backend source verification, and electron-builder) in the Linux environment.
+**Note**: The `package:linux` script automatically runs the full build process (code generation, electron-vite build, conda-pack, packaged backend source verification, and electron-builder) in the Linux environment.
 
 ---
 
@@ -262,6 +263,12 @@ After editing the OpenAPI spec, regenerate both files through the shared local/C
 
 ```bash
 npm run codegen
+```
+
+For development startup immediately after an API contract edit, use:
+
+```bash
+npm run dev:codegen
 ```
 
 Before opening a pull request, check that generated artifacts are current:
@@ -352,7 +359,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 -   **フロントエンド:** React, TypeScript, TanStack Query, Zustand
 -   **バックエンド:** Python, FastAPI, Gunicorn/Uvicorn, PySCF, RDKit, GPU4PySCF (オプション、Linux)
 -   **デスクトップフレームワーク:** Electron
--   **ビルドツール:** Webpack, Electron Builder, conda-pack
+-   **ビルドツール:** electron-vite, Electron Builder, conda-pack
 -   **パッケージ管理:** npm (Node.js), conda (Python)
 -   **API仕様:** OpenAPI (Swagger)
 
@@ -391,6 +398,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     conda activate pyscf-env
     npm run dev
     ```
+    `npm run dev` は electron-vite の開発サーバーを起動し、OpenAPI生成物は再生成しません。`src/api-spec/openapi.yaml` を変更した後は、初回のみ `npm run dev:codegen` を使うか、事前に `npm run codegen` を実行してください。
 
 ### 手動セットアップ
 
@@ -485,6 +493,12 @@ OpenAPI仕様を変更したら、ローカルとCIで共通のコマンド経�
 
 ```bash
 npm run codegen
+```
+
+API契約を変更した直後に開発起動までまとめて行う場合は、以下を使います。
+
+```bash
+npm run dev:codegen
 ```
 
 PR作成前には、生成物が最新か確認します。
