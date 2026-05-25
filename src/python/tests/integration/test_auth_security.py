@@ -7,7 +7,10 @@ TEST_TOKEN = "pytest-test-token-12345"
 
 
 def make_auth_client(monkeypatch, token=TEST_TOKEN, env='development'):
-    monkeypatch.setenv('PYSCF_AUTH_TOKEN', token)
+    if token is None:
+        monkeypatch.delenv('PYSCF_AUTH_TOKEN', raising=False)
+    else:
+        monkeypatch.setenv('PYSCF_AUTH_TOKEN', token)
     monkeypatch.setenv('PYSCF_ENV', env)
     monkeypatch.delenv('PYSCF_RESOURCES_PATH', raising=False)
     app = create_fastapi_app(server_port=5000, test_config={'TESTING': env != 'production'})
@@ -80,3 +83,23 @@ def test_api_docs_requires_token_outside_development(monkeypatch):
 
     assert response.status_code == 401
     assert response.json() == {'success': False, 'error': 'Unauthorized'}
+
+
+def test_missing_token_in_production(monkeypatch):
+    """Test that production requests fail when no auth token is configured."""
+    with make_auth_client(monkeypatch, token=None, env='production') as client:
+        response = client.get('/health')
+
+    assert response.status_code == 401
+    assert response.json() == {
+        'success': False,
+        'error': 'Unauthorized: Missing authentication token',
+    }
+
+
+def test_missing_token_in_development(monkeypatch):
+    """Test that development requests are allowed when no auth token is configured."""
+    with make_auth_client(monkeypatch, token=None, env='development') as client:
+        response = client.get('/health')
+
+    assert response.status_code != 401

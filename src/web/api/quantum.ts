@@ -14,8 +14,6 @@ import {
 } from '../types/api-types';
 import { request, ApiError } from './core';
 
-export type StartCalculationResponse = StartCalculationResponseData;
-
 const validateCalculationId = (id: string | null, endpoint: string) => {
   if (!id || id === 'undefined' || id === 'null') {
     throw new ApiError(
@@ -45,8 +43,8 @@ export const getCalculationDetails = (
 
 export const startCalculation = (
   params: QuantumCalculationRequest
-): Promise<StartCalculationResponse> => {
-  return request<StartCalculationResponse>('/api/quantum/calculate', {
+): Promise<StartCalculationResponseData> => {
+  return request<StartCalculationResponseData>('/api/quantum/calculate', {
     method: 'POST',
     body: JSON.stringify(params),
   });

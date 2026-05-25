@@ -48,6 +48,57 @@ class SettingsService:
         raise ServiceError(error_message)
 
     @staticmethod
+    def _rollback_successful_directory_migration(
+        move_result: Dict[str, Any],
+        current_calc_dir: str,
+    ) -> None:
+        """Move calculation data back after a later settings update failure."""
+        if (
+            move_result.get("success") is not True
+            or move_result.get("moved_count", 0) <= 0
+        ):
+            return
+
+        new_path = move_result.get("new_path")
+        old_path = move_result.get("old_path", current_calc_dir)
+        if not new_path or not old_path:
+            logger.warning(
+                "Cannot roll back calculations directory migration because paths are missing: "
+                f"{move_result}"
+            )
+            return
+
+        logger.warning(
+            "Settings save failed after calculations directory migration; "
+            f"rolling back {new_path} -> {old_path}"
+        )
+        try:
+            rollback_migration = CalculationDirectoryMigration(base_dir=new_path)
+            rollback_result = rollback_migration.move_calculations_directory(old_path)
+        except Exception as rollback_error:
+            logger.error(
+                f"Failed to roll back calculations directory migration: {rollback_error}",
+                exc_info=True,
+            )
+            raise ServiceError(
+                "Failed to update settings after moving calculations directory, "
+                f"and rollback failed: {rollback_error}"
+            ) from rollback_error
+
+        if rollback_result.get("success") is not True:
+            logger.error(
+                f"Failed to roll back calculations directory migration: {rollback_result}"
+            )
+            raise ServiceError(
+                "Failed to update settings after moving calculations directory, "
+                f"and rollback failed: {rollback_result.get('message', 'Move operation failed')}"
+            )
+
+        logger.info(
+            "Rolled back calculations directory migration after settings save failure"
+        )
+
+    @staticmethod
     def _raise_if_calculations_directory_change_blocked() -> None:
         """Reject directory changes while calculations are managed in memory."""
         process_manager = get_process_manager()
@@ -135,7 +186,15 @@ class SettingsService:
                     raise ServiceError(f'Failed to move calculations directory: {str(move_error)}')
 
             # Update settings
-            updated_settings = update_app_settings(new_settings)
+            try:
+                updated_settings = update_app_settings(new_settings)
+            except Exception:
+                if new_calc_dir and new_calc_dir != current_calc_dir and move_result:
+                    self._rollback_successful_directory_migration(
+                        move_result,
+                        current_calc_dir,
+                    )
+                raise
 
             # Update process manager with new parallel instance limit
             try:

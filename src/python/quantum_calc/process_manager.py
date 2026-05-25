@@ -13,6 +13,7 @@ from .pause_manager import pause_manager
 from ._worker_runtime import calculation_worker, _worker_initializer
 from ._queue_scheduler import CalculationQueueScheduler
 from ._status_transition import CalculationStatusManager, CalculationStatus
+from .resource_manager import AllocationStatus as _AllocationStatus
 
 logger = logging.getLogger(__name__)
 
@@ -168,11 +169,11 @@ class CalculationProcessManager:
             parameters, len(self.active_futures), self.scheduler.max_parallel_instances
         )
 
-        if allocation_status == AllocationStatus.INSUFFICIENT_RESOURCES:
+        if allocation_status == _AllocationStatus.INSUFFICIENT_RESOURCES:
             logger.error(f"System resources insufficient for calculation {calculation_id}: {reason}")
             return False, 'error', reason
 
-        if allocation_status == AllocationStatus.SHOULD_QUEUE:
+        if allocation_status == _AllocationStatus.SHOULD_QUEUE:
             self.scheduler.enqueue(calculation_id, parameters, reason)
             self.status_manager.notify(calculation_id, 'waiting', None)
             return True, 'waiting', reason
@@ -490,9 +491,6 @@ class CalculationProcessManager:
 
 
 # --- Global process manager ---
-
-from .resource_manager import AllocationStatus  # re-export for backward compat
-
 _process_manager: Optional[CalculationProcessManager] = None
 
 

@@ -46,11 +46,14 @@ class BaseCalculator(
         self.geomopt_maxsteps = geomopt_maxsteps
         self.geomopt_conv_energy = geomopt_conv_energy
         self.gpu_enabled = False
+        self.gpu_acceleration_enabled: Optional[bool] = None
         self._gpu4pyscf_available: Optional[bool] = None
         self._cuda_supported: Optional[bool] = None
 
     def _is_gpu_acceleration_enabled(self) -> bool:
         """Check whether GPU acceleration is enabled in app settings."""
+        if self.gpu_acceleration_enabled is not None:
+            return bool(self.gpu_acceleration_enabled)
         try:
             from .settings_manager import get_current_settings
             settings = get_current_settings()
@@ -234,6 +237,7 @@ class BaseCalculator(
             'memory_mb': kwargs.get('memory_mb', self._get_default_memory_mb()),
             'density_fitting': kwargs.get('density_fitting', False),
             'auxiliary_basis': kwargs.get('auxiliary_basis', None),
+            'gpu_acceleration_enabled': kwargs.get('gpu_acceleration_enabled'),
         }
     
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
@@ -281,6 +285,7 @@ class BaseCalculator(
         self.max_cycle = common_params['max_cycle']
         self.solvent_method = common_params['solvent_method']
         self.solvent = common_params['solvent']
+        self.gpu_acceleration_enabled = common_params.get('gpu_acceleration_enabled')
 
         # Store spin in results so _create_scf_method can access it
         self.results['spin'] = common_params['spin']

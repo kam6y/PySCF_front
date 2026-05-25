@@ -424,6 +424,10 @@ class CalculationParameters(BaseModel):
     )
     cpu_cores: Optional[int] = None
     memory_mb: Optional[int] = None
+    gpu_acceleration_enabled: Optional[bool] = Field(
+        None,
+        description='GPU acceleration setting snapshot captured when the calculation job was submitted',
+    )
     created_at: Optional[AwareDatetime] = None
     tddft_nstates: Optional[int] = Field(
         None, description='Number of excited states (TDDFT only)'

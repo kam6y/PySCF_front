@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import pytest
 
 import services.settings_service as settings_service_module
-from services.exceptions import ValidationError
+from services.exceptions import ServiceError, ValidationError
 from services.settings_service import SettingsService
 
 
@@ -175,3 +175,56 @@ def test_update_settings_with_directory_migration_conflict_keeps_current_setting
     assert (old_calc_a / "metadata.json").read_text(encoding="utf-8") == "old a"
     assert (old_calc_b / "metadata.json").read_text(encoding="utf-8") == "old b"
     assert (existing_new_calc_b / "metadata.json").read_text(encoding="utf-8") == "new b"
+
+
+def test_update_settings_rolls_back_directory_migration_when_settings_save_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    GIVEN calculations were moved to a new directory
+    WHEN persisting the new settings fails afterward
+    THEN calculation data is moved back to the configured old directory
+    """
+    old_dir = tmp_path / "old_calculations"
+    new_dir = tmp_path / "new_calculations"
+    old_calc = old_dir / "calc_a"
+
+    old_calc.mkdir(parents=True)
+    (old_calc / "metadata.json").write_text("old a", encoding="utf-8")
+
+    current_settings = SimpleNamespace(calculations_directory=str(old_dir))
+    update_app_settings = Mock(side_effect=RuntimeError("settings file locked"))
+    quantum_service = Mock()
+
+    monkeypatch.setattr(
+        settings_service_module,
+        "get_current_settings",
+        lambda: current_settings,
+    )
+    monkeypatch.setattr(settings_service_module, "update_app_settings", update_app_settings)
+    monkeypatch.setattr(
+        settings_service_module,
+        "get_process_manager",
+        lambda: SimpleNamespace(
+            get_active_calculations=Mock(return_value=[]),
+            get_queued_calculations=Mock(return_value=[]),
+            set_max_parallel_instances=Mock(),
+        ),
+    )
+    monkeypatch.setattr(
+        settings_service_module,
+        "get_resource_manager",
+        lambda: SimpleNamespace(update_resource_constraints=Mock()),
+    )
+    monkeypatch.setattr("services.get_quantum_service", lambda: quantum_service)
+
+    service = SettingsService()
+
+    with pytest.raises(ServiceError, match="settings file locked"):
+        service.update_settings({"calculations_directory": str(new_dir)})
+
+    update_app_settings.assert_called_once_with({"calculations_directory": str(new_dir)})
+    quantum_service.update_calculations_directory.assert_not_called()
+    assert (old_calc / "metadata.json").read_text(encoding="utf-8") == "old a"
+    assert not (new_dir / "calc_a").exists()

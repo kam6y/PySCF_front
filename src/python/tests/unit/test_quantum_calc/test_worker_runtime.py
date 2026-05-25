@@ -7,7 +7,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from quantum_calc._worker_runtime import _create_calculator_instance
+from quantum_calc._worker_runtime import (
+    _create_calculator_instance,
+    _prepare_setup_parameters,
+)
 
 
 SUPPORTED_METHODS = ["DFT", "HF", "MP2", "CCSD", "CCSD_T", "TDDFT"]
@@ -82,3 +85,43 @@ def test_create_calculator_instance_preserves_explicit_optimize_geometry_false()
     )
 
     assert instances[0].kwargs["optimize_geometry"] is False
+
+
+def test_create_calculator_instance_rejects_unknown_method() -> None:
+    """
+    GIVEN an unsupported calculation method reaches the worker
+    WHEN the worker creates a calculator instance
+    THEN it should fail instead of silently running DFT
+    """
+    calculator_class, _ = _build_recording_calculator()
+
+    with pytest.raises(ValueError, match="Unsupported calculation method"):
+        _create_calculator_instance(
+            "UNKNOWN",
+            {"name": "Water", "calculation_method": "UNKNOWN"},
+            "/tmp/calc",
+            _calculator_classes(calculator_class),
+            Mock(),
+        )
+
+
+def test_prepare_setup_parameters_preserves_gpu_setting_snapshot() -> None:
+    """
+    GIVEN persisted job parameters include a GPU acceleration snapshot
+    WHEN worker setup parameters are prepared
+    THEN the calculator receives the persisted GPU setting
+    """
+    setup_params = _prepare_setup_parameters(
+        {
+            "calculation_method": "HF",
+            "basis_function": "sto-3g",
+            "charges": 0,
+            "spin": 0,
+            "solvent_method": "none",
+            "solvent": "-",
+            "gpu_acceleration_enabled": True,
+        },
+        memory_mb=1024,
+    )
+
+    assert setup_params["gpu_acceleration_enabled"] is True

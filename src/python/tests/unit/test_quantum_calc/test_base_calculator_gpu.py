@@ -120,6 +120,25 @@ def test_gpu_required_raises_when_enabled_but_unavailable(monkeypatch):
         calculator._require_gpu4pyscf_available()
 
 
+def test_gpu_acceleration_uses_job_snapshot_over_current_settings(monkeypatch):
+    """
+    GIVEN a calculator has a persisted GPU setting from job parameters
+    WHEN the current global setting differs
+    THEN the calculator uses the job snapshot
+    """
+    calculator = DummyCalculator(optimize_geometry=False)
+    calculator.gpu_acceleration_enabled = True
+
+    monkeypatch.setattr(
+        base_calculator,
+        "get_current_settings",
+        lambda: SimpleNamespace(gpu_acceleration_enabled=False),
+        raising=False,
+    )
+
+    assert calculator._is_gpu_acceleration_enabled() is True
+
+
 def test_hf_gpu_setup_failure_raises(tmp_path, monkeypatch):
     """
     GIVEN GPU prerequisites are available but GPU4PySCF HF setup fails
@@ -246,3 +265,40 @@ def test_tddft_gpu_kernel_failure_raises_without_cpu_fallback(tmp_path):
 
     with pytest.raises(CalculationError, match="GPU4PySCF TDDFT calculation failed"):
         calculator._perform_specific_calculation(-1.0)
+
+
+@pytest.mark.parametrize(
+    ("tddft_method", "factory_module", "factory_name"),
+    [
+        ("TDA", "tdscf", "TDA"),
+        ("TDDFT", "tddft", "TDDFT"),
+    ],
+)
+def test_tddft_gpu_requires_gpu_excited_state_factory(
+    tmp_path,
+    monkeypatch,
+    tddft_method,
+    factory_module,
+    factory_name,
+):
+    """
+    GIVEN GPU TDDFT execution is active but the GPU mean-field object lacks a TD factory
+    WHEN excited-state calculation setup starts
+    THEN CPU TDDFT/TDA is not constructed and CalculationError is raised
+    """
+    calculator = TDDFTCalculator(working_dir=str(tmp_path), optimize_geometry=False)
+    calculator.gpu_enabled = True
+    calculator.tddft_nstates = 1
+    calculator.tddft_method = tddft_method
+    calculator.mf = SimpleNamespace(
+        mo_energy=[-0.5, -0.1, 0.2, 0.4],
+        mo_occ=[2, 2, 0, 0],
+    )
+    cpu_factory = MagicMock()
+    module = getattr(sys.modules["quantum_calc.tddft_calculator"], factory_module)
+    monkeypatch.setattr(module, factory_name, cpu_factory)
+
+    with pytest.raises(CalculationError, match="GPU4PySCF .* factory is unavailable"):
+        calculator._perform_specific_calculation(-1.0)
+
+    cpu_factory.assert_not_called()

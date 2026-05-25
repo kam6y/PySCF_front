@@ -24,7 +24,6 @@
     "docker:package": "node scripts/docker-run.js",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
     "codegen:python": "cd src/python && bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description --disable-timestamp'",
-    "python-exec": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && \"$@\"' --",
     "setup-env": "./scripts/setup-environment.sh",
     "verify-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/verify-environment.py'",
     "verify-build-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && echo \"=== Build Environment Verification ===\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import conda_pack; print(f\\\"conda-pack: {conda_pack.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import fastapi, uvicorn, socketio; print(\\\"FastAPI ASGI stack verified\\\")\" && echo \"✓ All build tools verified\"'",
@@ -34,8 +33,6 @@
     "test:web": "ts-node --files src/web/api/agent.test.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\"",
-    "test:python-build": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && cd src/python && echo \"Testing Python build...\" && python -c \"import app; print(\\\"Python app imports successfully\\\")\"'",
-    "test:gunicorn-local": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && cd src/python && echo \"Testing Gunicorn/Uvicorn locally...\" && gunicorn --bind 127.0.0.1:5000 --workers 1 --worker-class uvicorn.workers.UvicornWorker --timeout 0 --log-level info app:app'",
     "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\"",
     "test:python-standalone": "node scripts/test-python-standalone.js",
     "release": "node scripts/bump-version.js",
@@ -148,7 +145,11 @@
           "!share/doc/**",
           "!share/info/**",
           "!share/gtk-doc/**",
-          "!**/*.la"
+          "!**/*.la",
+          "!**/__pycache__",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!**/*.pyo"
         ]
       },
       {

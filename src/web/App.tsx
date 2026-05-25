@@ -205,7 +205,7 @@ export const App = () => {
       // 削除された計算がアクティブだった場合はクリア
       if (calculationData.activeCalculationId === calculationId) {
         appState.calculation.selectCalculation(null);
-        appState.calculation.clearStaged();
+        appState.calculation.clearStagedCalculation();
         appState.ui.setCurrentPage('calculation-settings');
       }
     },
@@ -344,6 +344,8 @@ export const App = () => {
         onDropdownClose={appState.ui.closeDropdown}
         isAIAgentEnabled={appState.ui.isAIAgentEnabled}
         onAIAgentToggle={appState.ui.setAIAgentEnabled}
+        platform={platform}
+        isFullScreen={isFullScreen}
       />
 
       <Sidebar

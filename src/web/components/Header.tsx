@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { DropdownMenu, DropdownOption } from './DropdownMenu';
 import { AIAgentSwitch } from './AIAgentSwitch';
 import styles from './Header.module.css';
@@ -14,6 +14,8 @@ interface HeaderProps {
   onDropdownClose: () => void;
   isAIAgentEnabled: boolean;
   onAIAgentToggle: (enabled: boolean) => void;
+  platform: string;
+  isFullScreen: boolean;
 }
 
 export const Header = React.memo<HeaderProps>(
@@ -28,43 +30,9 @@ export const Header = React.memo<HeaderProps>(
     onDropdownClose,
     isAIAgentEnabled,
     onAIAgentToggle,
+    platform,
+    isFullScreen,
   }) => {
-    const [platform, setPlatform] = useState<string>('');
-    const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
-
-    // Get platform information on mount
-    useEffect(() => {
-      const fetchPlatform = async () => {
-        try {
-          const platformName = await window.electronAPI.getPlatform();
-          setPlatform(platformName);
-        } catch (error) {
-          console.error('Failed to get platform:', error);
-        }
-      };
-      fetchPlatform();
-    }, []);
-
-    // Get and monitor fullscreen state
-    useEffect(() => {
-      const fetchFullScreen = async () => {
-        try {
-          const fullScreen = await window.electronAPI.isFullScreen();
-          setIsFullScreen(fullScreen);
-        } catch (error) {
-          console.error('Failed to get fullscreen state:', error);
-        }
-      };
-      fetchFullScreen();
-
-      // Monitor fullscreen state changes
-      const cleanup = window.electronAPI.onFullScreenChange(fullScreen => {
-        setIsFullScreen(fullScreen);
-      });
-
-      return cleanup;
-    }, []);
-
     // Get page icon based on current page
     const getPageIcon = (page: DropdownOption) => {
       switch (page) {

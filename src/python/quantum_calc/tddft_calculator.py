@@ -82,13 +82,17 @@ class TDDFTCalculator(BaseCalculator):
         
         if tddft_method == 'TDA':
             # Tamm-Dancoff approximation
-            if self.gpu_enabled and hasattr(self.mf, "TDA"):
+            if self.gpu_enabled:
+                if not hasattr(self.mf, "TDA"):
+                    raise CalculationError("GPU4PySCF TDA factory is unavailable")
                 self.mytd = self.mf.TDA()
             else:
                 self.mytd = tdscf.TDA(self.mf)
         else:
             # Full TDDFT
-            if self.gpu_enabled and hasattr(self.mf, "TDDFT"):
+            if self.gpu_enabled:
+                if not hasattr(self.mf, "TDDFT"):
+                    raise CalculationError("GPU4PySCF TDDFT factory is unavailable")
                 self.mytd = self.mf.TDDFT()
             else:
                 self.mytd = tddft.TDDFT(self.mf)

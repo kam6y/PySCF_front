@@ -35,6 +35,7 @@ Thumbs.db
 !README.md
 
 # Test files
+src/python/tests/
 *.test.ts
 *.test.js
 *.spec.ts

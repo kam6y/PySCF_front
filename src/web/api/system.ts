@@ -1,17 +1,10 @@
-import { components } from '../types/generated-api';
+import type { components } from '../types/generated-api';
 import { request } from './core';
 
-type SystemResourceResponse = components['schemas']['SystemResourceResponse'];
 type Gpu4PyscfStatusResponse = components['schemas']['Gpu4PyscfStatusResponse'];
 type Gpu4PyscfInstallResponse =
   components['schemas']['Gpu4PyscfInstallResponse'];
 type Gpu4PyscfInstallRequest = components['schemas']['Gpu4PyscfInstallRequest'];
-
-export const getSystemResourceStatus = (): Promise<SystemResourceResponse> => {
-  return request<SystemResourceResponse>('/api/system/resource-status', {
-    method: 'GET',
-  });
-};
 
 export const getGpu4PyscfStatus = (): Promise<
   Gpu4PyscfStatusResponse['data']

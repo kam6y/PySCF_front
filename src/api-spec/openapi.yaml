@@ -1882,6 +1882,10 @@ components:
         memory_mb:
           type: integer
           nullable: true
+        gpu_acceleration_enabled:
+          type: boolean
+          nullable: true
+          description: GPU acceleration setting snapshot captured when the calculation job was submitted
         created_at:
           type: string
           format: date-time

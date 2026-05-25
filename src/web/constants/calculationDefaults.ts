@@ -47,7 +47,7 @@ export const INPUT_PLACEHOLDERS: Record<string, string> = {
 };
 
 // CalculationSettingsPage の定義済み溶媒リスト
-export const PREDEFINED_SOLVENTS = [
+const PREDEFINED_SOLVENTS = [
   'water',
   'dimethylsulfoxide',
   'n,n-dimethylformamide',

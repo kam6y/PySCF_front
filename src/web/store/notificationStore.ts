@@ -48,7 +48,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       notifications: state.notifications.filter(n => n.id !== id),
     }));
   },
-
 }));
 
 // Convenience functions for common notification types
@@ -101,7 +100,7 @@ export const showInfoNotification = (
 };
 
 // エラーコード付きエラー通知の汎用関数
-export const showErrorWithCodeNotification = (
+const showErrorWithCodeNotification = (
   errorCode: string,
   rawErrorMessage: string,
   title?: string,

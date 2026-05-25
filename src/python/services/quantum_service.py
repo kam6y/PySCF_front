@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 class QuantumService:
     """Service for quantum chemistry calculation operations."""
 
+    GPU4PYSCF_SUPPORTED_METHODS = frozenset({'DFT', 'HF', 'TDDFT'})
     TERMINAL_STATUSES = frozenset({'completed', 'error', 'paused'})
     NON_TERMINAL_STATUSES = frozenset({'pending', 'running', 'waiting', 'pausing'})
     RESTART_INTERRUPTED_MESSAGE = (
@@ -49,6 +50,16 @@ class QuantumService:
         calculations_dir = settings.calculations_directory
         self.repository = CalculationRepository(base_dir=calculations_dir)
         self.cube_service = CubeArtifactService(base_dir=calculations_dir)
+
+    def _with_runtime_settings_snapshot(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Return calculation parameters with runtime settings fixed for this job."""
+        settings = get_current_settings()
+        return {
+            **params,
+            'gpu_acceleration_enabled': bool(
+                getattr(settings, 'gpu_acceleration_enabled', False)
+            ),
+        }
 
     def update_calculations_directory(self, new_directory: str) -> None:
         """
@@ -106,6 +117,24 @@ class QuantumService:
             # Reject requests with inapplicable or disabled parameters
             return applicability_error
 
+        gpu_acceleration_enabled = params.get('gpu_acceleration_enabled')
+        if gpu_acceleration_enabled is None:
+            settings = get_current_settings()
+            gpu_acceleration_enabled = getattr(
+                settings, 'gpu_acceleration_enabled', False
+            )
+        if (
+            bool(gpu_acceleration_enabled)
+            and calculation_method not in self.GPU4PYSCF_SUPPORTED_METHODS
+        ):
+            supported_methods = ', '.join(sorted(self.GPU4PYSCF_SUPPORTED_METHODS))
+            return (
+                "GPU acceleration is enabled, but "
+                f"{calculation_method} is not supported by GPU4PySCF. "
+                f"Supported GPU methods: {supported_methods}. "
+                "Disable GPU acceleration or choose a supported method."
+            )
+
         # Check DFT/TDDFT method constraints
         if calculation_method in {'DFT', 'TDDFT'} and not params.get('exchange_correlation'):
             return f"{calculation_method} method requires an exchange-correlation functional to be specified"
@@ -150,6 +179,8 @@ class QuantumService:
             ServiceError: For other errors
         """
         try:
+            params = self._with_runtime_settings_snapshot(params)
+
             # Validate calculation parameters
             validation_error = self.validate_calculation_parameters(params)
             if validation_error:

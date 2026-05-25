@@ -23,7 +23,6 @@ interface CalculationState {
     newParams: QuantumCalculationRequest
   ) => void;
   updateStagedCalculation: (updatedCalculation: CalculationInstance) => void;
-  clearStaged: () => void;
 }
 
 export const useCalculationStore = create<CalculationState>((set, get) => ({
@@ -105,9 +104,5 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
     if (stagedCalculation && updatedCalculation.id === stagedCalculation.id) {
       set({ stagedCalculation: updatedCalculation });
     }
-  },
-
-  clearStaged: () => {
-    set({ stagedCalculation: null });
   },
 }));

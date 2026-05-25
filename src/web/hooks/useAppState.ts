@@ -57,7 +57,7 @@ export const useAppState = () => {
       createNewCalculation: calculationState.createNewCalculation,
       createNewFromExisting: calculationState.createNewFromExisting,
       updateStagedCalculation: calculationState.updateStagedCalculation,
-      clearStaged: calculationState.clearStaged,
+      clearStagedCalculation: calculationState.clearStagedCalculation,
     },
 
     // 統合されたアクション（複数ストアにまたがる操作）

@@ -83,11 +83,6 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
           colorscheme: 'default',
         };
       }
-      // Fallback: should never happen because toggleStyle prevents empty set
-      if (!spec.stick && !spec.sphere) {
-        spec.stick = { radius: bondRadius, colorscheme: 'default' };
-        spec.sphere = { radius: atomRadius, colorscheme: 'default' };
-      }
       return spec;
     },
     [atomRadius, bondRadius]

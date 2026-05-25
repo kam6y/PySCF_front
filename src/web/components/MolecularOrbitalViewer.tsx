@@ -1,7 +1,6 @@
 // src/web/components/MolecularOrbitalViewer.tsx
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   useGetOrbitals,
   useGetOrbitalCube,
@@ -32,7 +31,6 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       selectedOrbitalIndex: externalSelectedOrbitalIndex,
       onOrbitalSelect,
     }) => {
-      const queryClient = useQueryClient();
       const viewerRef = useRef<HTMLDivElement>(null);
       const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
@@ -235,7 +233,7 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
         };
       }, [handleViewerResize]);
 
-      // calculationIdが変更されたときに状態をリセットとキャッシュ無効化
+      // calculationIdが変更されたときに状態をリセット
       useEffect(() => {
         const previousCalculationId = previousCalculationIdRef.current;
 
@@ -257,20 +255,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
           }
           setViewer(null);
 
-          // 軌道関連のクエリキャッシュを無効化（新しいcalculationIdが有効な場合のみ）
-          if (calculationId && !calculationId.startsWith('new-calculation-')) {
-            queryClient.invalidateQueries({
-              queryKey: ['orbitals', calculationId],
-            });
-            queryClient.invalidateQueries({
-              queryKey: ['orbital-cube', calculationId],
-            });
-          }
-
           // 現在のcalculationIdを記録
           previousCalculationIdRef.current = calculationId;
         }
-      }, [calculationId, queryClient, viewer]);
+      }, [calculationId, viewer]);
 
       // 外部から渡された選択軌道を内部状態に同期
       useEffect(() => {

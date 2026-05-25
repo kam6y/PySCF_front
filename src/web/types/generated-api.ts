@@ -988,6 +988,8 @@ export interface components {
             molecule_name?: string | null;
             cpu_cores?: number | null;
             memory_mb?: number | null;
+            /** @description GPU acceleration setting snapshot captured when the calculation job was submitted */
+            gpu_acceleration_enabled?: boolean | null;
             /** Format: date-time */
             created_at?: string | null;
             /** @description Number of excited states (TDDFT only) */

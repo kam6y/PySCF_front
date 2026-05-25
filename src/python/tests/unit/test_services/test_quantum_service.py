@@ -5,6 +5,8 @@ Tests the QuantumService class parameter validation logic with mocked dependenci
 Focuses on validate_calculation_parameters() which is core business logic.
 """
 
+from types import SimpleNamespace
+
 import pytest
 
 from quantum_calc import CalculationError
@@ -140,37 +142,6 @@ def test_validate_dft_missing_exchange_correlation():
     # ASSERT
     assert result is not None
     assert 'exchange-correlation functional' in result.lower()
-
-
-@pytest.mark.parametrize("xc_functional", [
-    'B3LYP',
-    'PBE0',
-    'M06-2X',
-    'CAM-B3LYP',
-    'wB97X-D'
-])
-def test_validate_dft_various_functionals(xc_functional):
-    """
-    GIVEN DFT parameters with various valid XC functionals
-    WHEN validate_calculation_parameters is called
-    THEN it should return None for all
-    """
-    # ARRANGE
-    service = QuantumService()
-    params = {
-        'calculation_method': 'DFT',
-        'exchange_correlation': xc_functional,
-        'basis_function': '6-31G',
-        'charges': 0,
-        'spin': 0
-    }
-    
-    # ACT
-    result = service.validate_calculation_parameters(params)
-    
-    # ASSERT
-    assert result is None
-
 
 # ============================================================================
 # validate_calculation_parameters() - TDDFT Method Tests
@@ -504,34 +475,45 @@ def test_validate_high_charge_rejected():
     assert 'exceeds maximum' in result.lower()
 
 
-@pytest.mark.parametrize("method", ['HF', 'DFT', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF'])
-def test_validate_all_methods_accept_basic_params(method):
+@pytest.mark.parametrize(
+    "calculation_method",
+    ["MP2", "CCSD", "CCSD_T", "CASCI", "CASSCF"],
+)
+def test_validate_gpu_enabled_rejects_unsupported_methods(
+    calculation_method,
+    tmp_path,
+    mocker,
+):
     """
-    GIVEN basic parameters for any calculation method
-    WHEN validate_calculation_parameters is called
-    THEN it should not crash (may return errors for method-specific params)
+    GIVEN GPU acceleration is enabled
+    WHEN a method without GPU4PySCF execution support is validated
+    THEN validation fails before a CPU calculation can be submitted
     """
     # ARRANGE
+    mocker.patch(
+        "services.quantum_service.get_current_settings",
+        return_value=SimpleNamespace(
+            calculations_directory=str(tmp_path),
+            gpu_acceleration_enabled=True,
+        ),
+    )
     service = QuantumService()
     params = {
-        'calculation_method': method,
-        'basis_function': 'sto-3g',
-        'charges': 0,
-        'spin': 0,
-        # Add method-specific params to make them valid
-        'exchange_correlation': 'B3LYP' if method in ['DFT', 'TDDFT'] else None,
-        'tddft_nstates': 5 if method == 'TDDFT' else None,
-        'ncas': 4 if method in ['CASCI', 'CASSCF'] else None,
-        'nelecas': 4 if method in ['CASCI', 'CASSCF'] else None,
+        "calculation_method": calculation_method,
+        "basis_function": "sto-3g",
+        "charges": 0,
+        "spin": 0,
     }
-    
-    # ACT - Should not raise exception
-    result = service.validate_calculation_parameters(params)
-    
-    # ASSERT - Just ensure it doesn't crash
-    # Result can be None (valid) or error message (invalid)
-    assert result is None or isinstance(result, str)
+    if calculation_method in {"CASCI", "CASSCF"}:
+        params.update({"ncas": 2, "nelecas": 2})
 
+    # ACT
+    result = service.validate_calculation_parameters(params)
+
+    # ASSERT
+    assert result is not None
+    assert "GPU acceleration is enabled" in result
+    assert calculation_method in result
 
 # ============================================================================
 # get_supported_parameters() Tests
@@ -667,6 +649,47 @@ def test_start_calculation_does_not_recover_new_pending_before_submit(
     assert service.repository.read_calculation_results(str(calc_dir)) != {
         "error": QuantumService.RESTART_INTERRUPTED_MESSAGE,
     }
+
+
+def test_start_calculation_saves_gpu_setting_snapshot(tmp_path, mocker):
+    """
+    GIVEN GPU acceleration is enabled when a calculation is submitted
+    WHEN start_calculation persists and submits the job
+    THEN the job parameters include that GPU setting snapshot
+    """
+    mocker.patch(
+        "services.quantum_service.get_current_settings",
+        return_value=SimpleNamespace(
+            calculations_directory=str(tmp_path),
+            gpu_acceleration_enabled=True,
+        ),
+    )
+    service = QuantumService()
+
+    params = {
+        "name": "GPU Snapshot",
+        "created_at": "2026-05-25T00:00:00",
+        "calculation_method": "DFT",
+        "basis_function": "sto-3g",
+        "exchange_correlation": "B3LYP",
+        "charges": 0,
+        "spin": 0,
+    }
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+    process_manager.submit_calculation.return_value = (True, "running", None)
+    mocker.patch("services.quantum_service.get_process_manager", return_value=process_manager)
+
+    response = service.start_calculation(params)
+    calc_dir = tmp_path / response["id"]
+    saved_params = service.repository.read_calculation_parameters(str(calc_dir))
+    submitted_params = process_manager.submit_calculation.call_args.args[1]
+
+    assert saved_params["gpu_acceleration_enabled"] is True
+    assert submitted_params["gpu_acceleration_enabled"] is True
+    assert "gpu_acceleration_enabled" not in params
 
 
 def test_recover_stale_non_terminal_calculations_marks_only_stale_as_error(

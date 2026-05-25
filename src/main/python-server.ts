@@ -31,30 +31,20 @@ const resolveServerPort = async (defaultPort: number): Promise<number> => {
     return port;
   } catch (error) {
     console.log(`⚠️  Auto-detection failed: ${error}`);
-    console.log(`Attempting to use fallback port: ${defaultPort}`);
     try {
-      await findAvailablePort(defaultPort, defaultPort);
-      console.log(`✓ Fallback port ${defaultPort} is available`);
-      return defaultPort;
-    } catch (fallbackError) {
       console.log(
-        `✗ CRITICAL: Fallback port ${defaultPort} is also unavailable`
+        `Searching in extended range ${portRangeEnd + 1}-${portRangeEnd + 100}...`
       );
-      try {
-        console.log(
-          `Searching in extended range ${portRangeEnd + 1}-${portRangeEnd + 100}...`
-        );
-        const port = await findAvailablePort(
-          portRangeEnd + 1,
-          portRangeEnd + 100
-        );
-        console.log(`✓ Found port in extended range: ${port}`);
-        return port;
-      } catch (extendedError) {
-        throw new Error(
-          `CRITICAL: No available ports found in any range. This may indicate:\n1. Too many services running on localhost\n2. Firewall blocking port access\n3. System resource limitations\n\nTried ranges: ${defaultPort}-${portRangeEnd}, ${portRangeEnd + 1}-${portRangeEnd + 100}`
-        );
-      }
+      const port = await findAvailablePort(
+        portRangeEnd + 1,
+        portRangeEnd + 100
+      );
+      console.log(`✓ Found port in extended range: ${port}`);
+      return port;
+    } catch (extendedError) {
+      throw new Error(
+        `CRITICAL: No available ports found in any range. This may indicate:\n1. Too many services running on localhost\n2. Firewall blocking port access\n3. System resource limitations\n\nTried ranges: ${defaultPort}-${portRangeEnd}, ${portRangeEnd + 1}-${portRangeEnd + 100}`
+      );
     }
   }
 };

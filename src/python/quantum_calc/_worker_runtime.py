@@ -157,10 +157,7 @@ def _create_calculator_instance(calculation_method: str, parameters: dict,
                 f"{calculation_method} calculator is not available. "
                 "Please check PySCF mcscf module installation."
             )
-        # Default to DFT if unknown method
-        calculator_class = calculator_classes['DFT']
-        effective_method = 'DFT'
-        process_logger.warning(f"Unknown calculation method '{calculation_method}', defaulting to DFT")
+        raise ValueError(f"Unsupported calculation method: {calculation_method}")
 
     optimize_geometry = parameters.get('optimize_geometry')
     if optimize_geometry is None:
@@ -195,6 +192,7 @@ def _prepare_setup_parameters(parameters: dict, memory_mb: int) -> dict:
         'solvent_method': parameters['solvent_method'],
         'solvent': parameters['solvent'],
         'memory_mb': memory_mb,
+        'gpu_acceleration_enabled': parameters.get('gpu_acceleration_enabled'),
     }
 
     # Add exchange-correlation functional for DFT and TDDFT

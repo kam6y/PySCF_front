@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getGpu4PyscfStatus, installGpu4Pyscf } from '../api/system';
-import { components } from '../types/generated-api';
+import type { components } from '../types/generated-api';
 
 type Gpu4PyscfStatus = components['schemas']['Gpu4PyscfStatus'];
 type Gpu4PyscfInstallRequest = components['schemas']['Gpu4PyscfInstallRequest'];
@@ -20,7 +20,7 @@ export const useGpu4PyscfStatus = () => {
   });
 };
 
-export const useInstallGpu4Pyscf = () => {
+const useInstallGpu4Pyscf = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
