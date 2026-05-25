@@ -313,16 +313,6 @@
   color: #6b7280;
 }
 
-/* Action Buttons */
-.settingsActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid #e5e7eb;
-  margin-top: 2rem;
-}
-
 .cancelButton,
 .saveButton {
   padding: 0.75rem 1.5rem;
@@ -414,10 +404,6 @@
   
   .settingControl {
     min-width: auto;
-  }
-  
-  .settingsActions {
-    flex-direction: column-reverse;
   }
   
   .cancelButton,

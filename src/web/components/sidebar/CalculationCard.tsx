@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppSettings } from '../../hooks';
+import { useAppSettings } from '../../hooks/useAppSettings';
 import { CalculationSummary } from '../../types/api-types';
 import { formatDateTimeWithSeconds } from '../../utils/dateFormatter';
 import styles from '../Sidebar.module.css';

@@ -218,14 +218,3 @@ class CalculationDirectoryMigration:
 
         logger.info(f"Move operation completed: {result['message']}")
         return result
-
-    def set_base_directory(self, new_path: str) -> None:
-        """
-        Update the base directory path.
-
-        Args:
-            new_path: Full directory path for calculations (should include PySCF_calculations)
-        """
-        self.base_dir = Path(new_path)
-        self.base_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Base directory updated to: {self.base_dir}")

@@ -32,7 +32,6 @@ export const MolecularOrbitalsSection =
                 <MolecularOrbitalEnergyDiagram
                   key={`energy-${calculationId}`}
                   calculationId={calculationId}
-                  selectedOrbitalIndex={selectedOrbitalIndex}
                   onOrbitalSelect={onOrbitalSelect}
                   onError={onError}
                 />

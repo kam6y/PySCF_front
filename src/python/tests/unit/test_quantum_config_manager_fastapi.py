@@ -10,8 +10,3 @@ def test_quantum_config_manager_reads_server_config():
     expected = server_config.get("quantum_calculation_defaults", {})
     assert config["quantum_calculation_defaults"] == expected
     assert manager.get_memory_setting("DFT") == int(expected["memory_settings"]["DFT"])
-    assert manager.get_config_info() == {
-        "config_source": "ServerConfig",
-        "config_available": True,
-        "using_fallback": False,
-    }

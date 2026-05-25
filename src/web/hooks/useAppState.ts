@@ -42,7 +42,6 @@ export const useAppState = () => {
       isUserMenuOpen: uiState.isUserMenuOpen,
       isSettingsOpen: uiState.isSettingsOpen,
       toggleUserMenu: uiState.toggleUserMenu,
-      closeUserMenu: uiState.closeUserMenu,
       openSettings: uiState.openSettings,
       closeSettings: uiState.closeSettings,
     },
@@ -59,7 +58,6 @@ export const useAppState = () => {
       createNewFromExisting: calculationState.createNewFromExisting,
       updateStagedCalculation: calculationState.updateStagedCalculation,
       clearStaged: calculationState.clearStaged,
-      isStagedCalculation: calculationState.isStagedCalculation,
     },
 
     // 統合されたアクション（複数ストアにまたがる操作）

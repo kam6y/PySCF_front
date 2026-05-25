@@ -568,8 +568,7 @@ class SystemService:
                     'current_state': {
                         'active_futures_count': pm_diag['active_futures_count'],
                         'active_calculation_ids': pm_diag['active_calculation_ids'],
-                        'queued_calculations_count': pm_diag['queued_calculations_count'],
-                        'completion_callbacks_count': pm_diag['completion_callbacks_count']
+                        'queued_calculations_count': pm_diag['queued_calculations_count']
                     },
                     'queue_details': [],
                     'resource_monitoring': pm_diag['resource_monitoring']

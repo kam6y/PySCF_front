@@ -68,16 +68,6 @@ class QuantumCalculationConfigManager:
             }
         }
 
-    def reload_config(self) -> None:
-        """
-        Reload configuration from ServerConfig.
-
-        Note: Since configuration is read directly from ServerConfig at runtime,
-        this method is kept for backwards compatibility but has no effect.
-        Configuration changes should be made directly to the server config file.
-        """
-        logger.info("Configuration reload requested (configuration is read from ServerConfig at runtime)")
-    
     def get_memory_setting(self, calculation_method: str) -> int:
         """
         Get memory setting for a specific calculation method.
@@ -166,40 +156,6 @@ class QuantumCalculationConfigManager:
             return (float(range_list[0]), float(range_list[1]))
         return (400.0, 4000.0)
     
-    def get_frequency_threshold(self) -> float:
-        """Get frequency threshold for vibrational analysis."""
-        return float(self.get_spectrum_setting("frequency_threshold"))
-    
-    def get_all_memory_settings(self) -> Dict[str, int]:
-        """Get all memory settings as a dictionary."""
-        config = self._get_config()
-        return config["quantum_calculation_defaults"]["memory_settings"].copy()
-
-    def get_all_cycle_settings(self) -> Dict[str, int]:
-        """Get all cycle settings as a dictionary."""
-        config = self._get_config()
-        return config["quantum_calculation_defaults"]["cycle_settings"].copy()
-
-    def get_all_spectrum_settings(self) -> Dict[str, Any]:
-        """Get all spectrum settings as a dictionary."""
-        config = self._get_config()
-        return config["quantum_calculation_defaults"]["spectrum_settings"].copy()
-
-    def get_config_info(self) -> Dict[str, Any]:
-        """
-        Get information about the configuration source and status.
-
-        Returns:
-            Dictionary with configuration source information.
-        """
-        server_config = get_server_config()
-        has_config = bool(server_config.get('quantum_calculation_defaults', {}))
-        return {
-            "config_source": "ServerConfig",
-            "config_available": has_config,
-            "using_fallback": not has_config
-        }
-
 
 # Global instance for easy access
 _config_manager = None
@@ -210,12 +166,6 @@ def get_config_manager() -> QuantumCalculationConfigManager:
     if _config_manager is None:
         _config_manager = QuantumCalculationConfigManager()
     return _config_manager
-
-def reload_global_config() -> None:
-    """Reload the global configuration."""
-    global _config_manager
-    if _config_manager is not None:
-        _config_manager.reload_config()
 
 # Convenience functions for common operations
 def get_memory_for_method(calculation_method: str) -> int:
@@ -238,14 +188,6 @@ def get_ah_max_cycle() -> int:
     """Convenience function to get ah_max_cycle setting."""
     return get_config_manager().get_cycle_setting("ah_max_cycle")
 
-def get_ir_range() -> Tuple[float, float]:
-    """Convenience function to get IR frequency range."""
-    return get_config_manager().get_ir_frequency_range()
-
 def get_spectrum_setting(setting_name: str) -> Any:
     """Convenience function to get spectrum setting."""
     return get_config_manager().get_spectrum_setting(setting_name)
-
-def get_frequency_threshold() -> float:
-    """Convenience function to get frequency threshold."""
-    return get_config_manager().get_frequency_threshold()

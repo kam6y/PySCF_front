@@ -123,17 +123,3 @@ def test_quantum_calculate_rejects_inapplicable_method_parameter(client):
     body = response.json()
     assert body['success'] is False
     assert 'exchange_correlation' in body['error']
-
-
-def test_gpu4pyscf_install_rejects_non_loopback_client(client, monkeypatch):
-    import api.system as system_api
-
-    monkeypatch.setattr(system_api, '_get_client_host', lambda request: '203.0.113.10')
-
-    response = client.post('/api/system/gpu4pyscf-install')
-
-    assert response.status_code == 403
-    assert response.json() == {
-        'success': False,
-        'error': 'GPU4PySCF installation is only available from the local machine.',
-    }

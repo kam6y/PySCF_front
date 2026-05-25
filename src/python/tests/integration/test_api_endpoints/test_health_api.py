@@ -26,36 +26,8 @@ class TestHealthAPI:
         assert 'service' in data
         assert data['service'] == 'pyscf-front-api'
         assert 'version' in data
-
-    def test_health_check_json_format(self, client):
-        """
-        GIVEN the FastAPI application is running
-        WHEN GET /health is called
-        THEN it returns valid JSON with expected fields
-        """
-        # ACT
-        response = client.get('/health')
-
-        # ASSERT
-        assert response.status_code == 200
         assert response.headers['content-type'] == 'application/json'
-        
-        data = response.json()
         assert isinstance(data, dict)
         assert len(data) >= 3  # At least status, service, version
-
-    def test_health_check_version_field(self, client):
-        """
-        GIVEN the FastAPI application is running
-        WHEN GET /health is called
-        THEN the version field is present (even if 'unknown')
-        """
-        # ACT
-        response = client.get('/health')
-
-        # ASSERT
-        data = response.json()
-        assert 'version' in data
         assert isinstance(data['version'], str)
-        # Version should be non-empty string (either version number or 'unknown')
         assert len(data['version']) > 0

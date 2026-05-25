@@ -17,13 +17,12 @@ logger = logging.getLogger(__name__)
 class SMILESService:
     """Service for SMILES to XYZ conversion operations."""
     
-    def convert_smiles(self, smiles: str, title: str = None) -> Dict[str, Any]:
+    def convert_smiles(self, smiles: str) -> Dict[str, Any]:
         """
         Convert a SMILES string to XYZ format.
         
         Args:
             smiles: SMILES string representing the molecular structure
-            title: Optional title for the XYZ file (defaults to SMILES string)
             
         Returns:
             Dict containing XYZ data
@@ -49,10 +48,7 @@ class SMILESService:
             # Strip whitespace from SMILES string
             smiles_stripped = smiles.strip()
             
-            # Use provided title or default
-            if title is None:
-                title = f"Molecule from SMILES: {smiles_stripped}"
-            
+            title = f"Molecule from SMILES: {smiles_stripped}"
             xyz_string = smiles_to_xyz(smiles_stripped, title=title)
             
             logger.info(f"Successfully converted SMILES to XYZ structure")

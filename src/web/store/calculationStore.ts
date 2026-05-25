@@ -24,7 +24,6 @@ interface CalculationState {
   ) => void;
   updateStagedCalculation: (updatedCalculation: CalculationInstance) => void;
   clearStaged: () => void;
-  isStagedCalculation: (id: string | null) => boolean;
 }
 
 export const useCalculationStore = create<CalculationState>((set, get) => ({
@@ -110,9 +109,5 @@ export const useCalculationStore = create<CalculationState>((set, get) => ({
 
   clearStaged: () => {
     set({ stagedCalculation: null });
-  },
-
-  isStagedCalculation: (id: string | null) => {
-    return id ? id.startsWith('new-calculation-') : false;
   },
 }));

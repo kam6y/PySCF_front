@@ -62,7 +62,6 @@ export const VibrationalAnalysisSection =
                       calculationId={calculationId}
                       onError={onError}
                       onSpectrumDataLoaded={onSpectrumDataLoaded}
-                      selectedPeakIndex={selectedIRPeakIndex}
                       settings={irSettings}
                       onSettingsChange={onSetIRSettings}
                     />

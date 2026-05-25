@@ -94,7 +94,7 @@ if (!gotTheLock) {
   app.quit();
 } else {
   // 2つ目のインスタンスが起動しようとした時の処理
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
+  app.on('second-instance', () => {
     console.log('Second instance detected. Focusing existing window...');
     // 既存のウィンドウをフォーカス
     const mainWindow = getMainWindow();

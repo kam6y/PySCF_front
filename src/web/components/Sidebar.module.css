@@ -503,41 +503,6 @@
   color: #9a3412;
 }
 
-/* Loading State */
-.calculationTagsLoading {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.tagSkeleton {
-  height: 20px;
-  width: 50px;
-  background: #f3f4f6;
-  border-radius: 4px;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-
-.tagSkeleton:nth-child(2) {
-  width: 40px;
-}
-
-.tagSkeleton:nth-child(3) {
-  width: 60px;
-}
-
-@keyframes shimmer {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-  100% {
-    opacity: 1;
-  }
-}
 
 /* Spinner animation for running status */
 .animateSpin {

@@ -28,7 +28,7 @@ export const useUpdateSettings = () => {
   return useMutation({
     mutationFn: (settings: AppSettings) =>
       updateSettings(settings).then(response => response.settings),
-    onSuccess: (updatedSettings, variables) => {
+    onSuccess: updatedSettings => {
       // Check if calculations_directory changed BEFORE updating cache
       const oldSettings = queryClient.getQueryData<AppSettings>(
         settingsKeys.settings()

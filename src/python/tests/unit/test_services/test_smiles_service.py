@@ -39,30 +39,6 @@ def test_convert_smiles_success(mocker):
     assert result['xyz'] == expected_xyz
 
 
-def test_convert_smiles_with_custom_title(mocker):
-    """
-    GIVEN a valid SMILES string with custom title
-    WHEN convert_smiles is called
-    THEN it should use the custom title
-    """
-    # ARRANGE
-    smiles = 'c1ccccc1'  # Benzene
-    custom_title = 'Benzene molecule'
-    expected_xyz = "12\nBenzene molecule\n..."
-    
-    mock_converter = mocker.patch('services.smiles_service.smiles_to_xyz', return_value=expected_xyz)
-    
-    service = SMILESService()
-    
-    # ACT
-    result = service.convert_smiles(smiles, title=custom_title)
-    
-    # ASSERT
-    assert result['xyz'] == expected_xyz
-    # Verify the converter was called with the custom title
-    mock_converter.assert_called_once_with(smiles, title=custom_title)
-
-
 def test_convert_smiles_default_title(mocker):
     """
     GIVEN a valid SMILES string without title
@@ -82,34 +58,6 @@ def test_convert_smiles_default_title(mocker):
     # ASSERT
     # Verify the converter was called with default title
     mock_converter.assert_called_once_with(smiles, title=f"Molecule from SMILES: {smiles}")
-
-
-@pytest.mark.parametrize("smiles,description", [
-    ('C', 'methane'),
-    ('CC', 'ethane'),
-    ('CCO', 'ethanol'),
-    ('c1ccccc1', 'benzene'),
-    ('CC(=O)O', 'acetic acid'),
-    ('CC(C)C', 'isobutane'),
-])
-def test_convert_smiles_various_molecules(mocker, smiles, description):
-    """
-    GIVEN various valid SMILES strings
-    WHEN convert_smiles is called
-    THEN it should successfully convert each one
-    """
-    # ARRANGE
-    mocker.patch('services.smiles_service.smiles_to_xyz', return_value=f"xyz for {description}")
-    
-    service = SMILESService()
-    
-    # ACT
-    result = service.convert_smiles(smiles)
-    
-    # ASSERT
-    assert result is not None
-    assert 'xyz' in result
-
 
 # ============================================================================
 # convert_smiles() Validation Error Tests

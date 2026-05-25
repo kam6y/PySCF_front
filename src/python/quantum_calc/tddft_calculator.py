@@ -29,11 +29,6 @@ class TDDFTCalculator(BaseCalculator):
         self.keep_files = keep_files
         self.molecule_name = molecule_name
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup TDDFT calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate TDDFT-specific parameters."""
         # DFT-related parameters

@@ -163,7 +163,7 @@ export const CIAnalysisViewer: React.FC<CIAnalysisViewerProps> = React.memo(
                 </div>
                 {enhancedCiAnalysis.major_configurations
                   .slice(0, 20)
-                  .map((config: any, index: number) => (
+                  .map((config: any) => (
                     <div
                       key={config.configuration_index}
                       className={styles.configTableRow}

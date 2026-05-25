@@ -173,17 +173,9 @@ def test_cleanup_future_with_worker_exception_persists_error_transition():
     calc_id = "crashed-calc"
     scheduler = FakeScheduler()
     status_manager = FakeStatusManager()
-    callback_calls = []
 
     manager = object.__new__(CalculationProcessManager)
     manager.active_futures = {calc_id: object()}
-    manager.completion_callbacks = {
-        calc_id: [
-            lambda calculation_id, success, error_message: callback_calls.append(
-                (calculation_id, success, error_message)
-            )
-        ]
-    }
     manager.scheduler = scheduler
     manager.status_manager = status_manager
     manager.executor = None
@@ -196,7 +188,6 @@ def test_cleanup_future_with_worker_exception_persists_error_transition():
         (calc_id, CalculationStatus.ERROR, "boom"),
     ]
     assert status_manager.notifications == []
-    assert callback_calls == [(calc_id, False, "boom")]
     assert scheduler.unregistered_calculation_ids == [calc_id]
     assert scheduler.processed is True
 

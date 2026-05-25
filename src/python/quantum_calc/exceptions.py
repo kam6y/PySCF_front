@@ -31,16 +31,6 @@ class ProcessManagerError(Exception):
     pass
 
 
-class WebSocketError(Exception):
-    """Exception raised for WebSocket communication errors."""
-    pass
-
-
-class XYZValidationError(Exception):
-    """Exception raised for XYZ format validation errors."""
-    pass
-
-
 class PauseRequestedException(Exception):
     """Exception raised when a calculation is paused by user request."""
     pass

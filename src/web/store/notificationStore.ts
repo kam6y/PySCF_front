@@ -17,7 +17,6 @@ interface NotificationState {
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id'>) => string;
   removeNotification: (id: string) => void;
-  clearNotifications: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -50,9 +49,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     }));
   },
 
-  clearNotifications: () => {
-    set({ notifications: [] });
-  },
 }));
 
 // Convenience functions for common notification types

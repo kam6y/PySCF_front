@@ -43,28 +43,6 @@
   margin: 0 0 6px 0;
 }
 
-.peakMetadata {
-  font-size: 12px;
-  color: #6b7280;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-}
-
-.separator {
-  color: #d1d5db;
-}
-
-/* Peak Table Content */
-.peakTableContent {
-  min-width: 0;
-  padding: 20px;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
 /* Right Column: Vibration Mode Visualization */
 .vibrationViewerColumn {
   min-width: 0;

@@ -220,16 +220,6 @@
   box-shadow: 0 4px 12px rgba(72, 199, 142, 0.3);
 }
 
-.running {
-  background: #45c1e8;
-}
-
-.running:hover {
-  background: #22b9e7;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
-}
-
 .error {
   background: #dc3545;
 }
@@ -644,10 +634,6 @@
   gap: 6px;
 }
 
-.validationMessage.valid {
-  color: #28a745;
-}
-
 .validationMessage.invalid {
   color: #dc3545;
 }
@@ -674,22 +660,6 @@
   gap: 6px;
 }
 
-/* Loading state */
-.loadingContainer {
-  text-align: center;
-  padding: 40px;
-  color: #666;
-  width: 100%;
-}
-
-/* Frozen core help text */
-.frozenCoreHelp {
-  font-size: 12px;
-  color: #666;
-  margin-left: 20px;
-  margin-top: 4px;
-}
-
 /* Converting and validation messages */
 .convertingMessage {
   margin-top: 8px;
@@ -697,13 +667,4 @@
 
 .errorMessage {
   margin-top: 8px;
-}
-
-.nestedSettings {
-  margin-left: 20px;
-  padding-left: 12px;
-  border-left: 2px solid #eee;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }

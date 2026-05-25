@@ -9,7 +9,7 @@ from .tddft_calculator import TDDFTCalculator
 from .casci_calculator import CASCICalculator
 from .casscf_calculator import CASSCFCalculator
 from .orbital_generator import MolecularOrbitalGenerator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError, FileManagerError, ProcessManagerError, WebSocketError, XYZValidationError, PauseRequestedException
+from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError, FileManagerError, ProcessManagerError, PauseRequestedException
 from ._status_transition import CalculationStatus
 from .process_manager import CalculationProcessManager, get_process_manager, initialize_process_manager_with_callback, shutdown_process_manager, update_process_manager_settings
 from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
@@ -35,8 +35,6 @@ __all__ = [
     'GeometryError',
     'FileManagerError',
     'ProcessManagerError',
-    'WebSocketError',
-    'XYZValidationError',
     'PauseRequestedException',
     'CalculationStatus',
     'CalculationProcessManager',

@@ -2,7 +2,7 @@
 
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pyscf import gto, scf, mcscf
 
 from .base_calculator import BaseCalculator
@@ -31,11 +31,6 @@ class CASSCFCalculator(BaseCalculator):
         # Set calculation method for memory management
         self.calculation_method = 'CASSCF'
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup CASSCF calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate CASSCF-specific parameters."""
         # CASSCF-specific parameters

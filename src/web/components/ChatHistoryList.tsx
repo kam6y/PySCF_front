@@ -2,7 +2,7 @@ import React from 'react';
 import { ChatSessionSummary } from '../types/api-types';
 import { useGetChatSessions } from '../hooks/useChatHistoryQueries';
 import { useChatHistoryStore } from '../store/chatHistoryStore';
-import { useAppSettings } from '../hooks';
+import { useAppSettings } from '../hooks/useAppSettings';
 import { formatDateTime } from '../utils/dateFormatter';
 import styles from './ChatHistoryList.module.css';
 

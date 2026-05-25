@@ -33,8 +33,6 @@ interface UIState {
   setCurrentPage: (page: DropdownOption) => void;
   getCurrentPageTitle: () => string;
 
-  // AI Agent actions
-  toggleAIAgent: () => void;
   setAIAgentEnabled: (enabled: boolean) => void;
 
   // Search actions
@@ -42,7 +40,6 @@ interface UIState {
 
   // Modal actions
   toggleUserMenu: () => void;
-  closeUserMenu: () => void;
   openSettings: () => void;
   closeSettings: () => void;
 }
@@ -79,9 +76,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   setCurrentPage: (page: DropdownOption) => set({ currentPage: page }),
   getCurrentPageTitle: () => getPageTitle(get().currentPage),
 
-  // AI Agent actions
-  toggleAIAgent: () =>
-    set(state => ({ isAIAgentEnabled: !state.isAIAgentEnabled })),
   setAIAgentEnabled: (enabled: boolean) => set({ isAIAgentEnabled: enabled }),
 
   // Search actions
@@ -90,7 +84,6 @@ export const useUIStore = create<UIState>((set, get) => ({
   // Modal actions
   toggleUserMenu: () =>
     set(state => ({ isUserMenuOpen: !state.isUserMenuOpen })),
-  closeUserMenu: () => set({ isUserMenuOpen: false }),
   openSettings: () =>
     set({
       isSettingsOpen: true,

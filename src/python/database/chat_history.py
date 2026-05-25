@@ -426,26 +426,3 @@ class ChatHistoryDatabase:
             'session': session,
             'messages': messages
         }
-
-    # Utility methods
-
-    def get_stats(self) -> Dict[str, int]:
-        """
-        Get database statistics.
-
-        Returns:
-            Dict with session_count and message_count
-        """
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-
-            cursor.execute("SELECT COUNT(*) FROM chat_sessions")
-            session_count = cursor.fetchone()[0]
-
-            cursor.execute("SELECT COUNT(*) FROM chat_messages")
-            message_count = cursor.fetchone()[0]
-
-            return {
-                'session_count': session_count,
-                'message_count': message_count
-            }

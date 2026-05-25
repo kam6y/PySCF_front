@@ -99,7 +99,7 @@ export const usePauseCalculation = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => quantumApi.pauseCalculation(id),
-    onSuccess: (data, id) => {
+    onSuccess: (_data, id) => {
       // 成功したら関連するキャッシュを更新
       queryClient.invalidateQueries({ queryKey: calculationQueryKeys.list() });
       queryClient.invalidateQueries({
@@ -146,7 +146,7 @@ export const useUpdateCalculationName = () => {
   return useMutation({
     mutationFn: ({ id, newName }: { id: string; newName: string }) =>
       quantumApi.updateCalculationName(id, newName),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // 成功したら関連するキャッシュを更新
       queryClient.invalidateQueries({ queryKey: calculationQueryKeys.list() });
       queryClient.invalidateQueries({

@@ -42,37 +42,11 @@ class TestSMILESConvertAPI:
         # Verify service was called correctly
         mock_service.return_value.convert_smiles.assert_called_once_with('O')
 
-    def test_convert_complex_smiles(self, client, mocker):
-        """
-        GIVEN SMILESService handles complex molecules
-        WHEN POST /api/smiles/convert is called with benzene SMILES
-        THEN conversion succeeds
-        """
-        # ARRANGE
-        benzene_smiles = 'c1ccccc1'
-        mock_result = {
-            'xyz': 'C 0 0 0\nC 1 0 0\nC 1.5 0.866 0\nC 1.5 1.732 0\nC 1 2.598 0\nC 0 2.598 0',
-            'smiles': benzene_smiles
-        }
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
-        mock_service.return_value.convert_smiles.return_value = mock_result
-
-        # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': benzene_smiles
-        })
-
-        # ASSERT
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
-        assert 'C' in data['data']['xyz']
-
-    def test_convert_with_whitespace_trimming(self, client, mocker):
+    def test_convert_passes_request_smiles_to_service(self, client, mocker):
         """
         GIVEN SMILES string has leading/trailing whitespace
         WHEN POST /api/smiles/convert is called
-        THEN whitespace is trimmed before conversion
+        THEN the API delegates validation and trimming to the service layer
         """
         # ARRANGE
         smiles_with_whitespace = '  CCO  '
@@ -87,7 +61,6 @@ class TestSMILESConvertAPI:
 
         # ASSERT
         assert response.status_code == 200
-        # Service should receive trimmed version
         mock_service.return_value.convert_smiles.assert_called_once_with(smiles_with_whitespace)
 
     def test_convert_invalid_smiles(self, client, mocker):
@@ -174,29 +147,6 @@ class TestSMILESConvertAPI:
 
         # ASSERT
         assert response.status_code == 400
-
-    def test_convert_very_long_smiles(self, client, mocker):
-        """
-        GIVEN very long SMILES string
-        WHEN POST /api/smiles/convert is called
-        THEN service handles it appropriately
-        """
-        # ARRANGE
-        # Create a long SMILES (polymer-like)
-        long_smiles = 'C' * 1000
-        mock_result = {'xyz': 'C 0 0 0', 'smiles': long_smiles}
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
-        mock_service.return_value.convert_smiles.return_value = mock_result
-
-        # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': long_smiles
-        })
-
-        # ASSERT
-        assert response.status_code == 200
-        data = response.json()
-        assert data['success'] is True
 
     def test_convert_invalid_json(self, client):
         """

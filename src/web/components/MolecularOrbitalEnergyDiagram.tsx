@@ -17,7 +17,6 @@ interface MolecularOrbitalEnergyDiagramProps {
   calculationId: string;
   onError?: (error: string) => void;
   onOrbitalSelect?: (orbitalIndex: number) => void;
-  selectedOrbitalIndex?: number | null;
 }
 
 interface ProcessedOrbital extends OrbitalInfo {
@@ -45,7 +44,7 @@ const DIAGRAM_CONFIG = {
 
 export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagramProps> =
   React.memo(
-    ({ calculationId, onError, onOrbitalSelect, selectedOrbitalIndex }) => {
+    ({ calculationId, onError, onOrbitalSelect }) => {
       const svgRef = useRef<SVGSVGElement>(null);
       const containerRef = useRef<HTMLDivElement>(null);
       const [viewerSize, setViewerSize] = useState({ width: 800, height: 600 });

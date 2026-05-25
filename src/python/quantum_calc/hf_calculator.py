@@ -2,7 +2,7 @@
 
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pyscf import gto, scf
 # geometric_solver is now imported in BaseCalculator
 
@@ -37,11 +37,6 @@ class HFCalculator(BaseCalculator):
         self.keep_files = keep_files
         self.molecule_name = molecule_name
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup HF calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate HF-specific parameters."""
         # HF-specific parameters (HF has no method-specific parameters beyond common ones)

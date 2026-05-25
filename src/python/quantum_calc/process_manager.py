@@ -4,7 +4,7 @@ import os
 import logging
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, Future
-from typing import Dict, Any, Optional, Callable, List
+from typing import Dict, Any, Optional, Callable
 import threading
 import time
 
@@ -24,7 +24,6 @@ class CalculationProcessManager:
                  notification_callback: Optional[Callable] = None):
         self.max_workers = max_workers or multiprocessing.cpu_count()
         self.active_futures: Dict[str, Future] = {}
-        self.completion_callbacks: Dict[str, List[Callable]] = {}
         self._shutdown = False
 
         # Initialize resource manager
@@ -242,15 +241,6 @@ class CalculationProcessManager:
                     logger.warning(f"Calculation {calculation_id} failed: {error_message}")
                     self.status_manager.notify(calculation_id, 'error', error_message)
 
-            # Call completion callbacks
-            if calculation_id in self.completion_callbacks:
-                callbacks = self.completion_callbacks.pop(calculation_id)
-                for callback in callbacks:
-                    try:
-                        callback(calculation_id, success, error_message)
-                    except Exception as callback_error:
-                        logger.error(f"Error in completion callback for {calculation_id}: {callback_error}")
-
             logger.info(f"Calculation {calculation_id} cleanup completed. Processing queue for waiting calculations...")
             self._process_queue()
 
@@ -383,11 +373,6 @@ class CalculationProcessManager:
         future = self.active_futures.get(calculation_id)
         return future is not None and not future.done()
 
-    def register_completion_callback(self, calculation_id: str, callback: Callable):
-        if calculation_id not in self.completion_callbacks:
-            self.completion_callbacks[calculation_id] = []
-        self.completion_callbacks[calculation_id].append(callback)
-
     def get_active_calculations(self) -> list:
         return [calc_id for calc_id, future in self.active_futures.items() if not future.done()]
 
@@ -408,7 +393,6 @@ class CalculationProcessManager:
             'max_workers': self.max_workers,
             'max_parallel_instances': self.max_parallel_instances,
             'queued_calculations_count': len(self.calculation_queue),
-            'completion_callbacks_count': len(self.completion_callbacks),
             'resource_monitoring': {
                 'monitoring_active': (
                     self._resource_monitor_thread is not None

@@ -268,7 +268,6 @@ export const App = () => {
             activeCalculation={calculationData.activeCalculation || undefined}
             isLoadingDetails={calculationData.detailsLoading}
             detailsError={calculationData.detailsError?.message ?? null}
-            onCalculationUpdate={calculationActions.handleCalculationUpdate}
           />
         );
       case 'draw-molecule':

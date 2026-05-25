@@ -2,7 +2,7 @@
 
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pyscf import gto, scf, mp
 # geometric_solver is now imported in BaseCalculator
 
@@ -38,11 +38,6 @@ class MP2Calculator(BaseCalculator):
         self.keep_files = keep_files
         self.molecule_name = molecule_name
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup MP2 calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate MP2-specific parameters."""
         # MP2-specific parameters (MP2 has no method-specific parameters beyond common ones)

@@ -17,7 +17,7 @@ import { convertSmilesToXyz } from '../api/molecule';
 import { useUIStore } from '../store/uiStore';
 import { useCalculationStore } from '../store/calculationStore';
 import { useNotificationStore } from '../store/notificationStore';
-import { useActiveCalculation } from '../hooks/useActiveCalculation';
+import { useCalculationData } from '../hooks/useCalculationData';
 import {
   DEFAULT_CALCULATION_PARAMETERS,
   STATUS_MESSAGES,
@@ -243,7 +243,7 @@ export const DrawMoleculePage: React.FC = () => {
   );
 
   // アクティブな計算を取得
-  const { activeCalculation } = useActiveCalculation();
+  const { activeCalculation } = useCalculationData();
 
   // Draw Moleculeを使わずに開始された計算かどうか判定
   const isNonDrawMoleculeCalculation = Boolean(

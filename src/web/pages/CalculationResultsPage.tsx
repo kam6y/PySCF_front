@@ -27,14 +27,12 @@ interface CalculationResultsPageProps {
   activeCalculation?: CalculationInstance;
   isLoadingDetails?: boolean;
   detailsError?: string | null;
-  onCalculationUpdate: (updatedCalculation: CalculationInstance) => void;
 }
 
 export const CalculationResultsPage = ({
   activeCalculation,
   isLoadingDetails = false,
   detailsError = null,
-  onCalculationUpdate,
 }: CalculationResultsPageProps) => {
   const [error, setError] = useState<string | null>(null);
   const [selectedOrbitalIndex, setSelectedOrbitalIndex] = useState<
@@ -123,9 +121,6 @@ export const CalculationResultsPage = ({
       !!results.optimized_geometry
     );
   }, [processedData]);
-
-  // Keep prop for interface compatibility (currently unused in this container)
-  void onCalculationUpdate;
 
   // Show loading state
   if (isLoadingDetails) {

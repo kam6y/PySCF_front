@@ -2,7 +2,7 @@
 
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pyscf import gto, scf, cc
 # geometric_solver is now imported in BaseCalculator
 
@@ -32,11 +32,6 @@ class CCSDCalculator(BaseCalculator):
         self.molecule_name = molecule_name
         self.calculate_ccsd_t = False  # Flag to indicate if CCSD(T) should be calculated
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup CCSD calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate CCSD-specific parameters."""
         # CCSD-specific parameters
