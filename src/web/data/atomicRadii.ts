@@ -3,12 +3,6 @@
  * Data sourced from authoritative chemical references
  */
 
-export interface AtomicRadiusData {
-  symbol: string;
-  name: string;
-  vdwRadius: number; // Van der Waals radius in Å
-}
-
 // Van der Waals radii database (in Angstrom)
 export const VAN_DER_WAALS_RADII: Record<string, number> = {
   // Period 1
@@ -117,7 +111,7 @@ export const VAN_DER_WAALS_RADII: Record<string, number> = {
 /**
  * Get Van der Waals radius for an element
  */
-export function getVdwRadius(element: string): number | null {
+function getVdwRadius(element: string): number | null {
   if (!element || typeof element !== 'string' || element.trim() === '') {
     return null;
   }
@@ -125,24 +119,6 @@ export function getVdwRadius(element: string): number | null {
   const symbol =
     element.charAt(0).toUpperCase() + element.slice(1).toLowerCase();
   return VAN_DER_WAALS_RADII[symbol] || null;
-}
-
-/**
- * Calculate relative atomic sizes based on Van der Waals radii
- * @param baseRadius - The base radius to scale from (default: hydrogen radius)
- * @param scaleFactor - Overall scaling factor for all atoms
- */
-export function calculateAtomicSizes(
-  baseRadius: number = VAN_DER_WAALS_RADII['H'],
-  scaleFactor: number = 0.3
-): Record<string, number> {
-  const sizes: Record<string, number> = {};
-
-  for (const [symbol, radius] of Object.entries(VAN_DER_WAALS_RADII)) {
-    sizes[symbol] = (radius / baseRadius) * scaleFactor;
-  }
-
-  return sizes;
 }
 
 /**

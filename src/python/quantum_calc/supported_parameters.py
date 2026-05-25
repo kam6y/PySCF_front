@@ -1,11 +1,7 @@
 """Module for detecting supported quantum chemistry parameters from PySCF and other sources."""
 
-import logging
 from typing import Dict, List, Any
-from pyscf import gto, dft
 from quantum_calc.method_defaults import get_method_defaults, get_parameter_constraints
-
-logger = logging.getLogger(__name__)
 
 
 def get_supported_calculation_methods() -> List[str]:
@@ -169,38 +165,6 @@ def get_supported_solvents() -> Dict[str, List[Dict[str, Any]]]:
 def get_supported_tddft_methods() -> List[str]:
     """Get list of supported TDDFT calculation methods."""
     return ['TDDFT', 'TDA']
-
-
-def validate_basis_function(basis: str) -> bool:
-    """Validate if a basis function is supported by PySCF."""
-    try:
-        mol = gto.Mole()
-        mol.atom = 'H 0 0 0; H 0 0 0.74'
-        mol.basis = basis
-        mol.build(verbose=0)
-        return True
-    except Exception as e:
-        logger.debug(f"Basis function {basis} not supported: {e}")
-        return False
-
-
-def validate_exchange_correlation(xc: str) -> bool:
-    """Validate if an exchange-correlation functional is supported by PySCF."""
-    try:
-        mol = gto.Mole()
-        mol.atom = 'H 0 0 0; H 0 0 0.74'
-        mol.basis = 'sto-3g'
-        mol.build(verbose=0)
-
-        mf = dft.RKS(mol)
-        mf.xc = xc
-        mf.max_cycle = 1
-        mf.verbose = 0
-        mf.kernel()
-        return True
-    except Exception as e:
-        logger.debug(f"Exchange-correlation functional {xc} not supported: {e}")
-        return False
 
 
 def get_all_supported_parameters() -> Dict[str, Any]:

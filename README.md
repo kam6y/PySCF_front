@@ -251,38 +251,6 @@ http://127.0.0.1:5000/api-docs/
 
 **Note:** Swagger UI is automatically enabled when running the development server and uses the OpenAPI specification from [src/api-spec/openapi.yaml](src/api-spec/openapi.yaml).
 
-### Codebase Visualization (uitnize)
-
-The `uitnize` script generates a comprehensive text file containing the entire codebase structure and contents, useful for sharing context with AI assistants or documentation purposes.
-
-**Usage:**
-```bash
-# Scan entire project
-npm run uitnize
-
-# Scan specific directory
-./scripts/uitnize.sh src/python
-./scripts/uitnize.sh config
-```
-
-**Output:**
-- Creates `code.txt` in the project root directory
-- Includes directory tree structure (using `tree` command)
-- Contains all file contents with line numbers
-- Automatically excludes build artifacts, dependencies, and generated files
-
-**Requirements:**
-- Install `tree` command for better directory visualization:
-  ```bash
-  # macOS
-  brew install tree
-
-  # Ubuntu/Debian
-  sudo apt-get install tree
-  ```
-
-**Recommendation:** For large projects, scan specific directories instead of the entire project to keep the output manageable.
-
 ---
 
 ## Troubleshooting
@@ -460,38 +428,6 @@ http://127.0.0.1:5000/api-docs/
 - ❌ **パッケージ版**: Swagger UIは含まれません（開発ツールのみ）
 
 **注記:** Swagger UIは開発サーバー起動時に自動的に有効化され、[src/api-spec/openapi.yaml](src/api-spec/openapi.yaml)のOpenAPI仕様を使用します。
-
-### コードベース可視化 (uitnize)
-
-`uitnize`スクリプトは、コードベース全体の構造と内容を包括的なテキストファイルとして生成します。AIアシスタントへのコンテキスト共有やドキュメント作成に便利です。
-
-**使用方法:**
-```bash
-# プロジェクト全体をスキャン
-npm run uitnize
-
-# 特定ディレクトリのみスキャン
-./scripts/uitnize.sh src/python
-./scripts/uitnize.sh config
-```
-
-**出力内容:**
-- プロジェクトルートに`code.txt`を生成
-- ディレクトリツリー構造を表示（`tree`コマンド使用）
-- 全ファイルの内容を行番号付きで出力
-- ビルド成果物、依存関係、生成ファイルは自動除外
-
-**必要な準備:**
-- より見やすいディレクトリ表示のため、`tree`コマンドをインストールすることを推奨:
-  ```bash
-  # macOS
-  brew install tree
-
-  # Ubuntu/Debian
-  sudo apt-get install tree
-  ```
-
-**推奨:** 大規模プロジェクトでは、プロジェクト全体ではなく特定のディレクトリをスキャンすることで、出力を管理しやすいサイズに保つことができます。
 
 ---
 

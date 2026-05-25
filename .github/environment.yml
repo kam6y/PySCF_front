@@ -9,8 +9,6 @@ dependencies:
   - rdkit=2025.03.6
   - geometric=1.1
   - ase=3.26.0
-  # Bioinformatics (for PubMed search)
-  - biopython=1.85
   # Web framework and networking
   - fastapi=0.136.1
   - uvicorn=0.47.0

@@ -64,12 +64,6 @@
   gap: 5px;
 }
 
-.rangeValue {
-  font-size: 12px;
-  color: #666;
-  text-align: center;
-}
-
 .rangeInput {
   width: 100%;
 }
@@ -105,20 +99,4 @@
   align-items: center;
   justify-content: center;
   z-index: 10;
-}
-
-.loadingText {
-  font-size: 14px;
-  color: #666;
-}
-
-/* Error states */
-.errorMessage {
-  color: #e74c3c;
-  background-color: #fdf2f2;
-  padding: 10px;
-  border: 1px solid #e74c3c;
-  border-radius: 4px;
-  font-size: 14px;
-  margin: 10px 0;
 }

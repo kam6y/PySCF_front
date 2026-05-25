@@ -52,21 +52,6 @@ def _wait_for_server_start(
 # ============================================================================
 
 
-@pytest.fixture(autouse=True)
-def _configure_application():
-    """Disable legacy test plugin application mutation for FastAPI tests."""
-
-
-@pytest.fixture(autouse=True)
-def _monkeypatch_response_class():
-    """Disable legacy response_class patching for FastAPI tests."""
-
-
-@pytest.fixture(autouse=True)
-def _push_request_context():
-    """Disable legacy request-context setup for FastAPI tests."""
-
-
 class DummyExecutor(Executor):
     """
     A synchronous executor that mimics the ProcessPoolExecutor interface.

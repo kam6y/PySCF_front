@@ -329,23 +329,6 @@ class ChatHistoryDatabase:
             logger.info(f"Deleted chat session: {session_id}")
             return True
 
-    def touch_session(self, session_id: str):
-        """
-        Update the updated_at timestamp of a session (used when messages are added).
-
-        Args:
-            session_id: Session ID to touch
-        """
-        now = datetime.utcnow().isoformat()
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE chat_sessions
-                SET updated_at = ?
-                WHERE id = ?
-            """, (now, session_id))
-
     # Message operations
 
     def add_message(

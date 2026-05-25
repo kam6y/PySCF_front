@@ -27,8 +27,6 @@ export const STATUS_CONFIG = {
       </svg>
     ),
     label: 'Pending',
-    className: styles.statusPending,
-    color: '#ffa500',
   },
   running: {
     icon: (
@@ -50,8 +48,6 @@ export const STATUS_CONFIG = {
       </svg>
     ),
     label: 'Running',
-    className: styles.statusRunning,
-    color: '#2196f3',
   },
   completed: {
     icon: (
@@ -78,8 +74,6 @@ export const STATUS_CONFIG = {
       </svg>
     ),
     label: 'Completed',
-    className: styles.statusCompleted,
-    color: '#4caf50',
   },
   error: {
     icon: (
@@ -106,8 +100,6 @@ export const STATUS_CONFIG = {
       </svg>
     ),
     label: 'Error',
-    className: styles.statusError,
-    color: '#f44336',
   },
   waiting: {
     icon: (
@@ -141,8 +133,6 @@ export const STATUS_CONFIG = {
       </svg>
     ),
     label: 'Waiting',
-    className: styles.statusWaiting,
-    color: '#ff9800',
   },
   pausing: {
     icon: (
@@ -188,8 +178,6 @@ export const STATUS_CONFIG = {
       </span>
     ),
     label: 'Pausing',
-    className: styles.statusPausing,
-    color: '#9c27b0',
   },
   paused: {
     icon: (
@@ -211,8 +199,6 @@ export const STATUS_CONFIG = {
       </svg>
     ),
     label: 'Paused',
-    className: styles.statusPaused,
-    color: '#9c27b0',
   },
 } as const;
 

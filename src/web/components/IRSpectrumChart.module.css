@@ -33,19 +33,6 @@
   font-size: 14px;
 }
 
-.settingInput {
-  padding: 6px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.settingInput:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
 /* Range slider item - takes full width in second row */
 .settingItemRange {
   display: flex;

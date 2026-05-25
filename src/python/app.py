@@ -66,10 +66,6 @@ def _is_development_api_docs_path(path: str) -> bool:
     return path == '/api-docs' or path.startswith('/api-docs/')
 
 
-def _get_state(app: FastAPI, name: str, default: Any = None) -> Any:
-    return getattr(app.state, name, default)
-
-
 def register_auth_middleware(fastapi_app: FastAPI) -> None:
     @fastapi_app.middleware('http')
     async def verify_auth_token(request: Request, call_next):

@@ -135,23 +135,3 @@ export function formatDateTimeWithSeconds(
     return dateString;
   }
 }
-
-/**
- * Get the current date-time in the specified timezone.
- *
- * @param timezone - IANA timezone identifier
- * @returns Formatted current date-time string
- */
-export function getCurrentDateTime(timezone: string): string {
-  return formatDateTime(new Date().toISOString(), timezone);
-}
-
-/**
- * Check if a timezone is valid.
- *
- * @param timezone - IANA timezone identifier
- * @returns True if timezone is valid
- */
-export function isValidTimezone(timezone: string): boolean {
-  return timezone in TIMEZONE_LABELS;
-}

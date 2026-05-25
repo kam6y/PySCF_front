@@ -5,7 +5,6 @@ import tempfile
 import logging
 import threading
 from typing import ClassVar, Dict, List, Any, Optional
-from datetime import datetime
 import numpy as np
 from pyscf import gto, lib, tools
 from .exceptions import CalculationError, FileManagerError
@@ -474,123 +473,6 @@ class MolecularOrbitalGenerator:
                 except OSError as e:
                     logger.warning(f"Failed to clean up temporary CUBE file: {e}")
     
-    def list_cube_files(self) -> List[Dict[str, Any]]:
-        """
-        List all CUBE files in the working directory.
-        
-        Returns:
-            List of CUBE file information
-        """
-        cube_files = []
-        
-        orbital_dir = os.path.join(self.working_dir, "orbital")
-        if not os.path.exists(orbital_dir):
-            return cube_files
-        
-        # Find all cube files matching our naming pattern
-        import glob
-        pattern = os.path.join(orbital_dir, "orbital_*_grid*.cube")
-        
-        for file_path in glob.glob(pattern):
-            filename = os.path.basename(file_path)
-            
-            # Extract orbital index and grid size from filename
-            try:
-                # Parse filename: orbital_{index}_grid{size}.cube
-                parts = filename.replace('.cube', '').split('_')
-                if len(parts) >= 3 and parts[0] == 'orbital' and parts[2].startswith('grid'):
-                    orbital_index = int(parts[1])
-                    grid_size = int(parts[2].replace('grid', ''))
-                    
-                    file_size_kb = os.path.getsize(file_path) / 1024.0
-                    modified_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-                    
-                    cube_files.append({
-                        "filename": filename,
-                        "file_path": file_path,
-                        "orbital_index": orbital_index,
-                        "grid_size": grid_size,
-                        "file_size_kb": file_size_kb,
-                        "modified": modified_time.isoformat()
-                    })
-            except (ValueError, IndexError) as e:
-                logger.warning(f"Failed to parse CUBE filename {filename}: {e}")
-                continue
-        
-        return sorted(cube_files, key=lambda x: x["orbital_index"])
-    
-    def delete_cube_file(self, orbital_index: int, grid_size: int = None) -> bool:
-        """
-        Delete a specific CUBE file or all CUBE files for an orbital.
-        
-        Args:
-            orbital_index: Index of the orbital
-            grid_size: Specific grid size to delete, or None to delete all grid sizes
-        
-        Returns:
-            True if file(s) were deleted successfully
-        """
-        deleted_count = 0
-        orbital_dir = os.path.join(self.working_dir, "orbital")
-        
-        if not os.path.exists(orbital_dir):
-            return False
-        
-        if grid_size is not None:
-            # Delete specific file
-            filename = f"orbital_{orbital_index}_grid{grid_size}.cube"
-            file_path = os.path.join(orbital_dir, filename)
-            
-            if os.path.exists(file_path):
-                try:
-                    os.unlink(file_path)
-                    deleted_count += 1
-                    logger.info(f"Deleted CUBE file: {filename}")
-                except Exception as e:
-                    logger.error(f"Failed to delete CUBE file {filename}: {e}")
-                    return False
-        else:
-            # Delete all grid sizes for this orbital
-            import glob
-            pattern = os.path.join(orbital_dir, f"orbital_{orbital_index}_grid*.cube")
-            
-            for file_path in glob.glob(pattern):
-                try:
-                    os.unlink(file_path)
-                    deleted_count += 1
-                    logger.info(f"Deleted CUBE file: {os.path.basename(file_path)}")
-                except Exception as e:
-                    logger.error(f"Failed to delete CUBE file {file_path}: {e}")
-        
-        return deleted_count > 0
-    
-    def delete_all_cube_files(self) -> int:
-        """
-        Delete all CUBE files in the working directory.
-        
-        Returns:
-            Number of files deleted
-        """
-        deleted_count = 0
-        orbital_dir = os.path.join(self.working_dir, "orbital")
-        
-        if not os.path.exists(orbital_dir):
-            return deleted_count
-        
-        import glob
-        pattern = os.path.join(orbital_dir, "orbital_*_grid*.cube")
-        
-        for file_path in glob.glob(pattern):
-            try:
-                os.unlink(file_path)
-                deleted_count += 1
-                logger.info(f"Deleted CUBE file: {os.path.basename(file_path)}")
-            except Exception as e:
-                logger.error(f"Failed to delete CUBE file {file_path}: {e}")
-        
-        logger.info(f"Deleted {deleted_count} CUBE files from {orbital_dir}")
-        return deleted_count
-
     def validate_calculation(self) -> bool:
         """
         Validate that the calculation data is available for orbital generation.

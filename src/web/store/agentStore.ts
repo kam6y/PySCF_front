@@ -22,7 +22,6 @@ interface AgentState {
   currentAgentStatus: AgentStatus;
 
   // アクション
-  addMessage: (message: ChatHistory) => void;
   addMessages: (messages: ChatHistory[]) => void;
   updateMessage: (index: number, update: Partial<ChatHistory>) => void;
   setHistory: (history: ChatHistory[]) => void;
@@ -33,16 +32,10 @@ interface AgentState {
 // 永続化を削除し、メモリキャッシュとしてのみ使用
 // 会話履歴の永続化はSQLiteデータベースで一元管理
 // セッションIDの管理はchatHistoryStoreで一元化
-export const useAgentStore = create<AgentState>((set, get) => ({
+export const useAgentStore = create<AgentState>(set => ({
   // 初期状態
   history: [],
   currentAgentStatus: { agent: null, status: 'idle' },
-
-  // メッセージを履歴に追加
-  addMessage: (message: ChatHistory) =>
-    set(state => ({
-      history: [...state.history, message],
-    })),
 
   // 複数のメッセージを一度に履歴に追加（状態更新の原子性を保証）
   addMessages: (messages: ChatHistory[]) =>
