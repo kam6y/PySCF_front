@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { ApiError } from './api/core';
+import { getBackendRuntimeConfig } from './runtime-config';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,7 +58,7 @@ const queryClient = new QueryClient({
 const root = createRoot(document.getElementById('root') as Element);
 
 // URLパラメータ経由で取得したポート番号（preloadで設定済み）
-const backendPort = window.electronAPI?.flaskPort;
+const { backendPort } = getBackendRuntimeConfig();
 
 if (!backendPort) {
   console.error(
@@ -92,10 +93,7 @@ if (!backendPort) {
     </StrictMode>
   );
 } else {
-  // グローバル変数に保存（WebSocket接続用）
-  window.flaskPort = backendPort;
-
-  console.log('[index.tsx] Rendering app with backend port:', window.flaskPort);
+  console.log('[index.tsx] Rendering app with backend port:', backendPort);
 
   root.render(
     <StrictMode>

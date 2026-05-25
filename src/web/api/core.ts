@@ -1,4 +1,6 @@
-const initialPort = window.electronAPI?.flaskPort;
+import { getBackendRuntimeConfig } from '../runtime-config';
+
+const { backendPort: initialPort, backendBaseUrl } = getBackendRuntimeConfig();
 
 if (!initialPort) {
   console.error(
@@ -7,7 +9,7 @@ if (!initialPort) {
 }
 
 // フォールバック 5000 を廃止。ポート未取得時は空文字列にして fetch が明確に失敗するようにする
-const API_BASE_URL = initialPort ? `http://127.0.0.1:${initialPort}` : '';
+const API_BASE_URL = backendBaseUrl;
 
 console.log(
   `[API Client] Initialized with port: ${initialPort ?? 'UNAVAILABLE'}`

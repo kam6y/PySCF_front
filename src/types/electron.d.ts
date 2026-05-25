@@ -1,6 +1,6 @@
 export interface ElectronAPI {
   // URLパラメータから取得したbackendポート番号（preloadで設定）
-  flaskPort: number | null;
+  backendPort: number | null;
   // IPC経由で受信した認証トークンを取得（トークンが届くまで待機）
   getAuthToken: () => Promise<string | null>;
   openExternalUrl: (
@@ -20,6 +20,5 @@ export interface ElectronAPI {
 declare global {
   interface Window {
     electronAPI: ElectronAPI;
-    flaskPort?: number;
   }
 }

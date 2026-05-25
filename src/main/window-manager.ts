@@ -89,7 +89,7 @@ export const createWindow = (
   const htmlPath = path.join(__dirname, 'index.html');
   newWindow.loadFile(htmlPath, {
     query: {
-      flask_port: String(backendPort),
+      backend_port: String(backendPort),
     },
   });
 

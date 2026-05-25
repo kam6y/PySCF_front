@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { getBackendRuntimeConfig } from '../runtime-config';
 
 export interface SocketEventHandlers {
   onConnect?: (socket: Socket) => void;
@@ -98,7 +99,8 @@ export const useSocketTransport = ({
     isConnectingRef.current = true;
 
     void (async () => {
-      const port = window.flaskPort;
+      const { backendPort: port, backendBaseUrl: serverUrl } =
+        getBackendRuntimeConfig();
       if (!port) {
         console.error(
           '[UnifiedWebSocket] Backend port not set. Cannot connect.'
@@ -106,7 +108,6 @@ export const useSocketTransport = ({
         isConnectingRef.current = false;
         return;
       }
-      const serverUrl = `http://127.0.0.1:${port}`;
       console.log(`[UnifiedWebSocket] Connecting to ${serverUrl}`);
 
       try {

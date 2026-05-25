@@ -72,7 +72,7 @@ Module._load = (...args: unknown[]): unknown => {
 
 (globalThis as any).window = {
   electronAPI: {
-    flaskPort: 5000,
+    backendPort: 5000,
     getAuthToken: async () => null,
   },
 };
