@@ -1,12 +1,6 @@
 // src/web/App.tsx
 
-import React, {
-  useMemo,
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-} from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
@@ -23,11 +17,7 @@ import { useCalculationData } from './hooks/useCalculationData';
 import { useCalculationActions } from './hooks/useCalculationActions';
 import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
 import { useChatHistoryStore } from './store/chatHistoryStore';
-import { useAgentStore } from './store/agentStore';
-import {
-  useGetChatSessionDetail,
-  useGetChatSessions,
-} from './hooks/useChatHistoryQueries';
+import { useGetChatSessions } from './hooks/useChatHistoryQueries';
 import { useAppSettings } from './hooks/useAppSettings';
 
 export const App = () => {
@@ -231,7 +221,6 @@ export const App = () => {
   const setActiveSessionId = useChatHistoryStore(
     state => state.setActiveSessionId
   );
-  const setHistory = useAgentStore(state => state.setHistory);
 
   const handleChatSessionSelect = async (sessionId: string) => {
     try {

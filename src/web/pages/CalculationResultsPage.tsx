@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import styles from './CalculationResultsPage.module.css';
 import { CalculationInstance } from '../types/api-types';
 import { useProcessedCalculationResults } from '../hooks/useProcessedCalculationResults';

@@ -195,13 +195,6 @@
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
-.sizeHelpText {
-  font-size: 11px;
-  color: #666;
-  font-style: italic;
-  margin-top: 4px;
-}
-
 /* Toggle Switch with Margin */
 .toggleSwitchWithMargin {
   margin-bottom: 16px;

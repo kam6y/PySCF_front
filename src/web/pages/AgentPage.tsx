@@ -168,22 +168,6 @@ export const AgentPage = React.memo(() => {
     </div>
   );
 
-  // タイピングインジケーター
-  const renderTypingIndicator = () => (
-    <div className={styles.typingIndicator}>
-      <div className={styles.typingDots}>
-        <div className={styles.typingDot}></div>
-        <div className={styles.typingDot}></div>
-        <div className={styles.typingDot}></div>
-      </div>
-    </div>
-  );
-
-  // エージェント表示名を取得
-  const getAgentDisplayName = (agent: string) => {
-    return 'AI Assistant';
-  };
-
   return (
     <div className={styles.agentPageContainer}>
       {/* Title and New Chat button container - only show when there's an active session */}

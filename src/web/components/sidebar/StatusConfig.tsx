@@ -1,4 +1,3 @@
-import React from 'react';
 import { CalculationSummary } from '../../types/api-types';
 import styles from '../Sidebar.module.css';
 

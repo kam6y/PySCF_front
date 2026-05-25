@@ -167,10 +167,6 @@ class SettingsService:
 
             result = updated_settings.model_dump(mode='json')
 
-            # Add move result to response if directory was moved
-            if move_result:
-                result['move_result'] = move_result
-
             logger.info(f"Successfully updated settings")
             return result
 

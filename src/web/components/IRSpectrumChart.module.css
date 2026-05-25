@@ -108,15 +108,6 @@
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.rangeInputs {
-  display: flex;
-  gap: 8px;
-}
-
-.rangeInputs input {
-  flex: 1;
-}
-
 .rangeSlider {
   position: relative;
   height: 32px;
@@ -270,40 +261,4 @@
   margin: 2px 0;
   color: #dc2626;
   font-size: 12px;
-}
-
-/* Metadata Section */
-.metadataSection {
-  padding: 15px;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-}
-
-.metadataSection h4 {
-  margin: 0 0 15px 0;
-  color: #333;
-  font-size: 1.1em;
-  font-weight: 500;
-}
-
-.metadataGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.metadataItem {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  color: #333;
-}
-
-.metadataLabel {
-  font-weight: 500;
-}
-
-.metadataValue {
-  color: #0066cc;
-  font-family: monospace;
 }

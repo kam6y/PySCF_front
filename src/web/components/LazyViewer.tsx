@@ -22,7 +22,6 @@ interface LazyViewerProps {
 export const LazyViewer: React.FC<LazyViewerProps> = React.memo(
   ({ children, placeholder, rootMargin = '200px' }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [isVisible, setIsVisible] = useState(false);
     const [hasBeenVisible, setHasBeenVisible] = useState(false);
 
     useEffect(() => {
@@ -33,11 +32,7 @@ export const LazyViewer: React.FC<LazyViewerProps> = React.memo(
       const handleIntersection = (entries: IntersectionObserverEntry[]) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
-            setIsVisible(true);
-            // 一度表示されたら、その状態を保持
             setHasBeenVisible(true);
-          } else {
-            setIsVisible(false);
           }
         });
       };

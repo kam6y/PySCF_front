@@ -7,30 +7,23 @@ to results retrieval, using DummyExecutor for synchronous testing.
 
 import pytest
 import time
-from tests.conftest import DummyExecutor
 
 
 class TestCalculationWorkflowSync:
     """
     Integration tests for complete calculation workflow using synchronous execution.
     
-    These tests use DummyExecutor to replace ProcessPoolExecutor, allowing
+    The shared app fixture replaces ProcessPoolExecutor with DummyExecutor, allowing
     calculations to run synchronously and deterministically in tests.
     """
 
-    def test_full_hf_calculation_workflow(self, client, mocker, valid_hf_params, app):
+    def test_full_hf_calculation_workflow(self, client, mocker, valid_hf_params):
         """
-        GIVEN ProcessPoolExecutor is replaced with DummyExecutor
+        GIVEN the shared app fixture uses DummyExecutor
         WHEN a HF calculation is submitted and completes
         THEN the full workflow from submission to results retrieval works
         """
         # ARRANGE
-        # Replace ProcessPoolExecutor with DummyExecutor for synchronous execution
-        mocker.patch(
-            'quantum_calc.process_manager.ProcessPoolExecutor',
-            new=DummyExecutor
-        )
-        
         # Mock PySCF to avoid actual computation
         # We need to mock at the module where it's imported, not where it's defined
         mock_mol = mocker.MagicMock()
@@ -102,8 +95,6 @@ class TestCalculationWorkflowSync:
         THEN all calculations are listed
         """
         # ARRANGE
-        mocker.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor)
-        
         # Mock PySCF
         mock_mol = mocker.MagicMock()
         mock_scf = mocker.MagicMock()
@@ -146,8 +137,6 @@ class TestCalculationWorkflowSync:
         THEN the name is updated and reflected in details
         """
         # ARRANGE
-        mocker.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor)
-        
         # Mock PySCF
         mock_mol = mocker.MagicMock()
         mock_scf = mocker.MagicMock()
@@ -187,8 +176,6 @@ class TestCalculationWorkflowSync:
         THEN it no longer appears in listings and cannot be retrieved
         """
         # ARRANGE
-        mocker.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor)
-        
         # Mock PySCF
         mock_mol = mocker.MagicMock()
         mock_scf = mocker.MagicMock()
@@ -257,8 +244,6 @@ class TestCalculationWorkflowSync:
         THEN the workflow still exposes a calculation ID for Socket.IO clients
         """
         # ARRANGE
-        mocker.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor)
-        
         # Mock PySCF
         mock_mol = mocker.MagicMock()
         mock_scf = mocker.MagicMock()
@@ -278,96 +263,132 @@ class TestCalculationWorkflowSync:
         # ASSERT
         assert calc_id
 
-    def test_workflow_error_handling(self, client, mocker, valid_hf_params):
+    def test_workflow_worker_exception_persists_error_details(
+        self,
+        client,
+        mocker,
+        valid_hf_params,
+    ):
         """
-        GIVEN PySCF raises an exception during calculation
-        WHEN calculation is executed
-        THEN error status is properly recorded
-
-        NOTE: This test has limitations due to process manager initialization timing.
-        The ProcessPoolExecutor is created during app fixture initialization, before
-        mocks can be applied. Therefore, calculations may run in actual separate processes
-        where mocks don't apply. The test validates that the workflow handles various
-        states correctly, but cannot reliably force error conditions via mocking.
+        GIVEN a calculation worker raises during execution
+        WHEN calculation details are fetched through the API
+        THEN repository-backed error status and message are returned
         """
         # ARRANGE
-        mocker.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor)
+        error_message = "SCF did not converge"
 
-        # Mock PySCF to raise error
-        mock_mol = mocker.MagicMock()
-        mock_scf = mocker.MagicMock()
-        mock_scf.kernel.side_effect = RuntimeError("SCF did not converge")
+        def failing_worker(_calculation_id, _parameters):
+            raise RuntimeError(error_message)
 
-        mocker.patch('pyscf.gto.M', return_value=mock_mol)
-        mocker.patch('pyscf.scf.RHF', return_value=mock_scf)
-        mocker.patch('pyscf.scf.UHF', return_value=mock_scf)
+        mocker.patch(
+            'quantum_calc.process_manager.calculation_worker',
+            side_effect=failing_worker,
+        )
 
         # ACT
         response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
+
+        # ASSERT
+        assert response_submit.status_code == 202
         calc_id = response_submit.json()['data']['calculation']['id']
 
-        # Get calculation details
         response_details = client.get(f'/api/quantum/calculations/{calc_id}')
-
-        # ASSERT
         assert response_details.status_code == 200
-        details_data = response_details.json()
-        calc_details = details_data['data']['calculation']
 
-        # Should have error status (or waiting/running if not yet processed)
-        # Note: Due to process manager initialization timing, mocks may not apply
-        # and the calculation may complete successfully
-        assert calc_details['status'] in ['error', 'waiting', 'running', 'completed']
+        calc_details = response_details.json()['data']['calculation']
+        assert calc_details['status'] == 'error'
+        assert calc_details['results']['error'] == error_message
 
-    def test_workflow_orbital_generation(self, client, mocker, valid_hf_params):
+    def test_workflow_orbitals_route_uses_completed_calculation_data(
+        self,
+        client,
+        mocker,
+        valid_hf_params,
+    ):
         """
-        GIVEN a completed calculation with orbital data
-        WHEN orbital CUBE file is requested
-        THEN CUBE file is generated successfully
+        GIVEN a completed calculation and available orbital metadata
+        WHEN /orbitals is requested through the API
+        THEN route, service, and repository cooperate to return orbital data
         """
         # ARRANGE
-        mocker.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor)
-        
-        # Mock PySCF with orbital data
-        mock_mol = mocker.MagicMock()
-        mock_scf = mocker.MagicMock()
-        mock_scf.kernel.return_value = -1.06
-        mock_scf.mo_energy = [-0.5, 0.3, 0.8]
-        mock_scf.mo_occ = [2.0, 0.0, 0.0]
-        mock_scf.mo_coeff = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]  # Mock MO coefficients
-        
-        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
-        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
-        
-        # Mock CUBE file generation
-        mocker.patch('quantum_calc.orbital_generator.tools.cubegen.orbital')
+        def completed_worker(calculation_id, parameters):
+            from quantum_calc import get_current_settings
+            from quantum_calc._calculation_repository import CalculationRepository
 
-        # Submit and complete calculation
-        response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
-        calc_id = response_submit.json()['data']['calculation']['id']
+            repository = CalculationRepository(
+                base_dir=get_current_settings().calculations_directory,
+            )
+            calc_dir = str(repository.resolve_calculation_path(calculation_id))
+            repository.save_calculation_results(
+                calc_dir,
+                {
+                    'energy': -1.06,
+                    'calculation_method': parameters['calculation_method'],
+                },
+            )
+            repository.save_calculation_status(calc_dir, 'completed')
+            return True, None
 
-        # Wait for calculation to complete
-        import time
-        for _ in range(10):  # Try for 10 seconds
-            response_details = client.get(f'/api/quantum/calculations/{calc_id}')
-            calc_details = response_details.json()['data']['calculation']
-            if calc_details['status'] == 'completed':
-                break
-            time.sleep(1)
+        orbital_summary = {
+            'orbitals': [
+                {
+                    'index': 0,
+                    'energy_hartree': -0.5,
+                    'energy_ev': -13.605693122994,
+                    'occupancy': 2.0,
+                    'orbital_type': 'homo',
+                    'label': 'HOMO',
+                },
+                {
+                    'index': 1,
+                    'energy_hartree': 0.3,
+                    'energy_ev': 8.1634158737964,
+                    'occupancy': 0.0,
+                    'orbital_type': 'lumo',
+                    'label': 'LUMO',
+                },
+            ],
+            'homo_index': 0,
+            'lumo_index': 1,
+            'total_orbitals': 2,
+            'num_occupied': 1,
+            'num_virtual': 1,
+        }
+
+        mocker.patch(
+            'quantum_calc.process_manager.calculation_worker',
+            side_effect=completed_worker,
+        )
+        mock_orbital_generator = mocker.patch(
+            'services.quantum_service.MolecularOrbitalGenerator',
+        )
+        mock_orbital_generator.return_value.validate_calculation.return_value = True
+        mock_orbital_generator.return_value.get_orbital_summary.return_value = (
+            orbital_summary
+        )
 
         # ACT
-        # Request orbitals list
-        response_orbitals = client.get(f'/api/quantum/calculations/{calc_id}/orbitals')
+        response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
 
         # ASSERT
-        # May return 200 with orbital data, or an error if checkpoint data is not available.
-        assert response_orbitals.status_code in [200, 400, 404]
-        if response_orbitals.status_code == 200:
-            orbitals_data = response_orbitals.json()
-            assert orbitals_data['success'] is True
+        assert response_submit.status_code == 202
+        calc_id = response_submit.json()['data']['calculation']['id']
 
-            # Should have orbital information
-            assert 'orbitals' in orbitals_data['data'] or 'homo_index' in orbitals_data['data']
+        response_details = client.get(f'/api/quantum/calculations/{calc_id}')
+        assert response_details.status_code == 200
+        assert (
+            response_details.json()['data']['calculation']['status']
+            == 'completed'
+        )
+
+        response_orbitals = client.get(f'/api/quantum/calculations/{calc_id}/orbitals')
+        assert response_orbitals.status_code == 200
+
+        orbitals_data = response_orbitals.json()
+        assert orbitals_data['success'] is True
+        assert orbitals_data['data'] == orbital_summary
+
+        mock_orbital_generator.assert_called_once()
 
 
 class TestCalculationWorkflowValidation:
@@ -461,8 +482,6 @@ class TestCalculationWorkflowMultipleCalculations:
         THEN each maintains its own state and results
         """
         # ARRANGE
-        mocker.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor)
-        
         # Mock PySCF
         mock_mol = mocker.MagicMock()
         mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)

@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppSettings, useGetCalculations, useGpu4Pyscf } from '../hooks';
-import {
-  TIMEZONE_LABELS,
-  TIMEZONE_GROUPS,
-  getTimezoneLabel,
-} from '../utils/dateFormatter';
+import { TIMEZONE_GROUPS, getTimezoneLabel } from '../utils/dateFormatter';
 import type { components } from '../types/generated-api';
 import styles from './SettingsPage.module.css';
 

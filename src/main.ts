@@ -16,7 +16,6 @@ import {
 let backendPort: number | null = null;
 let authToken: string = '';
 let isCreatingWindow = false;
-let isQuitting = false;
 
 // グローバル設定を読み込み
 let serverConfig: any = null;
@@ -133,6 +132,5 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
-  isQuitting = true;
   stopPythonServer();
 });

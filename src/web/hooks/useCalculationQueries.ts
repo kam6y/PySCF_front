@@ -2,7 +2,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as quantumApi from '../api/quantum';
-import { searchPubChem, convertSmilesToXyz } from '../api/molecule';
 import {
   CalculationInstance,
   CalculationListResponseData,
@@ -18,8 +17,6 @@ export const calculationQueryKeys = {
     [...calculationQueryKeys.all, 'orbitals', id] as const,
   orbitalCube: (id: string, idx: number, opts?: object) =>
     [...calculationQueryKeys.all, 'orbital-cube', id, idx, opts] as const,
-  cubeFiles: (id: string) =>
-    [...calculationQueryKeys.all, 'cube-files', id] as const,
   supportedParams: () =>
     [...calculationQueryKeys.all, 'supported-parameters'] as const,
 };
@@ -159,26 +156,6 @@ export const useUpdateCalculationName = () => {
   });
 };
 
-// PubChem検索Mutation
-export const useSearchPubChem = () => {
-  return useMutation({
-    mutationFn: ({
-      query,
-      searchType,
-    }: {
-      query: string;
-      searchType: 'name' | 'cid';
-    }) => searchPubChem(query, searchType),
-  });
-};
-
-// SMILES変換Mutation
-export const useConvertSmilesToXyz = () => {
-  return useMutation({
-    mutationFn: (smiles: string) => convertSmilesToXyz(smiles),
-  });
-};
-
 // 軌道情報を取得するQuery
 export const useGetOrbitals = (calculationId: string | null) => {
   return useQuery({
@@ -215,86 +192,6 @@ export const useGetOrbitalCube = (
     gcTime: 24 * 60 * 60 * 1000, // 24時間メモリに保持（永続化されたファイルアクセス用）
     refetchOnWindowFocus: false, // ウィンドウフォーカス時の再取得を無効化
     refetchOnMount: false, // マウント時の再取得を無効化（staleTimeを優先してキャッシュを活用）
-  });
-};
-
-// 軌道のCUBEファイルを生成するMutation（再生成が必要な場合）
-export const useGenerateOrbitalCube = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      calculationId,
-      orbitalIndex,
-      options,
-    }: {
-      calculationId: string;
-      orbitalIndex: number;
-      options?: {
-        gridSize?: number;
-        isovaluePos?: number;
-        isovalueNeg?: number;
-      };
-    }) => quantumApi.getOrbitalCube(calculationId, orbitalIndex, options),
-    onSuccess: (data, variables) => {
-      // 成功したら該当するキャッシュを更新
-      queryClient.setQueryData(
-        calculationQueryKeys.orbitalCube(
-          variables.calculationId,
-          variables.orbitalIndex,
-          variables.options
-        ),
-        data
-      );
-    },
-  });
-};
-
-// CUBE files management
-export const useListCubeFiles = (calculationId: string | null) => {
-  return useQuery({
-    queryKey: calculationQueryKeys.cubeFiles(calculationId ?? ''),
-    queryFn: () => quantumApi.listCubeFiles(calculationId!),
-    enabled: !!calculationId && !calculationId.startsWith('new-calculation-'),
-  });
-};
-
-export const useDeleteCubeFiles = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      calculationId,
-      orbitalIndex,
-    }: {
-      calculationId: string;
-      orbitalIndex?: number;
-    }) => quantumApi.deleteCubeFiles(calculationId, orbitalIndex),
-    onSuccess: (data, variables) => {
-      // Invalidate related queries
-      queryClient.invalidateQueries({
-        queryKey: calculationQueryKeys.cubeFiles(variables.calculationId),
-      });
-      if (variables.orbitalIndex !== undefined) {
-        queryClient.invalidateQueries({
-          queryKey: calculationQueryKeys.orbitalCube(
-            variables.calculationId,
-            variables.orbitalIndex
-          ),
-        });
-        return;
-      }
-
-      const orbitalCubePrefix = calculationQueryKeys.orbitalCube(
-        variables.calculationId,
-        0
-      );
-      queryClient.invalidateQueries({
-        predicate: query =>
-          Array.isArray(query.queryKey) &&
-          query.queryKey[0] === orbitalCubePrefix[0] &&
-          query.queryKey[1] === orbitalCubePrefix[1] &&
-          query.queryKey[2] === orbitalCubePrefix[2],
-      });
-    },
   });
 };
 

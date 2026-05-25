@@ -21,7 +21,6 @@ from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
 
 
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
-PENDING_FASTAPI_MIGRATION_ROUTES = set()
 
 PYTHON_DIR = Path(__file__).resolve().parents[3]
 OPENAPI_PATH = PYTHON_DIR.parent / "api-spec" / "openapi.yaml"
@@ -178,9 +177,7 @@ def test_openapi_and_implementation_have_same_public_routes() -> None:
     openapi_routes, _ = _extract_openapi_contract()
 
     only_in_impl = sorted(impl_routes - openapi_routes)
-    only_in_openapi = sorted(
-        openapi_routes - impl_routes - PENDING_FASTAPI_MIGRATION_ROUTES
-    )
+    only_in_openapi = sorted(openapi_routes - impl_routes)
 
     issues = []
     if only_in_impl:
@@ -191,28 +188,6 @@ def test_openapi_and_implementation_have_same_public_routes() -> None:
         issues.append(f"Defined in OpenAPI but missing in implementation: {formatted}")
 
     assert not issues, "\n".join(issues)
-
-
-def test_pending_fastapi_migration_routes_are_defined_in_openapi() -> None:
-    openapi_routes, _ = _extract_openapi_contract()
-
-    missing_from_openapi = sorted(PENDING_FASTAPI_MIGRATION_ROUTES - openapi_routes)
-
-    assert not missing_from_openapi, (
-        "Pending migration allowlist routes must exist in OpenAPI: "
-        + ", ".join(_format_route(route) for route in missing_from_openapi)
-    )
-
-
-def test_pending_fastapi_migration_routes_are_not_registered() -> None:
-    impl_routes, _ = _extract_implementation_contract()
-
-    registered_routes = sorted(PENDING_FASTAPI_MIGRATION_ROUTES & impl_routes)
-
-    assert not registered_routes, (
-        "Registered routes must be removed from PENDING_FASTAPI_MIGRATION_ROUTES: "
-        + ", ".join(_format_route(route) for route in registered_routes)
-    )
 
 
 def test_openapi_defines_auth_token_security_contract() -> None:

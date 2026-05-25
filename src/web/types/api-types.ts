@@ -3,7 +3,7 @@
  * This file provides easier access to the generated types for use throughout the application
  */
 
-import { components, operations } from './generated-api';
+import { components } from './generated-api';
 import { ApiError } from '../api/core';
 
 // Export enum types as union types for convenience
@@ -47,10 +47,6 @@ export type ResumeCalculationResponse =
   components['schemas']['ResumeCalculationResponse'];
 export type OrbitalsResponse = components['schemas']['OrbitalsResponse'];
 export type OrbitalCubeResponse = components['schemas']['OrbitalCubeResponse'];
-export type CubeFilesListResponse =
-  components['schemas']['CubeFilesListResponse'];
-export type CubeFilesDeleteResponse =
-  components['schemas']['CubeFilesDeleteResponse'];
 export type SupportedParametersResponse =
   components['schemas']['SupportedParametersResponse'];
 export type IRSpectrumResponse = components['schemas']['IRSpectrumResponse'];
@@ -81,27 +77,6 @@ export type ChatSession = components['schemas']['ChatSession'];
 export type ChatSessionSummary = components['schemas']['ChatSessionSummary'];
 export type ChatSessionDetail = components['schemas']['ChatSessionDetail'];
 
-// Operation types for reference
-export type Operations = {
-  healthCheck: operations['healthCheck'];
-  searchPubChem: operations['searchPubChem'];
-  convertSmiles: operations['convertSmiles'];
-  validateXYZ: operations['validateXYZ'];
-  startCalculation: operations['startCalculation'];
-  listCalculations: operations['listCalculations'];
-  getCalculationDetails: operations['getCalculationDetails'];
-  updateCalculation: operations['updateCalculation'];
-  deleteCalculation: operations['deleteCalculation'];
-  getOrbitals: operations['getOrbitals'];
-  getOrbitalCube: operations['getOrbitalCube'];
-  listCubeFiles: operations['listCubeFiles'];
-  deleteCubeFiles: operations['deleteCubeFiles'];
-  getSupportedParameters: operations['getSupportedParameters'];
-  getIRSpectrum: operations['getIRSpectrum'];
-  getGpu4PyscfStatus: operations['getGpu4PyscfStatus'];
-  installGpu4Pyscf: operations['installGpu4Pyscf'];
-};
-
 // Response wrapper for API responses
 export type ApiResponse<T> = {
   success: boolean;
@@ -121,8 +96,6 @@ export type PauseCalculationResponseData = PauseCalculationResponse['data'];
 export type ResumeCalculationResponseData = ResumeCalculationResponse['data'];
 export type OrbitalsResponseData = OrbitalsResponse['data'];
 export type OrbitalCubeResponseData = OrbitalCubeResponse['data'];
-export type CubeFilesListResponseData = CubeFilesListResponse['data'];
-export type CubeFilesDeleteResponseData = CubeFilesDeleteResponse['data'];
 export type SupportedParametersResponseData =
   SupportedParametersResponse['data'];
 export type IRSpectrumResponseData = IRSpectrumResponse['data'];

@@ -589,7 +589,7 @@ export const MoleculeViewer = ({
         }
 
         // Apply styles for each element with appropriate radius
-        for (const [element, atoms] of Object.entries(elementGroups)) {
+        for (const element of Object.keys(elementGroups)) {
           const atomRadius = getAtomicRadius(
             element,
             VAN_DER_WAALS_RADII['H'],

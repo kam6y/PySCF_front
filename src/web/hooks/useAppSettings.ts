@@ -5,7 +5,6 @@ import { useCalculationStore } from '../store/calculationStore';
 
 // Type definitions
 type AppSettings = components['schemas']['AppSettings'];
-type SettingsResponse = components['schemas']['SettingsResponse'];
 
 // Query keys
 const settingsKeys = {

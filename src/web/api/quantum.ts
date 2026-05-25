@@ -7,8 +7,6 @@ import {
   StartCalculationResponseData,
   OrbitalsResponseData,
   OrbitalCubeResponseData,
-  CubeFilesListResponseData,
-  CubeFilesDeleteResponseData,
   SupportedParametersResponseData,
   IRSpectrumResponseData,
   PauseCalculationResponseData,
@@ -159,42 +157,6 @@ export const getOrbitalCube = (
   }`;
 
   return request<OrbitalCubeResponseData>(endpoint, { method: 'GET' });
-};
-
-export const listCubeFiles = (
-  calculationId: string
-): Promise<CubeFilesListResponseData> => {
-  validateCalculationId(
-    calculationId,
-    `/api/quantum/calculations/${calculationId}/orbitals/cube-files`
-  );
-
-  return request<CubeFilesListResponseData>(
-    `/api/quantum/calculations/${calculationId}/orbitals/cube-files`,
-    { method: 'GET' }
-  );
-};
-
-export const deleteCubeFiles = (
-  calculationId: string,
-  orbitalIndex?: number
-): Promise<CubeFilesDeleteResponseData> => {
-  validateCalculationId(
-    calculationId,
-    `/api/quantum/calculations/${calculationId}/orbitals/cube-files`
-  );
-
-  const queryParams = new URLSearchParams();
-  if (orbitalIndex !== undefined && orbitalIndex >= 0) {
-    queryParams.append('orbital_index', orbitalIndex.toString());
-  }
-
-  const queryString = queryParams.toString();
-  const endpoint = `/api/quantum/calculations/${calculationId}/orbitals/cube-files${
-    queryString ? `?${queryString}` : ''
-  }`;
-
-  return request<CubeFilesDeleteResponseData>(endpoint, { method: 'DELETE' });
 };
 
 export const getSupportedParameters =

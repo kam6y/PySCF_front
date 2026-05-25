@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any
 from quantum_calc import (
     get_process_manager, get_all_supported_parameters, get_current_settings,
     InputError, GeometryError, ProcessManagerError, CalculationError, FileManagerError,
-    CalculationRepository, CubeArtifactService, CalculationDirectoryMigration,
+    CalculationRepository, CubeArtifactService,
 )
 from quantum_calc.orbital_generator import MolecularOrbitalGenerator
 from quantum_calc.ir_spectrum import create_ir_spectrum_from_calculation_results
@@ -49,7 +49,6 @@ class QuantumService:
         calculations_dir = settings.calculations_directory
         self.repository = CalculationRepository(base_dir=calculations_dir)
         self.cube_service = CubeArtifactService(base_dir=calculations_dir)
-        self.migration = CalculationDirectoryMigration(base_dir=calculations_dir)
 
     def update_calculations_directory(self, new_directory: str) -> None:
         """
@@ -59,7 +58,6 @@ class QuantumService:
             new_directory: New directory path for calculations
         """
         logger.info(f"Updating QuantumService calculations directory to: {new_directory}")
-        self.migration.set_base_directory(new_directory)
         self.repository.set_base_directory(new_directory)
         self.cube_service.set_base_directory(new_directory)
 

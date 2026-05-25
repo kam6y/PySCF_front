@@ -187,18 +187,6 @@
   max-width: 400px;
 }
 
-.typingIndicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background-color: #e5e7eb;
-  border-radius: 18px;
-  border-bottom-left-radius: 4px;
-  align-self: flex-start;
-  max-width: 100px;
-}
-
 .typingDots {
   display: flex;
   gap: 4px;

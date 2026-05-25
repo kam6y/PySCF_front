@@ -1,4 +1,4 @@
-import { BrowserWindow, app, screen } from 'electron';
+import { BrowserWindow, app } from 'electron';
 import path from 'node:path';
 
 let mainWindow: BrowserWindow | null = null;
