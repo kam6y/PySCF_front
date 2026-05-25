@@ -251,6 +251,46 @@ http://127.0.0.1:5000/api-docs/
 
 **Note:** Swagger UI is automatically enabled when running the development server and uses the OpenAPI specification from [src/api-spec/openapi.yaml](src/api-spec/openapi.yaml).
 
+### OpenAPI Code Generation
+
+`src/api-spec/openapi.yaml` is the source of truth for API contracts. Generated API files are read-only by convention:
+
+- `src/python/generated_models.py`
+- `src/web/types/generated-api.ts`
+
+After editing the OpenAPI spec, regenerate both files through the shared local/CI command path:
+
+```bash
+npm run codegen
+```
+
+Before opening a pull request, check that generated artifacts are current:
+
+```bash
+npm run codegen:check
+```
+
+CI runs the same `npm run codegen:check` path and fails if either generated file changes. Do not edit generated files directly; update `src/api-spec/openapi.yaml` first and regenerate.
+
+### Python Environment Reproducibility
+
+`.github/environment.yml` remains the canonical Python environment source. For fully reproducible macOS/Linux dependency resolution, the recommended follow-up is to add `conda-lock` and commit an OS-aware lock artifact generated from `.github/environment.yml`.
+
+Recommended target platforms:
+
+- `osx-arm64` for Apple Silicon macOS development
+- `osx-64` for Intel macOS compatibility if needed
+- `linux-64` for CI, WSL, and Linux packaging
+
+The expected follow-up flow is:
+
+```bash
+conda-lock -f .github/environment.yml -p osx-arm64 -p osx-64 -p linux-64
+conda-lock render --kind explicit
+```
+
+`conda-lock` defaults to a unified multi-platform lockfile and can render explicit per-platform lock files for direct conda installation. Lock adoption is tracked separately in issue #18 because it needs platform-specific solve verification and CI cache-key updates.
+
 ---
 
 ## Troubleshooting
@@ -428,6 +468,46 @@ http://127.0.0.1:5000/api-docs/
 - ❌ **パッケージ版**: Swagger UIは含まれません（開発ツールのみ）
 
 **注記:** Swagger UIは開発サーバー起動時に自動的に有効化され、[src/api-spec/openapi.yaml](src/api-spec/openapi.yaml)のOpenAPI仕様を使用します。
+
+### OpenAPIコード生成
+
+API契約の正本は `src/api-spec/openapi.yaml` です。以下の生成ファイルは手編集しない運用です。
+
+- `src/python/generated_models.py`
+- `src/web/types/generated-api.ts`
+
+OpenAPI仕様を変更したら、ローカルとCIで共通のコマンド経路を使って再生成します。
+
+```bash
+npm run codegen
+```
+
+PR作成前には、生成物が最新か確認します。
+
+```bash
+npm run codegen:check
+```
+
+CIも同じ `npm run codegen:check` を実行し、生成後に上記2ファイルへ差分が出た場合は失敗します。生成ファイルを直接編集せず、先に `src/api-spec/openapi.yaml` を更新してから再生成してください。
+
+### Python環境の再現性
+
+`.github/environment.yml` は引き続きPython環境定義の正本です。macOS/Linuxで依存解決を完全に再現可能にする次のステップとして、`conda-lock` を導入し、`.github/environment.yml` からOS別ロック成果物をコミットする方針を推奨します。
+
+推奨対象プラットフォーム:
+
+- `osx-arm64`: Apple Silicon macOS開発環境
+- `osx-64`: 必要に応じたIntel macOS互換
+- `linux-64`: CI、WSL、Linuxパッケージング
+
+想定フロー:
+
+```bash
+conda-lock -f .github/environment.yml -p osx-arm64 -p osx-64 -p linux-64
+conda-lock render --kind explicit
+```
+
+`conda-lock` はデフォルトで複数プラットフォーム対応の統合lockfileを生成でき、必要に応じてcondaへ直接渡せる明示的なプラットフォーム別lockfileも出力できます。導入時は各OSでのsolve検証とCIキャッシュキー更新が必要なため、issue #18 で別タスクとして追跡します。
 
 ---
 

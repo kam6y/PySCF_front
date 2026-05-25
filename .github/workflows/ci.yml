@@ -68,12 +68,10 @@ jobs:
       run: |
         python scripts/verify-environment.py
 
-    - name: Generate code from OpenAPI spec
+    - name: Generate and check OpenAPI artifacts
       shell: bash -l {0}
       run: |
-        npm run codegen:typescript
-        cd src/python
-        datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description
+        npm run codegen:check
 
     - name: Run Python tests
       shell: bash -l {0}
