@@ -13,9 +13,9 @@
 version: 1
 metadata:
   content_hash:
-    osx-arm64: b2cfbde07a652ae1619aa82860e07e938edb45989ea74802a9ac72a8ba1fb17e
-    osx-64: da997b8d5e0fb4e4e5224ae11fd494f97cea187a8864e32a703e6f3000132a5b
-    linux-64: b774b0fe38f89add5c64fcac40b13fc9020f2626d85692c309babd1df7cd4044
+    osx-arm64: 323b4d0652957c2633a698518fa0d1d15c37296f2b52e68248c388c223ef5599
+    osx-64: e1b7daf1fe2f74aa9c23e5a92289ad17d3b86a737c2ae4006e294305d0119290
+    linux-64: 249954be768176af65122a4c9a98b2332a6122a85b1655fa842cb530d920eb18
   channels:
   - url: conda-forge
     used_env_vars: []
@@ -9348,36 +9348,6 @@ package:
   url: https://files.pythonhosted.org/packages/41/5d/e44573011401fb82e9d51e97f1290ceb377800fb4eed650b96f4753b499c/pytokens-0.4.1-cp312-cp312-macosx_11_0_arm64.whl
   hash:
     sha256: 140709331e846b728475786df8aeb27d24f48cbcf7bcd449f8de75cae7a45083
-  category: main
-  optional: false
-- name: pyyaml
-  version: 6.0.1
-  manager: pip
-  platform: linux-64
-  dependencies: {}
-  url: https://files.pythonhosted.org/packages/b4/33/720548182ffa8344418126017aa1d4ab4aeec9a2275f04ce3f3573d8ace8/PyYAML-6.0.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-  hash:
-    sha256: 6c22bec3fbe2524cde73d7ada88f6566758a8f7227bfbf93a408a9d86bcc12a0
-  category: main
-  optional: false
-- name: pyyaml
-  version: 6.0.1
-  manager: pip
-  platform: osx-64
-  dependencies: {}
-  url: https://files.pythonhosted.org/packages/bc/06/1b305bf6aa704343be85444c9d011f626c763abb40c0edc1cad13bfd7f86/PyYAML-6.0.1-cp312-cp312-macosx_10_9_x86_64.whl
-  hash:
-    sha256: 855fb52b0dc35af121542a76b9a84f8d1cd886ea97c84703eaa6d88e37a2ad28
-  category: main
-  optional: false
-- name: pyyaml
-  version: 6.0.1
-  manager: pip
-  platform: osx-arm64
-  dependencies: {}
-  url: https://files.pythonhosted.org/packages/84/02/404de95ced348b73dd84f70e15a41843d817ff8c1744516bf78358f2ffd2/PyYAML-6.0.1-cp312-cp312-macosx_11_0_arm64.whl
-  hash:
-    sha256: 40df9b996c2b73138957fe23a16a4f0ba614f4c0efce1e9406a184b6d07fa3a9
   category: main
   optional: false
 - name: tqdm

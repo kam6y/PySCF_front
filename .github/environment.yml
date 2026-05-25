@@ -23,6 +23,8 @@ dependencies:
   - pytest=8.4.2
   - pytest-mock=3.14.0
   - pytest-cov=6.0.0
+  # YAML parsing for OpenAPI spec
+  - pyyaml=6.0.3
   - pip=25.2
   # Environment packaging for distribution
   - setuptools<75
@@ -34,7 +36,5 @@ dependencies:
     - datamodel-code-generator==0.33.0
     # File system monitoring
     - watchdog==6.0.0
-    # YAML parsing for OpenAPI spec
-    - pyyaml==6.0.1
     # AI Chat integration (Gemini API)
     - google-generativeai>=0.8.0
