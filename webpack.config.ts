@@ -1,7 +1,6 @@
 /** エディタで補完を効かせるために型定義をインポート */
 import type { Configuration } from 'webpack';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import webpack from 'webpack';
 
 import HtmlWebpackPlugin from 'html-webpack-plugin';
@@ -9,7 +8,7 @@ import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 
 // 開発者モードか否かで処理を分岐する
 const isDev = process.env.NODE_ENV === 'development';
-const configDir = path.dirname(fileURLToPath(import.meta.url));
+const configDir = process.cwd();
 const disabledKetcherMacromoleculesEditor = path.resolve(
   configDir,
   'src/web/vendor/ketcher/DisabledMacromoleculesEditor.tsx'
