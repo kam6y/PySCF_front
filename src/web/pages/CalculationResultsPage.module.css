@@ -268,7 +268,6 @@
 }
 
 /* Grid Layouts */
-.summaryGrid,
 .thermochemicalGrid,
 .excitedStatesGrid,
 .parametersGrid,
@@ -282,7 +281,6 @@
   margin-bottom: 16px;
 }
 
-.summaryGrid > div,
 .thermochemicalGrid > div,
 .excitedStatesGrid > div,
 .parametersGrid > div,
@@ -297,7 +295,6 @@
   transition: all 0.2s ease;
 }
 
-.summaryGrid > div:hover,
 .thermochemicalGrid > div:hover,
 .excitedStatesGrid > div:hover,
 .parametersGrid > div:hover,
@@ -309,16 +306,6 @@
   border-color: #50d4f5;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(80, 212, 245, 0.15);
-}
-
-/* Energy Display */
-.energyResult {
-  font-size: 18px;
-  padding: 16px;
-  background: #f0f8ff;
-  border-radius: 6px;
-  border: 1px solid #50d4f5;
-  font-weight: 500;
 }
 
 /* Section Descriptions */

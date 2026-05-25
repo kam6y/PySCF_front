@@ -54,7 +54,7 @@ class NotificationService:
             # Read current data
             parameters = file_manager.read_calculation_parameters(calc_dir) or {}
             results = file_manager.read_calculation_results(calc_dir)
-            display_name = file_manager.get_display_name(calculation_id, parameters)
+            display_name = file_manager.get_display_name(parameters)
 
             # Build calculation instance
             calculation_instance = {

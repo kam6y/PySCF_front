@@ -11,7 +11,7 @@ import shutil
 import subprocess
 from importlib import util
 import numpy as np
-from .config_manager import get_memory_for_method, get_max_cycle
+from .config_manager import get_max_cycle
 from .exceptions import CalculationError, PauseRequestedException
 from ._checkpoint_resume import CheckpointResumeMixin
 from ._frequency_analysis import FrequencyAnalysisMixin
@@ -46,7 +46,6 @@ class BaseCalculator(
         self.geomopt_maxsteps = geomopt_maxsteps
         self.geomopt_conv_energy = geomopt_conv_energy
         self.gpu_enabled = False
-        self._force_cpu_fallback = False
         self._gpu4pyscf_available: Optional[bool] = None
         self._cuda_supported: Optional[bool] = None
 
@@ -88,23 +87,20 @@ class BaseCalculator(
 
         Returns False when GPU acceleration is disabled. Returns True when it is
         enabled and all prerequisites are available. If prerequisites are missing,
-        logs a warning and falls back to CPU.
+        raises instead of silently running on CPU.
         """
-        if self._force_cpu_fallback or not self._is_gpu_acceleration_enabled():
+        if not self._is_gpu_acceleration_enabled():
             self.gpu_enabled = False
             return False
         if self._is_gpu4pyscf_available():
             return True
 
         reason = self._get_gpu4pyscf_unavailable_reason()
-        logger.warning(
-            "GPU acceleration is enabled but GPU4PySCF is unavailable: %s. "
-            "Falling back to CPU.",
-            reason,
-        )
         self.gpu_enabled = False
-        self._force_cpu_fallback = True
-        return False
+        raise CalculationError(
+            "GPU acceleration is enabled but GPU4PySCF is unavailable: "
+            f"{reason}"
+        )
 
     def _is_cuda_supported(self) -> bool:
         """Check whether a supported CUDA Toolkit is available (via nvcc)."""
@@ -188,23 +184,6 @@ class BaseCalculator(
         
         return atoms
     
-    
-    def apply_resource_settings(self, mol, memory_mb: Optional[int] = None, cpu_cores: Optional[int] = None) -> None:
-        """Apply resource settings to PySCF molecule object."""
-        if memory_mb is not None and memory_mb > 0:
-            # PySCF expects memory in MB
-            mol.max_memory = int(memory_mb)
-            print(f"Set PySCF max_memory to {memory_mb} MB")
-        else:
-            # Use calculation-specific default memory settings from config
-            calculation_method = getattr(self, 'calculation_method', 'DFT')
-            default_memory = get_memory_for_method(calculation_method)
-            mol.max_memory = default_memory
-            print(f"Using config-based PySCF max_memory: {default_memory} MB ({calculation_method})")
-        
-        # CPU cores are now configured at the process level in process_manager.py
-        # This avoids conflicts and ensures proper timing of environment variable setup
-
     def setup_calculation(self, atoms: List[List], **kwargs) -> None:
         """
         Template method for setting up quantum chemistry calculations.
@@ -481,42 +460,10 @@ class BaseCalculator(
             raise
         except Exception as exc:
             if self.gpu_enabled:
-                logger.warning(
-                    "GPU4PySCF calculation failed: %s. Falling back to CPU.",
-                    exc,
-                )
-                energy = self._retry_base_scf_on_cpu_after_gpu_failure(exc)
-            else:
-                raise
+                raise CalculationError(f"GPU4PySCF calculation failed: {exc}") from exc
+            raise
         logger.info(f"{self._get_base_method_description()} calculation completed")
         return energy
-
-    def _retry_base_scf_on_cpu_after_gpu_failure(self, error: Exception) -> float:
-        """Recreate the mean-field object on CPU and rerun SCF after GPU failure."""
-        self.gpu_enabled = False
-        self._force_cpu_fallback = True
-
-        mol = getattr(self.mf, "mol", None) or getattr(self, "mol", None)
-        if mol is None:
-            raise CalculationError(
-                f"GPU4PySCF calculation failed and CPU fallback could not be prepared: {error}"
-            ) from error
-
-        try:
-            self.mf = self._create_scf_method(mol)
-            if getattr(self, 'density_fitting', False):
-                auxbasis = getattr(self, 'auxiliary_basis', None) or None
-                self.mf = self.mf.density_fit(auxbasis=auxbasis)
-            self.mf = self._apply_solvent_effects(self.mf)
-            self._apply_calculation_settings()
-            return self.mf.kernel()
-        except PauseRequestedException:
-            raise
-        except Exception as fallback_error:
-            raise CalculationError(
-                "GPU4PySCF calculation failed, and CPU fallback also failed: "
-                f"{fallback_error}"
-            ) from fallback_error
     
     def _verify_scf_convergence(self) -> None:
         """Verify SCF convergence and orbital data."""

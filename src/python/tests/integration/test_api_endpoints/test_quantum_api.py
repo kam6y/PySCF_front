@@ -104,7 +104,7 @@ class TestCalculationSubmissionAPI:
         ('spin', -1),
         ('xyz', ''),
     ])
-    def test_start_calculation_invalid_params(self, client, mocker, valid_dft_params, invalid_field, invalid_value):
+    def test_start_calculation_invalid_params(self, client, valid_dft_params, invalid_field, invalid_value):
         """
         GIVEN invalid calculation parameters
         WHEN POST /api/quantum/calculate is called
@@ -186,7 +186,7 @@ class TestCalculationSubmissionAPI:
         data = response.json()
         assert data['success'] is False
 
-    def test_dft_rejects_casci_parameters(self, client, mocker, sample_h2_xyz):
+    def test_dft_rejects_casci_parameters(self, client, sample_h2_xyz):
         """
         GIVEN DFT calculation with CASCI-specific parameters (ncas, nelecas)
         WHEN POST /api/quantum/calculate is called
@@ -214,7 +214,7 @@ class TestCalculationSubmissionAPI:
         error_message = data['error'].lower()
         assert 'ncas' in error_message or 'not applicable' in error_message
 
-    def test_tddft_rejects_optimize_geometry_true(self, client, mocker, sample_h2_xyz):
+    def test_tddft_rejects_optimize_geometry_true(self, client, sample_h2_xyz):
         """
         GIVEN TDDFT calculation with optimize_geometry=True (disabled parameter)
         WHEN POST /api/quantum/calculate is called

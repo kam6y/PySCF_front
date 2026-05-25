@@ -124,7 +124,7 @@ python -m pytest tests/ -v
 - AI機能の現仕様は「Gemini APIベースの単一チャット」です。
 - `/api/agent/chat` は SSE で `agent_status` / `chunk` / `done` / `error` を返す。
 - チャット履歴は `session_id` がある場合にDBへ保存する。
-- GPU4PySCF は Linux のみ対象。利用不可・失敗時は CPU にフォールバックする。
+- GPU4PySCF は Linux のみ対象。GPU設定が有効な場合、利用不可・失敗時は CPU にフォールバックせずエラーにする。
 - PySCFの `spin` は不対電子数（2S）であり、一般的な多重度（2S+1）と表記が異なる。
 
 ## 更新時チェックリスト
@@ -132,5 +132,5 @@ python -m pytest tests/ -v
 - [ ] 変更内容が「単純化優先・breaking change許容」の方針に沿っている。
 - [ ] API変更時に `src/api-spec/openapi.yaml` と生成物の整合を取った。
 - [ ] 記載した `npm run ...` が `package.json` の `scripts` に存在する。
-- [ ] GPU説明が Linux 限定かつ CPUフォールバック前提になっている。
+- [ ] GPU説明が Linux 限定かつ GPU有効時は fail-fast 前提になっている。
 - [ ] 実行した検証コマンドと未実施項目を最終報告に記載した。

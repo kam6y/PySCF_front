@@ -6,6 +6,19 @@ type ChatSessionResponse = components['schemas']['ChatSessionResponse'];
 type ChatSessionDetailResponse =
   components['schemas']['ChatSessionDetailResponse'];
 
+const rejectInvalidSessionId = (sessionId: string): Promise<never> => {
+  return Promise.reject(
+    new ApiError(
+      'Invalid session ID provided.',
+      400,
+      'Bad Request',
+      `/api/chat-history/sessions/${sessionId}`,
+      null,
+      false
+    )
+  );
+};
+
 export const getChatSessions = (): Promise<ChatHistoryListResponse['data']> => {
   return request<ChatHistoryListResponse['data']>(
     '/api/chat-history/sessions',
@@ -28,16 +41,7 @@ export const getChatSessionDetail = (
   sessionId: string
 ): Promise<ChatSessionDetailResponse['data']> => {
   if (!sessionId || sessionId.trim() === '') {
-    return Promise.reject(
-      new ApiError(
-        'Invalid session ID provided.',
-        400,
-        'Bad Request',
-        `/api/chat-history/sessions/${sessionId}`,
-        null,
-        false
-      )
-    );
+    return rejectInvalidSessionId(sessionId);
   }
 
   return request<ChatSessionDetailResponse['data']>(
@@ -51,16 +55,7 @@ export const updateChatSession = (
   name: string
 ): Promise<ChatSessionResponse['data']> => {
   if (!sessionId || sessionId.trim() === '') {
-    return Promise.reject(
-      new ApiError(
-        'Invalid session ID provided.',
-        400,
-        'Bad Request',
-        `/api/chat-history/sessions/${sessionId}`,
-        null,
-        false
-      )
-    );
+    return rejectInvalidSessionId(sessionId);
   }
 
   return request<ChatSessionResponse['data']>(
@@ -74,16 +69,7 @@ export const updateChatSession = (
 
 export const deleteChatSession = (sessionId: string): Promise<void> => {
   if (!sessionId || sessionId.trim() === '') {
-    return Promise.reject(
-      new ApiError(
-        'Invalid session ID provided.',
-        400,
-        'Bad Request',
-        `/api/chat-history/sessions/${sessionId}`,
-        null,
-        false
-      )
-    );
+    return rejectInvalidSessionId(sessionId);
   }
 
   return request<void>(`/api/chat-history/sessions/${sessionId}`, {

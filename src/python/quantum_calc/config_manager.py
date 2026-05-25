@@ -1,7 +1,7 @@
 """Configuration manager for quantum calculation settings."""
 
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 
 from config import get_server_config
 
@@ -148,13 +148,6 @@ class QuantumCalculationConfigManager:
         default_value = fallback_values.get(setting_name)
         logger.debug(f"No spectrum setting found for {setting_name}, using default: {default_value}")
         return default_value
-    
-    def get_ir_frequency_range(self) -> Tuple[float, float]:
-        """Get IR frequency range as a tuple."""
-        range_list = self.get_spectrum_setting("ir_frequency_range")
-        if isinstance(range_list, list) and len(range_list) >= 2:
-            return (float(range_list[0]), float(range_list[1]))
-        return (400.0, 4000.0)
     
 
 # Global instance for easy access

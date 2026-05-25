@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from .exceptions import PauseRequestedException
 from .pause_manager import pause_manager
@@ -96,15 +96,13 @@ class CheckpointResumeMixin:
 
         return False  # Continue optimization
 
-    def resume_from_checkpoint(self, pause_state: Optional[Dict[str, Any]] = None) -> None:
+    def resume_from_checkpoint(self) -> None:
         """
         Resume calculation from checkpoint file.
 
         This method configures the SCF calculation to use the checkpoint file
         as an initial guess, enabling true checkpoint-based resume.
 
-        Args:
-            pause_state: Optional pause state information containing checkpoint details
         """
         chk_path = self.get_checkpoint_path()
 

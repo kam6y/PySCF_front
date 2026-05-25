@@ -199,7 +199,6 @@ def get_parameter_constraints() -> Dict[str, Dict[str, Any]]:
     Example:
         {
             'ncas': {'min': 1, 'max': 20, 'applicable_methods': ['CASCI', 'CASSCF'], ...},
-            'optimize_geometry': {'disabled_for': ['TDDFT', 'CASCI', ...], ...},
             ...
         }
     """
@@ -248,32 +247,6 @@ def is_parameter_applicable(param_name: str, method: str) -> bool:
         return method in constraint['applicable_methods']
 
     return True
-
-
-def is_parameter_disabled(param_name: str, method: str) -> bool:
-    """Check if a parameter is disabled for a specific calculation method.
-
-    Args:
-        param_name: Name of the parameter (e.g., 'optimize_geometry')
-        method: Calculation method name (e.g., 'TDDFT', 'CCSD')
-
-    Returns:
-        True if the parameter is disabled for the method, False otherwise.
-
-    Example:
-        >>> is_parameter_disabled('optimize_geometry', 'TDDFT')
-        True
-        >>> is_parameter_disabled('optimize_geometry', 'DFT')
-        False
-    """
-    constraint = PARAMETER_CONSTRAINTS.get(param_name)
-    if not constraint:
-        return False
-
-    if 'disabled_for' in constraint:
-        return method in constraint['disabled_for']
-
-    return False
 
 
 def validate_parameter_value(param_name: str, value: Any) -> tuple[bool, str]:

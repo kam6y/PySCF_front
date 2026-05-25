@@ -25,7 +25,6 @@ for _var in _THREAD_CONTROL_VARS:
 import asyncio
 import json
 import logging
-import sys
 from contextlib import asynccontextmanager
 from typing import Any
 

@@ -336,7 +336,7 @@ class QuantumService:
             results = self.repository.read_calculation_results(calc_path)
             status, waiting_reason = self.repository.read_calculation_status_details(calc_path)
             
-            display_name = self.repository.get_display_name(calculation_id, parameters)
+            display_name = self.repository.get_display_name(parameters)
             creation_date = parameters.get('created_at', datetime.fromtimestamp(os.path.getmtime(calc_path)).isoformat())
             
             calculation_instance = {

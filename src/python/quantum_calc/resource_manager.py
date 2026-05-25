@@ -538,11 +538,3 @@ def get_resource_manager() -> SystemResourceManager:
     if _resource_manager is None:
         _resource_manager = SystemResourceManager()
     return _resource_manager
-
-
-def shutdown_resource_manager():
-    """Shutdown the global resource manager."""
-    global _resource_manager
-    if _resource_manager is not None:
-        logger.info("Shutting down resource manager")
-        _resource_manager = None

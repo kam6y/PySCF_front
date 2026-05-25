@@ -91,7 +91,7 @@ class CalculationRepository:
         # Return the same ID
         return calculation_id
 
-    def get_display_name(self, directory_name: str, parameters: Optional[Dict[str, Any]]) -> str:
+    def get_display_name(self, parameters: Optional[Dict[str, Any]]) -> str:
         """Get display name from parameters."""
         if parameters and parameters.get('name'):
             return parameters['name'].strip()
@@ -142,7 +142,7 @@ class CalculationRepository:
                 continue
 
             params = self.read_calculation_parameters(str(item))
-            display_name = self.get_display_name(item.name, params)
+            display_name = self.get_display_name(params)
             calc_status = self.read_calculation_status(str(item))
 
             # Apply filters - skip this calculation if it doesn't match

@@ -34,7 +34,7 @@ def build_calculation_instance(
         parameters = file_manager.read_calculation_parameters(calc_path) or {}
         results = file_manager.read_calculation_results(calc_path)
         status = file_manager.read_calculation_status(calc_path) or "pending"
-        display_name = file_manager.get_display_name(calc_id, parameters)
+        display_name = file_manager.get_display_name(parameters)
 
         try:
             creation_date = parameters.get(

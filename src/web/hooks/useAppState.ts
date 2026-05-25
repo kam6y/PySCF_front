@@ -73,7 +73,6 @@ export const useAppState = () => {
       // 計算選択（UI状態も更新、Agent画面をオフ）
       handleCalculationSelect: (calculationId: string) => {
         calculationState.selectCalculation(calculationId);
-        calculationState.clearStaged();
         uiState.closeSidebar();
         uiState.setAIAgentEnabled(false);
       },

@@ -147,12 +147,7 @@ class TDDFTCalculator(BaseCalculator):
             raise
         except Exception as e:
             if self.gpu_enabled:
-                logger.warning(
-                    "GPU4PySCF TDDFT calculation failed: %s. Falling back to CPU.",
-                    e,
-                )
-                cpu_base_energy = self._retry_base_scf_on_cpu_after_gpu_failure(e)
-                return self._perform_specific_calculation(cpu_base_energy)
+                raise CalculationError(f"GPU4PySCF TDDFT calculation failed: {e}") from e
             error_msg = str(e).lower()
             if "singular" in error_msg or "convergence" in error_msg:
                 raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
@@ -202,12 +197,8 @@ class TDDFTCalculator(BaseCalculator):
                 self.gpu_enabled = True
                 return mf
             except Exception as exc:
-                logger.warning(
-                    "GPU4PySCF TDDFT setup failed: %s. Falling back to CPU.",
-                    exc,
-                )
                 self.gpu_enabled = False
-                self._force_cpu_fallback = True
+                raise CalculationError(f"GPU4PySCF TDDFT setup failed: {exc}") from exc
 
         if spin == 0:
             mf = dft.RKS(mol)

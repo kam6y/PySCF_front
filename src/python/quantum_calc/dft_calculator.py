@@ -94,12 +94,8 @@ class DFTCalculator(BaseCalculator):
                 self.gpu_enabled = True
                 return mf
             except Exception as exc:
-                logger.warning(
-                    "GPU4PySCF DFT setup failed: %s. Falling back to CPU.",
-                    exc,
-                )
                 self.gpu_enabled = False
-                self._force_cpu_fallback = True
+                raise CalculationError(f"GPU4PySCF DFT setup failed: {exc}") from exc
 
         if spin == 0:
             mf = dft.RKS(mol)

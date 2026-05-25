@@ -4,7 +4,6 @@
  */
 
 import { components } from './generated-api';
-import { ApiError } from '../api/core';
 
 // Export enum types as union types for convenience
 export type SearchType = components['schemas']['SearchType'];
@@ -77,13 +76,6 @@ export type ChatSession = components['schemas']['ChatSession'];
 export type ChatSessionSummary = components['schemas']['ChatSessionSummary'];
 export type ChatSessionDetail = components['schemas']['ChatSessionDetail'];
 
-// Response wrapper for API responses
-export type ApiResponse<T> = {
-  success: boolean;
-  data: T;
-  error?: string;
-};
-
 // Commonly used response data types
 export type PubChemSearchResponseData = PubChemSearchResponse['data'];
 export type SMILESConvertResponseData = SMILESConvertResponse['data'];
@@ -101,6 +93,3 @@ export type SupportedParametersResponseData =
 export type IRSpectrumResponseData = IRSpectrumResponse['data'];
 export type Gpu4PyscfStatusResponseData = Gpu4PyscfStatusResponse['data'];
 export type Gpu4PyscfInstallResponseData = Gpu4PyscfInstallResponse['data'];
-
-// Error handling
-export { ApiError };

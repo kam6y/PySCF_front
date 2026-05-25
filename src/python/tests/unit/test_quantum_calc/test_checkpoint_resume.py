@@ -97,7 +97,7 @@ class FakeGeometryResumeCalculator:
         self.file_manager.load_last_geometry.return_value = last_geometry
         self.parsed_xyz_values: list[str] = []
         self.setup_atoms = None
-        self.resume_pause_state = None
+        self.resume_from_checkpoint_called = False
 
     def parse_xyz(self, xyz: str) -> list[tuple[str, str]]:
         self.parsed_xyz_values.append(xyz)
@@ -106,8 +106,8 @@ class FakeGeometryResumeCalculator:
     def setup_calculation(self, atoms: list[tuple[str, str]], **kwargs: object) -> None:
         self.setup_atoms = atoms
 
-    def resume_from_checkpoint(self, pause_state: dict) -> None:
-        self.resume_pause_state = pause_state
+    def resume_from_checkpoint(self) -> None:
+        self.resume_from_checkpoint_called = True
 
     def run_calculation(self) -> dict:
         return {"energy": -1.0}
@@ -175,4 +175,4 @@ def test_calculation_worker_geometry_resume_uses_last_geometry_for_setup(
     assert error is None
     assert fake_calculator.parsed_xyz_values == [last_geometry]
     assert fake_calculator.setup_atoms == [("parsed_from", last_geometry)]
-    assert fake_calculator.resume_pause_state == pause_state
+    assert fake_calculator.resume_from_checkpoint_called is True

@@ -6,11 +6,18 @@ dist/
 build/
 conda_env/
 python_dist/
+release/
+out/
 *.tar.gz
 
 # IDE and editor files
 .vscode/
 .idea/
+.claude/
+.codex/
+.gemini/
+.serena/
+.worktrees/
 *.swp
 *.swo
 *~
@@ -47,3 +54,25 @@ yarn-error.log*
 # Temporary files
 tmp/
 temp/
+
+# Python local environments and caches
+.venv/
+venv/
+env/
+ENV/
+virtualenv/
+.virtualenv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+htmlcov/
+*.egg-info/
+.eggs/
+
+# Local application data and generated dumps
+data/chat_history.db
+data/settings.json
+code.txt
+*.spec

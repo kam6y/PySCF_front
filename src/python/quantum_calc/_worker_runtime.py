@@ -398,7 +398,7 @@ def calculation_worker(calculation_id: str, parameters: dict) -> tuple:
             process_logger.info(f"Resuming calculation {calculation_id} from checkpoint")
             if pause_state:
                 process_logger.info(f"Pause state: {pause_state}")
-            calculator.resume_from_checkpoint(pause_state)
+            calculator.resume_from_checkpoint()
 
         # Run calculation with controlled BLAS/LAPACK/OpenMP threading
         # Note: Not specifying user_api controls ALL threadpool libraries (blas, openmp, etc.)
