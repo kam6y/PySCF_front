@@ -29,7 +29,7 @@
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "typecheck": "tsc --noEmit",
     "test:main": "ts-node --files src/main/backend-gunicorn.test.ts && ts-node --files src/main/backend-health.test.ts && ts-node --files src/main/backend-process.test.ts && ts-node --files src/main/renderer-entry.test.ts && ts-node --files src/main/electron-vite-config.test.ts",
-    "test:web": "ts-node --files src/web/api/agent.test.ts && ts-node --files src/web/runtime-config.test.ts && ts-node --files src/splash/splash-html.test.ts",
+    "test:web": "ts-node --files src/web/api/agent.test.ts && ts-node --files src/web/runtime-config.test.ts && ts-node --files src/web/realtime/useCalculationUpdateStream.test.ts && ts-node --files src/splash/splash-html.test.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\" \"electron.vite.config.ts\" \"index.html\" \"splash.html\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\" \"electron.vite.config.ts\" \"index.html\" \"splash.html\"",
     "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\"",

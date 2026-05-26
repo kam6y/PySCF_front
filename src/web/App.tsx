@@ -15,7 +15,7 @@ import { DrawMoleculePage } from './pages/DrawMoleculePage';
 import { useAppState } from './hooks/useAppState';
 import { useCalculationData } from './hooks/useCalculationData';
 import { useCalculationActions } from './hooks/useCalculationActions';
-import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
+import { useCalculationUpdates } from './hooks/useCalculationUpdates';
 import { useChatHistoryStore } from './store/chatHistoryStore';
 import { useGetChatSessions } from './hooks/useChatHistoryQueries';
 import { useAppSettings } from './hooks/useAppSettings';
@@ -149,8 +149,8 @@ export const App = () => {
     }
   }, [appState.ui.isAIAgentEnabled, appState.ui.setSidebarView]);
 
-  // 統合WebSocketによるリアルタイム更新（グローバル + アクティブ計算監視）
-  useUnifiedWebSocket({
+  // SSEによるリアルタイム更新（グローバル + アクティブ計算監視）
+  useCalculationUpdates({
     activeCalculationId: calculationData.activeCalculation?.id || null,
   });
 
