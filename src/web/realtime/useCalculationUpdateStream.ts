@@ -149,7 +149,6 @@ export const useCalculationUpdateStream = ({
 
           const headers: HeadersInit = {
             Accept: 'text/event-stream',
-            'Cache-Control': 'no-cache',
           };
 
           if (authToken) {

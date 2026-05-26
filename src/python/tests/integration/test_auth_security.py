@@ -59,6 +59,24 @@ def test_options_request_cors(monkeypatch):
     assert 'X-Auth-Token' in response.headers['access-control-allow-headers']
 
 
+def test_sse_options_request_accepts_event_stream_headers(monkeypatch):
+    """Test that SSE preflight requests accept browser event-stream headers."""
+    with make_auth_client(monkeypatch) as client:
+        response = client.options(
+            '/api/quantum/calculations/updates/stream',
+            headers={
+                'Origin': 'http://localhost:5173',
+                'Access-Control-Request-Method': 'GET',
+                'Access-Control-Request-Headers': 'cache-control,x-auth-token',
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    allowed_headers = response.headers['access-control-allow-headers']
+    assert 'Cache-Control' in allowed_headers
+    assert 'X-Auth-Token' in allowed_headers
+
+
 def test_api_docs_html_without_token_in_development(monkeypatch):
     """Test that development API docs HTML is accessible without a token."""
     with make_auth_client(monkeypatch) as client:

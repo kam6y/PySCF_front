@@ -107,7 +107,7 @@ def register_cors_middleware(fastapi_app: FastAPI) -> None:
         allow_origin_regex=r'^(https?://(127\.0\.0\.1|localhost)(:\d+)?)$',
         allow_credentials=True,
         allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allow_headers=['Content-Type', 'X-Auth-Token'],
+        allow_headers=['Cache-Control', 'Content-Type', 'X-Auth-Token'],
     )
 
 
