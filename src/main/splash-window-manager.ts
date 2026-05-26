@@ -54,13 +54,6 @@ export const createSplashWindow = (): void => {
 };
 
 /**
- * スプラッシュウィンドウの参照を取得
- */
-export const getSplashWindow = (): BrowserWindow | null => {
-  return splashWindow;
-};
-
-/**
  * 進捗状態を更新
  * @param stage 現在のステージ
  * @param message 表示するメッセージ

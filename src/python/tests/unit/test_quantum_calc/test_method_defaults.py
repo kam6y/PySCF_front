@@ -1,5 +1,7 @@
 """Unit tests for method defaults and parameter constraints."""
 
+import pytest
+
 from quantum_calc.method_defaults import (
     get_method_defaults,
     get_parameter_constraints,
@@ -187,181 +189,79 @@ class TestParameterConstraints:
 class TestParameterApplicability:
     """Tests for parameter applicability checks."""
 
-    def test_ncas_applicable_to_casci(self):
-        """Test that ncas is applicable to CASCI."""
-        assert is_parameter_applicable('ncas', 'CASCI') is True
-
-    def test_ncas_not_applicable_to_dft(self):
-        """Test that ncas is not applicable to DFT."""
-        assert is_parameter_applicable('ncas', 'DFT') is False
-
-    def test_tddft_nstates_applicable_to_tddft(self):
-        """Test that tddft_nstates is applicable to TDDFT."""
-        assert is_parameter_applicable('tddft_nstates', 'TDDFT') is True
-
-    def test_tddft_nstates_not_applicable_to_dft(self):
-        """Test that tddft_nstates is not applicable to DFT."""
-        assert is_parameter_applicable('tddft_nstates', 'DFT') is False
-
-    def test_exchange_correlation_applicable_to_dft(self):
-        """Test that exchange_correlation is applicable to DFT."""
-        assert is_parameter_applicable('exchange_correlation', 'DFT') is True
-
-    def test_exchange_correlation_applicable_to_tddft(self):
-        """Test that exchange_correlation is applicable to TDDFT."""
-        assert is_parameter_applicable('exchange_correlation', 'TDDFT') is True
-
-    def test_exchange_correlation_not_applicable_to_hf(self):
-        """Test that exchange_correlation is not applicable to HF."""
-        assert is_parameter_applicable('exchange_correlation', 'HF') is False
-
-    def test_exchange_correlation_not_applicable_to_mp2(self):
-        """Test that exchange_correlation is not applicable to MP2."""
-        assert is_parameter_applicable('exchange_correlation', 'MP2') is False
-
-    def test_universal_parameter_is_always_applicable(self):
-        """Test that parameters without applicability constraints are always applicable."""
-        # cpu_cores and memory_mb have no applicability constraints
-        assert is_parameter_applicable('cpu_cores', 'DFT') is True
-        assert is_parameter_applicable('cpu_cores', 'CCSD') is True
-        assert is_parameter_applicable('memory_mb', 'TDDFT') is True
-
-
-    def test_optimize_geometry_applicable_to_dft(self):
-        """Test that optimize_geometry is applicable to DFT."""
-        assert is_parameter_applicable('optimize_geometry', 'DFT') is True
-
-    def test_optimize_geometry_applicable_to_hf(self):
-        """Test that optimize_geometry is applicable to HF."""
-        assert is_parameter_applicable('optimize_geometry', 'HF') is True
-
-    def test_optimize_geometry_applicable_to_mp2(self):
-        """Test that optimize_geometry is applicable to MP2."""
-        assert is_parameter_applicable('optimize_geometry', 'MP2') is True
-
-    def test_optimize_geometry_not_applicable_to_tddft(self):
-        """Test that optimize_geometry is not applicable to TDDFT."""
-        assert is_parameter_applicable('optimize_geometry', 'TDDFT') is False
-
-    def test_optimize_geometry_not_applicable_to_casci(self):
-        """Test that optimize_geometry is not applicable to CASCI."""
-        assert is_parameter_applicable('optimize_geometry', 'CASCI') is False
-
-    def test_optimize_geometry_not_applicable_to_ccsd(self):
-        """Test that optimize_geometry is not applicable to CCSD."""
-        assert is_parameter_applicable('optimize_geometry', 'CCSD') is False
+    @pytest.mark.parametrize(
+        ("param", "method", "expected"),
+        [
+            ("ncas", "CASCI", True),
+            ("ncas", "DFT", False),
+            ("tddft_nstates", "TDDFT", True),
+            ("tddft_nstates", "DFT", False),
+            ("exchange_correlation", "DFT", True),
+            ("exchange_correlation", "TDDFT", True),
+            ("exchange_correlation", "HF", False),
+            ("exchange_correlation", "MP2", False),
+            ("cpu_cores", "DFT", True),
+            ("cpu_cores", "CCSD", True),
+            ("memory_mb", "TDDFT", True),
+            ("optimize_geometry", "DFT", True),
+            ("optimize_geometry", "HF", True),
+            ("optimize_geometry", "MP2", True),
+            ("optimize_geometry", "TDDFT", False),
+            ("optimize_geometry", "CASCI", False),
+            ("optimize_geometry", "CCSD", False),
+        ],
+    )
+    def test_parameter_applicability(self, param, method, expected):
+        """Test method-specific and universal parameter applicability."""
+        assert is_parameter_applicable(param, method) is expected
 
 
 class TestParameterValidation:
     """Tests for parameter value validation."""
 
-    def test_validate_ncas_within_bounds(self):
-        """Test validating ncas within valid bounds."""
-        is_valid, error = validate_parameter_value('ncas', 10)
-        assert is_valid is True
-        assert error == ''
-
-    def test_validate_ncas_below_min(self):
-        """Test validating ncas below minimum."""
-        is_valid, error = validate_parameter_value('ncas', 0)
-        assert is_valid is False
-        assert 'below minimum' in error
-
-    def test_validate_ncas_above_max(self):
-        """Test validating ncas above maximum."""
-        is_valid, error = validate_parameter_value('ncas', 25)
-        assert is_valid is False
-        assert 'exceeds maximum' in error
-
-    def test_validate_nelecas_within_bounds(self):
-        """Test validating nelecas within valid bounds."""
-        is_valid, error = validate_parameter_value('nelecas', 20)
-        assert is_valid is True
-        assert error == ''
-
-    def test_validate_cpu_cores_within_bounds(self):
-        """Test validating cpu_cores within valid bounds."""
-        is_valid, error = validate_parameter_value('cpu_cores', 8)
-        assert is_valid is True
-        assert error == ''
-
-    def test_validate_cpu_cores_at_bounds(self):
-        """Test validating cpu_cores boundary values."""
-        for value in (1, 32):
-            is_valid, error = validate_parameter_value('cpu_cores', value)
-            assert is_valid is True
-            assert error == ''
-
-    def test_validate_cpu_cores_below_min(self):
-        """Test validating cpu_cores below minimum."""
-        is_valid, error = validate_parameter_value('cpu_cores', 0)
-        assert is_valid is False
-        assert 'below minimum' in error
-
-    def test_validate_cpu_cores_above_max(self):
-        """Test validating cpu_cores above maximum."""
-        is_valid, error = validate_parameter_value('cpu_cores', 64)
-        assert is_valid is False
-        assert 'exceeds maximum' in error
-
-    def test_validate_memory_mb_within_bounds(self):
-        """Test validating memory_mb within valid bounds."""
-        is_valid, error = validate_parameter_value('memory_mb', 2000)
-        assert is_valid is True
-        assert error == ''
-
-    def test_validate_memory_mb_at_bounds(self):
-        """Test validating memory_mb boundary values."""
-        for value in (512, 32768):
-            is_valid, error = validate_parameter_value('memory_mb', value)
-            assert is_valid is True
-            assert error == ''
-
-    def test_validate_memory_mb_below_min(self):
-        """Test validating memory_mb below minimum."""
-        is_valid, error = validate_parameter_value('memory_mb', 511)
-        assert is_valid is False
-        assert 'below minimum' in error
-
-    def test_validate_memory_mb_above_max(self):
-        """Test validating memory_mb above maximum."""
-        is_valid, error = validate_parameter_value('memory_mb', 32769)
-        assert is_valid is False
-        assert 'exceeds maximum' in error
-
-    def test_validate_charges_at_bounds(self):
-        """Test validating charges boundary values."""
-        for value in (-10, 0, 10):
-            is_valid, error = validate_parameter_value('charges', value)
-            assert is_valid is True
-            assert error == ''
-
-    def test_validate_charges_out_of_bounds(self):
-        """Test validating charges outside supported bounds."""
-        for value, expected_error in ((-11, 'below minimum'), (11, 'exceeds maximum')):
-            is_valid, error = validate_parameter_value('charges', value)
-            assert is_valid is False
+    @pytest.mark.parametrize(
+        ("param", "value", "expected_valid", "expected_error"),
+        [
+            ("ncas", 10, True, ""),
+            ("ncas", 0, False, "below minimum"),
+            ("ncas", 25, False, "exceeds maximum"),
+            ("nelecas", 20, True, ""),
+            ("cpu_cores", 8, True, ""),
+            ("cpu_cores", 1, True, ""),
+            ("cpu_cores", 32, True, ""),
+            ("cpu_cores", 0, False, "below minimum"),
+            ("cpu_cores", 64, False, "exceeds maximum"),
+            ("memory_mb", 2000, True, ""),
+            ("memory_mb", 512, True, ""),
+            ("memory_mb", 32768, True, ""),
+            ("memory_mb", 511, False, "below minimum"),
+            ("memory_mb", 32769, False, "exceeds maximum"),
+            ("charges", -10, True, ""),
+            ("charges", 0, True, ""),
+            ("charges", 10, True, ""),
+            ("charges", -11, False, "below minimum"),
+            ("charges", 11, False, "exceeds maximum"),
+            ("spin", 0, True, ""),
+            ("spin", 10, True, ""),
+            ("spin", -1, False, "below minimum"),
+            ("spin", 11, False, "exceeds maximum"),
+            ("unknown_param", 999, True, ""),
+        ],
+    )
+    def test_validate_parameter_value(
+        self,
+        param,
+        value,
+        expected_valid,
+        expected_error,
+    ):
+        """Test parameter value bounds and unknown-parameter behavior."""
+        is_valid, error = validate_parameter_value(param, value)
+        assert is_valid is expected_valid
+        if expected_valid:
+            assert error == ""
+        else:
             assert expected_error in error
-
-    def test_validate_spin_at_bounds(self):
-        """Test validating spin boundary values."""
-        for value in (0, 10):
-            is_valid, error = validate_parameter_value('spin', value)
-            assert is_valid is True
-            assert error == ''
-
-    def test_validate_spin_out_of_bounds(self):
-        """Test validating spin outside supported bounds."""
-        for value, expected_error in ((-1, 'below minimum'), (11, 'exceeds maximum')):
-            is_valid, error = validate_parameter_value('spin', value)
-            assert is_valid is False
-            assert expected_error in error
-
-    def test_validate_unknown_parameter(self):
-        """Test validating an unknown parameter (should always pass)."""
-        is_valid, error = validate_parameter_value('unknown_param', 999)
-        assert is_valid is True
-        assert error == ''
 
 
 class TestDataIntegrity:

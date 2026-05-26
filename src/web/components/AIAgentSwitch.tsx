@@ -4,22 +4,18 @@ import styles from './AIAgentSwitch.module.css';
 interface AIAgentSwitchProps {
   isEnabled: boolean;
   onChange: (enabled: boolean) => void;
-  disabled?: boolean;
 }
 
 export const AIAgentSwitch: React.FC<AIAgentSwitchProps> = ({
   isEnabled,
   onChange,
-  disabled = false,
 }) => {
   const handleClick = () => {
-    if (!disabled) {
-      onChange(!isEnabled);
-    }
+    onChange(!isEnabled);
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if ((event.key === 'Enter' || event.key === ' ') && !disabled) {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onChange(!isEnabled);
     }
@@ -27,12 +23,11 @@ export const AIAgentSwitch: React.FC<AIAgentSwitchProps> = ({
 
   return (
     <button
-      className={`${styles.switchContainer} ${isEnabled ? styles.enabled : ''} ${disabled ? styles.disabled : ''}`}
+      className={`${styles.switchContainer} ${isEnabled ? styles.enabled : ''}`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       aria-pressed={isEnabled}
       aria-label="Toggle AI Agent"
-      disabled={disabled}
       type="button"
     >
       <div className={styles.switchBackground}>

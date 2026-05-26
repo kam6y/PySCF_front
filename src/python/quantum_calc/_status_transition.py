@@ -17,16 +17,6 @@ class CalculationStatus(Enum):
     ERROR = "error"
 
 
-ALLOWED_TRANSITIONS: dict[CalculationStatus, set[CalculationStatus]] = {
-    CalculationStatus.WAITING: {CalculationStatus.RUNNING, CalculationStatus.ERROR},
-    CalculationStatus.RUNNING: {CalculationStatus.COMPLETED, CalculationStatus.ERROR, CalculationStatus.PAUSING},
-    CalculationStatus.PAUSING: {CalculationStatus.PAUSED, CalculationStatus.ERROR},
-    CalculationStatus.PAUSED: {CalculationStatus.RUNNING},
-    CalculationStatus.COMPLETED: set(),
-    CalculationStatus.ERROR: set(),
-}
-
-
 class CalculationStatusManager:
     """Manages calculation status transitions, file persistence, and WebSocket notifications."""
 

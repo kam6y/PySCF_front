@@ -50,12 +50,13 @@ def test_options_request_cors(monkeypatch):
             '/health',
             headers={
                 'Origin': 'http://127.0.0.1:3000',
-                'Access-Control-Request-Method': 'GET',
-                'Access-Control-Request-Headers': 'X-Auth-Token',
+                'Access-Control-Request-Method': 'PATCH',
+                'Access-Control-Request-Headers': 'X-Auth-Token, Content-Type',
             },
         )
 
     assert response.status_code in {200, 204}
+    assert 'X-Auth-Token' in response.headers['access-control-allow-headers']
 
 
 def test_api_docs_html_without_token_in_development(monkeypatch):

@@ -21,10 +21,6 @@ class QueuedCalculation:
     created_at: datetime
     waiting_reason: Optional[str] = None
 
-    def __lt__(self, other):
-        """For priority queue ordering by creation time."""
-        return self.created_at < other.created_at
-
 
 class CalculationQueueScheduler:
     """Manages the calculation queue and resource-based scheduling decisions."""

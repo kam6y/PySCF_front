@@ -9,13 +9,14 @@ Tests the complete pause→resume→complete workflow including:
 - Error cases for invalid operations
 """
 
-import pytest
 import json
 import time
 from pathlib import Path
 
-from quantum_calc._calculation_repository import CalculationRepository
+import pytest
+
 from quantum_calc import get_current_settings
+from quantum_calc._calculation_repository import CalculationRepository
 
 
 # ============================================================================
@@ -73,7 +74,7 @@ def wait_for_status(client, calc_id, expected_status, timeout=300, poll_interval
     )
 
 
-def get_calculation_dir(app, calc_id):
+def get_calculation_dir(calc_id):
     """Get the directory path for a calculation."""
     # Import settings_manager to get actual calculation directory
     from quantum_calc.settings_manager import get_settings_manager
@@ -258,7 +259,7 @@ H    1.4671  1.1550  0.0848"""
         mock_memory.percent = 50.0
         mocker.patch('quantum_calc.resource_manager.psutil.virtual_memory', return_value=mock_memory)
 
-    def test_pause_resume_full_workflow(self, client, app, quick_DFT_params, process_manager):
+    def test_pause_resume_full_workflow(self, client, quick_DFT_params, process_manager):
         """
         GIVEN a running quantum calculation
         WHEN pause is requested, then resume is requested
@@ -289,7 +290,7 @@ H    1.4671  1.1550  0.0848"""
         calc_id = data['data']['calculation']['id']
         print(f"Calculation ID: {calc_id}")
 
-        calc_dir = get_calculation_dir(app, calc_id)
+        calc_dir = get_calculation_dir(calc_id)
 
         # Step 2: Wait for calculation to start running
         print("\n=== Step 2: Waiting for 'running' status ===")
@@ -298,29 +299,12 @@ H    1.4671  1.1550  0.0848"""
 
         # Step 3: Request pause while running
         print("\n=== Step 3: Requesting pause ===")
-        # Wait briefly for geometry optimization to start, then pause
-        # This gives the calculation time to enter a pausable state
-        time.sleep(0.5)
-
-        # Check current status before attempting to pause
-        current_calc = client.get(f'/api/quantum/calculations/{calc_id}').json()['data']['calculation']
-        if current_calc['status'] in ['completed', 'error']:
-            pytest.skip(
-                f"Calculation finished too quickly (status: {current_calc['status']}) to test pause/resume workflow. "
-                "This is not a test failure, just means the calculation was too fast."
-            )
-
         pause_response = client.post(f'/api/quantum/calculations/{calc_id}/pause')
         assert pause_response.status_code == 202
 
         pause_data = pause_response.json()
         assert pause_data['success'] is True
         assert 'pause' in pause_data['data']['message'].lower()
-
-        # Verify .pause_requested flag file is created
-        # (It may already be gone if pause happened very quickly)
-        print("\n=== Checking for pause flag file ===")
-        time.sleep(0.1)
 
         # Step 4: Wait for paused status
         print("\n=== Step 4: Waiting for 'paused' status ===")
@@ -332,19 +316,6 @@ H    1.4671  1.1550  0.0848"""
 
         # Check if pause_state.json exists
         pause_state_exists = check_file_exists(calc_dir, 'pause_state.json')
-
-        if not pause_state_exists:
-            # If pause_state.json doesn't exist, the calculation might have completed too quickly
-            # Check if calculation is still paused or already completed
-            current_calc = client.get(f'/api/quantum/calculations/{calc_id}').json()['data']['calculation']
-            print(f"WARNING: pause_state.json not found. Current status: {current_calc['status']}")
-
-            # For this test to be meaningful, we need the calculation to actually pause
-            # If it completed too quickly, we should skip the rest of the test
-            if current_calc['status'] == 'completed':
-                pytest.skip("Calculation completed too quickly to test pause/resume workflow. "
-                           "This is not a test failure, just means the calculation was too fast.")
-
         assert pause_state_exists, "pause_state.json should exist after pausing"
         assert check_file_exists(calc_dir, 'calculation.chk'), "calculation.chk should exist"
         assert not check_file_exists(calc_dir, '.pause_requested'), ".pause_requested should be cleaned up"

@@ -2,9 +2,7 @@ import React from 'react';
 import { ConfirmationModal } from '../ConfirmationModal';
 import type { DeleteModalsState } from './useDeleteModals';
 
-export type DeleteModalsProps = DeleteModalsState;
-
-export const DeleteModals: React.FC<DeleteModalsProps> = ({
+export const DeleteModals: React.FC<DeleteModalsState> = ({
   isDeleteModalOpen,
   calculationToDelete,
   handleConfirmDelete,

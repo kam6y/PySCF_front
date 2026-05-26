@@ -198,38 +198,6 @@ class QuantumService:
         """Resume a paused calculation."""
         return self.command_service.resume_calculation(calculation_id)
 
-    def _build_calculation_instance(
-        self,
-        calculation_id: str,
-        parameters: dict[str, Any],
-        status: str,
-        waiting_reason: str | None = None,
-    ) -> dict[str, Any]:
-        """Build calculation instance dict for responses."""
-        return self.context.build_calculation_instance(
-            calculation_id,
-            parameters,
-            status,
-            waiting_reason,
-        )
-
-    def _validate_orbital_cube_parameters(
-        self,
-        grid_size: int,
-        isovalue_pos: float | None,
-        isovalue_neg: float | None,
-    ) -> None:
-        """Validate orbital CUBE generation parameters against the API contract."""
-        self.artifact_service.validate_orbital_cube_parameters(
-            grid_size=grid_size,
-            isovalue_pos=isovalue_pos,
-            isovalue_neg=isovalue_neg,
-        )
-
-    def _resolve_calculation_path(self, calculation_id: str) -> str:
-        """Resolve a calculation ID from an external request into a safe path."""
-        return self.context.resolve_calculation_path(calculation_id)
-
     def _recover_stale_non_terminal_calculations(
         self,
         process_manager: Any | None = None,

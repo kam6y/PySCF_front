@@ -294,11 +294,6 @@ class WebSocketCalculationWatcher:
                     if calculation_id in self.connections:
                         self.connections[calculation_id].discard(callback)
     
-    def get_active_connections(self) -> Dict[str, int]:
-        """Get a summary of active connections by calculation ID."""
-        with self._lock:
-            return {calc_id: len(callbacks) for calc_id, callbacks in self.connections.items()}
-    
     def update_base_directory(self, new_base_directory: str) -> None:
         """Update the base directory, re-scheduling all active watches."""
         new_base = Path(new_base_directory)
@@ -337,16 +332,6 @@ class WebSocketCalculationWatcher:
                         logger.error(f"Error re-scheduling watch for {calc_id}: {e}")
 
             logger.info(f"Watcher base directory updated to: {new_base}")
-
-    def is_watching(self, calculation_id: str) -> bool:
-        """Check if a calculation is currently being watched."""
-        try:
-            calc_dir = self.repository.resolve_calculation_path(calculation_id)
-        except ValueError:
-            return False
-        calc_dir_str = str(calc_dir)
-        return calc_dir_str in self.watched_dirs
-
 
 # Global instance for the application
 _global_watcher: Optional[WebSocketCalculationWatcher] = None

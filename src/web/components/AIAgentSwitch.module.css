@@ -19,11 +19,6 @@
   border-radius: 20px;
 }
 
-.switchContainer.disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
 .switchBackground {
   position: relative;
   width: 60px;
@@ -36,7 +31,9 @@
 
 .switchContainer.enabled .switchBackground {
   background: #f8eb7d;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2), 0 2px 8px rgba(248, 235, 125, 0.3);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.2),
+    0 2px 8px rgba(248, 235, 125, 0.3);
 }
 
 .switchToggle {
@@ -47,7 +44,9 @@
   height: 28px;
   border-radius: 50%;
   background: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 1px 2px rgba(0, 0, 0, 0.1);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: center;
@@ -57,7 +56,9 @@
 
 .switchContainer.enabled .switchToggle {
   transform: translateX(28px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
 .aiText {
@@ -74,25 +75,27 @@
 }
 
 /* Hover effects */
-.switchContainer:hover:not(.disabled) .switchBackground {
+.switchContainer:hover .switchBackground {
   transform: scale(1.02);
 }
 
-.switchContainer:hover:not(.disabled) .switchToggle {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25), 0 2px 4px rgba(0, 0, 0, 0.15);
+.switchContainer:hover .switchToggle {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    0 2px 4px rgba(0, 0, 0, 0.15);
 }
 
-.switchContainer.enabled:hover:not(.disabled) .switchBackground {
+.switchContainer.enabled:hover .switchBackground {
   background: #f5e056;
 }
 
 /* Active/pressed state */
-.switchContainer:active:not(.disabled) .switchToggle {
+.switchContainer:active .switchToggle {
   transform: scale(0.95);
   transition-duration: 0.1s;
 }
 
-.switchContainer.enabled:active:not(.disabled) .switchToggle {
+.switchContainer.enabled:active .switchToggle {
   transform: translateX(28px) scale(0.95);
 }
 
@@ -110,12 +113,12 @@
   .switchBackground {
     border: 2px solid #000;
   }
-  
+
   .switchContainer.enabled .switchBackground {
     background: #f8eb7d;
     border-color: #000;
   }
-  
+
   .switchToggle {
     border: 1px solid #000;
   }

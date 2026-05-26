@@ -8,10 +8,6 @@ export const getMainWindow = (): BrowserWindow | null => {
   return mainWindow;
 };
 
-export const setMainWindow = (window: BrowserWindow | null): void => {
-  mainWindow = window;
-};
-
 export const createWindow = (
   backendPort: number,
   authToken: string

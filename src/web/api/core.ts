@@ -17,7 +17,7 @@ console.log(
 
 export const getApiBaseUrl = () => API_BASE_URL;
 
-export type ApiResponse<T> = {
+type ApiResponse<T> = {
   success: boolean;
   data: T;
   error?: string;

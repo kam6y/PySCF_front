@@ -166,7 +166,6 @@ def app():
         yield _app
         shutdown_process_manager()
 
-    import shutil
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 

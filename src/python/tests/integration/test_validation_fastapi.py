@@ -50,23 +50,6 @@ def test_invalid_query_parameter_returns_400_envelope(app):
     assert response.json()['error'].startswith('Validation failed:')
 
 
-def test_options_preflight_succeeds_without_auth(monkeypatch, app):
-    monkeypatch.setenv('PYSCF_AUTH_TOKEN', 'secret-token')
-
-    with TestClient(app) as client:
-        response = client.options(
-            '/health',
-            headers={
-                'Origin': 'http://127.0.0.1:3000',
-                'Access-Control-Request-Method': 'PATCH',
-                'Access-Control-Request-Headers': 'X-Auth-Token, Content-Type',
-            },
-        )
-
-    assert response.status_code in {200, 204}
-    assert 'X-Auth-Token' in response.headers['access-control-allow-headers']
-
-
 def test_auth_error_includes_cors_headers(monkeypatch, app):
     monkeypatch.setenv('PYSCF_AUTH_TOKEN', 'secret-token')
 

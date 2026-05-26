@@ -1,4 +1,4 @@
-export type BackendRuntimeConfig = {
+type BackendRuntimeConfig = {
   backendPort: number | null;
   backendBaseUrl: string;
 };
@@ -14,7 +14,7 @@ const isValidBackendPort = (
   );
 };
 
-export const getBackendPort = (): number | null => {
+const getBackendPort = (): number | null => {
   const backendPort = window.electronAPI?.backendPort ?? null;
   return isValidBackendPort(backendPort) ? backendPort : null;
 };
