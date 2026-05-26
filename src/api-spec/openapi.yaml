@@ -318,6 +318,60 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/quantum/calculations/updates/stream:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
+    get:
+      security:
+        - AuthToken: []
+      tags:
+        - Quantum Calculation
+      summary: Stream calculation updates
+      operationId: streamCalculationUpdates
+      description: |
+        Opens a Server-Sent Events stream for all calculation updates.
+        Each event line contains a JSON `CalculationUpdateStreamEvent`.
+      responses:
+        '200':
+          description: Successfully opened a calculation update SSE stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/quantum/calculations/{calculationId}/updates/stream:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
+    get:
+      security:
+        - AuthToken: []
+      tags:
+        - Quantum Calculation
+      summary: Stream updates for one calculation
+      operationId: streamCalculationUpdatesForCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
+          schema:
+            type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
+      description: |
+        Opens a Server-Sent Events stream for one calculation and emits the
+        current calculation payload before future updates.
+      responses:
+        '200':
+          description: Successfully opened a calculation-specific SSE stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
   /api/quantum/status:
     parameters:
       - $ref: '#/components/parameters/AuthTokenHeader'
@@ -2384,6 +2438,40 @@ components:
               type: string
               enum: [geometry_optimization, scf_calculation, post_scf]
               description: Which phase the calculation was in when paused
+
+    CalculationUpdateStreamEvent:
+      type: object
+      required:
+        - type
+        - payload
+      properties:
+        type:
+          type: string
+          enum:
+            - calculation_update
+            - heartbeat
+            - error
+        payload:
+          type: object
+          additionalProperties: true
+
+    CalculationUpdateStreamPayload:
+      type: object
+      required:
+        - calculation
+      properties:
+        calculation:
+          $ref: '#/components/schemas/CalculationInstance'
+
+    CalculationUpdateStreamErrorPayload:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        calculation_id:
+          type: string
 
     CalculationSummary:
       type: object

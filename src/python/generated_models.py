@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, RootModel
 
@@ -573,6 +573,22 @@ class ResumeInfo(BaseModel):
     calculation_phase: Optional[CalculationPhase] = Field(
         None, description='Which phase the calculation was in when paused'
     )
+
+
+class Type(Enum):
+    calculation_update = 'calculation_update'
+    heartbeat = 'heartbeat'
+    error = 'error'
+
+
+class CalculationUpdateStreamEvent(BaseModel):
+    type: Type
+    payload: Dict[str, Any]
+
+
+class CalculationUpdateStreamErrorPayload(BaseModel):
+    message: str
+    calculation_id: Optional[str] = None
 
 
 class CalculationSummary(BaseModel):
@@ -1881,6 +1897,10 @@ class CalculationInstance(BaseModel):
     resumeInfo: Optional[ResumeInfo] = Field(
         None, description='Information about the paused state for resuming'
     )
+
+
+class CalculationUpdateStreamPayload(BaseModel):
+    calculation: CalculationInstance
 
 
 class Data3(BaseModel):

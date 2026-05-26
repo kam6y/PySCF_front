@@ -142,6 +142,56 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quantum/calculations/updates/stream": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream calculation updates
+         * @description Opens a Server-Sent Events stream for all calculation updates.
+         *     Each event line contains a JSON `CalculationUpdateStreamEvent`.
+         *
+         */
+        get: operations["streamCalculationUpdates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/calculations/{calculationId}/updates/stream": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream updates for one calculation
+         * @description Opens a Server-Sent Events stream for one calculation and emits the
+         *     current calculation payload before future updates.
+         *
+         */
+        get: operations["streamCalculationUpdatesForCalculation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quantum/status": {
         parameters: {
             query?: never;
@@ -1272,6 +1322,20 @@ export interface components {
                  */
                 calculation_phase?: "geometry_optimization" | "scf_calculation" | "post_scf";
             } | null;
+        };
+        CalculationUpdateStreamEvent: {
+            /** @enum {string} */
+            type: "calculation_update" | "heartbeat" | "error";
+            payload: {
+                [key: string]: unknown;
+            };
+        };
+        CalculationUpdateStreamPayload: {
+            calculation: components["schemas"]["CalculationInstance"];
+        };
+        CalculationUpdateStreamErrorPayload: {
+            message: string;
+            calculation_id?: string;
         };
         CalculationSummary: {
             /** @description Unique calculation ID */
@@ -2667,6 +2731,57 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+        };
+    };
+    streamCalculationUpdates: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully opened a calculation update SSE stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
+        };
+    };
+    streamCalculationUpdatesForCalculation: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path: {
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully opened a calculation-specific SSE stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
         };
     };
     getCalculationStatus: {
