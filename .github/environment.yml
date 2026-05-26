@@ -33,7 +33,5 @@ dependencies:
     - pyscf-properties @ git+https://github.com/pyscf/properties  # IR/Raman intensity calculations
     # Code generation and build tools
     - datamodel-code-generator==0.33.0
-    # File system monitoring
-    - watchdog==6.0.0
     # AI Chat integration (Gemini API)
     - google-generativeai>=0.8.0

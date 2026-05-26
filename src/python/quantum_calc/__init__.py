@@ -12,7 +12,6 @@ from .orbital_generator import MolecularOrbitalGenerator
 from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError, FileManagerError, ProcessManagerError, PauseRequestedException
 from ._status_transition import CalculationStatus
 from .process_manager import CalculationProcessManager, get_process_manager, initialize_process_manager_with_callback, shutdown_process_manager, update_process_manager_settings
-from .file_watcher import WebSocketCalculationWatcher, get_websocket_watcher, shutdown_websocket_watcher
 from .supported_parameters import get_all_supported_parameters
 from .settings_manager import SettingsManager, get_settings_manager, get_current_settings, update_app_settings, mask_settings
 from ._calculation_repository import CalculationRepository
@@ -42,9 +41,6 @@ __all__ = [
     'initialize_process_manager_with_callback',
     'shutdown_process_manager',
     'update_process_manager_settings',
-    'WebSocketCalculationWatcher',
-    'get_websocket_watcher',
-    'shutdown_websocket_watcher',
     'get_all_supported_parameters',
     'SettingsManager',
     'get_settings_manager',

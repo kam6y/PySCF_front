@@ -82,10 +82,6 @@ class QuantumService:
         logger.info(f"Updating QuantumService calculations directory to: {new_directory}")
         self.context.set_base_directory(new_directory)
 
-        from quantum_calc.file_watcher import update_watcher_base_directory
-
-        update_watcher_base_directory(new_directory)
-
     def get_supported_parameters(self) -> dict[str, Any]:
         """Get supported quantum chemistry parameters."""
         return self.query_service.get_supported_parameters()

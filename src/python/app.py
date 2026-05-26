@@ -42,7 +42,7 @@ from config import (
     determine_server_port,
     get_server_config,
 )
-from quantum_calc import shutdown_process_manager, shutdown_websocket_watcher
+from quantum_calc import shutdown_process_manager
 from services.exceptions import ServiceError
 from websocket.event_loop_bridge import bind_event_loop, clear_event_loop
 
@@ -177,7 +177,6 @@ async def lifespan(fastapi_app: FastAPI):
         yield
     finally:
         clear_event_loop()
-        shutdown_websocket_watcher()
         shutdown_process_manager(wait=False, force=True)
 
 

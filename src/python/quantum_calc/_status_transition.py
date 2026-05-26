@@ -18,7 +18,7 @@ class CalculationStatus(Enum):
 
 
 class CalculationStatusManager:
-    """Manages calculation status transitions, file persistence, and WebSocket notifications."""
+    """Manages calculation status transitions, file persistence, and realtime update notifications."""
 
     def __init__(self, notification_callback: Optional[Callable] = None):
         self.notification_callback = notification_callback
@@ -26,7 +26,7 @@ class CalculationStatusManager:
     def transition(self, calculation_id: str, new_status: CalculationStatus,
                    error_message: Optional[str] = None) -> None:
         """
-        Execute a status transition: persist to file + send WebSocket notification.
+        Execute a status transition: persist to file + send realtime update notification.
 
         This is used by the parent process (CalculationProcessManager) for all status
         updates. Worker processes write status directly via CalculationRepository since they
@@ -52,13 +52,13 @@ class CalculationStatusManager:
 
     def notify(self, calculation_id: str, status: str,
                error_message: Optional[str] = None) -> None:
-        """Send WebSocket notification for a calculation status change."""
+        """Send realtime update notification for a calculation status change."""
         if self.notification_callback is None:
-            logger.debug(f"WebSocket notification not available for calculation {calculation_id}")
+            logger.debug(f"Realtime update notification not available for calculation {calculation_id}")
             return
 
         try:
             self.notification_callback(calculation_id, status, error_message)
-            logger.debug(f"Sent WebSocket notification for calculation {calculation_id} with status {status}")
+            logger.debug(f"Sent realtime update notification for calculation {calculation_id} with status {status}")
         except Exception as e:
-            logger.warning(f"Failed to send WebSocket notification for calculation {calculation_id}: {e}")
+            logger.warning(f"Failed to send realtime update notification for calculation {calculation_id}: {e}")

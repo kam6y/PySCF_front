@@ -190,7 +190,6 @@ def asgi_server() -> Generator[str, None, None]:
     import services as services_module
     import quantum_calc.settings_manager as settings_manager_module
     from app import create_app
-    from quantum_calc import shutdown_websocket_watcher
     from quantum_calc.process_manager import shutdown_process_manager
     from quantum_calc.settings_manager import SettingsManager
 
@@ -206,7 +205,7 @@ def asgi_server() -> Generator[str, None, None]:
         with (
             mock.patch.dict(
                 os.environ,
-                {'PYSCF_AUTH_TOKEN': 'socket-token', 'PYSCF_ENV': 'development'},
+                {'PYSCF_AUTH_TOKEN': 'test-token', 'PYSCF_ENV': 'development'},
             ),
             mock.patch(
                 'quantum_calc.process_manager.ProcessPoolExecutor',
@@ -251,7 +250,6 @@ def asgi_server() -> Generator[str, None, None]:
                     server.force_exit = True
                     thread.join(timeout=1)
                 shutdown_process_manager()
-                shutdown_websocket_watcher()
                 _clear_calculation_update_stream_hub()
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)

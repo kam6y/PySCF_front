@@ -10,7 +10,7 @@ from services.calculation_update_stream import get_calculation_update_stream_hub
 from websocket.event_loop_bridge import schedule_coroutine
 
 
-AUTH_HEADERS = {"X-Auth-Token": "socket-token"}
+AUTH_HEADERS = {"X-Auth-Token": "test-token"}
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 1.0) -> None:

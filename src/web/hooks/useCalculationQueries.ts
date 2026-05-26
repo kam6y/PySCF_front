@@ -55,17 +55,17 @@ export const useGetCalculationDetails = (id: string | null) => {
     queryFn: () => quantumApi.getCalculationDetails(id!),
     enabled: !!id && !id.startsWith('new-calculation-'), // idが存在し、一時IDでない場合にのみ実行
 
-    // WebSocketがリアルタイム更新を提供するため、ポーリングは不要
-    staleTime: 60 * 1000, // 1分 - WebSocketが主な更新メカニズム
+    // SSE realtime update streamが更新を提供するため、ポーリングは不要
+    staleTime: 60 * 1000, // 1分 - realtime update streamが主な更新メカニズム
     gcTime: 10 * 60 * 1000, // 10分 - 詳細データを長めに保持
 
-    // ウィンドウフォーカス時の再フェッチを無効化（WebSocketが更新を管理）
+    // ウィンドウフォーカス時の再フェッチを無効化（realtime update streamが更新を管理）
     refetchOnWindowFocus: false,
 
-    // ネットワーク復帰時の再フェッチは有効（WebSocketより先に復帰する可能性）
+    // ネットワーク復帰時の再フェッチは有効（realtime update streamより先に復帰する可能性）
     refetchOnReconnect: true,
 
-    // コンポーネント再マウント時は同期（WebSocket切断時の不整合を防ぐ）
+    // コンポーネント再マウント時は同期（realtime update stream切断時の不整合を防ぐ）
     refetchOnMount: true,
   });
 };

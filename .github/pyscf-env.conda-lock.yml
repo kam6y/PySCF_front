@@ -13,9 +13,9 @@
 version: 1
 metadata:
   content_hash:
-    osx-arm64: 5c47f7ddfd0aa3e00d14555b3226c8b2ded1b95f7f2834daecadc21e10494fb3
-    osx-64: 2150ce016181cc9ba006c3b6db63904bdc787bc34e9dc7fdae11bf7696982fa5
-    linux-64: 9e53233109fee3d4330ec6e7dabb38a9766fa0238c2a36f9d365853cf6203c50
+    osx-arm64: d9f259b8ed93929e75a922e304b557bd90210892d183e51ea076dbb74e913f5f
+    osx-64: 7c15d23df0d3c0d25a0e88f1569ebbb6024f4fd495fa3f03396c910917e89293
+    linux-64: 7b594a17189195abc9f7e86ae63f4ee153fdbf3f15c383e0f836b34fb94c41ed
   channels:
   - url: conda-forge
     used_env_vars: []
@@ -9249,35 +9249,5 @@ package:
   url: https://files.pythonhosted.org/packages/a9/99/3ae339466c9183ea5b8ae87b34c0b897eda475d2aec2307cae60e5cd4f29/uritemplate-4.2.0-py3-none-any.whl
   hash:
     sha256: 962201ba1c4edcab02e60f9a0d3821e82dfc5d2d6662a21abd533879bdb8a686
-  category: main
-  optional: false
-- name: watchdog
-  version: 6.0.0
-  manager: pip
-  platform: linux-64
-  dependencies: {}
-  url: https://files.pythonhosted.org/packages/b5/e8/dbf020b4d98251a9860752a094d09a65e1b436ad181faf929983f697048f/watchdog-6.0.0-py3-none-manylinux2014_x86_64.whl
-  hash:
-    sha256: 20ffe5b202af80ab4266dcd3e91aae72bf2da48c0d33bdb15c66658e685e94e2
-  category: main
-  optional: false
-- name: watchdog
-  version: 6.0.0
-  manager: pip
-  platform: osx-64
-  dependencies: {}
-  url: https://files.pythonhosted.org/packages/12/87/48361531f70b1f87928b045df868a9fd4e253d9ae087fa4cf3f7113be363/watchdog-6.0.0-cp312-cp312-macosx_10_13_x86_64.whl
-  hash:
-    sha256: c7c15dda13c4eb00d6fb6fc508b3c0ed88b9d5d374056b239c4ad1611125c860
-  category: main
-  optional: false
-- name: watchdog
-  version: 6.0.0
-  manager: pip
-  platform: osx-arm64
-  dependencies: {}
-  url: https://files.pythonhosted.org/packages/5b/7e/8f322f5e600812e6f9a31b75d242631068ca8f4ef0582dd3ae6e72daecc8/watchdog-6.0.0-cp312-cp312-macosx_11_0_arm64.whl
-  hash:
-    sha256: 6f10cb2d5902447c7d0da897e2c6768bca89174d0c6e1e30abec5421af97a5b0
   category: main
   optional: false
