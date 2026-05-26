@@ -225,6 +225,12 @@ export const useCalculationUpdateStream = ({
               if (trackGlobalConnection) {
                 setGlobalConnected(false);
               }
+
+              if (controller.signal.aborted) {
+                return;
+              }
+
+              throw new Error('Calculation update stream closed unexpectedly.');
             },
 
             onerror: error => {

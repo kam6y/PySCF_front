@@ -96,15 +96,9 @@ export const useCalculationSync = ({
     [queryClient]
   );
 
-  const notifyStreamError = useCallback(
-    (errorMessage: string) => {
-      queryClient.invalidateQueries({
-        queryKey: calculationQueryKeys.list(),
-      });
-      onStreamErrorRef.current?.(errorMessage);
-    },
-    [queryClient]
-  );
+  const notifyStreamError = useCallback((errorMessage: string) => {
+    onStreamErrorRef.current?.(errorMessage);
+  }, []);
 
   const handleCalculationUpdate = useCallback(
     (updatedCalculation: CalculationInstance) => {
