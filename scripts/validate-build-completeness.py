@@ -263,7 +263,6 @@ def validate_conda_functionality(project_root: Path) -> bool:
         "rdkit",
         "fastapi",
         "uvicorn",
-        "socketio",
         "gunicorn",
         "pydantic",
         "conda_pack",

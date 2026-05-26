@@ -17,7 +17,6 @@ python -c "import gunicorn; print(f\"Gunicorn: {gunicorn.__version__}\")"
 python -c "import watchdog; print(\"Watchdog: Available\")"
 python -c "import fastapi; print(f\"FastAPI: {fastapi.__version__}\")"
 python -c "import uvicorn; print(f\"Uvicorn: {uvicorn.__version__}\")"
-python -c "import socketio; print('python-socketio: available')"
 python -c "import pyscf; print(f\"PySCF: {pyscf.__version__}\")"
 
 echo "=== Verifying packaged FastAPI backend source ==="

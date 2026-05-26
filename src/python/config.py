@@ -225,7 +225,6 @@ def configure_fastapi_app(app, config: ServerConfig, server_port: int) -> None:
     app.state.TESTING = False
 
     app.state.GUNICORN = config.get('gunicorn', {})
-    app.state.SOCKETIO = config.get('socketio', {})
     app.state.DEVELOPMENT = config.get('development', {})
     app.state.PRODUCTION = config.get('production', {})
     app.state.QUANTUM_CALCULATIONS = config.get('quantum_calculations', {})

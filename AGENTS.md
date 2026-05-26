@@ -120,7 +120,7 @@ python -m pytest tests/ -v
 
 ## ドメイン注意点
 - 量子化学計算は `DFT`, `HF`, `MP2`, `CCSD`, `CCSD_T`, `TDDFT`, `CASCI`, `CASSCF` を扱う。
-- リアルタイム更新は Socket.IO のイベント駆動（`join_calculation`, `leave_calculation`, `join_global_updates`, `calculation_update`）で行う。
+- リアルタイム更新は SSE エンドポイント（`/api/quantum/calculations/updates/stream`, `/api/quantum/calculations/{calculationId}/updates/stream`）で行う。
 - AI機能の現仕様は「Gemini APIベースの単一チャット」です。
 - `/api/agent/chat` は SSE で `agent_status` / `chunk` / `done` / `error` を返す。
 - チャット履歴は `session_id` がある場合にDBへ保存する。

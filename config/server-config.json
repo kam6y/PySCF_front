@@ -18,19 +18,6 @@
     "graceful_timeout": 30,
     "worker_tmp_dir": "/tmp"
   },
-  "socketio": {
-    "cors_allowed_origins": [
-      "http://127.0.0.1:*",
-      "ws://127.0.0.1:*",
-      "file://",
-      "null"
-    ],
-    "async_mode": "asgi",
-    "ping_timeout": 60,
-    "ping_interval": 25,
-    "logger": true,
-    "engineio_logger": false
-  },
   "development": {
     "use_reloader": false,
     "debug": false,

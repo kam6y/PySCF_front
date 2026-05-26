@@ -15,6 +15,7 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
     -   Perform **geometry optimization** and **vibrational frequency analysis**.
     -   Analyze results, including SCF energy, molecular orbitals (HOMO/LUMO), and more.
 -   **Calculation History**: View, rename, and delete past calculation results.
+-   **Realtime Calculation Updates**: Reflect calculation progress in the UI through Server-Sent Events endpoints.
 -   **AI Chat Assistant (Gemini API)**:
     -   **Single Assistant Chat**: Supports quantum chemistry Q&A and interpretation help in natural language.
     -   **SSE Streaming**: `/api/agent/chat` streams responses in real time via Server-Sent Events.
@@ -352,7 +353,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
 -   **自動環境構築:** ワンコマンドで開発環境をセットアップできます（`npm run setup-env`）。
 -   **環境検証機能:** Python依存関係と環境の健全性を自動チェックします（`npm run verify-env`）。
 -   **統一実行環境:** 開発・本番環境で同一のGunicornベースサーバーを使用し、環境差異問題を解決。
--   **リアルタイム更新:** WebSocketを利用して計算状況をリアルタイムにUIへ反映します。
+-   **リアルタイム更新:** Server-Sent Eventsエンドポイントで計算状況をリアルタイムにUIへ反映します。
 
 ## 技術スタック
 

@@ -248,7 +248,7 @@ function createPythonEnv(serverPort = 0) {
     await testPythonCommand([
       pythonExecutablePath,
       '-c',
-      'import fastapi, uvicorn, socketio; from uvicorn.workers import UvicornWorker; print("FastAPI ASGI import successful")',
+      'import fastapi, uvicorn; from uvicorn.workers import UvicornWorker; print("FastAPI ASGI import successful")',
     ]);
 
     // Test 5: App import test (if conda environment)

@@ -24,7 +24,7 @@
     "codegen:python": "cd src/python && bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && datamodel-codegen --input ../../src/api-spec/openapi.yaml --output generated_models.py --output-model-type pydantic_v2.BaseModel --field-constraints --use-schema-description --disable-timestamp'",
     "setup-env": "./scripts/setup-environment.sh",
     "verify-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/verify-environment.py'",
-    "verify-build-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && echo \"=== Build Environment Verification ===\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import conda_pack; print(f\\\"conda-pack: {conda_pack.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import fastapi, uvicorn, socketio; print(\\\"FastAPI ASGI stack verified\\\")\" && echo \"✓ All build tools verified\"'",
+    "verify-build-env": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && echo \"=== Build Environment Verification ===\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import conda_pack; print(f\\\"conda-pack: {conda_pack.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import gunicorn; print(f\\\"Gunicorn: {gunicorn.__version__}\\\")\" && $(conda info --base)/envs/pyscf-env/bin/python -c \"import fastapi, uvicorn; print(\\\"FastAPI ASGI stack verified\\\")\" && echo \"✓ All build tools verified\"'",
     "validate-build": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/validate-build-completeness.py'",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "typecheck": "tsc --noEmit",
@@ -96,7 +96,6 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
-    "socket.io-client": "^4.8.1",
     "zustand": "^5.0.7"
   },
   "build": {

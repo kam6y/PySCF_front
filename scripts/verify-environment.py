@@ -61,7 +61,6 @@ def _get_package_version(package_name: str) -> str:
         'geometric': 'geometric',
         'fastapi': 'fastapi',
         'uvicorn': 'uvicorn',
-        'socketio': 'python-socketio',
         'pydantic': 'pydantic',
         'gunicorn': 'gunicorn',
         'requests': 'requests',
@@ -87,7 +86,6 @@ def check_required_packages() -> bool:
         ('geometric', 'geometric - 分子幾何最適化'),
         ('fastapi', 'FastAPI - ASGI Web フレームワーク'),
         ('uvicorn', 'Uvicorn - ASGI サーバー'),
-        ('socketio', 'python-socketio - Socket.IO ASGI対応'),
         ('pydantic', 'Pydantic - データバリデーション'),
         ('gunicorn', 'Gunicorn - 本番プロセスマネージャ'),
         ('requests', 'Requests - HTTP クライアント'),
@@ -186,7 +184,6 @@ def check_fastapi_functionality() -> bool:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
         from uvicorn.workers import UvicornWorker
-        import socketio
 
         app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -196,9 +193,8 @@ def check_fastapi_functionality() -> bool:
 
         client = TestClient(app)
         response = client.get('/test')
-        server = socketio.AsyncServer(async_mode='asgi')
 
-        if response.status_code == 200 and server.async_mode == 'asgi' and UvicornWorker is not None:
+        if response.status_code == 200 and UvicornWorker is not None:
             log_success("FastAPI ASGI 機能テスト成功 ✓")
             return True
 
