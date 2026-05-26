@@ -213,6 +213,8 @@ export const useCalculationUpdateStream = ({
                     parsed.errorMessage ||
                       'Calculation update stream reported an error.'
                   );
+                  controller.abort();
+                  return;
                 }
               } catch (error) {
                 notifyStreamError(
