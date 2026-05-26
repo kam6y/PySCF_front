@@ -136,7 +136,6 @@ def app():
     test_config = {
         'TESTING': True,
         'CALCULATIONS_DIR': temp_dir,
-        'WEBSOCKET_WATCHER_ENABLED': False,
     }
 
     import services as services_module
@@ -184,7 +183,6 @@ def asgi_server() -> Generator[str, None, None]:
     test_config = {
         'TESTING': True,
         'CALCULATIONS_DIR': temp_dir,
-        'WEBSOCKET_WATCHER_ENABLED': False,
     }
 
     import services as services_module

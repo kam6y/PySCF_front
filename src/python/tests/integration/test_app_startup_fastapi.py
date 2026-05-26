@@ -65,11 +65,9 @@ def test_config_is_stored_on_app_state():
         test_config={
             'TESTING': True,
             'CALCULATIONS_DIR': '/tmp/pyscf-fastapi-test',
-            'WEBSOCKET_WATCHER_ENABLED': False,
         },
     )
 
     assert app.state.TESTING is True
     assert app.state.SERVER_PORT == 5123
     assert app.state.CALCULATIONS_DIR == '/tmp/pyscf-fastapi-test'
-    assert app.state.WEBSOCKET_WATCHER_ENABLED is False
