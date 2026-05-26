@@ -22,8 +22,9 @@ def test_thread_control_vars_are_set_before_app_import(monkeypatch):
     for name in thread_vars:
         assert os.environ[name] == '1'
     assert hasattr(module, 'fastapi_app')
-    assert hasattr(module, 'sio')
     assert hasattr(module, 'app')
+    assert isinstance(module.app, FastAPI)
+    assert not hasattr(module, 'sio')
 
 
 def test_app_import_does_not_initialize_process_manager(monkeypatch):

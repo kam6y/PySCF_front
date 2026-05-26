@@ -47,6 +47,15 @@ def _wait_for_server_start(
         time.sleep(0.05)
 
 
+def _clear_calculation_update_stream_hub() -> None:
+    """Reset the SSE hub singleton between tests."""
+    from services.calculation_update_stream import get_calculation_update_stream_hub
+
+    hub = get_calculation_update_stream_hub()
+    hub._global_subscribers.clear()
+    hub._calculation_subscribers.clear()
+
+
 # ============================================================================
 # Core Application Fixtures
 # ============================================================================
@@ -128,11 +137,6 @@ def app():
         'TESTING': True,
         'CALCULATIONS_DIR': temp_dir,
         'WEBSOCKET_WATCHER_ENABLED': False,
-        'SOCKETIO': {
-            'cors_allowed_origins': ['http://127.0.0.1:*', 'http://localhost:*', 'file://'],
-            'logger': False,
-            'engineio_logger': False,
-        },
     }
 
     import services as services_module
@@ -162,42 +166,33 @@ def app():
         ),
     ):
         shutdown_process_manager()
-        _app = create_fastapi_app(server_port=5000, test_config=test_config)
-        yield _app
-        shutdown_process_manager()
+        try:
+            _app = create_fastapi_app(server_port=5000, test_config=test_config)
+            yield _app
+        finally:
+            shutdown_process_manager()
+            _clear_calculation_update_stream_hub()
 
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope='function')
 def asgi_server() -> Generator[str, None, None]:
-    """Run the real Socket.IO ASGI app on a local Uvicorn server."""
+    """Run the real FastAPI ASGI app on a local Uvicorn server."""
     port = _get_free_port()
     temp_dir = tempfile.mkdtemp(prefix='pyscf_asgi_test_')
     test_config = {
         'TESTING': True,
         'CALCULATIONS_DIR': temp_dir,
         'WEBSOCKET_WATCHER_ENABLED': False,
-        'SOCKETIO': {
-            'cors_allowed_origins': [
-                'http://127.0.0.1:3000',
-                'http://localhost:3000',
-                'file://',
-                'null',
-            ],
-            'logger': False,
-            'engineio_logger': False,
-        },
     }
 
     import services as services_module
-    import services.notification_service as notification_service_module
     import quantum_calc.settings_manager as settings_manager_module
     from app import create_app
     from quantum_calc import shutdown_websocket_watcher
     from quantum_calc.process_manager import shutdown_process_manager
     from quantum_calc.settings_manager import SettingsManager
-    from websocket.handlers import _sid_state
 
     test_settings_manager = SettingsManager(
         settings_file=os.path.join(temp_dir, 'app-settings.json')
@@ -222,7 +217,6 @@ def asgi_server() -> Generator[str, None, None]:
                 '_settings_manager',
                 test_settings_manager,
             ),
-            mock.patch.object(notification_service_module, '_notification_service', None),
             mock.patch.multiple(
                 services_module,
                 _quantum_service=None,
@@ -233,7 +227,6 @@ def asgi_server() -> Generator[str, None, None]:
             ),
         ):
             shutdown_process_manager()
-            _sid_state.clear()
             uvicorn_app = create_app(server_port=port, test_config=test_config)
             config = uvicorn.Config(
                 uvicorn_app,
@@ -259,7 +252,7 @@ def asgi_server() -> Generator[str, None, None]:
                     thread.join(timeout=1)
                 shutdown_process_manager()
                 shutdown_websocket_watcher()
-                _sid_state.clear()
+                _clear_calculation_update_stream_hub()
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 

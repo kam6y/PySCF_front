@@ -28,7 +28,6 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
-import socketio
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,7 +44,6 @@ from config import (
 )
 from quantum_calc import shutdown_process_manager, shutdown_websocket_watcher
 from services.exceptions import ServiceError
-from websocket import register_websocket_handlers
 from websocket.event_loop_bridge import bind_event_loop, clear_event_loop
 
 try:
@@ -196,36 +194,6 @@ def initialize_process_manager_notifications() -> None:
         logger.error("Failed to initialize process manager with callback: %s", exc)
 
 
-def create_socketio_server(socketio_config: dict[str, Any] | None = None) -> socketio.AsyncServer:
-    socketio_config = socketio_config or {}
-    cors_allowed_origins = socketio_config.get('cors_allowed_origins')
-    if cors_allowed_origins not in (None, '*'):
-        cors_allowed_origins = [
-            origin
-            for origin in cors_allowed_origins
-            if not origin.endswith(':*') and origin not in {'ws://127.0.0.1:*', 'ws://localhost:*'}
-        ]
-        cors_allowed_origins.extend([
-            'http://127.0.0.1:3000',
-            'http://localhost:3000',
-            'http://127.0.0.1:5173',
-            'http://localhost:5173',
-        ])
-    return socketio.AsyncServer(
-        async_mode='asgi',
-        cors_allowed_origins=cors_allowed_origins or [
-            'file://',
-            'null',
-            'http://127.0.0.1:3000',
-            'http://localhost:3000',
-        ],
-        ping_timeout=socketio_config.get('ping_timeout', 60),
-        ping_interval=socketio_config.get('ping_interval', 25),
-        logger=socketio_config.get('logger', True),
-        engineio_logger=socketio_config.get('engineio_logger', False),
-    )
-
-
 def create_fastapi_app(server_port: int | None = None, test_config: dict[str, Any] | None = None) -> FastAPI:
     server_config = get_server_config()
     if server_port is None:
@@ -246,26 +214,15 @@ def create_fastapi_app(server_port: int | None = None, test_config: dict[str, An
     return fastapi_app
 
 
-def compose_asgi_app(fastapi_instance: FastAPI, socketio_instance: socketio.AsyncServer):
-    register_websocket_handlers(socketio_instance)
-
-    from services.notification_service import bind_notification_service
-
-    bind_notification_service(socketio_instance)
-    fastapi_instance.state.socketio = socketio_instance
-    return socketio.ASGIApp(socketio_instance, fastapi_instance)
+def create_app(
+    server_port: int | None = None,
+    test_config: dict[str, Any] | None = None,
+) -> FastAPI:
+    return create_fastapi_app(server_port=server_port, test_config=test_config)
 
 
-def create_app(server_port: int | None = None, test_config: dict[str, Any] | None = None):
-    fastapi_instance = create_fastapi_app(server_port=server_port, test_config=test_config)
-    socketio_config = getattr(fastapi_instance.state, 'SOCKETIO', {})
-    socketio_instance = create_socketio_server(socketio_config)
-    return compose_asgi_app(fastapi_instance, socketio_instance)
-
-
-fastapi_app = create_fastapi_app()
-sio = create_socketio_server(getattr(fastapi_app.state, 'SOCKETIO', {}))
-app = compose_asgi_app(fastapi_app, sio)
+app = create_app()
+fastapi_app = app
 
 
 if __name__ == '__main__':

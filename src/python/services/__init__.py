@@ -21,7 +21,6 @@ from .exceptions import (
 from .notification_service import (
     NotificationService,
     get_notification_service,
-    bind_notification_service
 )
 from .pubchem_service import PubChemService
 from .quantum_service import QuantumService
@@ -129,5 +128,4 @@ __all__ = [
     'get_settings_service',
     'get_system_service',
     'get_notification_service',
-    'bind_notification_service'
 ]
