@@ -42,8 +42,6 @@ const noopErrorHandler = () => {};
 const RESTORE_MAX_RETRIES = 10;
 const RESTORE_RETRY_DELAY_MS = 300;
 
-type PersistenceFormat = 'molfile' | 'ket' | 'smiles';
-
 const hasMeaningfulContent = (value: string | null | undefined): boolean =>
   typeof value === 'string' && value.trim().length > 0;
 
@@ -55,24 +53,18 @@ const getRestoreKey = (
 const serializeForPersistence = async (
   ketcher: Ketcher,
   smilesFallback?: string
-): Promise<{ data: string; format: PersistenceFormat }> => {
-  const serializers: Array<{
-    format: PersistenceFormat;
-    getter: () => Promise<string>;
-  }> = [
-    { format: 'molfile', getter: () => ketcher.getMolfile() },
-    { format: 'ket', getter: () => ketcher.getKet() },
-    {
-      format: 'smiles',
-      getter: async () => smilesFallback ?? ketcher.getSmiles(),
-    },
+): Promise<string> => {
+  const serializers: Array<() => Promise<string>> = [
+    () => ketcher.getMolfile(),
+    () => ketcher.getKet(),
+    async () => smilesFallback ?? ketcher.getSmiles(),
   ];
 
-  for (const serializer of serializers) {
+  for (const serialize of serializers) {
     try {
-      const serializedData = await serializer.getter();
+      const serializedData = await serialize();
       if (hasMeaningfulContent(serializedData)) {
-        return { data: serializedData, format: serializer.format };
+        return serializedData;
       }
     } catch {
       // Try next serializer
@@ -442,7 +434,7 @@ export const DrawMoleculePage: React.FC = () => {
           parameters: {
             ...baseParams,
             xyz: response.xyz,
-            ketcher_data: serialized.data,
+            ketcher_data: serialized,
             name: calculationName,
           },
           results: undefined,

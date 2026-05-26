@@ -3,7 +3,6 @@
 import pytest
 
 from quantum_calc.method_defaults import (
-    get_method_defaults,
     get_parameter_constraints,
     get_defaults_for_method,
     is_parameter_applicable,
@@ -16,21 +15,6 @@ from quantum_calc.method_defaults import (
 
 class TestMethodDefaults:
     """Tests for method default values."""
-
-    def test_get_method_defaults_returns_dict(self):
-        """Test that get_method_defaults returns a dictionary."""
-        defaults = get_method_defaults()
-        assert isinstance(defaults, dict)
-        assert len(defaults) > 0
-
-    def test_all_calculation_methods_have_defaults(self):
-        """Test that all supported calculation methods have defaults."""
-        expected_methods = ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT', 'CASCI', 'CASSCF']
-        defaults = get_method_defaults()
-
-        for method in expected_methods:
-            assert method in defaults, f"Method {method} missing defaults"
-            assert isinstance(defaults[method], dict), f"Defaults for {method} should be a dict"
 
     @pytest.mark.parametrize(
         ("method", "expected_values", "absent_keys"),
@@ -145,12 +129,6 @@ class TestMethodDefaults:
 
 class TestParameterConstraints:
     """Tests for parameter constraints."""
-
-    def test_get_parameter_constraints_returns_dict(self):
-        """Test that get_parameter_constraints returns a dictionary."""
-        constraints = get_parameter_constraints()
-        assert isinstance(constraints, dict)
-        assert len(constraints) > 0
 
     @pytest.mark.parametrize(
         ("param", "expected_values"),

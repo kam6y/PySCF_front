@@ -19,7 +19,6 @@ export type CalculationResults = components['schemas']['CalculationResults'];
 export type CalculationInstance = components['schemas']['CalculationInstance'];
 export type CalculationSummary = components['schemas']['CalculationSummary'];
 export type OrbitalInfo = components['schemas']['OrbitalInfo'];
-export type IRSpectrumData = components['schemas']['IRSpectrumData'];
 
 // Chat history data models
 export type ChatSessionSummary = components['schemas']['ChatSessionSummary'];

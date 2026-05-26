@@ -21,8 +21,7 @@ Key fixtures are defined in `conftest.py`:
 - `app`: FastAPI application configured for tests.
 - `client`: FastAPI `TestClient` for HTTP endpoint tests.
 - `asgi_server`: real Uvicorn server for SSE endpoint smoke tests.
-- `dummy_executor`: synchronous executor for deterministic workflow tests.
-- `sample_h2_xyz`, `sample_water_xyz`, `valid_dft_params`, `valid_hf_params`: common chemistry payloads.
+- `sample_h2_xyz`, `valid_dft_params`, `valid_hf_params`: common chemistry payloads.
 
 ## Examples
 

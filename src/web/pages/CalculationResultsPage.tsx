@@ -249,15 +249,13 @@ export const CalculationResultsPage = ({
           <CASResultsSection results={results} parameters={parameters} />
         )}
 
-        {processedData.shouldShowEnergeticsSection && (
-          <EnergeticsSection
-            results={results}
-            parameters={parameters}
-            processedData={{
-              shouldShowCCSDSection: processedData.shouldShowCCSDSection,
-            }}
-          />
-        )}
+        <EnergeticsSection
+          results={results}
+          parameters={parameters}
+          processedData={{
+            shouldShowCCSDSection: processedData.shouldShowCCSDSection,
+          }}
+        />
 
         {processedData.shouldShowVibrationalSection && (
           <VibrationalAnalysisSection

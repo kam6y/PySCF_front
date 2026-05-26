@@ -26,6 +26,30 @@ class CalculationArtifactService:
     def __init__(self, context: CalculationServiceContext) -> None:
         self.context = context
 
+    def _get_validated_orbital_generator(
+        self,
+        calculation_id: str,
+    ) -> MolecularOrbitalGenerator:
+        calc_path = self.context.resolve_calculation_path(calculation_id)
+
+        if not os.path.isdir(calc_path):
+            raise NotFoundError(f'Calculation "{calculation_id}" not found.')
+
+        status = self.context.repository.read_calculation_status(calc_path)
+        if status != "completed":
+            raise ValidationError(
+                f'Calculation "{calculation_id}" is not completed. '
+                f"Status: {status}"
+            )
+
+        orbital_generator = MolecularOrbitalGenerator(calc_path)
+        if not orbital_generator.validate_calculation():
+            raise NotFoundError(
+                "Orbital data is not available or calculation data is invalid."
+            )
+
+        return orbital_generator
+
     def get_molecular_orbitals(self, calculation_id: str) -> dict[str, Any]:
         """
         Get molecular orbital information for a calculation.
@@ -36,25 +60,7 @@ class CalculationArtifactService:
             ServiceError: For calculation or file access failures.
         """
         try:
-            calc_path = self.context.resolve_calculation_path(calculation_id)
-
-            if not os.path.isdir(calc_path):
-                raise NotFoundError(f'Calculation "{calculation_id}" not found.')
-
-            status = self.context.repository.read_calculation_status(calc_path)
-            if status != "completed":
-                raise ValidationError(
-                    f'Calculation "{calculation_id}" is not completed. '
-                    f"Status: {status}"
-                )
-
-            orbital_generator = MolecularOrbitalGenerator(calc_path)
-
-            if not orbital_generator.validate_calculation():
-                raise NotFoundError(
-                    "Orbital data is not available or calculation data is invalid."
-                )
-
+            orbital_generator = self._get_validated_orbital_generator(calculation_id)
             orbital_summary = orbital_generator.get_orbital_summary()
 
             logger.info(
@@ -98,25 +104,7 @@ class CalculationArtifactService:
                 isovalue_neg=isovalue_neg,
             )
 
-            calc_path = self.context.resolve_calculation_path(calculation_id)
-
-            if not os.path.isdir(calc_path):
-                raise NotFoundError(f'Calculation "{calculation_id}" not found.')
-
-            status = self.context.repository.read_calculation_status(calc_path)
-            if status != "completed":
-                raise ValidationError(
-                    f'Calculation "{calculation_id}" is not completed. '
-                    f"Status: {status}"
-                )
-
-            orbital_generator = MolecularOrbitalGenerator(calc_path)
-
-            if not orbital_generator.validate_calculation():
-                raise NotFoundError(
-                    "Orbital data is not available or calculation data is invalid."
-                )
-
+            orbital_generator = self._get_validated_orbital_generator(calculation_id)
             logger.info(
                 f"Generating CUBE file for calculation {calculation_id}, "
                 f"orbital {orbital_index}"

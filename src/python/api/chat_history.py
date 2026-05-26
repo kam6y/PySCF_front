@@ -9,6 +9,13 @@ from services.chat_history_service import get_chat_history_service
 router = APIRouter(prefix='/api/chat-history')
 
 
+def _chat_session_not_found_response(session_id: str) -> JSONResponse:
+    return JSONResponse(
+        {'success': False, 'error': f'Chat session not found: {session_id}'},
+        status_code=404,
+    )
+
+
 @router.get('/sessions')
 def get_chat_sessions() -> dict:
     data = get_chat_history_service().list_sessions()
@@ -25,10 +32,7 @@ def create_chat_session(body: CreateChatSessionRequest) -> dict:
 def get_chat_session(session_id: str) -> dict | JSONResponse:
     session_data = get_chat_history_service().get_session_with_messages(session_id)
     if session_data is None:
-        return JSONResponse(
-            {'success': False, 'error': f'Chat session not found: {session_id}'},
-            status_code=404,
-        )
+        return _chat_session_not_found_response(session_id)
     return {'success': True, 'data': session_data}
 
 
@@ -39,10 +43,7 @@ def update_chat_session(
 ) -> dict | JSONResponse:
     session = get_chat_history_service().update_session(session_id, body.name)
     if session is None:
-        return JSONResponse(
-            {'success': False, 'error': f'Chat session not found: {session_id}'},
-            status_code=404,
-        )
+        return _chat_session_not_found_response(session_id)
     return {'success': True, 'data': {'session': session}}
 
 
@@ -50,10 +51,7 @@ def update_chat_session(
 def delete_chat_session(session_id: str) -> dict | JSONResponse:
     deleted = get_chat_history_service().delete_session(session_id)
     if not deleted:
-        return JSONResponse(
-            {'success': False, 'error': f'Chat session not found: {session_id}'},
-            status_code=404,
-        )
+        return _chat_session_not_found_response(session_id)
     return {
         'success': True,
         'data': {

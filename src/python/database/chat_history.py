@@ -130,17 +130,6 @@ class ChatHistoryDatabase:
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
-            # Verify FOREIGN KEY constraints are enabled
-            cursor.execute("PRAGMA foreign_keys")
-            fk_status = cursor.fetchone()[0]
-            if fk_status != 1:
-                logger.warning("FOREIGN KEY constraints are not enabled! Attempting to enable...")
-                cursor.execute("PRAGMA foreign_keys = ON")
-                cursor.execute("PRAGMA foreign_keys")
-                fk_status = cursor.fetchone()[0]
-                if fk_status != 1:
-                    logger.error("Failed to enable FOREIGN KEY constraints! CASCADE deletion may not work.")
-
             # Create chat_sessions table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS chat_sessions (

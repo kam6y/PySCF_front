@@ -21,7 +21,6 @@ interface MolecularOrbitalEnergyDiagramProps {
 
 interface ProcessedOrbital extends OrbitalInfo {
   yPosition: number;
-  displayLevel: number;
 }
 
 interface LabelInfo {
@@ -106,12 +105,11 @@ export const MolecularOrbitalEnergyDiagram: React.FC<MolecularOrbitalEnergyDiagr
         DIAGRAM_CONFIG.margin.top -
         DIAGRAM_CONFIG.margin.bottom;
 
-      return sortedOrbitals.map((orbital, index) => ({
+      return sortedOrbitals.map(orbital => ({
         ...orbital,
         yPosition:
           DIAGRAM_CONFIG.margin.top +
           drawableHeight * (1 - (orbital.energy_ev - minEnergy) / energyRange),
-        displayLevel: index,
       }));
     }, [orbitalsData]);
 

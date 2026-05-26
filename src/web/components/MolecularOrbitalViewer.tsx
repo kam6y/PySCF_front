@@ -18,10 +18,11 @@ interface MolecularOrbitalViewerProps {
 }
 
 interface ViewerOptions {
-  gridSize: number;
   isovaluePos: number;
   isovalueNeg: number;
 }
+
+const ORBITAL_GRID_SIZE = 80;
 
 export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
   React.memo(
@@ -40,7 +41,6 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
         number | null
       >(null);
       const [viewerOptions, setViewerOptions] = useState<ViewerOptions>({
-        gridSize: 80,
         isovaluePos: 0.02,
         isovalueNeg: -0.02,
       });
@@ -48,8 +48,6 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
       const retryCountRef = useRef(0);
       const [isDomReady, setIsDomReady] = useState(false);
       const [isViewerReady, setIsViewerReady] = useState(false);
-
-      const previousCalculationIdRef = useRef<string | null>(null);
 
       // Callback ref to track when DOM element becomes available
       const setViewerRef = useCallback(
@@ -90,7 +88,10 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
         data: cubeData,
         isLoading: cubeLoading,
         error: cubeError,
-      } = useGetOrbitalCube(calculationId, cubeOrbitalIndex, viewerOptions);
+      } = useGetOrbitalCube(calculationId, cubeOrbitalIndex, {
+        gridSize: ORBITAL_GRID_SIZE,
+        ...viewerOptions,
+      });
 
       // ビューアーのリサイズ処理
       const handleViewerResize = useCallback(() => {
@@ -232,33 +233,6 @@ export const MolecularOrbitalViewer: React.FC<MolecularOrbitalViewerProps> =
           }
         };
       }, [handleViewerResize]);
-
-      // calculationIdが変更されたときに状態をリセット
-      useEffect(() => {
-        const previousCalculationId = previousCalculationIdRef.current;
-
-        // 実際にcalculationIdが変更された場合のみ処理を実行
-        if (previousCalculationId !== calculationId) {
-          // 状態をリセット
-          setSelectedOrbitalIndex(null);
-          setIsLoading(false);
-          setIsViewerReady(false);
-          retryCountRef.current = 0;
-
-          // 3Dmol.jsビューアーをクリア
-          if (viewer) {
-            try {
-              viewer.clear();
-            } catch (error) {
-              console.error('Failed to clear viewer:', error);
-            }
-          }
-          setViewer(null);
-
-          // 現在のcalculationIdを記録
-          previousCalculationIdRef.current = calculationId;
-        }
-      }, [calculationId, viewer]);
 
       // 外部から渡された選択軌道を内部状態に同期
       useEffect(() => {

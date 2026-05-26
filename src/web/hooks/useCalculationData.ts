@@ -48,24 +48,6 @@ export const useCalculationData = () => {
     return null;
   }, [stagedCalculation, detailsData?.calculation]);
 
-  // 計算の種類を判定
-  const calculationType = useMemo(() => {
-    if (stagedCalculation) return 'staged';
-    if (detailsData?.calculation) return 'detailed';
-    return 'none';
-  }, [stagedCalculation, detailsData?.calculation]);
-
-  // ステージド計算かどうか
-  const isStagedCalculation = useMemo(
-    () => calculationType === 'staged',
-    [calculationType]
-  );
-
-  // ローディング状態
-  const isLoading =
-    calculationsLoading ||
-    (activeCalculationId && !stagedCalculation && detailsLoading);
-
   // サイドバー用の計算リスト
   const sidebarCalculations = useMemo(() => {
     return calculationsData?.calculations ?? [];
@@ -75,11 +57,9 @@ export const useCalculationData = () => {
     // メイン状態
     activeCalculation,
     activeCalculationId,
-    calculationType,
-    isStagedCalculation,
+    isStagedCalculation: !!stagedCalculation,
 
     // ローディングとエラー状態
-    isLoading,
     detailsLoading,
     calculationsLoading,
     calculationsError,
@@ -87,9 +67,5 @@ export const useCalculationData = () => {
 
     // 補助データ
     sidebarCalculations,
-
-    // 生のデータ（必要に応じて）
-    calculationsData,
-    detailsData,
   };
 };

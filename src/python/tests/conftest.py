@@ -276,17 +276,6 @@ def client(app):
 # Helper Classes and Utilities
 # ============================================================================
 
-@pytest.fixture
-def dummy_executor():
-    """
-    Provide a DummyExecutor instance for testing async workflows.
-
-    Returns:
-        DummyExecutor: A synchronous executor for testing.
-    """
-    return DummyExecutor()
-
-
 # ============================================================================
 # Test Data Fixtures
 # ============================================================================
@@ -303,20 +292,6 @@ def sample_h2_xyz():
              Lines 3+: atom symbol and coordinates
     """
     return "2\nHydrogen molecule\nH 0 0 0\nH 0 0 0.74"
-
-
-@pytest.fixture
-def sample_water_xyz():
-    """
-    Provide sample water molecule coordinates in valid XYZ format.
-
-    Returns:
-        str: XYZ coordinates for a water molecule with proper format:
-             Line 1: number of atoms
-             Line 2: comment line
-             Lines 3+: atom symbol and coordinates
-    """
-    return "3\nWater molecule\nO 0.0000 0.0000 0.1173\nH 0.0000 0.7572 -0.4692\nH 0.0000 -0.7572 -0.4692"
 
 
 @pytest.fixture

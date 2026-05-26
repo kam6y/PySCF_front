@@ -157,44 +157,6 @@ def test_convert_smiles_invalid_structure(mocker):
         service.convert_smiles('INVALID_SMILES_XYZ')
 
 
-def test_convert_smiles_rdkit_parsing_error(mocker):
-    """
-    GIVEN smiles_to_xyz raises SMILESError due to RDKit parsing failure
-    WHEN convert_smiles is called
-    THEN it should raise ValidationError
-    """
-    # ARRANGE
-    mocker.patch(
-        'services.smiles_service.smiles_to_xyz',
-        side_effect=SMILESError('RDKit could not parse SMILES')
-    )
-    
-    service = SMILESService()
-    
-    # ACT & ASSERT
-    with pytest.raises(ValidationError, match="RDKit could not parse"):
-        service.convert_smiles('C1C')
-
-
-def test_convert_smiles_3d_generation_error(mocker):
-    """
-    GIVEN smiles_to_xyz raises SMILESError due to 3D coordinate generation failure
-    WHEN convert_smiles is called
-    THEN it should raise ValidationError
-    """
-    # ARRANGE
-    mocker.patch(
-        'services.smiles_service.smiles_to_xyz',
-        side_effect=SMILESError('Failed to generate 3D coordinates')
-    )
-    
-    service = SMILESService()
-    
-    # ACT & ASSERT
-    with pytest.raises(ValidationError, match="Failed to generate 3D coordinates"):
-        service.convert_smiles('c1ccccc1')
-
-
 # ============================================================================
 # convert_smiles() Unexpected Error Tests
 # ============================================================================

@@ -23,9 +23,7 @@ export const MullikenChargeViewer: React.FC<MullikenChargeViewerProps> =
       const viewerRef = useRef<GLViewer | null>(null);
       const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
-      const opacity = 0.7; // Fixed opacity
       const [chargeRange, setChargeRange] = useState(0.5);
-      const surfaceType = 'VDW'; // Fixed to Van der Waals
       const [isLoading, setIsLoading] = useState(true);
       const [error, setError] = useState<string | null>(null);
 
@@ -121,14 +119,10 @@ export const MullikenChargeViewer: React.FC<MullikenChargeViewerProps> =
             }
           );
 
-          // Add surface with charge-based coloring
-          // Use string literals as 3Dmol.js expects
-          const surfaceTypeValue = surfaceType === 'VDW' ? 'VDW' : 'SAS';
-
           viewer.addSurface(
-            surfaceTypeValue as any,
+            'VDW' as any,
             {
-              opacity: opacity,
+              opacity: 0.7,
               colorscheme: {
                 prop: 'charge',
                 gradient: 'rwb', // Red (negative) - White (neutral) - Blue (positive) -> Swapped min/max to invert

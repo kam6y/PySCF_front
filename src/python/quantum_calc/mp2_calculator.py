@@ -4,7 +4,6 @@ import logging
 import numpy as np
 from typing import Dict, Any, Optional
 from pyscf import gto, scf, mp
-# geometric_solver is now imported in BaseCalculator
 
 from .base_calculator import BaseCalculator
 from .exceptions import CalculationError
