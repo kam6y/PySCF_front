@@ -41,14 +41,12 @@ function ensureOutputDirectory(directoryPath) {
   fs.mkdirSync(directoryPath, { recursive: true });
 }
 
-
 const dockerDistPath = dockerizePath(distPath);
 const dockerReleasePath = dockerizePath(releasePath);
 
 const args = process.argv.slice(2);
 const useNoCache = args.includes('--no-cache');
 const useClean = args.includes('--clean');
-const useDryRun = args.includes('--dry-run');
 
 console.log('Building Docker image for Linux package...');
 console.log(`Project root: ${projectRoot}`);
@@ -107,16 +105,6 @@ const dockerCmd = commandText([
   containerBuildScript,
 ]);
 
-if (useDryRun) {
-  console.log('\n=== Dry run: commands were not executed ===');
-  console.log(`Build command: ${buildCmd}`);
-  console.log(`Run command: ${dockerCmd}`);
-  console.log('\nContainer output copy:');
-  console.log(`  clean ${CONTAINER_OUTPUT_ROOT}/dist/*, then /app/dist/. -> ${CONTAINER_OUTPUT_ROOT}/dist/`);
-  console.log(`  clean ${CONTAINER_OUTPUT_ROOT}/release/*, then /app/release/. -> ${CONTAINER_OUTPUT_ROOT}/release/`);
-  process.exit(0);
-}
-
 try {
   if (useClean) {
     console.log('\n=== Step 0a: Cleaning Docker build cache ===');
@@ -148,7 +136,9 @@ try {
 
   console.log('\n=== Step 2: Running build in container ===');
   console.log(`Mounting: ${dockerDistPath} -> ${CONTAINER_OUTPUT_ROOT}/dist`);
-  console.log(`Mounting: ${dockerReleasePath} -> ${CONTAINER_OUTPUT_ROOT}/release`);
+  console.log(
+    `Mounting: ${dockerReleasePath} -> ${CONTAINER_OUTPUT_ROOT}/release`
+  );
   console.log('Container cleanup runs only against internal /app paths.');
 
   execSync(dockerCmd, {

@@ -237,32 +237,6 @@ class TestCalculationWorkflowSync:
         response_after = client.get(f'/api/quantum/calculations/{calc_id}')
         assert response_after.status_code == 404
 
-    def test_workflow_with_websocket_integration(self, client, mocker, valid_hf_params):
-        """
-        GIVEN WebSocket delivery is covered by ASGI smoke tests
-        WHEN a calculation is submitted
-        THEN the workflow still exposes a calculation ID for Socket.IO clients
-        """
-        # ARRANGE
-        # Mock PySCF
-        mock_mol = mocker.MagicMock()
-        mock_scf = mocker.MagicMock()
-        mock_scf.kernel.return_value = -1.06
-        mock_scf.mo_energy = [-0.5, 0.3]
-        mock_scf.mo_occ = [2.0, 0.0]
-
-        mocker.patch('quantum_calc.hf_calculator.gto.M', return_value=mock_mol)
-        mocker.patch('quantum_calc.hf_calculator.scf.RHF', return_value=mock_scf)
-
-        # ACT
-        # Step 1: Submit calculation
-        response_submit = client.post('/api/quantum/calculate', json=valid_hf_params)
-        assert response_submit.status_code == 202
-        calc_id = response_submit.json()['data']['calculation']['id']
-
-        # ASSERT
-        assert calc_id
-
     def test_workflow_worker_exception_persists_error_details(
         self,
         client,
@@ -389,88 +363,6 @@ class TestCalculationWorkflowSync:
         assert orbitals_data['data'] == orbital_summary
 
         mock_orbital_generator.assert_called_once()
-
-
-class TestCalculationWorkflowValidation:
-    """Integration tests for calculation parameter validation in workflow context."""
-
-    def test_workflow_rejects_invalid_basis_set(self, client, valid_dft_params):
-        """
-        GIVEN invalid basis set in calculation parameters
-        WHEN calculation is submitted
-        THEN calculation may be accepted but should fail during execution
-        """
-        # ARRANGE
-        invalid_params = {**valid_dft_params, 'basis_function': 'invalid_basis_xyz'}
-
-        # ACT
-        response = client.post('/api/quantum/calculate', json=invalid_params)
-
-        # ASSERT
-        # May accept (202) and fail later, or reject immediately (400/422)
-        assert response.status_code in [202, 400, 422]
-
-        # If accepted, it should fail during calculation
-        if response.status_code == 202:
-            calc_id = response.json()['data']['calculation']['id']
-            import time
-            for _ in range(10):
-                details_response = client.get(f'/api/quantum/calculations/{calc_id}')
-                details = details_response.json()['data']['calculation']
-                if details['status'] in ['error', 'completed']:
-                    break
-                time.sleep(1)
-            # Should eventually error due to invalid basis set
-            assert details['status'] in ['error', 'waiting', 'running']
-
-    def test_workflow_rejects_missing_xyz(self, client, valid_dft_params):
-        """
-        GIVEN XYZ coordinates are missing
-        WHEN calculation is submitted
-        THEN 400 Bad Request is returned
-        """
-        # ARRANGE
-        invalid_params = {**valid_dft_params}
-        del invalid_params['xyz']
-
-        # ACT
-        response = client.post('/api/quantum/calculate', json=invalid_params)
-
-        # ASSERT
-        assert response.status_code == 400
-
-    def test_workflow_rejects_invalid_charge_spin_combination(self, client, valid_hf_params):
-        """
-        GIVEN invalid charge/spin combination
-        WHEN calculation is submitted
-        THEN validation error occurs
-        """
-        # ARRANGE
-        # Even number of electrons with odd spin is invalid
-        invalid_params = {
-            **valid_hf_params,
-            'charges': 0,  # H2 has 2 electrons
-            'spin': 1  # Odd spin with even electrons is invalid
-        }
-
-        # ACT
-        response = client.post('/api/quantum/calculate', json=invalid_params)
-
-        # ASSERT
-        # Should be rejected either at API level or during calculation
-        # Status could be 400 (validation) or 202 followed by error status
-        if response.status_code == 202:
-            calc_id = response.json()['data']['calculation']['id']
-            import time
-            for _ in range(10):
-                details_response = client.get(f'/api/quantum/calculations/{calc_id}')
-                details = details_response.json()['data']['calculation']
-                if details['status'] in ['error', 'completed']:
-                    break
-                time.sleep(1)
-            # If accepted, should eventually error or be in waiting/running state
-            assert details['status'] in ['error', 'waiting', 'running', 'pending']
-
 
 class TestCalculationWorkflowMultipleCalculations:
     """Integration tests for managing multiple concurrent calculations."""

@@ -32,79 +32,110 @@ class TestMethodDefaults:
             assert method in defaults, f"Method {method} missing defaults"
             assert isinstance(defaults[method], dict), f"Defaults for {method} should be a dict"
 
-    def test_dft_defaults(self):
-        """Test DFT default values."""
-        defaults = get_defaults_for_method('DFT')
-        assert defaults['basis_function'] == '6-31G(d)'
-        assert defaults['exchange_correlation'] == 'B3LYP'
-        assert defaults['memory_mb'] == 2000
-        assert defaults['optimize_geometry'] is True
+    @pytest.mark.parametrize(
+        ("method", "expected_values", "absent_keys"),
+        [
+            (
+                "DFT",
+                {
+                    "basis_function": "6-31G(d)",
+                    "exchange_correlation": "B3LYP",
+                    "memory_mb": 2000,
+                    "optimize_geometry": True,
+                },
+                (),
+            ),
+            (
+                "HF",
+                {
+                    "basis_function": "6-31G(d)",
+                    "memory_mb": 2000,
+                    "optimize_geometry": True,
+                },
+                (),
+            ),
+            (
+                "MP2",
+                {
+                    "basis_function": "6-31G(d)",
+                    "memory_mb": 3000,
+                    "optimize_geometry": True,
+                },
+                (),
+            ),
+            (
+                "CCSD",
+                {
+                    "basis_function": "cc-pVDZ",
+                    "memory_mb": 4000,
+                    "frozen_core": True,
+                },
+                ("optimize_geometry",),
+            ),
+            (
+                "CCSD_T",
+                {
+                    "basis_function": "cc-pVDZ",
+                    "memory_mb": 4000,
+                    "frozen_core": True,
+                },
+                ("optimize_geometry",),
+            ),
+            (
+                "TDDFT",
+                {
+                    "basis_function": "6-31G(d)",
+                    "exchange_correlation": "B3LYP",
+                    "memory_mb": 2000,
+                    "tddft_nstates": 10,
+                    "tddft_method": "TDDFT",
+                    "tddft_analyze_nto": False,
+                },
+                ("optimize_geometry",),
+            ),
+            (
+                "CASCI",
+                {
+                    "basis_function": "6-31G(d)",
+                    "memory_mb": 3000,
+                    "ncas": 4,
+                    "nelecas": 4,
+                    "natorb": True,
+                    "max_cycle_micro": 3,
+                },
+                ("optimize_geometry",),
+            ),
+            (
+                "CASSCF",
+                {
+                    "basis_function": "6-31G(d)",
+                    "memory_mb": 3000,
+                    "ncas": 4,
+                    "nelecas": 4,
+                    "max_cycle_macro": 50,
+                    "max_cycle_micro": 3,
+                    "natorb": True,
+                    "conv_tol": 1e-6,
+                    "conv_tol_grad": 1e-4,
+                },
+                ("optimize_geometry",),
+            ),
+        ],
+    )
+    def test_method_specific_defaults(
+        self,
+        method,
+        expected_values,
+        absent_keys,
+    ):
+        """Test representative method-specific default values."""
+        defaults = get_defaults_for_method(method)
 
-    def test_ccsd_defaults(self):
-        """Test CCSD default values."""
-        defaults = get_defaults_for_method('CCSD')
-        assert defaults['basis_function'] == 'cc-pVDZ'
-        assert defaults['memory_mb'] == 4000
-        assert defaults['frozen_core'] is True
-        assert 'optimize_geometry' not in defaults  # Not applicable for CCSD
+        for key, expected_value in expected_values.items():
+            assert defaults[key] == expected_value
 
-    def test_ccsd_t_defaults(self):
-        """Test CCSD(T) default values."""
-        defaults = get_defaults_for_method('CCSD_T')
-        assert defaults['basis_function'] == 'cc-pVDZ'
-        assert defaults['memory_mb'] == 4000
-        assert defaults['frozen_core'] is True
-        assert 'optimize_geometry' not in defaults  # Not applicable for CCSD(T)
-
-    def test_tddft_defaults(self):
-        """Test TDDFT default values."""
-        defaults = get_defaults_for_method('TDDFT')
-        assert defaults['basis_function'] == '6-31G(d)'
-        assert defaults['exchange_correlation'] == 'B3LYP'
-        assert defaults['memory_mb'] == 2000
-        assert defaults['tddft_nstates'] == 10
-        assert defaults['tddft_method'] == 'TDDFT'
-        assert defaults['tddft_analyze_nto'] is False
-        assert 'optimize_geometry' not in defaults  # Not applicable for TDDFT
-
-    def test_casci_defaults(self):
-        """Test CASCI default values."""
-        defaults = get_defaults_for_method('CASCI')
-        assert defaults['basis_function'] == '6-31G(d)'
-        assert defaults['memory_mb'] == 3000
-        assert defaults['ncas'] == 4
-        assert defaults['nelecas'] == 4
-        assert defaults['natorb'] is True
-        assert defaults['max_cycle_micro'] == 3
-        assert 'optimize_geometry' not in defaults  # Not applicable for CASCI
-
-    def test_casscf_defaults(self):
-        """Test CASSCF default values."""
-        defaults = get_defaults_for_method('CASSCF')
-        assert defaults['basis_function'] == '6-31G(d)'
-        assert defaults['memory_mb'] == 3000
-        assert defaults['ncas'] == 4
-        assert defaults['nelecas'] == 4
-        assert defaults['max_cycle_macro'] == 50
-        assert defaults['max_cycle_micro'] == 3
-        assert defaults['natorb'] is True
-        assert defaults['conv_tol'] == 1e-6
-        assert defaults['conv_tol_grad'] == 1e-4
-        assert 'optimize_geometry' not in defaults  # Not applicable for CASSCF
-
-    def test_hf_defaults(self):
-        """Test HF default values."""
-        defaults = get_defaults_for_method('HF')
-        assert defaults['basis_function'] == '6-31G(d)'
-        assert defaults['memory_mb'] == 2000
-        assert defaults['optimize_geometry'] is True
-
-    def test_mp2_defaults(self):
-        """Test MP2 default values."""
-        defaults = get_defaults_for_method('MP2')
-        assert defaults['basis_function'] == '6-31G(d)'
-        assert defaults['memory_mb'] == 3000
-        assert defaults['optimize_geometry'] is True
+        for key in absent_keys:
+            assert key not in defaults
 
     def test_get_defaults_for_unknown_method(self):
         """Test getting defaults for an unknown method returns empty dict."""
@@ -121,69 +152,26 @@ class TestParameterConstraints:
         assert isinstance(constraints, dict)
         assert len(constraints) > 0
 
-    def test_ncas_constraint(self):
-        """Test ncas parameter constraint."""
+    @pytest.mark.parametrize(
+        ("param", "expected_values"),
+        [
+            ("ncas", {"min": 1, "max": 20, "applicable_methods": ["CASCI", "CASSCF"]}),
+            ("nelecas", {"min": 1, "max": 40, "applicable_methods": ["CASCI", "CASSCF"]}),
+            ("optimize_geometry", {"applicable_methods": ["DFT", "HF", "MP2"]}),
+            ("tddft_nstates", {"min": 1, "max": 50, "applicable_methods": ["TDDFT"]}),
+            ("cpu_cores", {"min": 1, "max": 32}),
+            ("memory_mb", {"min": 512, "max": 32768}),
+            ("charges", {"min": -10, "max": 10}),
+            ("spin", {"min": 0, "max": 10}),
+        ],
+    )
+    def test_parameter_constraints(self, param, expected_values):
+        """Test representative parameter constraints."""
         constraints = get_parameter_constraints()
-        assert 'ncas' in constraints
-        assert constraints['ncas']['min'] == 1
-        assert constraints['ncas']['max'] == 20
-        assert 'CASCI' in constraints['ncas']['applicable_methods']
-        assert 'CASSCF' in constraints['ncas']['applicable_methods']
 
-    def test_nelecas_constraint(self):
-        """Test nelecas parameter constraint."""
-        constraints = get_parameter_constraints()
-        assert 'nelecas' in constraints
-        assert constraints['nelecas']['min'] == 1
-        assert constraints['nelecas']['max'] == 40
-        assert 'CASCI' in constraints['nelecas']['applicable_methods']
-        assert 'CASSCF' in constraints['nelecas']['applicable_methods']
-
-    def test_optimize_geometry_constraint(self):
-        """Test optimize_geometry parameter constraint."""
-        constraints = get_parameter_constraints()
-        assert 'optimize_geometry' in constraints
-        applicable_methods = constraints['optimize_geometry']['applicable_methods']
-        assert 'DFT' in applicable_methods
-        assert 'HF' in applicable_methods
-        assert 'MP2' in applicable_methods
-        assert len(applicable_methods) == 3  # Only DFT, HF, MP2
-
-    def test_tddft_nstates_constraint(self):
-        """Test tddft_nstates parameter constraint."""
-        constraints = get_parameter_constraints()
-        assert 'tddft_nstates' in constraints
-        assert constraints['tddft_nstates']['min'] == 1
-        assert constraints['tddft_nstates']['max'] == 50
-        assert 'TDDFT' in constraints['tddft_nstates']['applicable_methods']
-
-    def test_cpu_cores_constraint(self):
-        """Test cpu_cores parameter constraint."""
-        constraints = get_parameter_constraints()
-        assert 'cpu_cores' in constraints
-        assert constraints['cpu_cores']['min'] == 1
-        assert constraints['cpu_cores']['max'] == 32
-
-    def test_memory_mb_constraint(self):
-        """Test memory_mb parameter constraint."""
-        constraints = get_parameter_constraints()
-        assert 'memory_mb' in constraints
-        assert constraints['memory_mb']['min'] == 512
-        assert constraints['memory_mb']['max'] == 32768
-
-    def test_charges_constraint(self):
-        """Test charges parameter constraint."""
-        constraints = get_parameter_constraints()
-        assert 'charges' in constraints
-        assert constraints['charges']['min'] == -10
-        assert constraints['charges']['max'] == 10
-
-    def test_spin_constraint(self):
-        """Test spin parameter constraint."""
-        constraints = get_parameter_constraints()
-        assert 'spin' in constraints
-        assert constraints['spin']['min'] == 0
-        assert constraints['spin']['max'] == 10
+        assert param in constraints
+        for key, expected_value in expected_values.items():
+            assert constraints[param][key] == expected_value
 
 
 class TestParameterApplicability:
@@ -294,30 +282,6 @@ class TestDataIntegrity:
             assert defaults['memory_mb'] >= 512
             assert defaults['memory_mb'] <= 32768
 
-    def test_method_defaults_optimize_geometry(self):
-        """Test that only DFT, HF, and MP2 specify optimize_geometry."""
-        # Methods that support geometry optimization
-        assert 'optimize_geometry' in METHOD_DEFAULTS['DFT']
-        assert METHOD_DEFAULTS['DFT']['optimize_geometry'] is True
-        assert 'optimize_geometry' in METHOD_DEFAULTS['HF']
-        assert METHOD_DEFAULTS['HF']['optimize_geometry'] is True
-        assert 'optimize_geometry' in METHOD_DEFAULTS['MP2']
-        assert METHOD_DEFAULTS['MP2']['optimize_geometry'] is True
-        
-        # Methods that don't support geometry optimization
-        assert 'optimize_geometry' not in METHOD_DEFAULTS['CCSD']
-        assert 'optimize_geometry' not in METHOD_DEFAULTS['CCSD_T']
-        assert 'optimize_geometry' not in METHOD_DEFAULTS['TDDFT']
-        assert 'optimize_geometry' not in METHOD_DEFAULTS['CASCI']
-        assert 'optimize_geometry' not in METHOD_DEFAULTS['CASSCF']
-
-    def test_dft_tddft_have_exchange_correlation(self):
-        """Test that DFT and TDDFT specify exchange_correlation."""
-        assert 'exchange_correlation' in METHOD_DEFAULTS['DFT']
-        assert 'exchange_correlation' in METHOD_DEFAULTS['TDDFT']
-        assert METHOD_DEFAULTS['DFT']['exchange_correlation'] == 'B3LYP'
-        assert METHOD_DEFAULTS['TDDFT']['exchange_correlation'] == 'B3LYP'
-
     def test_constraint_min_less_than_max(self):
         """Test that min is always less than max in constraints."""
         for param_name, constraint in PARAMETER_CONSTRAINTS.items():
@@ -331,8 +295,6 @@ class TestValidateParametersForMethod:
 
     def test_valid_dft_parameters(self):
         """Test that valid DFT parameters pass validation."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'DFT',
@@ -349,8 +311,6 @@ class TestValidateParametersForMethod:
 
     def test_dft_rejects_casci_parameters(self):
         """Test that DFT rejects CASCI-specific parameters (ncas, nelecas)."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'DFT',
@@ -367,8 +327,6 @@ class TestValidateParametersForMethod:
 
     def test_dft_rejects_tddft_parameters(self):
         """Test that DFT rejects TDDFT-specific parameters."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'DFT',
@@ -433,8 +391,6 @@ class TestValidateParametersForMethod:
 
     def test_casci_rejects_tddft_parameters(self):
         """Test that CASCI rejects TDDFT-specific parameters."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'CASCI',
@@ -450,8 +406,6 @@ class TestValidateParametersForMethod:
 
     def test_valid_tddft_parameters(self):
         """Test that valid TDDFT parameters pass validation."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'TDDFT',
@@ -468,8 +422,6 @@ class TestValidateParametersForMethod:
 
     def test_tddft_rejects_optimize_geometry(self):
         """Test that TDDFT rejects optimize_geometry parameter."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\\nH 0 0 0.74',
             'calculation_method': 'TDDFT',
@@ -487,8 +439,6 @@ class TestValidateParametersForMethod:
 
     def test_ccsd_accepts_frozen_core(self):
         """Test that CCSD accepts frozen_core parameter."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'CCSD',
@@ -502,8 +452,6 @@ class TestValidateParametersForMethod:
 
     def test_dft_rejects_frozen_core(self):
         """Test that DFT rejects frozen_core parameter."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'DFT',
@@ -518,8 +466,6 @@ class TestValidateParametersForMethod:
 
     def test_universal_parameters_accepted_by_all_methods(self):
         """Test that universal parameters are accepted by all methods."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         universal_params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'DFT',
@@ -541,8 +487,6 @@ class TestValidateParametersForMethod:
 
     def test_none_values_are_ignored(self):
         """Test that None values (unprovided parameters) are ignored."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'DFT',
@@ -558,8 +502,6 @@ class TestValidateParametersForMethod:
 
     def test_multiple_invalid_parameters_in_error_message(self):
         """Test that error message includes all invalid parameters."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'DFT',
@@ -576,8 +518,6 @@ class TestValidateParametersForMethod:
 
     def test_hf_rejects_exchange_correlation(self):
         """Test that HF rejects exchange_correlation parameter."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'HF',
@@ -593,8 +533,6 @@ class TestValidateParametersForMethod:
 
     def test_valid_hf_parameters(self):
         """Test that valid HF parameters pass validation."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'HF',
@@ -610,8 +548,6 @@ class TestValidateParametersForMethod:
 
     def test_mp2_rejects_exchange_correlation(self):
         """Test that MP2 rejects exchange_correlation parameter."""
-        from quantum_calc.method_defaults import validate_parameters_for_method
-
         params = {
             'xyz': 'H 0 0 0\nH 0 0 0.74',
             'calculation_method': 'MP2',

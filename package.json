@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "rimraf dist && electron-vite dev",
     "dev:codegen": "npm run codegen && npm run dev",
-    "dev:clean": "rimraf dist node_modules/.vite && npm run dev",
     "build": "npm run verify-env && npm run clean:build-artifacts && npm run codegen && npm run build:electron && npm run build:conda-pack && npm run validate-build",
     "build:electron": "cross-env NODE_ENV=\"production\" NODE_OPTIONS=\"--max-old-space-size=4096\" electron-vite build",
     "build:conda-pack": "npm run verify-build-env && bash scripts/build-conda-pack.sh",
@@ -18,7 +17,6 @@
     "package:linux:docker:no-cache": "node scripts/docker-build-linux.js --no-cache",
     "build:linux": "npm run verify-env && npm run clean:build-artifacts && npm run codegen && npm run build:electron && npm run build:conda-pack && npm run build:python:linux && npm run validate-build",
     "build:python:linux": "npm run verify-build-env && bash scripts/build-python-linux.sh",
-    "docker:clean": "docker builder prune -f",
     "codegen": "npm run codegen:python && npm run codegen:typescript",
     "codegen:check": "npm run codegen && git diff --exit-code -- src/python/generated_models.py src/web/types/generated-api.ts",
     "conda-lock:generate": "conda-lock -f .github/environment.yml --lockfile .github/pyscf-env.conda-lock.yml -p osx-arm64 -p osx-64 -p linux-64 && conda-lock render --kind explicit --filename-template .github/conda-locks/pyscf-env-{platform}.lock .github/pyscf-env.conda-lock.yml",

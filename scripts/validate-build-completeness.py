@@ -49,16 +49,11 @@ def check_conda_environment(project_root: Path) -> bool:
         log_info("conda-pack がまだ実行されていないか、失敗している可能性があります")
         return False
     
-    # 重要なファイルの存在確認 (Windows対応)
-    # Windowsの場合、実行ファイルは Scripts ディレクトリ配下にあり、.exe が付く
-    # Windows support removed
-    bin_dir = "bin"
-    exe_suffix = ""
-
+    # 重要なファイルの存在確認
     required_files = [
-        Path(bin_dir) / f"python{exe_suffix}",
-        Path(bin_dir) / f"gunicorn{exe_suffix}",
-        Path(bin_dir) / f"pip{exe_suffix}",
+        Path("bin/python"),
+        Path("bin/gunicorn"),
+        Path("bin/pip"),
     ]
     
     all_exist = True

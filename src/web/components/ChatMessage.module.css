@@ -34,10 +34,6 @@
   border-bottom-left-radius: 4px;
 }
 
-.messageContent {
-  /* Message content wrapper */
-}
-
 /* ストリーミング時のカーソル */
 .cursor {
   color: #3b82f6;
@@ -48,8 +44,14 @@
 }
 
 @keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0;
+  }
 }
 
 /* マークダウンスタイル */
@@ -114,7 +116,9 @@
   background-color: rgba(175, 184, 193, 0.2);
   padding: 2px 4px;
   border-radius: 4px;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
   font-size: 0.9em;
 }
 
@@ -125,7 +129,9 @@
   padding: 16px;
   margin: 12px 0;
   overflow-x: auto;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  font-family:
+    'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New',
+    monospace;
   font-size: 0.85em;
   line-height: 1.4;
 }
@@ -197,104 +203,7 @@
   background-color: rgba(246, 248, 250, 0.5);
 }
 
-/* シンタックスハイライト用スタイル */
-.markdown .hljs {
-  background-color: #f6f8fa !important;
-  color: #24292e;
-}
-
-.markdown .hljs-comment,
-.markdown .hljs-quote {
-  color: #6a737d;
-  font-style: italic;
-}
-
-.markdown .hljs-keyword,
-.markdown .hljs-selector-tag,
-.markdown .hljs-type {
-  color: #d73a49;
-}
-
-.markdown .hljs-string,
-.markdown .hljs-doctag {
-  color: #032f62;
-}
-
-.markdown .hljs-title,
-.markdown .hljs-section {
-  color: #6f42c1;
-  font-weight: 600;
-}
-
-.markdown .hljs-number,
-.markdown .hljs-literal {
-  color: #005cc5;
-}
-
-.markdown .hljs-function,
-.markdown .hljs-params {
-  color: #6f42c1;
-}
-
-.markdown .hljs-variable,
-.markdown .hljs-template-variable {
-  color: #e36209;
-}
-
-.markdown .hljs-builtin-name,
-.markdown .hljs-built_in {
-  color: #005cc5;
-}
-
 /* Orbital viewer in chat - override max-width for messages containing visualizations */
 .model:has(.markdown > div) {
   max-width: 85%;
-}
-
-/* === 数式レンダリングスタイル === */
-
-/* インライン数式の基本スタイル */
-.markdown .katex {
-  font-size: 1em;
-  line-height: inherit;
-}
-
-/* ディスプレイ数式（中央揃え、独立した行） */
-.markdown .katex-display {
-  margin: 16px 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
-}
-
-/* Webkitブラウザのスクロールバー */
-.markdown .katex-display::-webkit-scrollbar {
-  height: 6px;
-}
-
-.markdown .katex-display::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 3px;
-}
-
-.markdown .katex-display::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
-}
-
-.markdown .katex-display::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
-}
-
-/* ストリーミング中のエラー表示を控えめに */
-.markdown .katex-error {
-  background-color: transparent;
-  border: none;
-  color: inherit;
-}
-
-/* コードブロック内の数式の調整 */
-.markdown pre code .katex {
-  background-color: transparent;
-  padding: 0;
 }

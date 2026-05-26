@@ -802,11 +802,6 @@
   color: #9a3412;
 }
 
-\.rotationExtent\.significant {
-  background: #fce4ec;
-  color: #ad1457;
-}
-
 /* Molecular Structure Section */
 .xyzCoordinatesContainer {
   flex: 1;
