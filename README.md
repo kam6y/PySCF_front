@@ -169,11 +169,11 @@ This command automatically:
 
 **Advanced Usage:**
 ```bash
-# Build Docker image only
-npm run docker:build
+# Clean Docker build cache before building
+npm run package:linux:docker:clean
 
-# Run build with existing image (faster for subsequent builds)
-npm run docker:package
+# Rebuild the Docker image without cache
+npm run package:linux:docker:no-cache
 ```
 
 #### Method 2: Using WSL Directly
