@@ -17,9 +17,19 @@ from services.settings_service import SettingsService
 # Set up logging
 logger = logging.getLogger(__name__)
 
-# Constants
-MAX_MESSAGE_LENGTH = 100000  # Maximum allowed message length in characters
-router = APIRouter(prefix='/api/agent')
+# --- Input size caps ---
+# Maximum length of a single chat message in characters.
+# 10 000 chars is generous for interactive chat while preventing abuse.
+MAX_MESSAGE_LENGTH: int = 10_000
+# Maximum number of history items in a single chat request.
+MAX_HISTORY_ITEMS: int = 200
+# Maximum total characters across all history text parts before sending to the
+# LLM.  Prevents extremely long context windows from being forwarded.
+MAX_TOTAL_HISTORY_CHARS: int = 500_000
+# Maximum length of individual history part text (same cap as a message).
+MAX_HISTORY_PART_TEXT_LENGTH: int = MAX_MESSAGE_LENGTH
+
+router = APIRouter(prefix="/api/agent")
 
 
 def _format_sse_event(event: dict[str, Any]) -> str:
@@ -41,7 +51,9 @@ def _extract_history_role(message: Any) -> str:
         return message.get("role", "")
 
     role_attr = getattr(message, "role", "")
-    return str(role_attr).split('.')[-1] if hasattr(role_attr, 'value') else str(role_attr)
+    return (
+        str(role_attr).split(".")[-1] if hasattr(role_attr, "value") else str(role_attr)
+    )
 
 
 def _extract_text_parts(parts: list) -> list:
@@ -81,14 +93,13 @@ def _convert_history_to_gemini_format(history: list) -> list:
 
     for msg in history:
         role = _extract_history_role(msg)
-        parts = msg.get("parts", []) if isinstance(msg, dict) else getattr(msg, "parts", [])
+        parts = (
+            msg.get("parts", []) if isinstance(msg, dict) else getattr(msg, "parts", [])
+        ) or []
         text_parts = _extract_text_parts(parts)
 
         if text_parts:
-            converted.append({
-                "role": role,
-                "parts": text_parts
-            })
+            converted.append({"role": role, "parts": text_parts})
 
     return converted
 
@@ -103,6 +114,42 @@ def _validate_chat_request(request: AgentChatRequest) -> None:
             detail=f"Message is too long (maximum {MAX_MESSAGE_LENGTH} characters)",
         )
 
+    history = request.history or []
+
+    # Cap on number of history items
+    if len(history) > MAX_HISTORY_ITEMS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many history items (maximum {MAX_HISTORY_ITEMS})",
+        )
+
+    # Cap on total characters across all history text parts
+    total_chars = 0
+    for msg in history:
+        parts = (
+            msg.get("parts", []) if isinstance(msg, dict) else getattr(msg, "parts", [])
+        ) or []
+        for part in parts:
+            text = (
+                part.get("text", "")
+                if isinstance(part, dict)
+                else getattr(part, "text", "")
+            )
+            if text:
+                part_len = len(text)
+                if part_len > MAX_HISTORY_PART_TEXT_LENGTH:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"History item text too long (maximum {MAX_HISTORY_PART_TEXT_LENGTH} characters)",
+                    )
+                total_chars += part_len
+
+    if total_chars > MAX_TOTAL_HISTORY_CHARS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Total history text too long (maximum {MAX_TOTAL_HISTORY_CHARS} characters)",
+        )
+
 
 def stream_chat_response(request: AgentChatRequest) -> Iterator[dict[str, Any]]:
     """
@@ -114,7 +161,9 @@ def stream_chat_response(request: AgentChatRequest) -> Iterator[dict[str, Any]]:
     Yields:
         Event dictionaries to be formatted as SSE messages by the route
     """
-    _validate_chat_request(request)
+    # NOTE: Validation is performed by the caller (chat() route handler)
+    # before this generator is invoked. Do NOT re-validate here — raising
+    # HTTPException inside a generator after headers are sent is fragile.
 
     message = request.message
     history = request.history or []
@@ -135,7 +184,9 @@ def stream_chat_response(request: AgentChatRequest) -> Iterator[dict[str, Any]]:
     client_aborted = False
 
     try:
-        logger.debug(f"Starting Gemini chat stream for message: {message[:100]}{'...' if len(message) > 100 else ''}")
+        logger.debug(
+            f"Starting Gemini chat stream for message: {message[:100]}{'...' if len(message) > 100 else ''}"
+        )
 
         # Get API key from settings
         settings_service = SettingsService()
@@ -150,15 +201,16 @@ def stream_chat_response(request: AgentChatRequest) -> Iterator[dict[str, Any]]:
 
         # Import and configure Gemini
         import google.generativeai as genai
+
         genai.configure(api_key=api_key)
 
         # Create model with system instruction
         model = genai.GenerativeModel(
-            'gemini-2.5-flash',
+            "gemini-2.5-flash",
             system_instruction="""You are a helpful AI assistant for quantum chemistry calculations.
 You can help users understand molecular structures, explain calculation results,
 and provide guidance on using the PySCF quantum chemistry application.
-Be concise and helpful. When discussing chemistry concepts, be accurate and educational."""
+Be concise and helpful. When discussing chemistry concepts, be accurate and educational.""",
         )
 
         # Convert history to Gemini format
@@ -190,13 +242,18 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
         # Save AI response to database BEFORE sending completion event
         if session_id and accumulated_response:
             try:
-                complete_response = ''.join(accumulated_response)
+                complete_response = "".join(accumulated_response)
                 chat_service = get_chat_history_service()
                 chat_service.add_message(session_id, "model", complete_response)
                 db_save_successful = True
-                logger.info(f"Saved AI response to session: {session_id} (length: {len(complete_response)} chars)")
+                logger.info(
+                    f"Saved AI response to session: {session_id} (length: {len(complete_response)} chars)"
+                )
             except Exception as e:
-                logger.error(f"Failed to save AI response to session {session_id}: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to save AI response to session {session_id}: {e}",
+                    exc_info=True,
+                )
 
         # Send completion event
         yield {"type": "done"}
@@ -220,24 +277,35 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
         try:
             yield {
                 "type": "error",
-                "payload": {"message": f"An error occurred during the stream: {str(e)}"},
+                "payload": {
+                    "message": f"An error occurred during the stream: {str(e)}"
+                },
             }
         except (BrokenPipeError, ConnectionResetError, GeneratorExit):
             logger.debug("Unable to send error message - connection closed")
 
     finally:
         # Fallback: Save AI response to database if not already saved
-        if session_id and accumulated_response and not db_save_successful and not client_aborted:
+        if (
+            session_id
+            and accumulated_response
+            and not db_save_successful
+            and not client_aborted
+        ):
             try:
-                complete_response = ''.join(accumulated_response)
+                complete_response = "".join(accumulated_response)
                 chat_service = get_chat_history_service()
                 chat_service.add_message(session_id, "model", complete_response)
-                logger.warning(f"Fallback save: AI response saved to session {session_id} after error")
+                logger.warning(
+                    f"Fallback save: AI response saved to session {session_id} after error"
+                )
             except Exception as e:
-                logger.error(f"Fallback save failed for session {session_id}: {e}", exc_info=True)
+                logger.error(
+                    f"Fallback save failed for session {session_id}: {e}", exc_info=True
+                )
 
 
-@router.post('/chat')
+@router.post("/chat")
 def chat(request: AgentChatRequest):
     """Chat with AI agent using simple Gemini API with Server-Sent Events."""
     _validate_chat_request(request)
@@ -254,4 +322,4 @@ def chat(request: AgentChatRequest):
         for event in stream_chat_response(request):
             yield _format_sse_event(event)
 
-    return StreamingResponse(event_generator(), media_type='text/event-stream')
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

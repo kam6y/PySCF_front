@@ -4,6 +4,9 @@ Integration tests for System API endpoints.
 Covers GPU4PySCF status detection and installation endpoints.
 """
 
+
+import pytest
+
 from generated_models import AppSettings
 
 
@@ -51,6 +54,92 @@ class TestSystemDiagnosticsAPI:
         assert settings_payload["research_email"] == "***"
         assert sensitive_api_key not in response_text
         assert sensitive_email not in response_text
+
+
+class TestDebugEndpointProductionGating:
+    """Integration tests for debug endpoint production-environment gating."""
+
+    @pytest.mark.parametrize(
+        ("path", "error_contains"),
+        [
+            ("/api/debug/system-diagnostics", "production"),
+            ("/api/debug/process-manager-diagnostics", None),
+            ("/api/debug/resource-manager-diagnostics", None),
+        ],
+        ids=[
+            "system-diagnostics",
+            "process-manager-diagnostics",
+            "resource-manager-diagnostics",
+        ],
+    )
+    def test_debug_endpoint_returns_403_in_production(
+        self,
+        client,
+        monkeypatch,
+        path,
+        error_contains,
+    ):
+        """
+        GIVEN PYSCF_ENV is set to 'production'
+        WHEN GET debug endpoint is called with valid auth
+        THEN 403 is returned with success=False
+
+        NOTE: A valid PYSCF_AUTH_TOKEN + matching header is required so the
+        auth middleware lets the request through to the endpoint, where the
+        production-environment gate returns 403.
+        """
+        # Arrange
+        auth_token = "test-production-token"
+        monkeypatch.setenv("PYSCF_ENV", "production")
+        monkeypatch.setenv("PYSCF_AUTH_TOKEN", auth_token)
+
+        # Act
+        response = client.get(path, headers={"X-Auth-Token": auth_token})
+
+        # Assert
+        assert response.status_code == 403
+        data = response.json()
+        assert data["success"] is False
+        if error_contains is not None:
+            assert error_contains in data["error"].lower()
+
+    def test_debug_system_diagnostics_returns_200_in_development(
+        self,
+        client,
+        mocker,
+        tmp_path,
+    ):
+        """
+        GIVEN PYSCF_ENV is set to 'development' (default in test fixture)
+        WHEN GET /api/debug/system-diagnostics is called
+        THEN 200 is returned with diagnostic data
+        """
+        # Arrange — the conftest app fixture already sets PYSCF_ENV=development
+        settings = AppSettings(
+            max_parallel_instances=1,
+            max_cpu_utilization_percent=95.0,
+            max_memory_utilization_percent=95.0,
+            system_total_cores=1,
+            system_total_memory_mb=1024,
+            calculations_directory=str(tmp_path),
+            timezone="UTC",
+            gemini_api_key="test-key",
+            research_email="test@example.com",
+            gpu_acceleration_enabled=False,
+        )
+        mocker.patch(
+            "services.system_service.get_current_settings",
+            return_value=settings,
+        )
+
+        # Act
+        response = client.get("/api/debug/system-diagnostics")
+
+        # Assert
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert "data" in data
 
 
 class TestGpu4PyscfStatusAPI:
@@ -128,6 +217,7 @@ class TestGpu4PyscfInstallAPI:
         mock_service.return_value.install_gpu4pyscf.assert_called_once_with(
             include_cutensor=True,
             force_reinstall=False,
+            confirm_install=False,
         )
 
     def test_install_gpu4pyscf_blocks_remote(self, client, mocker):

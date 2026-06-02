@@ -634,7 +634,7 @@ export interface components {
             xyz: string;
         };
         CalculationRequestBase: {
-            /** @description XYZ molecular structure data */
+            /** @description XYZ molecular structure data (chemistry-aware cap ~1 MB) */
             xyz: string;
             calculation_method: components["schemas"]["CalculationMethod"];
             /** @description Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ) */
@@ -1675,11 +1675,71 @@ export interface components {
              */
             research_email?: string | null;
         };
+        AppSettingsResponse: {
+            /**
+             * @description Maximum number of parallel calculation instances
+             * @example 4
+             */
+            max_parallel_instances: number;
+            /**
+             * @description Maximum CPU utilization percentage for the system
+             * @example 95
+             */
+            max_cpu_utilization_percent: number;
+            /**
+             * @description Maximum memory utilization percentage for the system
+             * @example 95
+             */
+            max_memory_utilization_percent: number;
+            /**
+             * @description Whether GPU acceleration is enabled for calculations (Linux only)
+             * @default false
+             * @example false
+             */
+            gpu_acceleration_enabled: boolean;
+            /**
+             * @description Total number of CPU cores in the system (auto-detected)
+             * @example 8
+             */
+            system_total_cores: number;
+            /**
+             * @description Total system memory in MB (auto-detected)
+             * @example 16384
+             */
+            system_total_memory_mb: number;
+            /**
+             * @description Directory path where calculation data is stored
+             * @example /Users/username/PySCF_calculations
+             */
+            calculations_directory: string;
+            /**
+             * @description Display timezone for timestamps in chat history and calculation history
+             * @default UTC
+             * @example UTC
+             * @enum {string}
+             */
+            timezone: "UTC" | "Asia/Tokyo" | "Asia/Shanghai" | "Asia/Seoul" | "Asia/Singapore" | "Asia/Kolkata" | "Australia/Sydney" | "Europe/London" | "Europe/Paris" | "Europe/Berlin" | "America/New_York" | "America/Chicago" | "America/Denver" | "America/Los_Angeles";
+            /**
+             * @description Whether a non-empty Gemini API key is stored. The actual key value is never returned.
+             * @example false
+             */
+            gemini_api_key_configured: boolean;
+            /**
+             * @description Always returned as empty string. The real key is never exposed via GET.
+             * @example
+             */
+            gemini_api_key?: string | null;
+            /**
+             * @description Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
+             * @example pyscf-research-agent@example.com
+             */
+            research_email?: string | null;
+        };
         SettingsResponse: {
             /** @example true */
             success: boolean;
             data: {
-                settings: components["schemas"]["AppSettings"];
+                settings: components["schemas"]["AppSettingsResponse"];
             };
         };
         SettingsUpdateRequest: components["schemas"]["AppSettings"];
@@ -1834,6 +1894,11 @@ export interface components {
              * @default false
              */
             force_reinstall: boolean;
+            /**
+             * @description Must be true to confirm the installation and allow environment mutation. Prevents accidental installs.
+             * @default false
+             */
+            confirm_install: boolean;
         };
         Gpu4PyscfInstallResult: {
             status: components["schemas"]["Gpu4PyscfStatus"];
@@ -2305,6 +2370,7 @@ export interface components {
             history: {
                 /** @enum {string} */
                 role?: "user" | "model";
+                /** @description Content parts within a single history item. A normal message contains 1 part; the cap of 100 is intentionally generous for legitimate multi-part use while preventing DoS amplification through unbounded iteration. */
                 parts?: {
                     text?: string;
                 }[];
@@ -2627,6 +2693,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["XYZValidateResponse"];
+                };
+            };
+            /** @description Invalid request (e.g., XYZ string exceeds maximum length) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             401: components["responses"]["UnauthorizedError"];

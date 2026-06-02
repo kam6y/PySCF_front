@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { components } from '../types/generated-api';
-import { getSettings, updateSettings } from '../api/settings';
+import {
+  getSettings,
+  updateSettings,
+  type AppSettings,
+  type AppSettingsResponse,
+} from '../api/settings';
 import { useCalculationStore } from '../store/calculationStore';
-
-// Type definitions
-type AppSettings = components['schemas']['AppSettings'];
 
 // Query keys
 const settingsKeys = {
@@ -14,7 +15,7 @@ const settingsKeys = {
 
 // Custom hooks
 export const useGetSettings = () => {
-  return useQuery({
+  return useQuery<AppSettingsResponse>({
     queryKey: settingsKeys.settings(),
     queryFn: () => getSettings().then(response => response.settings),
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -30,7 +31,7 @@ export const useUpdateSettings = () => {
       updateSettings(settings).then(response => response.settings),
     onSuccess: updatedSettings => {
       // Check if calculations_directory changed BEFORE updating cache
-      const oldSettings = queryClient.getQueryData<AppSettings>(
+      const oldSettings = queryClient.getQueryData<AppSettingsResponse>(
         settingsKeys.settings()
       );
       const directoryChanged =

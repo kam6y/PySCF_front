@@ -34,6 +34,7 @@ interface SettingsFormValues {
   gpuAccelerationEnabled: boolean;
 }
 
+
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [formValues, setFormValues] = useState<SettingsFormValues>({
     geminiApiKey: '',
@@ -69,6 +70,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
     setFormValues(prev => ({ ...prev, [key]: value }));
   };
 
+  // Whether the backend reports a Gemini API key is already stored.
+  const geminiApiKeyConfigured = Boolean(
+    settings?.gemini_api_key_configured
+  );
+
   // Update local state when settings are loaded
   useEffect(() => {
     if (settings) {
@@ -91,7 +97,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         maxMemoryUtilization: !isNaN(maxMemoryUtilizationValue)
           ? maxMemoryUtilizationValue
           : DEFAULT_MAX_MEMORY_UTILIZATION,
-        geminiApiKey: settings.gemini_api_key || '',
+        // Never populate from GET response -- the real key is not returned.
+        geminiApiKey: '',
         calculationsDirectory: settings.calculations_directory || '',
         timezone: settings.timezone || 'UTC',
         gpuAccelerationEnabled: settings.gpu_acceleration_enabled ?? false,
@@ -136,7 +143,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
         calculations_directory: formValues.calculationsDirectory,
         timezone: formValues.timezone,
-        gemini_api_key: formValues.geminiApiKey || null,
+        // Only send gemini_api_key when the user typed a new value;
+        // empty/untouched keeps the existing key on the backend.
+        ...(formValues.geminiApiKey
+          ? { gemini_api_key: formValues.geminiApiKey }
+          : {}),
       });
 
       const newValues = { ...formValues };
@@ -648,6 +659,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                           force_reinstall: Boolean(
                             gpuStatus?.gpu4pyscf_installed
                           ),
+                          confirm_install: true,
                         })
                       }
                       disabled={
@@ -697,7 +709,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 <input
                   id="geminiApiKey"
                   type="password"
-                  placeholder="Enter your Gemini API key..."
+                  placeholder={
+                    geminiApiKeyConfigured
+                      ? '••••••••'
+                      : 'Enter your Gemini API key...'
+                  }
                   value={formValues.geminiApiKey}
                   onChange={e => {
                     const newValue = e.target.value;
@@ -707,9 +723,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   disabled={isUpdating}
                 />
                 <div className={styles.inputStatus}>
-                  {formValues.geminiApiKey ? (
+                  {formValues.geminiApiKey || geminiApiKeyConfigured ? (
                     <span className={styles.statusConfigured}>
-                      ✓ API Key Configured
+                      {formValues.geminiApiKey
+                        ? '✓ New API Key Entered'
+                        : '✓ API Key Configured'}
                     </span>
                   ) : (
                     <span className={styles.statusNotConfigured}>

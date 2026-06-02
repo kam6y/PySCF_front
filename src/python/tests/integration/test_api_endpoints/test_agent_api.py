@@ -13,22 +13,24 @@ from api.agent import stream_chat_response
 
 def test_agent_chat_stream_preserves_sse_format(client, mocker):
     def fake_stream(*args, **kwargs):
-        yield {'type': 'agent_status', 'payload': {'status': 'started'}}
-        yield {'type': 'chunk', 'payload': {'text': 'hello'}}
-        yield {'type': 'done', 'payload': {'message_id': 'msg-1'}}
+        yield {"type": "agent_status", "payload": {"status": "started"}}
+        yield {"type": "chunk", "payload": {"text": "hello"}}
+        yield {"type": "done", "payload": {"message_id": "msg-1"}}
 
-    mocker.patch('api.agent.stream_chat_response', side_effect=fake_stream)
+    mocker.patch("api.agent.stream_chat_response", side_effect=fake_stream)
 
     with client.stream(
-        'POST',
-        '/api/agent/chat',
-        json={'message': 'Hello', 'history': [], 'session_id': 'session-1'},
+        "POST",
+        "/api/agent/chat",
+        json={"message": "Hello", "history": [], "session_id": "session-1"},
     ) as response:
-        chunks = ''.join(response.iter_text())
+        chunks = "".join(response.iter_text())
 
     assert response.status_code == 200
-    assert response.headers['content-type'].startswith('text/event-stream')
-    assert 'data: {"type": "agent_status", "payload": {"status": "started"}}\n\n' in chunks
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert (
+        'data: {"type": "agent_status", "payload": {"status": "started"}}\n\n' in chunks
+    )
     assert 'data: {"type": "chunk", "payload": {"text": "hello"}}\n\n' in chunks
     assert 'data: {"type": "done", "payload": {"message_id": "msg-1"}}\n\n' in chunks
 
@@ -43,10 +45,7 @@ class TestAgentChatAPI:
         THEN 400 Bad Request is returned
         """
         # ACT
-        response = client.post('/api/agent/chat', json={
-            'message': '',
-            'history': []
-        })
+        response = client.post("/api/agent/chat", json={"message": "", "history": []})
 
         # ASSERT
         assert response.status_code == 400
@@ -58,32 +57,30 @@ class TestAgentChatAPI:
         THEN 400 Bad Request is returned
         """
         # ACT
-        response = client.post('/api/agent/chat', json={
-            'message': '   ',
-            'history': []
-        })
+        response = client.post(
+            "/api/agent/chat", json={"message": "   ", "history": []}
+        )
 
         # ASSERT
         assert response.status_code == 400
 
     def test_chat_message_too_long(self, client):
         """
-        GIVEN message exceeds maximum length
+        GIVEN message exceeds MAX_MESSAGE_LENGTH (10 000 chars)
         WHEN POST /api/agent/chat is called
         THEN 400 Bad Request is returned
         """
-        # ARRANGE
-        max_length = 100000
-        very_long_message = 'a' * (max_length + 1)
+        # ARRANGE — MAX_MESSAGE_LENGTH is 10_000
+        very_long_message = "a" * 10_001
 
         # ACT
-        response = client.post('/api/agent/chat', json={
-            'message': very_long_message,
-            'history': []
-        })
+        response = client.post(
+            "/api/agent/chat", json={"message": very_long_message, "history": []}
+        )
 
         # ASSERT
         assert response.status_code == 400
+        assert "10000" in response.json()["error"]
 
     def test_chat_missing_message_field(self, client):
         """
@@ -92,9 +89,7 @@ class TestAgentChatAPI:
         THEN 400 Bad Request is returned
         """
         # ACT
-        response = client.post('/api/agent/chat', json={
-            'history': []
-        })
+        response = client.post("/api/agent/chat", json={"history": []})
 
         # ASSERT
         assert response.status_code == 400
@@ -107,9 +102,9 @@ class TestAgentChatAPI:
         """
         # ACT
         response = client.post(
-            '/api/agent/chat',
-            content=b'invalid json',
-            headers={'Content-Type': 'application/json'},
+            "/api/agent/chat",
+            content=b"invalid json",
+            headers={"Content-Type": "application/json"},
         )
 
         # ASSERT
@@ -123,9 +118,9 @@ class TestAgentChatAPI:
         """
         # ARRANGE
         # Mock settings service to return API key
-        mock_settings_service = mocker.patch('api.agent.SettingsService')
+        mock_settings_service = mocker.patch("api.agent.SettingsService")
         mock_settings_service.return_value.get_settings.return_value = {
-            'gemini_api_key': 'test-api-key'
+            "gemini_api_key": "test-api-key"
         }
 
         # Mock Gemini model by injecting into sys.modules
@@ -148,28 +143,27 @@ class TestAgentChatAPI:
         mock_genai.configure = mocker.MagicMock()  # Mock the configure function
 
         # Inject mock into sys.modules so import statement gets the mock
-        mocker.patch.dict('sys.modules', {'google.generativeai': mock_genai})
+        mocker.patch.dict("sys.modules", {"google.generativeai": mock_genai})
 
         # ACT
-        response = client.post('/api/agent/chat', json={
-            'message': 'What is water?',
-            'history': []
-        })
+        response = client.post(
+            "/api/agent/chat", json={"message": "What is water?", "history": []}
+        )
 
         # ASSERT
         assert response.status_code == 200
-        assert response.headers['content-type'].startswith('text/event-stream')
-        
+        assert response.headers["content-type"].startswith("text/event-stream")
+
         # Parse SSE stream
-        data_str = response.content.decode('utf-8')
-        lines = [line for line in data_str.split('\n') if line.startswith('data:')]
-        
+        data_str = response.content.decode("utf-8")
+        lines = [line for line in data_str.split("\n") if line.startswith("data:")]
+
         # Should have chunk events and a done event
         assert len(lines) >= 2  # At least some chunks + done
-        
+
         # Verify last event is 'done'
-        last_event = json.loads(lines[-1].replace('data: ', ''))
-        assert last_event['type'] == 'done'
+        last_event = json.loads(lines[-1].replace("data: ", ""))
+        assert last_event["type"] == "done"
 
     def test_chat_no_api_key(self, client, mocker):
         """
@@ -178,30 +172,29 @@ class TestAgentChatAPI:
         THEN error event is returned in SSE stream
         """
         # ARRANGE
-        mock_settings_service = mocker.patch('api.agent.SettingsService')
+        mock_settings_service = mocker.patch("api.agent.SettingsService")
         mock_settings_service.return_value.get_settings.return_value = {
-            'gemini_api_key': None
+            "gemini_api_key": None
         }
 
         # ACT
-        response = client.post('/api/agent/chat', json={
-            'message': 'What is water?',
-            'history': []
-        })
+        response = client.post(
+            "/api/agent/chat", json={"message": "What is water?", "history": []}
+        )
 
         # ASSERT
         assert response.status_code == 200
-        assert response.headers['content-type'].startswith('text/event-stream')
-        
+        assert response.headers["content-type"].startswith("text/event-stream")
+
         # Parse SSE stream
-        data_str = response.content.decode('utf-8')
-        lines = [line for line in data_str.split('\n') if line.startswith('data:')]
-        
+        data_str = response.content.decode("utf-8")
+        lines = [line for line in data_str.split("\n") if line.startswith("data:")]
+
         # Should contain error event about missing API key
-        events = [json.loads(line.replace('data: ', '')) for line in lines]
-        error_events = [e for e in events if e['type'] == 'error']
+        events = [json.loads(line.replace("data: ", "")) for line in lines]
+        error_events = [e for e in events if e["type"] == "error"]
         assert len(error_events) > 0
-        assert 'API key' in error_events[0]['payload']['message']
+        assert "API key" in error_events[0]["payload"]["message"]
 
     def test_chat_stream_client_abort_does_not_save_partial_model_message(self, mocker):
         """
@@ -259,3 +252,182 @@ class TestAgentChatAPI:
             if call.args[1] == "model"
         ]
         assert model_saves == []
+
+
+class TestAgentChatInputSizeLimits:
+    """Tests for security-related input size validation on POST /api/agent/chat.
+
+    Constants under test (from api.agent):
+        MAX_MESSAGE_LENGTH          = 10_000
+        MAX_HISTORY_ITEMS           = 200
+        MAX_TOTAL_HISTORY_CHARS     = 500_000
+        MAX_HISTORY_PART_TEXT_LENGTH = 10_000
+        HistoryItem.parts max_length = 100  (Pydantic model cap)
+    """
+
+    # -- helpers ----------------------------------------------------------
+
+    @staticmethod
+    def _setup_gemini_mock(mocker):
+        """Configure Gemini SDK mock so valid requests stream without network."""
+        mock_settings_service = mocker.patch("api.agent.SettingsService")
+        mock_settings_service.return_value.get_settings.return_value = {
+            "gemini_api_key": "test-api-key"
+        }
+
+        mock_genai = mocker.MagicMock()
+        mock_model = mocker.MagicMock()
+        mock_chat = mocker.MagicMock()
+        mock_chunk = mocker.MagicMock()
+        mock_chunk.text = "OK"
+
+        mock_chat.send_message.return_value = iter([mock_chunk])
+        mock_model.start_chat.return_value = mock_chat
+        mock_genai.GenerativeModel.return_value = mock_model
+        mock_genai.configure = mocker.MagicMock()
+
+        mocker.patch.dict("sys.modules", {"google.generativeai": mock_genai})
+
+    @staticmethod
+    def _make_history_item(text="hi", role="user"):
+        """Return a single history item dict."""
+        return {"role": role, "parts": [{"text": text}]}
+
+    # -- 1. Message length boundary --------------------------------------
+
+    def test_chat_message_at_max_length_accepted(self, client, mocker):
+        """
+        GIVEN message is exactly MAX_MESSAGE_LENGTH (10 000) characters
+        WHEN POST /api/agent/chat is called
+        THEN request is accepted (200 streaming response)
+        """
+        # ARRANGE
+        self._setup_gemini_mock(mocker)
+        message = "a" * 10_000
+
+        # ACT
+        response = client.post(
+            "/api/agent/chat", json={"message": message, "history": []}
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+
+    def test_chat_message_one_over_max_length_rejected(self, client):
+        """
+        GIVEN message is MAX_MESSAGE_LENGTH + 1 (10 001) characters
+        WHEN POST /api/agent/chat is called
+        THEN 400 is returned with an error mentioning 10000
+        """
+        # ARRANGE
+        message = "a" * 10_001
+
+        # ACT
+        response = client.post(
+            "/api/agent/chat", json={"message": message, "history": []}
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        assert "10000" in response.json()["error"]
+
+    # -- 2. History item count boundary -----------------------------------
+
+    def test_chat_history_at_max_items_accepted(self, client, mocker):
+        """
+        GIVEN history has exactly MAX_HISTORY_ITEMS (200) entries
+        WHEN POST /api/agent/chat is called
+        THEN request is accepted (200 streaming response)
+        """
+        # ARRANGE
+        self._setup_gemini_mock(mocker)
+        history = [self._make_history_item() for _ in range(200)]
+
+        # ACT
+        response = client.post(
+            "/api/agent/chat", json={"message": "test", "history": history}
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+
+    def test_chat_history_one_over_max_items_rejected(self, client):
+        """
+        GIVEN history has MAX_HISTORY_ITEMS + 1 (201) entries
+        WHEN POST /api/agent/chat is called
+        THEN 400 is returned with an error mentioning 200
+        """
+        # ARRANGE
+        history = [self._make_history_item() for _ in range(201)]
+
+        # ACT
+        response = client.post(
+            "/api/agent/chat", json={"message": "test", "history": history}
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        assert "200" in response.json()["error"]
+
+    # -- 3. Per-part text length ------------------------------------------
+
+    def test_chat_history_part_text_over_max_rejected(self, client):
+        """
+        GIVEN a single history part has MAX_HISTORY_PART_TEXT_LENGTH + 1 (10 001) chars
+        WHEN POST /api/agent/chat is called
+        THEN 400 is returned with an error mentioning 10000
+        """
+        # ARRANGE
+        history = [self._make_history_item(text="a" * 10_001)]
+
+        # ACT
+        response = client.post(
+            "/api/agent/chat", json={"message": "test", "history": history}
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        assert "10000" in response.json()["error"]
+
+    # -- 4. Total history characters --------------------------------------
+
+    def test_chat_total_history_chars_over_max_rejected(self, client):
+        """
+        GIVEN total chars across all history parts exceeds MAX_TOTAL_HISTORY_CHARS
+              (51 items * 10 000 chars each = 510 000 > 500 000)
+              Each individual part is within per-part cap, item count within cap.
+        WHEN POST /api/agent/chat is called
+        THEN 400 is returned with an error about total history text
+        """
+        # ARRANGE — 51 items, each with one 10_000-char part → 510_000 total
+        history = [self._make_history_item(text="a" * 10_000) for _ in range(51)]
+
+        # ACT
+        response = client.post(
+            "/api/agent/chat", json={"message": "test", "history": history}
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        assert "500000" in response.json()["error"]
+
+    # -- 5. Parts maxItems (Pydantic model cap: 100) ----------------------
+
+    def test_chat_history_item_parts_over_model_max_rejected(self, client):
+        """
+        GIVEN a single history item has 101 parts (Pydantic max_length=100)
+        WHEN POST /api/agent/chat is called
+        THEN 400 is returned (Pydantic validation mapped to 400 by app handler)
+        """
+        # ARRANGE
+        parts = [{"text": "x"} for _ in range(101)]
+        history = [{"role": "user", "parts": parts}]
+
+        # ACT
+        response = client.post(
+            "/api/agent/chat", json={"message": "test", "history": history}
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        assert "100" in response.json()["error"]

@@ -29,6 +29,7 @@ export const createSplashWindow = (): void => {
       preload: path.join(__dirname, 'splashPreload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: !app.isPackaged,
     },
   });
 

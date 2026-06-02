@@ -21,6 +21,28 @@ const replaceKetcherMacromoleculesEditorImport = (code: string): string => {
   );
 };
 
+/**
+ * Dev-only CSP relaxation plugin.
+ *
+ * In production, index.html ships with a hardened CSP:
+ *   script-src 'self' 'wasm-unsafe-eval'
+ *
+ * During development, Vite HMR and @vitejs/plugin-react (React Fast Refresh)
+ * may require eval(). This plugin appends 'unsafe-eval' to script-src ONLY
+ * when the dev server is running (apply: 'serve' ensures this plugin is
+ * excluded from the build pipeline entirely).
+ */
+const devCspRelaxPlugin = (): Plugin => ({
+  name: 'dev-csp-relax',
+  apply: 'serve',
+  transformIndexHtml(html) {
+    return html.replace(
+      "script-src 'self' 'wasm-unsafe-eval'",
+      "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'"
+    );
+  },
+});
+
 const disableKetcherMacromoleculesEditor = (): Plugin => ({
   name: 'disable-ketcher-macromolecules-editor',
   enforce: 'pre',
@@ -95,7 +117,7 @@ const rendererConfig = {
       plugins: [disableKetcherMacromoleculesEditorInOptimizeDeps()],
     },
   },
-  plugins: [disableKetcherMacromoleculesEditor(), react()],
+  plugins: [devCspRelaxPlugin(), disableKetcherMacromoleculesEditor(), react()],
   build: {
     outDir: resolveProject('dist'),
     emptyOutDir: false,

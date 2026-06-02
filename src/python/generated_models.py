@@ -62,25 +62,39 @@ class CalculationStatus(Enum):
 
 
 class PubChemSearchRequest(BaseModel):
-    query: str = Field(..., description='Search query for PubChem', min_length=1)
+    query: str = Field(
+        ..., description='Search query for PubChem', max_length=500, min_length=1
+    )
     searchType: Optional[SearchType] = 'name'
 
 
 class SMILESConvertRequest(BaseModel):
     smiles: str = Field(
-        ..., description='SMILES string to convert to XYZ format', min_length=1
+        ...,
+        description='SMILES string to convert to XYZ format',
+        max_length=10000,
+        min_length=1,
     )
 
 
 class XYZValidateRequest(BaseModel):
-    xyz: str = Field(..., description='XYZ string to validate', min_length=1)
+    xyz: str = Field(
+        ..., description='XYZ string to validate', max_length=1000000, min_length=1
+    )
 
 
 class CalculationRequestBase(BaseModel):
-    xyz: str = Field(..., description='XYZ molecular structure data', min_length=1)
+    xyz: str = Field(
+        ...,
+        description='XYZ molecular structure data (chemistry-aware cap ~1 MB)',
+        max_length=1000000,
+        min_length=1,
+    )
     calculation_method: CalculationMethod
     basis_function: Optional[str] = Field(
-        None, description='Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ)'
+        None,
+        description='Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ)',
+        max_length=200,
     )
     charges: Optional[int] = Field(0, description='Molecular charge', ge=-10, le=10)
     spin: Optional[int] = Field(
@@ -90,6 +104,7 @@ class CalculationRequestBase(BaseModel):
     solvent: Optional[str] = Field(
         '-',
         description='Solvent type or custom parameters. Options include:\n- Predefined solvents: water, dimethylsulfoxide, n,n-dimethylformamide, etc.\n- Custom dielectric constant (numeric value > 1.0)\n',
+        max_length=200,
     )
     name: Optional[str] = Field(
         'Unnamed Calculation',
@@ -102,7 +117,7 @@ class CalculationRequestBase(BaseModel):
     )
     memory_mb: Optional[int] = Field(None, description='Memory in MB', ge=512, le=32768)
     ketcher_data: Optional[str] = Field(
-        None, description='Ketcher molecule format (JSON)'
+        None, description='Ketcher molecule format (JSON)', max_length=1000000
     )
 
 
@@ -115,6 +130,7 @@ class DFTCalculationRequest(CalculationRequestBase):
     exchange_correlation: Optional[str] = Field(
         'B3LYP',
         description='Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X)',
+        max_length=200,
     )
     basis_function: Optional[str] = '6-31G(d)'
     optimize_geometry: Optional[bool] = Field(
@@ -133,6 +149,7 @@ class DFTCalculationRequest(CalculationRequestBase):
     auxiliary_basis: Optional[str] = Field(
         None,
         description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+        max_length=200,
     )
 
 
@@ -157,6 +174,7 @@ class HFCalculationRequest(CalculationRequestBase):
     auxiliary_basis: Optional[str] = Field(
         None,
         description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+        max_length=200,
     )
 
 
@@ -181,6 +199,7 @@ class MP2CalculationRequest(CalculationRequestBase):
     auxiliary_basis: Optional[str] = Field(
         None,
         description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+        max_length=200,
     )
 
 
@@ -201,6 +220,7 @@ class CCSDCalculationRequest(CalculationRequestBase):
     auxiliary_basis: Optional[str] = Field(
         None,
         description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+        max_length=200,
     )
 
 
@@ -221,6 +241,7 @@ class CCSDTCalculationRequest(CalculationRequestBase):
     auxiliary_basis: Optional[str] = Field(
         None,
         description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+        max_length=200,
     )
 
 
@@ -240,7 +261,7 @@ class TddftMethod(Enum):
 class TDDFTCalculationRequest(CalculationRequestBase):
     calculation_method: Literal['TDDFT']
     exchange_correlation: Optional[str] = Field(
-        'B3LYP', description='Exchange-correlation functional'
+        'B3LYP', description='Exchange-correlation functional', max_length=200
     )
     basis_function: Optional[str] = '6-31G(d)'
     tddft_nstates: Optional[int] = Field(
@@ -259,6 +280,7 @@ class TDDFTCalculationRequest(CalculationRequestBase):
     auxiliary_basis: Optional[str] = Field(
         None,
         description='Auxiliary basis set for density fitting. If null, PySCF auto-selects.',
+        max_length=200,
     )
 
 
@@ -963,8 +985,74 @@ class AppSettings(BaseModel):
     )
 
 
+class AppSettingsResponse(BaseModel):
+    max_parallel_instances: int = Field(
+        ...,
+        description='Maximum number of parallel calculation instances',
+        examples=[4],
+        ge=1,
+        le=32,
+    )
+    max_cpu_utilization_percent: float = Field(
+        ...,
+        description='Maximum CPU utilization percentage for the system',
+        examples=[95.0],
+        ge=10.0,
+        le=100.0,
+    )
+    max_memory_utilization_percent: float = Field(
+        ...,
+        description='Maximum memory utilization percentage for the system',
+        examples=[95.0],
+        ge=10.0,
+        le=100.0,
+    )
+    gpu_acceleration_enabled: Optional[bool] = Field(
+        False,
+        description='Whether GPU acceleration is enabled for calculations (Linux only)',
+        examples=[False],
+    )
+    system_total_cores: int = Field(
+        ...,
+        description='Total number of CPU cores in the system (auto-detected)',
+        examples=[8],
+        ge=1,
+    )
+    system_total_memory_mb: int = Field(
+        ...,
+        description='Total system memory in MB (auto-detected)',
+        examples=[16384],
+        ge=1,
+    )
+    calculations_directory: str = Field(
+        ...,
+        description='Directory path where calculation data is stored',
+        examples=['/Users/username/PySCF_calculations'],
+    )
+    timezone: Timezone = Field(
+        ...,
+        description='Display timezone for timestamps in chat history and calculation history',
+        examples=['UTC'],
+    )
+    gemini_api_key_configured: bool = Field(
+        ...,
+        description='Whether a non-empty Gemini API key is stored. The actual key value is never returned.',
+        examples=[False],
+    )
+    gemini_api_key: Optional[str] = Field(
+        None,
+        description='Always returned as empty string. The real key is never exposed via GET.',
+        examples=[''],
+    )
+    research_email: Optional[str] = Field(
+        None,
+        description='Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.',
+        examples=['pyscf-research-agent@example.com'],
+    )
+
+
 class Data13(BaseModel):
-    settings: AppSettings
+    settings: AppSettingsResponse
 
 
 class SettingsResponse(BaseModel):
@@ -1127,6 +1215,10 @@ class Gpu4PyscfInstallRequest(BaseModel):
     )
     force_reinstall: Optional[bool] = Field(
         False, description='Force reinstall of GPU4PySCF and cuTENSOR packages'
+    )
+    confirm_install: Optional[bool] = Field(
+        False,
+        description='Must be true to confirm the installation and allow environment mutation. Prevents accidental installs.',
     )
 
 
@@ -1522,17 +1614,23 @@ class Role(Enum):
 
 
 class Part(BaseModel):
-    text: Optional[str] = None
+    text: Optional[str] = Field(None, max_length=10000)
 
 
 class HistoryItem(BaseModel):
     role: Optional[Role] = None
-    parts: Optional[List[Part]] = None
+    parts: Optional[List[Part]] = Field(
+        None,
+        description='Content parts within a single history item. A normal message contains 1 part; the cap of 100 is intentionally generous for legitimate multi-part use while preventing DoS amplification through unbounded iteration.',
+        max_length=100,
+    )
 
 
 class AgentChatRequest(BaseModel):
-    message: str = Field(..., description='New message from the user')
-    history: List[HistoryItem] = Field(..., description='Previous conversation history')
+    message: str = Field(..., description='New message from the user', max_length=10000)
+    history: List[HistoryItem] = Field(
+        ..., description='Previous conversation history', max_length=200
+    )
     session_id: Optional[str] = Field(
         None, description='Optional chat session ID for persisting conversation history'
     )
