@@ -55,19 +55,27 @@ ENV HOME=/root
 # Create working directory
 WORKDIR /app
 
-# Copy environment file first for better caching
-COPY .github/environment.yml .github/environment.yml
+# Copy lockfile first for better caching (matches CI/release lock-based install)
+COPY .github/pyscf-env.conda-lock.yml .github/pyscf-env.conda-lock.yml
 
 # Configure conda for better network stability
 RUN /root/miniforge3/bin/conda config --set remote_connect_timeout_secs 30.0 && \
     /root/miniforge3/bin/conda config --set remote_read_timeout_secs 120.0 && \
     /root/miniforge3/bin/conda config --set remote_max_retries 5
 
-# Create conda environment with retry logic
-RUN for i in 1 2 3; do \
-        /root/miniforge3/bin/conda env create -f .github/environment.yml && break || \
-        (echo "Attempt $i failed, retrying..." && sleep 5); \
+# Install conda-lock (pinned to match CI) and create environment from lockfile
+RUN /root/miniforge3/bin/conda install -n base -c conda-forge conda-lock=3.0.4 -y && \
+    for i in 1 2 3; do \
+        conda-lock install --name pyscf-env .github/pyscf-env.conda-lock.yml && break || { \
+            if [ "$i" -eq 3 ]; then \
+                echo "conda-lock install failed after 3 attempts"; \
+                exit 1; \
+            fi; \
+            echo "Attempt $i failed, retrying..."; \
+            sleep 5; \
+        }; \
     done && \
+    /root/miniforge3/bin/conda run -n pyscf-env python --version && \
     /root/miniforge3/bin/conda clean -afy
 
 # Activate conda environment in shell

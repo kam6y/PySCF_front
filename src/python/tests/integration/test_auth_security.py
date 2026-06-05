@@ -7,7 +7,11 @@ from app import create_fastapi_app
 TEST_TOKEN = "pytest-test-token-12345"
 
 
-def make_auth_client(monkeypatch, token=TEST_TOKEN, env="development"):
+def make_auth_client(
+    monkeypatch: pytest.MonkeyPatch,
+    token: str | None = TEST_TOKEN,
+    env: str = "development",
+) -> TestClient:
     if token is None:
         monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
     else:
@@ -193,3 +197,345 @@ def test_dev_docs_served_when_allowed(monkeypatch, env_action, path, content_che
 
     assert response.status_code == 200
     content_check(response)
+
+
+# ---------------------------------------------------------------------------
+# SEC-005: CORS origin conditioning on packaged vs development mode
+# ---------------------------------------------------------------------------
+
+
+def test_cors_development_allows_loopback_origin(monkeypatch):
+    """In development mode, loopback HTTP origins are allowed."""
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://127.0.0.1:5173"
+    )
+
+
+def test_cors_development_allows_localhost_origin(monkeypatch):
+    """In development mode, localhost HTTP origins are allowed."""
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    assert (
+        response.headers.get("access-control-allow-origin") == "http://localhost:5173"
+    )
+
+
+def test_cors_development_rejects_null_origin(monkeypatch):
+    """In development mode, null origin is not allowed."""
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "null",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    # CORSMiddleware will not set access-control-allow-origin for disallowed origins
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != "null"
+
+
+def test_cors_production_allows_null_origin(monkeypatch):
+    """In production (packaged) mode, null origin is allowed for file:// renderer."""
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app) as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "null",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    assert response.headers.get("access-control-allow-origin") == "null"
+
+
+def test_cors_production_rejects_loopback_origin(monkeypatch):
+    """In production (packaged) mode, loopback HTTP origins are not allowed."""
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app) as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != "http://127.0.0.1:5173"
+
+
+def test_cors_production_allows_file_origin(monkeypatch):
+    """In production (packaged) mode, file:// origin is allowed for Electron renderer."""
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app) as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "file://",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    assert response.headers.get("access-control-allow-origin") == "file://"
+
+
+def test_cors_production_rejects_external_origin(monkeypatch):
+    """In production mode, an external origin is rejected."""
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app) as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://evil.com",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != "http://evil.com"
+
+
+def test_cors_development_rejects_external_origin(monkeypatch):
+    """In development mode, an external origin is rejected."""
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://evil.com",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != "http://evil.com"
+
+
+@pytest.mark.parametrize(
+    "invalid_port",
+    ["0", "65536", "99999"],
+    ids=["port-0", "port-65536", "port-99999"],
+)
+def test_cors_development_rejects_invalid_port(monkeypatch, invalid_port):
+    """In development mode, loopback origins with invalid ports are rejected."""
+    origin = f"http://localhost:{invalid_port}"
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != origin
+    assert allow_origin != "*"
+
+
+def test_cors_development_rejects_https_loopback(monkeypatch):
+    """In development mode, https loopback origins are rejected (http only)."""
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "https://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != "https://127.0.0.1:5173"
+
+
+@pytest.mark.parametrize(
+    "origin",
+    ["http://localhost", "http://127.0.0.1"],
+    ids=["localhost-portless", "127-portless"],
+)
+def test_cors_development_rejects_portless_loopback(monkeypatch, origin):
+    """In development mode, portless loopback origins are rejected (parity with Electron)."""
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != origin
+    assert allow_origin != "*"
+
+
+# ---------------------------------------------------------------------------
+# SEC-005: CORS fail-closed for unknown / unset PYSCF_ENV
+# ---------------------------------------------------------------------------
+
+
+def test_cors_unset_env_uses_production_origins(monkeypatch):
+    """When PYSCF_ENV is unset, CORS falls through to restrictive (production) origins."""
+    monkeypatch.delenv("PYSCF_ENV", raising=False)
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app) as client:
+        # Loopback should be rejected (production only allows file:// and null)
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != "http://127.0.0.1:5173"
+
+
+def test_cors_typo_env_uses_production_origins(monkeypatch):
+    """When PYSCF_ENV is a typo like 'prod', CORS falls through to restrictive origins."""
+    monkeypatch.setenv("PYSCF_ENV", "prod")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app) as client:
+        # Loopback should be rejected
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    allow_origin = response.headers.get("access-control-allow-origin")
+    assert allow_origin != "http://127.0.0.1:5173"
+
+
+def test_mixed_case_env_treated_as_development_by_auth(monkeypatch):
+    """Mixed-case PYSCF_ENV like 'Development' is normalized to 'development' by auth."""
+    monkeypatch.setenv("PYSCF_ENV", "Development")
+    monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": False})
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    # With .lower() normalization, "Development" is treated as "development"
+    # so the request is allowed (not 401).
+    assert response.status_code != 401
+
+
+def test_mixed_case_env_consistent_across_auth_and_cors(monkeypatch):
+    """Mixed-case PYSCF_ENV is handled consistently by auth and CORS middleware."""
+    monkeypatch.setenv("PYSCF_ENV", "Development")
+    monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": False})
+    with TestClient(app) as client:
+        # Auth: should allow without token (development mode)
+        auth_response = client.get("/health")
+        # CORS: should allow loopback origin (development mode)
+        cors_response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://127.0.0.1:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert auth_response.status_code != 401
+    assert (
+        cors_response.headers.get("access-control-allow-origin")
+        == "http://127.0.0.1:5173"
+    )
+
+
+def test_cors_production_does_not_send_credentials_header(monkeypatch):
+    """In production mode, Access-Control-Allow-Credentials is not sent."""
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app) as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "null",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    # allow_credentials=False means the header should not be 'true'
+    creds_header = response.headers.get("access-control-allow-credentials")
+    assert creds_header != "true"
+
+
+def test_cors_development_does_not_send_credentials_header(monkeypatch):
+    """In development mode, Access-Control-Allow-Credentials is not sent."""
+    with make_auth_client(monkeypatch, env="development") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5173",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    # allow_credentials=False means the header should not be 'true'
+    creds_header = response.headers.get("access-control-allow-credentials")
+    assert creds_header != "true"

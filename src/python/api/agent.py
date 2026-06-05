@@ -56,18 +56,28 @@ def _extract_history_role(message: Any) -> str:
     )
 
 
-def _extract_text_parts(parts: list) -> list:
-    """Extract text values from dict or Pydantic history parts."""
-    text_parts = []
+def _extract_text_parts(parts: list[Any]) -> list[str]:
+    """Extract text values from dict or Pydantic history parts.
+
+    Only ``str`` values are included.  ``None`` and non-str values
+    (which can arise from ``Part.text: Optional[str]`` or untyped
+    dicts) are silently skipped so the caller always receives a
+    ``list[str]`` that is safe to hand to the Gemini SDK.
+    """
+    text_parts: list[str] = []
     for part in parts:
         if isinstance(part, dict) and "text" in part:
-            text_parts.append(part["text"])
+            val = part["text"]
         elif hasattr(part, "text"):
-            text_parts.append(part.text)
+            val = part.text
+        else:
+            continue
+        if isinstance(val, str):
+            text_parts.append(val)
     return text_parts
 
 
-def _convert_history_to_gemini_format(history: list) -> list:
+def _convert_history_to_gemini_format(history: list[Any]) -> list[dict[str, Any]]:
     """
     Convert frontend message history format to Gemini API format.
 
@@ -185,7 +195,9 @@ def stream_chat_response(request: AgentChatRequest) -> Iterator[dict[str, Any]]:
 
     try:
         logger.debug(
-            f"Starting Gemini chat stream for message: {message[:100]}{'...' if len(message) > 100 else ''}"
+            "Starting Gemini chat stream (message_length=%d, session=%s)",
+            len(message),
+            session_id,
         )
 
         # Get API key from settings
@@ -306,7 +318,7 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
 
 
 @router.post("/chat")
-def chat(request: AgentChatRequest):
+def chat(request: AgentChatRequest) -> StreamingResponse:
     """Chat with AI agent using simple Gemini API with Server-Sent Events."""
     _validate_chat_request(request)
 

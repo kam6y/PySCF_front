@@ -239,6 +239,8 @@ export const createCleanEnvironment = (
     'RDBASE',
     // Build / System
     'PKG_CONFIG_PATH',
+    // Application opt-in: allows runtime pip install in production
+    'PYSCF_ALLOW_RUNTIME_INSTALL',
   ];
 
   const cleanEnv: Record<string, string> = {};

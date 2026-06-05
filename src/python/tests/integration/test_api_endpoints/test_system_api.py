@@ -235,3 +235,217 @@ class TestGpu4PyscfInstallAPI:
         data = response.json()
         assert data["success"] is False
         mock_service.assert_not_called()
+
+
+class TestGpu4PyscfPackagedModeGate:
+    """SEC-004: Runtime install is disabled in packaged (production) builds."""
+
+    def test_install_denied_in_production_without_opt_in(self, monkeypatch):
+        """
+        GIVEN PYSCF_ENV=production and PYSCF_ALLOW_RUNTIME_INSTALL is unset
+        WHEN install_gpu4pyscf is called
+        THEN ValidationError is raised before any installation attempt
+        """
+        from services.system_service import SystemService
+        from services.exceptions import ValidationError as SvcValidationError
+
+        monkeypatch.setenv("PYSCF_ENV", "production")
+        monkeypatch.delenv("PYSCF_ALLOW_RUNTIME_INSTALL", raising=False)
+
+        service = SystemService()
+        with pytest.raises(SvcValidationError, match="disabled in packaged"):
+            service.install_gpu4pyscf(confirm_install=True)
+
+    def test_install_allowed_in_production_with_opt_in(self, monkeypatch):
+        """
+        GIVEN PYSCF_ENV=production and PYSCF_ALLOW_RUNTIME_INSTALL=1
+        WHEN _runtime_install_allowed is called
+        THEN it returns True (gate passes)
+        """
+        from services.system_service import SystemService
+
+        monkeypatch.setenv("PYSCF_ENV", "production")
+        monkeypatch.setenv("PYSCF_ALLOW_RUNTIME_INSTALL", "1")
+
+        assert SystemService._runtime_install_allowed() is True
+
+    def test_install_succeeds_in_production_with_opt_in(self, monkeypatch, mocker):
+        """
+        GIVEN PYSCF_ENV=production and PYSCF_ALLOW_RUNTIME_INSTALL=1
+        WHEN install_gpu4pyscf is called with confirm_install=True
+        THEN execution passes the gate and reaches _install_dependency_first
+        """
+        from services.system_service import (
+            CUDA_PACKAGE_MAP,
+            SystemService,
+        )
+
+        monkeypatch.setenv("PYSCF_ENV", "production")
+        monkeypatch.setenv("PYSCF_ALLOW_RUNTIME_INSTALL", "1")
+
+        service = SystemService()
+
+        # Simulate Linux + CUDA 12.4
+        monkeypatch.setattr("sys.platform", "linux")
+        mocker.patch.object(
+            service,
+            "_detect_cuda_version",
+            return_value=("12.4", 12, 4, None),
+        )
+        mocker.patch.object(service, "_is_site_writable", return_value=True)
+
+        mock_install = mocker.patch.object(
+            service,
+            "_install_dependency_first",
+            return_value=(True, ["gpu4pyscf-cuda12x==1.7.1"], "", ""),
+        )
+        mocker.patch.object(
+            service,
+            "get_gpu4pyscf_status",
+            return_value={"gpu4pyscf_installed": True},
+        )
+
+        service.install_gpu4pyscf(confirm_install=True)
+
+        # Verify execution reached _install_dependency_first (past the gate)
+        mock_install.assert_called_once()
+        gpu4pyscf_spec = mock_install.call_args.args[0]
+        expected_pkg = CUDA_PACKAGE_MAP[12][0]
+        assert gpu4pyscf_spec.startswith(expected_pkg)
+
+    def test_install_denied_in_production_without_opt_in_via_gate(self, monkeypatch):
+        """
+        GIVEN PYSCF_ENV=production and PYSCF_ALLOW_RUNTIME_INSTALL is unset
+        WHEN _runtime_install_allowed is called
+        THEN it returns False (gate blocks)
+        """
+        from services.system_service import SystemService
+
+        monkeypatch.setenv("PYSCF_ENV", "production")
+        monkeypatch.delenv("PYSCF_ALLOW_RUNTIME_INSTALL", raising=False)
+
+        assert SystemService._runtime_install_allowed() is False
+
+    def test_install_allowed_in_development(self, monkeypatch):
+        """
+        GIVEN PYSCF_ENV=development
+        WHEN _runtime_install_allowed is called
+        THEN it returns True (gate passes)
+        """
+        from services.system_service import SystemService
+
+        monkeypatch.setenv("PYSCF_ENV", "development")
+        monkeypatch.delenv("PYSCF_ALLOW_RUNTIME_INSTALL", raising=False)
+
+        assert SystemService._runtime_install_allowed() is True
+
+    def test_install_denied_when_env_unset(self, monkeypatch):
+        """
+        GIVEN PYSCF_ENV is unset (defaults to empty string)
+        WHEN _runtime_install_allowed is called
+        THEN it returns False (fail-closed: unknown environments are restrictive)
+        """
+        from services.system_service import SystemService
+
+        monkeypatch.delenv("PYSCF_ENV", raising=False)
+        monkeypatch.delenv("PYSCF_ALLOW_RUNTIME_INSTALL", raising=False)
+
+        assert SystemService._runtime_install_allowed() is False
+
+    def test_install_denied_when_env_typo(self, monkeypatch):
+        """
+        GIVEN PYSCF_ENV is set to a typo like 'prod'
+        WHEN _runtime_install_allowed is called
+        THEN it returns False (fail-closed: unknown values are restrictive)
+        """
+        from services.system_service import SystemService
+
+        monkeypatch.setenv("PYSCF_ENV", "prod")
+        monkeypatch.delenv("PYSCF_ALLOW_RUNTIME_INSTALL", raising=False)
+
+        assert SystemService._runtime_install_allowed() is False
+
+
+class TestGpu4PyscfVersionPinning:
+    """SEC-004: Verify gpu4pyscf top-level package is version-pinned."""
+
+    def test_gpu4pyscf_install_spec_contains_version_pin(self):
+        """
+        GIVEN CUDA_PACKAGE_MAP and GPU4PYSCF_VERSION_BY_CUDA are defined
+        WHEN _build_gpu4pyscf_install_spec is called for each CUDA generation
+        THEN every resulting install spec contains '==' (version-pinned).
+        """
+        from services.system_service import CUDA_PACKAGE_MAP, SystemService
+
+        for cuda_major, (package_name, _) in CUDA_PACKAGE_MAP.items():
+            spec = SystemService._build_gpu4pyscf_install_spec(package_name, cuda_major)
+            assert (
+                "==" in spec
+            ), f"CUDA {cuda_major}: spec '{spec}' is not version-pinned"
+            assert spec.startswith(package_name)
+
+    def test_gpu4pyscf_install_spec_unpinned_fallback(self):
+        """
+        GIVEN a CUDA generation that has no entry in GPU4PYSCF_VERSION_BY_CUDA
+        WHEN _build_gpu4pyscf_install_spec is called
+        THEN the bare package name is returned without '=='.
+        """
+        from services.system_service import SystemService
+
+        spec = SystemService._build_gpu4pyscf_install_spec("gpu4pyscf-cuda99x", 99)
+        assert spec == "gpu4pyscf-cuda99x"
+        assert "==" not in spec
+
+    def test_install_gpu4pyscf_passes_pinned_spec_to_install_dependency_first(
+        self, monkeypatch, mocker
+    ):
+        """
+        GIVEN a Linux platform with CUDA 12 detected
+        WHEN install_gpu4pyscf is called
+        THEN _install_dependency_first receives the '==' pinned spec matching
+             GPU4PYSCF_VERSION_BY_CUDA[12], not the bare package name.
+        """
+        from services.system_service import (
+            CUDA_PACKAGE_MAP,
+            GPU4PYSCF_VERSION_BY_CUDA,
+            SystemService,
+        )
+
+        monkeypatch.setenv("PYSCF_ENV", "development")
+
+        service = SystemService()
+
+        # Simulate Linux + CUDA 12.4
+        monkeypatch.setattr("sys.platform", "linux")
+        mocker.patch.object(
+            service,
+            "_detect_cuda_version",
+            return_value=("12.4", 12, 4, None),
+        )
+        mocker.patch.object(service, "_is_site_writable", return_value=True)
+
+        # Mock _install_dependency_first to capture its arguments
+        mock_install = mocker.patch.object(
+            service,
+            "_install_dependency_first",
+            return_value=(True, ["gpu4pyscf-cuda12x==1.7.1"], "", ""),
+        )
+        mocker.patch.object(
+            service,
+            "get_gpu4pyscf_status",
+            return_value={"gpu4pyscf_installed": True},
+        )
+
+        service.install_gpu4pyscf(confirm_install=True)
+
+        # Assert the pinned spec was passed
+        mock_install.assert_called_once()
+        gpu4pyscf_spec_arg = mock_install.call_args.args[0]
+        expected_pkg = CUDA_PACKAGE_MAP[12][0]
+        expected_version = GPU4PYSCF_VERSION_BY_CUDA[12]
+        assert (
+            "==" in gpu4pyscf_spec_arg
+        ), f"Spec '{gpu4pyscf_spec_arg}' is not version-pinned"
+        assert (
+            gpu4pyscf_spec_arg == f"{expected_pkg}=={expected_version}"
+        ), f"Expected '{expected_pkg}=={expected_version}', got '{gpu4pyscf_spec_arg}'"

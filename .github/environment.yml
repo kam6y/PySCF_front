@@ -30,8 +30,8 @@ dependencies:
   - conda-pack=0.8.1
   - pip:
     # PySCF extensions
-    - pyscf-properties @ git+https://github.com/pyscf/properties  # IR/Raman intensity calculations
+    - pyscf-properties @ git+https://github.com/pyscf/properties@4eee5a430fb47eca5962f36fdcaf75c2b87e7ede  # IR/Raman intensity calculations
     # Code generation and build tools
     - datamodel-code-generator==0.33.0
     # AI Chat integration (Gemini API)
-    - google-generativeai>=0.8.0
+    - google-generativeai==0.8.6

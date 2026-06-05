@@ -152,11 +152,12 @@ def register_request_size_middleware(fastapi_app: FastAPI) -> None:
 
 def register_auth_middleware(fastapi_app: FastAPI) -> None:
     @fastapi_app.middleware("http")
-    async def verify_auth_token(request: Request, call_next):
-        if (
-            _is_development_api_docs_path(request.url.path)
-            and os.getenv("PYSCF_ENV") == "development"
-        ):
+    async def verify_auth_token(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        env = os.getenv("PYSCF_ENV", "").lower()
+        if _is_development_api_docs_path(request.url.path) and env == "development":
             return await call_next(request)
 
         if request.method == "OPTIONS":
@@ -173,7 +174,6 @@ def register_auth_middleware(fastapi_app: FastAPI) -> None:
                 )
         else:
             is_testing = bool(getattr(request.app.state, "TESTING", False))
-            env = os.getenv("PYSCF_ENV")
             if is_testing and env != "production":
                 return await call_next(request)
             if env not in {"development", "test"}:
@@ -195,16 +195,39 @@ def register_auth_middleware(fastapi_app: FastAPI) -> None:
 
 
 def register_cors_middleware(fastapi_app: FastAPI) -> None:
+    env = os.getenv("PYSCF_ENV", "").lower()
+
+    if env in {"development", "test"}:
+        # Development / test: only loopback HTTP origins with an explicit
+        # port are accepted, matching the Electron-side
+        # ``isAllowedDevRendererUrl`` policy which requires a non-default
+        # port (portless / :80 URLs are rejected because dev servers
+        # always bind to a non-default port).  Bare ``http://localhost``
+        # and ``http://127.0.0.1`` (portless) are intentionally omitted.
+        origins: list[str] = []
+        # Port group limited to valid TCP range 1-65535.
+        _VALID_PORT = (
+            r"[1-9]|[1-9]\d|[1-9]\d{2}|[1-9]\d{3}"
+            r"|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5]"
+        )
+        origin_regex: str | None = rf"^http://(127\.0\.0\.1|localhost):({_VALID_PORT})$"
+    else:
+        # Production / unknown: Packaged Electron builds load the renderer
+        # via ``file://``, which causes the browser to send ``Origin: null``
+        # (or ``file://``).  Only those origins are permitted.
+        # CORS is NOT the authentication boundary — the mandatory
+        # ``X-Auth-Token`` custom header is.  A cross-origin attacker cannot
+        # read or forge this header (browsers block cross-origin custom
+        # headers unless the preflight succeeds).  ``allow_credentials`` is
+        # False so no cookies are ever reflected.
+        origins = ["file://", "null"]
+        origin_regex = None
+
     fastapi_app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://127.0.0.1",
-            "http://localhost",
-            "file://",
-            "null",
-        ],
-        allow_origin_regex=r"^(https?://(127\.0\.0\.1|localhost)(:\d+)?)$",
-        allow_credentials=True,
+        allow_origins=origins,
+        allow_origin_regex=origin_regex,
+        allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Cache-Control", "Content-Type", "X-Auth-Token"],
     )
@@ -221,7 +244,9 @@ def _format_validation_errors(errors: list[dict[str, Any]]) -> str:
 
 def register_exception_handlers(fastapi_app: FastAPI) -> None:
     @fastapi_app.exception_handler(json.JSONDecodeError)
-    async def json_decode_error_handler(request: Request, error: json.JSONDecodeError):
+    async def json_decode_error_handler(
+        request: Request, error: json.JSONDecodeError
+    ) -> JSONResponse:
         message = f"Validation failed: malformed JSON body: {error.msg}"
         logger.warning("Malformed JSON on %s: %s", request.url.path, message)
         return JSONResponse({"success": False, "error": message}, status_code=400)
@@ -229,7 +254,7 @@ def register_exception_handlers(fastapi_app: FastAPI) -> None:
     @fastapi_app.exception_handler(RequestValidationError)
     async def request_validation_error_handler(
         request: Request, error: RequestValidationError
-    ):
+    ) -> JSONResponse:
         message = _format_validation_errors(error.errors())
         logger.warning("Validation error on %s: %s", request.url.path, message)
         return JSONResponse({"success": False, "error": message}, status_code=400)
@@ -237,13 +262,15 @@ def register_exception_handlers(fastapi_app: FastAPI) -> None:
     @fastapi_app.exception_handler(ValidationError)
     async def pydantic_validation_error_handler(
         request: Request, error: ValidationError
-    ):
+    ) -> JSONResponse:
         message = _format_validation_errors(error.errors())
         logger.warning("Pydantic validation error on %s: %s", request.url.path, message)
         return JSONResponse({"success": False, "error": message}, status_code=400)
 
     @fastapi_app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, error: StarletteHTTPException):
+    async def http_exception_handler(
+        request: Request, error: StarletteHTTPException
+    ) -> JSONResponse:
         if error.status_code == 404:
             return JSONResponse(
                 {"success": False, "error": "Not Found"}, status_code=404
@@ -259,14 +286,18 @@ def register_exception_handlers(fastapi_app: FastAPI) -> None:
         )
 
     @fastapi_app.exception_handler(ServiceError)
-    async def service_error_handler(request: Request, error: ServiceError):
+    async def service_error_handler(
+        request: Request, error: ServiceError
+    ) -> JSONResponse:
         return JSONResponse(
             {"success": False, "error": error.message},
             status_code=error.status_code,
         )
 
     @fastapi_app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, error: Exception):
+    async def unhandled_exception_handler(
+        request: Request, error: Exception
+    ) -> JSONResponse:
         logger.error(
             "Unhandled exception on %s: %s", request.url.path, error, exc_info=True
         )

@@ -38,6 +38,23 @@ CUDA_PACKAGE_MAP = {
     12: ("gpu4pyscf-cuda12x", "cutensor-cu12"),
     13: ("gpu4pyscf-cuda13x", "cutensor-cu13"),
 }
+
+# Pinned versions for the top-level gpu4pyscf package per CUDA generation.
+# These must be updated when upgrading to a new gpu4pyscf release.  Unlike
+# cupy/cutensor, there is no version-fallback ladder — a wrong pin causes a
+# total install failure.  Verify availability on PyPI before changing.
+# The version is kept separate from CUDA_PACKAGE_MAP so that the status
+# endpoint can display the package name without the ``==`` suffix.
+#
+# Verified against PyPI as of 2026-06-02:
+#   gpu4pyscf-cuda11x: 0.6.1 .. 1.7.1
+#   gpu4pyscf-cuda12x: 0.6.1 .. 1.7.1
+#   gpu4pyscf-cuda13x: 1.4.3 .. 1.7.1
+GPU4PYSCF_VERSION_BY_CUDA: dict[int, str] = {
+    11: "1.7.1",
+    12: "1.7.1",
+    13: "1.7.1",
+}
 CUPY_CUTENSOR_RECOMMENDED_BY_CUDA = {
     11: [
         ("13.4.1", "2.2.0"),
@@ -417,12 +434,53 @@ class SystemService:
             "cutensor_version": cutensor_version,
         }
 
+    @staticmethod
+    def _build_gpu4pyscf_install_spec(package_name: str, cuda_major: int) -> str:
+        """Build a version-pinned install spec for the gpu4pyscf package.
+
+        Returns ``package_name==version`` when a pinned version exists for the
+        given CUDA generation, or bare ``package_name`` as an unpinned fallback.
+        """
+        version = GPU4PYSCF_VERSION_BY_CUDA.get(cuda_major)
+        if version is not None:
+            return f"{package_name}=={version}"
+        return package_name
+
+    @staticmethod
+    def _runtime_install_allowed() -> bool:
+        """Check whether runtime package installation is permitted.
+
+        Only known permissive environments (``development``, ``test``) allow
+        runtime installs unconditionally.  All other values — including unset,
+        empty, typos, and ``production`` — require the explicit opt-in
+        ``PYSCF_ALLOW_RUNTIME_INSTALL=1``.  This mirrors the fail-closed
+        pattern used by ``verify_auth_token`` in ``app.py``.
+        """
+        env = os.getenv("PYSCF_ENV", "").lower()
+        if env in {"development", "test"}:
+            return True
+        raw = os.getenv("PYSCF_ALLOW_RUNTIME_INSTALL", "0")
+        if raw not in {"0", "1", ""}:
+            logger.warning(
+                "Unrecognized PYSCF_ALLOW_RUNTIME_INSTALL=%r; only '1' enables runtime install",
+                raw,
+            )
+        return raw == "1"
+
     def install_gpu4pyscf(
         self,
         include_cutensor: bool = True,
         force_reinstall: bool = False,
         confirm_install: bool = False,
     ) -> Dict[str, Any]:
+        # In packaged builds, deny runtime installs unless explicitly opted in.
+        if not self._runtime_install_allowed():
+            raise ValidationError(
+                "Runtime package installation is disabled in packaged builds. "
+                "Set the PYSCF_ALLOW_RUNTIME_INSTALL=1 environment variable to "
+                "enable it."
+            )
+
         # Require explicit confirmation before mutating the Python environment.
         if not confirm_install:
             raise ValidationError(
@@ -447,12 +505,27 @@ class SystemService:
                 f"Unsupported CUDA version {cuda_version}. Supported versions: 11.x, 12.x, 13.x"
             )
 
-        gpu4pyscf_package, cutensor_package = CUDA_PACKAGE_MAP[cuda_major]
-        packages = [gpu4pyscf_package]
-        if include_cutensor:
-            packages.append(cutensor_package)
+        gpu4pyscf_package = CUDA_PACKAGE_MAP[cuda_major][0]
 
-        logger.info(f"Installing GPU4PySCF packages: {packages} (CUDA {cuda_version})")
+        # Pin the top-level gpu4pyscf package to a known-good version so that
+        # ``pip install`` never silently pulls an unvetted release.
+        gpu4pyscf_install_spec = self._build_gpu4pyscf_install_spec(
+            gpu4pyscf_package, cuda_major
+        )
+        if "==" not in gpu4pyscf_install_spec:
+            # Defensive fallback — if the CUDA generation is not in the map,
+            # install unpinned (better than refusing entirely).
+            logger.warning(
+                "No pinned gpu4pyscf version for CUDA %d; installing unpinned",
+                cuda_major,
+            )
+
+        logger.info(
+            "Installing GPU4PySCF package: %s (CUDA %s, include_cutensor=%s)",
+            gpu4pyscf_install_spec,
+            cuda_version,
+            include_cutensor,
+        )
 
         use_user_site = not self._is_site_writable()
         if use_user_site and not site.ENABLE_USER_SITE:
@@ -470,7 +543,10 @@ class SystemService:
             stdout_tail,
             stderr_tail,
         ) = self._install_dependency_first(
-            gpu4pyscf_package, dependency_candidates, use_user_site, force_reinstall
+            gpu4pyscf_install_spec,
+            dependency_candidates,
+            use_user_site,
+            force_reinstall,
         )
 
         if not ok:

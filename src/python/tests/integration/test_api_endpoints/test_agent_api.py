@@ -6,9 +6,12 @@ responses from the Gemini API.
 """
 
 import json
+import logging
 
 from generated_models import AgentChatRequest
-from api.agent import stream_chat_response
+from api.agent import (
+    stream_chat_response,
+)
 
 
 def test_agent_chat_stream_preserves_sse_format(client, mocker):
@@ -431,3 +434,108 @@ class TestAgentChatInputSizeLimits:
         # ASSERT
         assert response.status_code == 400
         assert "100" in response.json()["error"]
+
+
+class TestAgentChatDebugLogging:
+    """SEC-006: Verify chat message content is not leaked into debug logs."""
+
+    def test_debug_log_does_not_contain_message_content(self, mocker, caplog):
+        """
+        GIVEN a chat request with a distinctive message
+        WHEN stream_chat_response is consumed
+        THEN the debug log contains message length but NOT the message text
+        """
+        # ARRANGE
+        secret_message = "TopSecretContent_XYZ_12345"
+        mock_settings_service = mocker.patch("api.agent.SettingsService")
+        mock_settings_service.return_value.get_settings.return_value = {
+            "gemini_api_key": "test-api-key"
+        }
+
+        mock_genai = mocker.MagicMock()
+        mock_model = mocker.MagicMock()
+        mock_chat = mocker.MagicMock()
+        mock_chunk = mocker.MagicMock()
+        mock_chunk.text = "OK"
+        mock_chat.send_message.return_value = iter([mock_chunk])
+        mock_model.start_chat.return_value = mock_chat
+        mock_genai.GenerativeModel.return_value = mock_model
+        mock_genai.configure = mocker.MagicMock()
+        mocker.patch.dict("sys.modules", {"google.generativeai": mock_genai})
+
+        request = AgentChatRequest(
+            message=secret_message,
+            history=[],
+            session_id=None,
+        )
+
+        # ACT
+        with caplog.at_level(logging.DEBUG, logger="api.agent"):
+            events = list(stream_chat_response(request))
+
+        # ASSERT — stream completed
+        assert any(e["type"] == "done" for e in events)
+        # The message text must NOT appear in any log record
+        for record in caplog.records:
+            assert (
+                secret_message not in record.getMessage()
+            ), f"Message content leaked into log: {record.getMessage()}"
+        # The message length SHOULD appear in debug logs
+        debug_messages = [
+            r.getMessage() for r in caplog.records if r.levelno == logging.DEBUG
+        ]
+        assert len(debug_messages) > 0, "No DEBUG records captured; test is vacuous"
+        assert any(str(len(secret_message)) in msg for msg in debug_messages)
+
+
+class TestExtractTextPartsNullSafety:
+    """Verify _extract_text_parts skips None and non-str values (F1 soundness fix)."""
+
+    def test_dict_part_with_none_text_is_skipped(self):
+        """Dict part whose text value is None must not appear in the result."""
+
+        from api.agent import _extract_text_parts
+
+        parts = [{"text": None}, {"text": "hello"}]
+        result = _extract_text_parts(parts)
+        assert result == ["hello"]
+
+    def test_dict_part_with_non_str_text_is_skipped(self):
+        """Dict part whose text value is a non-str (e.g. int) must be skipped."""
+        from api.agent import _extract_text_parts
+
+        parts = [{"text": 123}, {"text": "world"}]
+        result = _extract_text_parts(parts)
+        assert result == ["world"]
+
+    def test_pydantic_part_with_none_text_is_skipped(self):
+        """Pydantic-like object with text=None must be skipped."""
+        import types
+
+        from api.agent import _extract_text_parts
+
+        obj_none = types.SimpleNamespace(text=None)
+        obj_valid = types.SimpleNamespace(text="valid")
+        result = _extract_text_parts([obj_none, obj_valid])
+        assert result == ["valid"]
+
+    def test_convert_history_skips_none_text_parts(self):
+        """End-to-end: history item with a None text part does not crash."""
+        import types
+
+        from api.agent import _convert_history_to_gemini_format
+
+        history = [
+            {
+                "role": "user",
+                "parts": [{"text": None}, {"text": "hi"}],
+            },
+            {
+                "role": "model",
+                "parts": [types.SimpleNamespace(text=None)],
+            },
+        ]
+        result = _convert_history_to_gemini_format(history)
+        # First item keeps the valid "hi" part; second item is empty and dropped
+        assert len(result) == 1
+        assert result[0] == {"role": "user", "parts": ["hi"]}

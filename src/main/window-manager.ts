@@ -1,6 +1,10 @@
-import { BrowserWindow, app } from 'electron';
+import { BrowserWindow, app, shell } from 'electron';
 import path from 'node:path';
-import { getMainRendererEntry } from './renderer-entry';
+import {
+  getMainRendererEntry,
+  installNavigationGuards,
+  isAllowedNavigation,
+} from './renderer-entry';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -90,6 +94,11 @@ export const createWindow = (
     rendererUrl: process.env.ELECTRON_RENDERER_URL,
   });
 
+  // --- SEC-001: Lock down renderer navigation ---
+  installNavigationGuards(newWindow.webContents, rendererEntry, {
+    openExternal: (url) => shell.openExternal(url),
+  });
+
   if (rendererEntry.type === 'url') {
     newWindow.loadURL(rendererEntry.url);
   } else {
@@ -100,7 +109,16 @@ export const createWindow = (
 
   // ウィンドウのロード完了後にIPCで認証トークンを送信
   // リロード時にもトークンを送信するため 'on' を使用
+  // Defense-in-depth: only send the token when the loaded page is an allowed origin
   newWindow.webContents.on('did-finish-load', () => {
+    if (newWindow.isDestroyed()) return;
+    const currentUrl = newWindow.webContents.getURL();
+    if (!isAllowedNavigation(currentUrl, rendererEntry)) {
+      console.warn(
+        `[Security] Refused to send auth token — loaded URL is not allowed: ${currentUrl}`
+      );
+      return;
+    }
     newWindow.webContents.send('auth-token', authToken);
     console.log('[Main] Auth token sent via IPC');
   });
