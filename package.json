@@ -28,7 +28,7 @@
     "validate-build": "bash -c 'CONDA_BASE=$(conda info --base 2>/dev/null || echo \"$HOME/miniforge3\") && source \"$CONDA_BASE/etc/profile.d/conda.sh\" && conda activate pyscf-env && $(conda info --base)/envs/pyscf-env/bin/python scripts/validate-build-completeness.py'",
     "codegen:typescript": "npx openapi-typescript src/api-spec/openapi.yaml --output src/web/types/generated-api.ts",
     "typecheck": "tsc --noEmit",
-    "test:main": "ts-node --files src/main/backend-gunicorn.test.ts && ts-node --files src/main/backend-health.test.ts && ts-node --files src/main/backend-process.test.ts && ts-node --files src/main/renderer-entry.test.ts && ts-node --files src/main/electron-vite-config.test.ts",
+    "test:main": "ts-node --files src/main/backend-gunicorn.test.ts && ts-node --files src/main/backend-health.test.ts && ts-node --files src/main/backend-process.test.ts && ts-node --files src/main/renderer-entry.test.ts && ts-node --files src/main/electron-vite-config.test.ts && ts-node --files src/main/ipc-security.test.ts && ts-node --files src/main/session-hardening.test.ts && ts-node --files src/main/backend-auth-injection.test.ts",
     "test:web": "ts-node --files src/web/api/agent.test.ts && ts-node --files src/web/runtime-config.test.ts && ts-node --files src/web/realtime/useCalculationUpdateStream.test.ts && ts-node --files src/splash/splash-html.test.ts",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json}\" \"electron.vite.config.ts\" \"index.html\" \"splash.html\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json}\" \"electron.vite.config.ts\" \"index.html\" \"splash.html\"",

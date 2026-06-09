@@ -141,8 +141,6 @@ export const useCalculationUpdateStream = ({
 
       (async () => {
         try {
-          const authToken = await window.electronAPI?.getAuthToken?.();
-
           if (controller.signal.aborted) {
             return;
           }
@@ -150,10 +148,6 @@ export const useCalculationUpdateStream = ({
           const headers: HeadersInit = {
             Accept: 'text/event-stream',
           };
-
-          if (authToken) {
-            (headers as Record<string, string>)['X-Auth-Token'] = authToken;
-          }
 
           await fetchEventSource(`${getApiBaseUrl()}${path}`, {
             method: 'GET',

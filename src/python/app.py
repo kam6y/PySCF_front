@@ -35,6 +35,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
 
 # Maximum allowed request body size in bytes (5 MB).
@@ -42,6 +43,21 @@ from starlette.responses import Response
 # molecules can be ~1 MB, ketcher JSON similarly large).  5 MB provides ample
 # headroom while still preventing abuse.
 MAX_REQUEST_BODY_BYTES: int = 5 * 1024 * 1024
+
+# ServiceError status codes whose messages are curated, developer-authored,
+# and safe to return to the client (e.g. for user-facing toast notifications).
+# True 500 / unknown 5xx may contain interpolated exception text and are
+# redacted to a generic message.
+CURATED_5XX_CODES: frozenset[int] = frozenset({503, 507})
+
+# Loopback addresses recognised as safe for TrustedHostMiddleware.
+# IPv6 loopback (::1) is intentionally excluded: Starlette's
+# TrustedHostMiddleware splits the Host header on the first colon
+# (``host.split(":")[0]``), so a bracketed IPv6 Host like ``[::1]:5000``
+# becomes ``"["`` and bare ``::1`` becomes ``""`` — neither can match the
+# literal string ``"::1"``.  This app binds to 127.0.0.1; IPv6 loopback
+# is not used.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "localhost"})
 
 # HTTP methods that may carry a request body.  For these methods the
 # middleware requires a valid Content-Length header so that body-size
@@ -173,22 +189,19 @@ def register_auth_middleware(fastapi_app: FastAPI) -> None:
                     {"success": False, "error": "Unauthorized"}, status_code=401
                 )
         else:
+            # Narrowly-scoped TESTING bypass: allow requests only when the
+            # application has been explicitly constructed with TESTING=True
+            # (pytest fixtures) and we are NOT in production.
             is_testing = bool(getattr(request.app.state, "TESTING", False))
             if is_testing and env != "production":
                 return await call_next(request)
-            if env not in {"development", "test"}:
-                logger.warning(
-                    "Unauthorized access attempt: Missing authentication token in production mode"
-                )
-                return JSONResponse(
-                    {
-                        "success": False,
-                        "error": "Unauthorized: Missing authentication token",
-                    },
-                    status_code=401,
-                )
-            logger.warning(
-                "Running without authentication token in debug/development mode!"
+            logger.warning("Unauthorized access attempt: Missing authentication token")
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "Unauthorized: Missing authentication token",
+                },
+                status_code=401,
             )
 
         return await call_next(request)
@@ -280,6 +293,22 @@ def register_exception_handlers(fastapi_app: FastAPI) -> None:
                 {"success": False, "error": f"Validation failed: {error.detail}"},
                 status_code=400,
             )
+        if error.status_code >= 500:
+            # Application code uses ServiceError / ResourceUnavailableError for
+            # curated 5xx responses; StarletteHTTPException 5xx are
+            # framework-internal and always redacted to prevent leaking
+            # raw detail strings.
+            logger.error(
+                "HTTP %d on %s: %s",
+                error.status_code,
+                request.url.path,
+                error.detail,
+                exc_info=error,
+            )
+            return JSONResponse(
+                {"success": False, "error": "An internal server error occurred."},
+                status_code=error.status_code,
+            )
         return JSONResponse(
             {"success": False, "error": str(error.detail)},
             status_code=error.status_code,
@@ -289,6 +318,25 @@ def register_exception_handlers(fastapi_app: FastAPI) -> None:
     async def service_error_handler(
         request: Request, error: ServiceError
     ) -> JSONResponse:
+        if error.status_code >= 500:
+            logger.error(
+                "Service error on %s: %s",
+                request.url.path,
+                error.message,
+                exc_info=error,
+            )
+            # Curated operational messages (503/507) are safe to surface;
+            # all other 5xx are redacted to prevent leaking raw exception
+            # text or internal paths.
+            client_message = (
+                error.message
+                if error.status_code in CURATED_5XX_CODES
+                else "An internal server error occurred."
+            )
+            return JSONResponse(
+                {"success": False, "error": client_message},
+                status_code=error.status_code,
+            )
         return JSONResponse(
             {"success": False, "error": error.message},
             status_code=error.status_code,
@@ -299,7 +347,7 @@ def register_exception_handlers(fastapi_app: FastAPI) -> None:
         request: Request, error: Exception
     ) -> JSONResponse:
         logger.error(
-            "Unhandled exception on %s: %s", request.url.path, error, exc_info=True
+            "Unhandled exception on %s: %s", request.url.path, error, exc_info=error
         )
         return JSONResponse(
             {"success": False, "error": "An internal server error occurred."},
@@ -345,14 +393,41 @@ def create_fastapi_app(
     configure_fastapi_app(fastapi_app, server_config, server_port)
     # Middleware registration order matters: Starlette executes the *last*
     # registered middleware first (outermost).  Desired execution order:
-    #   1. CORS  (outermost - must wrap 413/401 responses with CORS headers)
+    #   0. Host validation  (outermost - reject invalid Host headers first)
+    #   1. CORS  (must wrap 413/401 responses with CORS headers)
     #   2. Body-size check  (reject oversized bodies before auth/routing)
     #   3. Auth  (innermost - only reached if body size is OK)
-    # So register in reverse: auth -> body-size -> CORS.
+    # So register in reverse: auth -> body-size -> CORS -> host validation.
     register_auth_middleware(fastapi_app)
     register_request_size_middleware(fastapi_app)
     register_cors_middleware(fastapi_app)
     register_exception_handlers(fastapi_app)
+
+    # Host validation: restrict to loopback addresses appropriate for this
+    # local desktop app.  ``testserver`` is included only in development/test
+    # because Starlette's TestClient sends ``Host: testserver`` by default;
+    # all other environments (production, unset, typos) must NOT trust that
+    # synthetic hostname (fail-closed allowlist).
+    configured_host = server_config.get("server.host", "127.0.0.1")
+    if not isinstance(configured_host, str) or not configured_host:
+        logger.warning(
+            "Invalid server.host configuration value %r; falling back to 127.0.0.1",
+            configured_host,
+        )
+        configured_host = "127.0.0.1"
+    elif configured_host not in _LOOPBACK_HOSTS:
+        logger.warning(
+            "server.host %r is not a recognised loopback address; "
+            "falling back to 127.0.0.1",
+            configured_host,
+        )
+        configured_host = "127.0.0.1"
+
+    env = os.getenv("PYSCF_ENV", "").lower()
+    allowed_hosts: list[str] = list({"127.0.0.1", "localhost", configured_host})
+    if env in {"development", "test"}:
+        allowed_hosts.append("testserver")
+    fastapi_app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
 
     if test_config:
         for key, value in test_config.items():

@@ -135,7 +135,8 @@ class TestPubChemSearchAPI:
         assert response.status_code == 503
         data = response.json()
         assert data["success"] is False
-        assert "error" in data
+        # 503 is a curated operational message -- not redacted
+        assert data["error"] == "PubChem API unavailable"
 
     def test_search_missing_required_fields(self, client):
         """

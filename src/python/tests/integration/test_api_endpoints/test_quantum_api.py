@@ -194,6 +194,7 @@ class TestCalculationSubmissionAPI:
         assert response.status_code == 500
         data = response.json()
         assert data["success"] is False
+        assert data["error"] == "An internal server error occurred."
 
     def test_dft_rejects_casci_parameters(self, client, sample_h2_xyz):
         """

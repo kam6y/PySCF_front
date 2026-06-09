@@ -28,9 +28,11 @@ const replaceKetcherMacromoleculesEditorImport = (code: string): string => {
  *   script-src 'self' 'wasm-unsafe-eval'
  *
  * During development, Vite HMR and @vitejs/plugin-react (React Fast Refresh)
- * may require eval(). This plugin appends 'unsafe-eval' to script-src ONLY
- * when the dev server is running (apply: 'serve' ensures this plugin is
- * excluded from the build pipeline entirely).
+ * require eval() AND an inline <script> preamble. This plugin appends
+ * 'unsafe-eval' and 'unsafe-inline' to script-src ONLY when the dev server is
+ * running (apply: 'serve' ensures this plugin is excluded from the build
+ * pipeline entirely, so production stays strict). Kept in sync with the
+ * dev response-header CSP in src/main/session-hardening.ts.
  */
 const devCspRelaxPlugin = (): Plugin => ({
   name: 'dev-csp-relax',
@@ -38,7 +40,7 @@ const devCspRelaxPlugin = (): Plugin => ({
   transformIndexHtml(html) {
     return html.replace(
       "script-src 'self' 'wasm-unsafe-eval'",
-      "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'"
+      "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline'"
     );
   },
 });

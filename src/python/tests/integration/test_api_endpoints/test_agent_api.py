@@ -539,3 +539,70 @@ class TestExtractTextPartsNullSafety:
         # First item keeps the valid "hi" part; second item is empty and dropped
         assert len(result) == 1
         assert result[0] == {"role": "user", "parts": ["hi"]}
+
+
+class TestAgentStreamErrorRedaction:
+    """IMP-T2: Verify SSE error payload is redacted and partial responses
+    are not persisted when the LLM stream raises mid-response."""
+
+    def test_stream_error_redacts_internal_detail_and_skips_db_save(self, mocker):
+        """
+        GIVEN Gemini send_message yields one chunk then raises RuntimeError
+        WHEN stream_chat_response is consumed to completion
+        THEN (a) the SSE error event uses the generic message, not the
+             internal detail, and (b) no model message is persisted.
+        """
+        session_id = "session-error-redact"
+        mock_chat_service = mocker.MagicMock()
+        mocker.patch(
+            "api.agent.get_chat_history_service",
+            return_value=mock_chat_service,
+        )
+
+        mock_settings_service = mocker.patch("api.agent.SettingsService")
+        mock_settings_service.return_value.get_settings.return_value = {
+            "gemini_api_key": "test-api-key"
+        }
+
+        mock_genai = mocker.MagicMock()
+        mock_model = mocker.MagicMock()
+        mock_chat = mocker.MagicMock()
+
+        # Yield one chunk then raise
+        def _failing_stream(*args, **kwargs):
+            mock_chunk = mocker.MagicMock()
+            mock_chunk.text = "Partial"
+            yield mock_chunk
+            raise RuntimeError("secret internal detail")
+
+        mock_chat.send_message.side_effect = _failing_stream
+        mock_model.start_chat.return_value = mock_chat
+        mock_genai.GenerativeModel.return_value = mock_model
+        mocker.patch.dict("sys.modules", {"google.generativeai": mock_genai})
+
+        request = AgentChatRequest(
+            message="What is water?",
+            history=[],
+            session_id=session_id,
+        )
+
+        # ACT — consume the entire generator
+        events = list(stream_chat_response(request))
+
+        # ASSERT — error event has generic message
+        error_events = [e for e in events if e.get("type") == "error"]
+        assert len(error_events) == 1
+        error_msg = error_events[0]["payload"]["message"]
+        assert error_msg == "AI chat failed. Check settings and logs."
+        assert "secret internal detail" not in error_msg
+
+        # No "done" event (stream did not complete normally)
+        assert not any(e.get("type") == "done" for e in events)
+
+        # No model message persisted (stream_completed is False)
+        model_saves = [
+            call
+            for call in mock_chat_service.add_message.call_args_list
+            if call.args[1] == "model"
+        ]
+        assert model_saves == []

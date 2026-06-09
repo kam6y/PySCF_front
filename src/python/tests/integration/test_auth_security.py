@@ -21,7 +21,10 @@ def make_auth_client(
     app = create_fastapi_app(
         server_port=5000, test_config={"TESTING": env != "production"}
     )
-    return TestClient(app)
+    # Production builds exclude ``testserver`` from TrustedHostMiddleware
+    # allowed_hosts, so TestClient must send a recognised loopback Host.
+    base_url = "http://127.0.0.1" if env == "production" else "http://testserver"
+    return TestClient(app, base_url=base_url)
 
 
 def test_request_without_token(monkeypatch):
@@ -124,11 +127,24 @@ def test_missing_token_in_production(monkeypatch):
 
 
 def test_missing_token_in_development(monkeypatch):
-    """Test that development requests are allowed when no auth token is configured."""
-    with make_auth_client(monkeypatch, token=None, env="development") as client:
+    """Test that development requests are rejected when no auth token is configured.
+
+    Even in development mode, PYSCF_AUTH_TOKEN must be set for non-test
+    runtime requests.  The TESTING bypass is not active here (TESTING=False)
+    to simulate a real runtime scenario.
+    """
+    monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
+    monkeypatch.setenv("PYSCF_ENV", "development")
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": False})
+    with TestClient(app) as client:
         response = client.get("/health")
 
-    assert response.status_code != 401
+    assert response.status_code == 401
+    assert response.json() == {
+        "success": False,
+        "error": "Unauthorized: Missing authentication token",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +279,7 @@ def test_cors_production_allows_null_origin(monkeypatch):
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         response = client.options(
             "/health",
             headers={
@@ -283,7 +299,7 @@ def test_cors_production_rejects_loopback_origin(monkeypatch):
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         response = client.options(
             "/health",
             headers={
@@ -303,7 +319,7 @@ def test_cors_production_allows_file_origin(monkeypatch):
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         response = client.options(
             "/health",
             headers={
@@ -323,7 +339,7 @@ def test_cors_production_rejects_external_origin(monkeypatch):
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         response = client.options(
             "/health",
             headers={
@@ -425,7 +441,10 @@ def test_cors_unset_env_uses_production_origins(monkeypatch):
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app) as client:
+    # Use loopback base_url so TrustedHostMiddleware does not short-circuit
+    # the request before CORS runs (testserver is not trusted when env is
+    # unset under the fail-closed allowlist).
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         # Loopback should be rejected (production only allows file:// and null)
         response = client.options(
             "/health",
@@ -446,7 +465,10 @@ def test_cors_typo_env_uses_production_origins(monkeypatch):
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app) as client:
+    # Use loopback base_url so TrustedHostMiddleware does not short-circuit
+    # the request before CORS runs (testserver is not trusted when env is a
+    # typo under the fail-closed allowlist).
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         # Loopback should be rejected
         response = client.options(
             "/health",
@@ -462,7 +484,11 @@ def test_cors_typo_env_uses_production_origins(monkeypatch):
 
 
 def test_mixed_case_env_treated_as_development_by_auth(monkeypatch):
-    """Mixed-case PYSCF_ENV like 'Development' is normalized to 'development' by auth."""
+    """Mixed-case PYSCF_ENV without a token is rejected regardless of env value.
+
+    Even though .lower() normalizes 'Development' to 'development', auth
+    now requires PYSCF_AUTH_TOKEN for all non-test runtime requests.
+    """
     monkeypatch.setenv("PYSCF_ENV", "Development")
     monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
@@ -470,21 +496,29 @@ def test_mixed_case_env_treated_as_development_by_auth(monkeypatch):
     with TestClient(app) as client:
         response = client.get("/health")
 
-    # With .lower() normalization, "Development" is treated as "development"
-    # so the request is allowed (not 401).
-    assert response.status_code != 401
+    assert response.status_code == 401
+    assert response.json() == {
+        "success": False,
+        "error": "Unauthorized: Missing authentication token",
+    }
 
 
 def test_mixed_case_env_consistent_across_auth_and_cors(monkeypatch):
-    """Mixed-case PYSCF_ENV is handled consistently by auth and CORS middleware."""
+    """Mixed-case PYSCF_ENV: auth rejects without token; CORS still uses dev origins.
+
+    Auth now requires PYSCF_AUTH_TOKEN regardless of env, so a tokenless
+    request is rejected.  CORS still normalises the env correctly and
+    allows loopback origins in development mode (OPTIONS bypass auth).
+    """
     monkeypatch.setenv("PYSCF_ENV", "Development")
     monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": False})
     with TestClient(app) as client:
-        # Auth: should allow without token (development mode)
+        # Auth: should reject without token (fail-closed)
         auth_response = client.get("/health")
-        # CORS: should allow loopback origin (development mode)
+        # CORS: should still allow loopback origin (development mode, OPTIONS
+        # requests bypass auth)
         cors_response = client.options(
             "/health",
             headers={
@@ -494,7 +528,7 @@ def test_mixed_case_env_consistent_across_auth_and_cors(monkeypatch):
             },
         )
 
-    assert auth_response.status_code != 401
+    assert auth_response.status_code == 401
     assert (
         cors_response.headers.get("access-control-allow-origin")
         == "http://127.0.0.1:5173"
@@ -507,7 +541,7 @@ def test_cors_production_does_not_send_credentials_header(monkeypatch):
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
     app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         response = client.options(
             "/health",
             headers={
@@ -539,3 +573,276 @@ def test_cors_development_does_not_send_credentials_header(monkeypatch):
     # allow_credentials=False means the header should not be 'true'
     creds_header = response.headers.get("access-control-allow-credentials")
     assert creds_header != "true"
+
+
+# ---------------------------------------------------------------------------
+# TrustedHostMiddleware: Host header validation
+# ---------------------------------------------------------------------------
+
+
+def test_trusted_host_rejects_evil_host(monkeypatch):
+    """A request with Host: evil.com is rejected by TrustedHostMiddleware."""
+    with make_auth_client(monkeypatch) as client:
+        response = client.get("/health", headers={"host": "evil.com"})
+
+    assert response.status_code == 400
+    assert "Invalid host header" in response.text
+
+
+def test_trusted_host_accepts_loopback(monkeypatch):
+    """A request with Host: 127.0.0.1 passes TrustedHostMiddleware."""
+    with make_auth_client(monkeypatch) as client:
+        response = client.get(
+            "/health",
+            headers={"host": "127.0.0.1", "X-Auth-Token": TEST_TOKEN},
+        )
+
+    assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# TESTING bypass production boundary
+# ---------------------------------------------------------------------------
+
+
+def test_testing_bypass_blocked_in_production(monkeypatch):
+    """TESTING=True does NOT bypass auth when PYSCF_ENV=production.
+
+    Even when the app is constructed with test_config={"TESTING": True},
+    the TESTING bypass must not activate in production mode.
+    """
+    monkeypatch.delenv("PYSCF_AUTH_TOKEN", raising=False)
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        response = client.get("/health")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "success": False,
+        "error": "Unauthorized: Missing authentication token",
+    }
+
+
+# ---------------------------------------------------------------------------
+# IMP-1: testserver host rejected in production
+# ---------------------------------------------------------------------------
+
+
+def test_testserver_host_rejected_in_production(monkeypatch):
+    """Host: testserver is rejected by TrustedHostMiddleware in production.
+
+    Production builds exclude ``testserver`` from allowed_hosts so the
+    synthetic hostname that Starlette's TestClient sends by default is
+    not trusted.
+    """
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    # Default TestClient base_url sends Host: testserver
+    with TestClient(app) as client:
+        response = client.get("/health")
+
+    assert response.status_code == 400
+    assert "Invalid host header" in response.text
+
+
+# ---------------------------------------------------------------------------
+# IMP-2: non-loopback configured host falls back to 127.0.0.1
+# ---------------------------------------------------------------------------
+
+
+def test_non_loopback_configured_host_falls_back(monkeypatch, caplog):
+    """A non-loopback server.host config value is rejected with a warning.
+
+    TrustedHostMiddleware should still accept 127.0.0.1 and the
+    non-loopback value should NOT be in allowed_hosts.
+    """
+    import logging
+    from unittest.mock import MagicMock
+
+    monkeypatch.setenv("PYSCF_ENV", "development")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+
+    # Stub server config to return a non-loopback host
+    fake_config = MagicMock()
+    fake_config.get.side_effect = lambda key, default=None: {
+        "server.host": "0.0.0.0",
+        "server.port": 5000,
+    }.get(key, default)
+    fake_config.get_logging_level.return_value = "INFO"
+    fake_config.get_logging_format.return_value = (
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    monkeypatch.setattr("app.get_server_config", lambda: fake_config)
+
+    with caplog.at_level(logging.WARNING, logger="app"):
+        app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+
+    # Warning should have been emitted about the non-loopback host
+    assert any(
+        "not a recognised loopback address" in record.getMessage()
+        for record in caplog.records
+    ), "Expected a warning about non-loopback host fallback"
+
+    with TestClient(app) as client:
+        # 127.0.0.1 should be accepted (loopback fallback)
+        ok_response = client.get(
+            "/health",
+            headers={"host": "127.0.0.1", "X-Auth-Token": TEST_TOKEN},
+        )
+        assert ok_response.status_code == 200
+
+        # The original non-loopback host should be rejected
+        bad_response = client.get(
+            "/health",
+            headers={"host": "0.0.0.0", "X-Auth-Token": TEST_TOKEN},
+        )
+        assert bad_response.status_code == 400
+        assert "Invalid host header" in bad_response.text
+
+
+# ---------------------------------------------------------------------------
+# IMP-T3: StarletteHTTPException 5xx redaction
+# ---------------------------------------------------------------------------
+
+
+def test_starlette_http_exception_5xx_redacts_detail():
+    """A StarletteHTTPException with status 500 must redact the raw detail.
+
+    The response body should be the generic envelope, not the raw detail.
+    """
+    from fastapi import FastAPI
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    from app import register_exception_handlers
+
+    test_app = FastAPI()
+    register_exception_handlers(test_app)
+
+    @test_app.get("/boom")
+    def boom():
+        raise StarletteHTTPException(status_code=500, detail="secret db info")
+
+    with TestClient(test_app, raise_server_exceptions=False) as client:
+        response = client.get("/boom")
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body == {"success": False, "error": "An internal server error occurred."}
+    assert "secret db info" not in response.text
+
+
+# ---------------------------------------------------------------------------
+# IMP-T4: ServiceError 507 curated message preserved
+# ---------------------------------------------------------------------------
+
+
+def test_service_error_507_preserves_curated_message():
+    """A ServiceError with status 507 should surface its curated message.
+
+    507 is in CURATED_5XX_CODES, so the developer-authored message must
+    be returned to the client rather than the generic redacted text.
+    """
+    from fastapi import FastAPI
+
+    from app import register_exception_handlers
+    from services.exceptions import InsufficientResourcesError
+
+    test_app = FastAPI()
+    register_exception_handlers(test_app)
+
+    @test_app.get("/disk-full")
+    def disk_full():
+        raise InsufficientResourcesError("Disk space exhausted")
+
+    with TestClient(test_app, raise_server_exceptions=False) as client:
+        response = client.get("/disk-full")
+
+    assert response.status_code == 507
+    body = response.json()
+    assert body == {"success": False, "error": "Disk space exhausted"}
+
+
+# ---------------------------------------------------------------------------
+# F2: testserver fail-closed when PYSCF_ENV is unset/empty
+# ---------------------------------------------------------------------------
+
+
+def test_testserver_host_rejected_when_env_unset(monkeypatch):
+    """Host: testserver is rejected when PYSCF_ENV is unset (fail-closed).
+
+    The fail-closed allowlist only includes ``testserver`` when the
+    lowercased env is in {"development", "test"}.  When PYSCF_ENV is
+    unset (empty string after .lower()), ``testserver`` must NOT be
+    trusted.
+    """
+    monkeypatch.delenv("PYSCF_ENV", raising=False)
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    # Default TestClient base_url sends Host: testserver
+    with TestClient(app) as client:
+        response = client.get("/health", headers={"X-Auth-Token": TEST_TOKEN})
+
+    assert response.status_code == 400
+    assert "Invalid host header" in response.text
+
+
+# ---------------------------------------------------------------------------
+# F3: Host header with port (production-realistic)
+# ---------------------------------------------------------------------------
+
+
+def test_trusted_host_accepts_loopback_with_port(monkeypatch):
+    """A request with Host: 127.0.0.1:5000 passes TrustedHostMiddleware.
+
+    Production runtime sends ``Host: 127.0.0.1:<port>``.  Starlette
+    strips the port via ``host.split(":")[0]`` before matching, so
+    ``127.0.0.1`` must be in allowed_hosts.  This test pins that
+    port-stripping behaviour so a future Starlette upgrade that changes
+    it is caught.
+    """
+    with make_auth_client(monkeypatch) as client:
+        response = client.get(
+            "/health",
+            headers={"host": "127.0.0.1:5000", "X-Auth-Token": TEST_TOKEN},
+        )
+
+    assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# L4: ServiceError 500 redacts raw detail
+# ---------------------------------------------------------------------------
+
+
+def test_service_error_500_redacts_raw_detail():
+    """A ServiceError with status 500 must redact the raw detail message.
+
+    500 is NOT in CURATED_5XX_CODES, so the response body should be the
+    generic envelope and the raw detail must not leak to the client.
+    """
+    from fastapi import FastAPI
+
+    from app import register_exception_handlers
+    from services.exceptions import ServiceError
+
+    test_app = FastAPI()
+    register_exception_handlers(test_app)
+
+    @test_app.get("/internal-boom")
+    def internal_boom():
+        raise ServiceError("secret traceback /var/db/creds.py", status_code=500)
+
+    with TestClient(test_app, raise_server_exceptions=False) as client:
+        response = client.get("/internal-boom")
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body == {"success": False, "error": "An internal server error occurred."}
+    assert "secret traceback" not in response.text
+    assert "creds.py" not in response.text

@@ -5,6 +5,7 @@ import {
   getSplashRendererEntry,
   installNavigationGuards,
 } from './renderer-entry';
+import { hardenSession } from './session-hardening';
 
 let splashWindow: BrowserWindow | null = null;
 
@@ -35,6 +36,9 @@ export const createSplashWindow = (): void => {
       devTools: !app.isPackaged,
     },
   });
+
+  // SEC-006: Harden the splash session before loading content
+  hardenSession(splashWindow.webContents.session, app.isPackaged);
 
   const splashPath = path.join(__dirname, 'splash.html');
   const rendererEntry = getSplashRendererEntry({

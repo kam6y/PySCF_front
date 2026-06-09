@@ -73,7 +73,6 @@ Module._load = (...args: unknown[]): unknown => {
 (globalThis as any).window = {
   electronAPI: {
     backendPort: 5000,
-    getAuthToken: async () => null,
   },
 };
 

@@ -1,8 +1,6 @@
 export interface ElectronAPI {
-  // URLパラメータから取得したbackendポート番号（preloadで設定）
+  // Backend port number from URL parameters (set in preload)
   backendPort: number | null;
-  // IPC経由で受信した認証トークンを取得（トークンが届くまで待機）
-  getAuthToken: () => Promise<string | null>;
   openExternalUrl: (
     url: string
   ) => Promise<{ success: boolean; error?: string }>;

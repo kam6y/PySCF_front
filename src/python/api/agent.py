@@ -192,6 +192,7 @@ def stream_chat_response(request: AgentChatRequest) -> Iterator[dict[str, Any]]:
     accumulated_response = []
     db_save_successful = False
     client_aborted = False
+    stream_completed = False
 
     try:
         logger.debug(
@@ -249,6 +250,7 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
                 accumulated_response.append(chunk.text)
                 yield {"type": "chunk", "payload": {"text": chunk.text}}
 
+        stream_completed = True
         logger.debug("Stream completed successfully")
 
         # Save AI response to database BEFORE sending completion event
@@ -284,25 +286,25 @@ Be concise and helpful. When discussing chemistry concepts, be accurate and educ
 
     except Exception as e:
         logger.error(f"Error during Gemini chat streaming: {e}", exc_info=True)
-        accumulated_response.append(f"\n\n[Error: {str(e)}]")
 
         try:
             yield {
                 "type": "error",
-                "payload": {
-                    "message": f"An error occurred during the stream: {str(e)}"
-                },
+                "payload": {"message": "AI chat failed. Check settings and logs."},
             }
         except (BrokenPipeError, ConnectionResetError, GeneratorExit):
             logger.debug("Unable to send error message - connection closed")
 
     finally:
-        # Fallback: Save AI response to database if not already saved
+        # Fallback: Save AI response to database if not already saved.
+        # Only persist when the stream completed fully -- a mid-stream
+        # exception must NOT save a truncated response as if it were complete.
         if (
             session_id
             and accumulated_response
             and not db_save_successful
             and not client_aborted
+            and stream_completed
         ):
             try:
                 complete_response = "".join(accumulated_response)

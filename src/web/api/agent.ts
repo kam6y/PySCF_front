@@ -35,14 +35,10 @@ export const streamChatWithAgent = (
 
   (async () => {
     try {
-      const authToken = await window.electronAPI?.getAuthToken();
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
         Accept: 'text/event-stream',
       };
-      if (authToken) {
-        (headers as any)['X-Auth-Token'] = authToken;
-      }
 
       await fetchEventSource(`${getApiBaseUrl()}/api/agent/chat`, {
         method: 'POST',

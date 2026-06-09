@@ -15,7 +15,6 @@ const setMockWindow = (backendPort: number | null): void => {
   (globalThis as any).window = {
     electronAPI: {
       backendPort,
-      getAuthToken: async () => null,
     },
   };
 };

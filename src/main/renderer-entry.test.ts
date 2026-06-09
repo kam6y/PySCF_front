@@ -373,7 +373,7 @@ const testNavAllowed_packagedModeFileWithQuery = (): void => {
   };
 
   // Electron appends query params to the loaded file URL;
-  // the auth-token gate in did-finish-load passes this URL through isAllowedNavigation.
+  // navigation guards pass this URL through isAllowedNavigation.
   assert.equal(
     isAllowedNavigation('file:///app/dist/index.html?backend_port=5060', entry),
     true

@@ -3,8 +3,9 @@ import path from 'node:path';
 import {
   getMainRendererEntry,
   installNavigationGuards,
-  isAllowedNavigation,
 } from './renderer-entry';
+import { hardenSession } from './session-hardening';
+import { registerBackendAuthInjection } from './backend-auth-injection';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -84,8 +85,16 @@ export const createWindow = (
     mainWindow = null;
   });
 
-  // ポート番号をURLパラメータとして渡す
-  // 認証トークンはセキュリティのためIPC経由で送信
+  // SEC-006: Harden the window session with CSP response headers and
+  // permission restrictions before any content is loaded.
+  hardenSession(newWindow.webContents.session, app.isPackaged);
+
+  // SEC-002: inject the auth token into renderer->backend requests at the
+  // network layer so the token never enters the renderer/DOM world. Registered
+  // before any content loads; backendPort and authToken are valid here (resolved
+  // in main.ts before createWindow is called).
+  registerBackendAuthInjection(newWindow.webContents.session, backendPort, authToken);
+
   const htmlPath = path.join(__dirname, 'index.html');
   const rendererEntry = getMainRendererEntry({
     backendPort,
@@ -106,22 +115,6 @@ export const createWindow = (
       query: rendererEntry.query,
     });
   }
-
-  // ウィンドウのロード完了後にIPCで認証トークンを送信
-  // リロード時にもトークンを送信するため 'on' を使用
-  // Defense-in-depth: only send the token when the loaded page is an allowed origin
-  newWindow.webContents.on('did-finish-load', () => {
-    if (newWindow.isDestroyed()) return;
-    const currentUrl = newWindow.webContents.getURL();
-    if (!isAllowedNavigation(currentUrl, rendererEntry)) {
-      console.warn(
-        `[Security] Refused to send auth token — loaded URL is not allowed: ${currentUrl}`
-      );
-      return;
-    }
-    newWindow.webContents.send('auth-token', authToken);
-    console.log('[Main] Auth token sent via IPC');
-  });
 
   console.log(`[Main] Loading window with backend port: ${backendPort}`);
 
