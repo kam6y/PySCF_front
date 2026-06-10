@@ -101,8 +101,15 @@ export const App = () => {
 
     try {
       await updateSettingsAsync({
-        ...settings,
+        max_parallel_instances: settings.max_parallel_instances,
+        max_cpu_utilization_percent: settings.max_cpu_utilization_percent,
+        max_memory_utilization_percent: settings.max_memory_utilization_percent,
+        gpu_acceleration_enabled: settings.gpu_acceleration_enabled,
+        system_total_cores: settings.system_total_cores,
+        system_total_memory_mb: settings.system_total_memory_mb,
         calculations_directory: calculationsDirectory,
+        timezone: settings.timezone,
+        research_email: settings.research_email,
       });
     } catch (error) {
       console.error('Failed to save initial setup settings:', error);

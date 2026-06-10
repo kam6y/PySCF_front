@@ -426,6 +426,24 @@ class TestCalculationUpdateAPI:
         # ASSERT
         assert response.status_code == 404
 
+    def test_update_calculation_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid update payload with an extra unknown field
+        WHEN PUT /api/quantum/calculations/<id> is called
+        THEN 400 is returned because CalculationUpdateRequest has extra='forbid'
+        """
+        # ACT
+        response = client.put(
+            "/api/quantum/calculations/calc-123",
+            json={"name": "Valid Name", "unknown_field": "should be rejected"},
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
 
 class TestCalculationPauseAPI:
     """Integration tests for POST /api/quantum/calculations/<id>/pause."""

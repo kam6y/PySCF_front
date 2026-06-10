@@ -62,7 +62,9 @@ def _extract_route_query_params(route: APIRoute) -> set[str]:
 
 
 @lru_cache(maxsize=1)
-def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple[str, str], set[str]]]:
+def _extract_implementation_contract() -> (
+    tuple[set[tuple[str, str]], dict[tuple[str, str], set[str]]]
+):
     routes: set[tuple[str, str]] = set()
     query_params_by_route: dict[tuple[str, str], set[str]] = {}
 
@@ -85,7 +87,9 @@ def _extract_implementation_contract() -> tuple[set[tuple[str, str]], dict[tuple
 
 
 @lru_cache(maxsize=1)
-def _extract_openapi_contract() -> tuple[set[tuple[str, str]], dict[tuple[str, str], set[str]]]:
+def _extract_openapi_contract() -> (
+    tuple[set[tuple[str, str]], dict[tuple[str, str], set[str]]]
+):
     spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
     path_items = spec.get("paths", {})
 
@@ -110,7 +114,9 @@ def _extract_openapi_contract() -> tuple[set[tuple[str, str]], dict[tuple[str, s
             all_parameters = []
             if isinstance(path_level_parameters, list):
                 all_parameters.extend(path_level_parameters)
-            if isinstance(operation, dict) and isinstance(operation.get("parameters"), list):
+            if isinstance(operation, dict) and isinstance(
+                operation.get("parameters"), list
+            ):
                 all_parameters.extend(operation["parameters"])
 
             query_names = {
@@ -164,9 +170,14 @@ def _extract_string_assignments(path: Path, variable_name: str) -> set[str]:
     for node in ast.walk(tree):
         if not isinstance(node, ast.Assign):
             continue
-        if not isinstance(node.value, ast.Constant) or not isinstance(node.value.value, str):
+        if not isinstance(node.value, ast.Constant) or not isinstance(
+            node.value.value, str
+        ):
             continue
-        if any(isinstance(target, ast.Name) and target.id == variable_name for target in node.targets):
+        if any(
+            isinstance(target, ast.Name) and target.id == variable_name
+            for target in node.targets
+        ):
             values.add(node.value.value)
 
     return values
@@ -240,7 +251,9 @@ def test_openapi_public_operations_require_auth_token_and_document_401() -> None
     if missing_security:
         issues.append("Missing AuthToken security: " + ", ".join(missing_security))
     if missing_header:
-        issues.append("Missing X-Auth-Token header parameter: " + ", ".join(missing_header))
+        issues.append(
+            "Missing X-Auth-Token header parameter: " + ", ".join(missing_header)
+        )
     if missing_unauthorized_response:
         issues.append(
             "Missing 401 Unauthorized response: "
@@ -292,7 +305,10 @@ def test_openapi_active_space_limits_match_runtime_constraints() -> None:
     for schema_name in ("CASCICalculationRequest", "CASSCFCalculationRequest"):
         properties = schemas[schema_name]["allOf"][1]["properties"]
         for param_name in ("ncas", "nelecas", "max_cycle_micro"):
-            assert properties[param_name]["maximum"] == PARAMETER_CONSTRAINTS[param_name]["max"]
+            assert (
+                properties[param_name]["maximum"]
+                == PARAMETER_CONSTRAINTS[param_name]["max"]
+            )
 
 
 def test_list_calculations_method_filter_matches_calculation_method_schema() -> None:
@@ -329,8 +345,52 @@ def test_openapi_orbital_type_enum_allows_runtime_orbital_generator_values() -> 
 def test_delete_calculation_documents_validation_error_response() -> None:
     """DELETE calculation must document the 400 response used for non-terminal statuses."""
     spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
-    responses = spec["paths"]["/api/quantum/calculations/{calculationId}"]["delete"]["responses"]
+    responses = spec["paths"]["/api/quantum/calculations/{calculationId}"]["delete"][
+        "responses"
+    ]
 
     assert responses["400"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ErrorResponse"
     }
+
+
+def test_openapi_additional_properties_false_matches_pydantic_extra_forbid() -> None:
+    """OpenAPI schemas with additionalProperties: false must have extra='forbid' in Pydantic.
+
+    This guards against codegen drift: if the OpenAPI spec declares that a
+    request schema rejects unknown properties, the generated Pydantic model
+    must enforce the same constraint via model_config extra='forbid'.
+    """
+    import generated_models
+
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    schemas = spec.get("components", {}).get("schemas", {})
+
+    hardened_schemas: list[str] = [
+        name
+        for name, schema in schemas.items()
+        if isinstance(schema, dict) and schema.get("additionalProperties") is False
+    ]
+
+    assert (
+        hardened_schemas
+    ), "Expected at least one schema with additionalProperties: false"
+
+    missing_extra_forbid: list[str] = []
+    for schema_name in hardened_schemas:
+        model_class = getattr(generated_models, schema_name, None)
+        if model_class is None:
+            missing_extra_forbid.append(f"{schema_name}: not found in generated_models")
+            continue
+
+        config = getattr(model_class, "model_config", {})
+        extra_value = config.get("extra")
+        if extra_value != "forbid":
+            missing_extra_forbid.append(
+                f"{schema_name}: expected extra='forbid', got extra={extra_value!r}"
+            )
+
+    assert not missing_extra_forbid, (
+        "OpenAPI additionalProperties: false / Pydantic extra='forbid' mismatch:\n"
+        + "\n".join(f"  - {item}" for item in missing_extra_forbid)
+    )

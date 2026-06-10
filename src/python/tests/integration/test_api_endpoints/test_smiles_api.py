@@ -159,6 +159,25 @@ class TestSMILESConvertAPI:
         assert response.status_code == 400
 
 
+class TestSMILESExtraFieldRejection:
+    """Security tests: extra='forbid' rejects unknown fields at the Pydantic layer."""
+
+    def test_convert_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid SMILES convert payload with an extra unknown field
+        WHEN POST /api/smiles/convert is called
+        THEN 400 is returned because SMILESConvertRequest has extra='forbid'
+        """
+        payload = {"smiles": "O", "unknown_field": "x"}
+
+        response = client.post("/api/smiles/convert", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
+
 class TestSMILESInputLengthLimits:
     """Security tests for input length validation on SMILES endpoints."""
 

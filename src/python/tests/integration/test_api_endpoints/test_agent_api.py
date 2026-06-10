@@ -257,6 +257,29 @@ class TestAgentChatAPI:
         assert model_saves == []
 
 
+class TestAgentChatExtraFieldRejection:
+    """Verify that AgentChatRequest with extra='forbid' rejects unknown fields."""
+
+    def test_agent_chat_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid chat payload with an extra unknown field
+        WHEN POST /api/agent/chat is called
+        THEN 400 is returned because AgentChatRequest has extra='forbid'
+        """
+        payload = {
+            "message": "Hello",
+            "history": [],
+            "unknown_field": "should be rejected",
+        }
+
+        response = client.post("/api/agent/chat", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
+
 class TestAgentChatInputSizeLimits:
     """Tests for security-related input size validation on POST /api/agent/chat.
 

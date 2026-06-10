@@ -240,6 +240,40 @@ class TestPubChemValidateAPI:
         assert response.status_code == 400
 
 
+class TestPubChemExtraFieldRejection:
+    """Security tests: extra='forbid' rejects unknown fields at the Pydantic layer."""
+
+    def test_search_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid PubChem search payload with an extra unknown field
+        WHEN POST /api/pubchem/search is called
+        THEN 400 is returned because PubChemSearchRequest has extra='forbid'
+        """
+        payload = {"query": "water", "searchType": "name", "unknown_field": "x"}
+
+        response = client.post("/api/pubchem/search", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
+    def test_xyz_validate_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid XYZ validation payload with an extra unknown field
+        WHEN POST /api/pubchem/validate is called
+        THEN 400 is returned because XYZValidateRequest has extra='forbid'
+        """
+        payload = {"xyz": "H 0 0 0\nH 0 0 0.74", "unknown_field": "x"}
+
+        response = client.post("/api/pubchem/validate", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
+
 class TestPubChemInputLengthLimits:
     """Security tests for input length validation on PubChem endpoints."""
 

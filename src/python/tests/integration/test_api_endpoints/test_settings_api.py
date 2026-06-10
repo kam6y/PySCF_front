@@ -96,3 +96,63 @@ class TestSettingsAPI:
         assert settings["gemini_api_key"] == ""
         assert settings["gemini_api_key_configured"] is True
         assert "sk-new-secret" not in str(response.json())
+
+    def test_put_settings_succeeds_without_gemini_api_key(self, client, mocker):
+        """
+        GIVEN a valid settings payload that omits gemini_api_key entirely
+              (as the frontend initial-setup handler does)
+        WHEN PUT /api/settings is called
+        THEN 200 is returned with success=True, because gemini_api_key is
+             optional (default None) and extra='forbid' only rejects unknown
+             fields, not missing optional ones.
+        """
+        payload = self._settings_payload()
+        del payload["gemini_api_key"]
+
+        # Service returns settings with gemini_api_key defaulted to None
+        updated = {**payload, "gemini_api_key": None}
+        mock_service = mocker.patch("api.settings.get_settings_service")
+        mock_service.return_value.update_settings.return_value = updated
+
+        response = client.put("/api/settings", json=payload)
+
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+    def test_put_settings_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid settings payload with an extra unknown field
+        WHEN PUT /api/settings is called
+        THEN 400 is returned because AppSettings has extra='forbid'
+        """
+        payload = {**self._settings_payload(), "unknown_field": "should be rejected"}
+
+        response = client.put("/api/settings", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
+    def test_put_settings_rejects_response_only_field_gemini_api_key_configured(
+        self, client
+    ):
+        """
+        GIVEN a settings payload containing 'gemini_api_key_configured' (a
+              response-only field added by _mask_api_key_for_response, not a
+              declared AppSettings field)
+        WHEN PUT /api/settings is called
+        THEN 400 is returned because AppSettings has extra='forbid'
+
+        This documents the App.tsx coupling where the GET response includes
+        gemini_api_key_configured but the request schema forbids it, and
+        would catch a regression if the response-masking ever changes.
+        """
+        payload = {**self._settings_payload(), "gemini_api_key_configured": True}
+
+        response = client.put("/api/settings", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "gemini_api_key_configured" in body["error"]

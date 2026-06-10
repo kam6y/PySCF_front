@@ -1367,6 +1367,7 @@ components:
     PubChemSearchRequest:
       type: object
       required: [query]
+      additionalProperties: false
       properties:
         query:
           type: string
@@ -1380,6 +1381,7 @@ components:
     SMILESConvertRequest:
       type: object
       required: [smiles]
+      additionalProperties: false
       properties:
         smiles:
           type: string
@@ -1390,6 +1392,7 @@ components:
     XYZValidateRequest:
       type: object
       required: [xyz]
+      additionalProperties: false
       properties:
         xyz:
           type: string
@@ -1798,6 +1801,7 @@ components:
     CalculationUpdateRequest:
       type: object
       required: [name]
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -2998,6 +3002,7 @@ components:
     AppSettings:
       type: object
       required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb, calculations_directory, timezone]
+      additionalProperties: false
       properties:
         max_parallel_instances:
           type: integer
@@ -3897,6 +3902,7 @@ components:
     AgentChatRequest:
       type: object
       required: [message, history]
+      additionalProperties: false
       properties:
         message:
           type: string
@@ -4030,6 +4036,7 @@ components:
 
     CreateChatSessionRequest:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -4041,6 +4048,7 @@ components:
     UpdateChatSessionRequest:
       type: object
       required: [name]
+      additionalProperties: false
       properties:
         name:
           type: string

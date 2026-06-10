@@ -27,7 +27,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'npm'
     
     - name: Cache conda environment
@@ -104,8 +104,9 @@ jobs:
         npm run build:electron
 
         # Build conda-pack (CI version - without conda.sh sourcing)
-        # Ensure setuptools is available (conda-pack requires pkg_resources)
-        pip install "setuptools<75"
+        # setuptools<75 (providing pkg_resources for conda-pack) is pinned
+        # in .github/environment.yml, which propagates into the conda lock
+        # file via conda-lock — no separate pip install needed.
         rm -rf conda_env
         conda-pack -o conda_env.tar.gz
         mkdir -p conda_env
@@ -144,7 +145,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
         cache: 'npm'
     
     - name: Install Node.js dependencies
@@ -167,6 +168,26 @@ jobs:
           }
         done
     
+    - name: Audit npm dependencies (advisory, non-blocking)
+      continue-on-error: true
+      run: npm audit --audit-level=high
+
+    - name: Audit Python dependencies (advisory, non-blocking)
+      continue-on-error: true
+      run: |
+        # Isolated runner-Python audit via pipx — does NOT touch the conda
+        # pyscf-env that gets conda-packed/shipped (SEC-002 safe).
+        # KNOWN GAP: only the PyPI-resolvable deps listed below are covered.
+        # conda-channel packages (numpy, pyscf, fastapi, rdkit, etc.) and
+        # the git-pinned pyscf-properties are NOT scanned by this step.
+        # Full conda vulnerability scanning needs separate tooling
+        # (e.g. OSV-Scanner with conda-lock support) — tracked as follow-up.
+        cat > "$RUNNER_TEMP/py-audit-reqs.txt" <<'EOF'
+        datamodel-code-generator==0.33.0
+        google-generativeai==0.8.6
+        EOF
+        pipx run pip-audit -r "$RUNNER_TEMP/py-audit-reqs.txt"
+
     - name: Type check TypeScript
       run: npx tsc --noEmit
 

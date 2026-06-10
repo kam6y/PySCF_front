@@ -126,6 +126,39 @@ class TestChatHistoryAPI:
             "error": "Chat session not found: missing-session",
         }
 
+    def test_create_chat_session_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid create-session payload with an extra unknown field
+        WHEN POST /api/chat-history/sessions is called
+        THEN 400 is returned because CreateChatSessionRequest has extra='forbid'
+        """
+        payload = {"name": "New chat", "unknown_field": "should be rejected"}
+
+        response = client.post("/api/chat-history/sessions", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
+    def test_update_chat_session_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid update-session payload with an extra unknown field
+        WHEN PATCH /api/chat-history/sessions/<id> is called
+        THEN 400 is returned because UpdateChatSessionRequest has extra='forbid'
+        """
+        payload = {"name": "Renamed chat", "unknown_field": "should be rejected"}
+
+        response = client.patch(
+            "/api/chat-history/sessions/session-1",
+            json=payload,
+        )
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
     def test_service_error_uses_global_error_envelope(self, client, mocker):
         mock_service = mocker.patch("api.chat_history.get_chat_history_service")
         mock_service.return_value.list_sessions.side_effect = ServiceError(

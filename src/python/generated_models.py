@@ -62,6 +62,9 @@ class CalculationStatus(Enum):
 
 
 class PubChemSearchRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     query: str = Field(
         ..., description='Search query for PubChem', max_length=500, min_length=1
     )
@@ -69,6 +72,9 @@ class PubChemSearchRequest(BaseModel):
 
 
 class SMILESConvertRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     smiles: str = Field(
         ...,
         description='SMILES string to convert to XYZ format',
@@ -78,6 +84,9 @@ class SMILESConvertRequest(BaseModel):
 
 
 class XYZValidateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     xyz: str = Field(
         ..., description='XYZ string to validate', max_length=1000000, min_length=1
     )
@@ -356,6 +365,9 @@ class QuantumCalculationRequest(
 
 
 class CalculationUpdateRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     name: str = Field(
         ...,
         description='Updated name for the calculation',
@@ -925,6 +937,9 @@ class Timezone(Enum):
 
 
 class AppSettings(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     max_parallel_instances: int = Field(
         ...,
         description='Maximum number of parallel calculation instances',
@@ -1627,6 +1642,9 @@ class HistoryItem(BaseModel):
 
 
 class AgentChatRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     message: str = Field(..., description='New message from the user', max_length=10000)
     history: List[HistoryItem] = Field(
         ..., description='Previous conversation history', max_length=200
@@ -1701,12 +1719,18 @@ class ChatSessionDetail(BaseModel):
 
 
 class CreateChatSessionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     name: Optional[str] = Field(
         '新しいチャット', description='Session name/title', max_length=200, min_length=1
     )
 
 
 class UpdateChatSessionRequest(BaseModel):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
     name: str = Field(
         ..., description='Updated session name', max_length=200, min_length=1
     )
