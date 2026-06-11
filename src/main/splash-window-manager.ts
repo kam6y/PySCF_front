@@ -1,4 +1,4 @@
-import { BrowserWindow, app, shell } from 'electron';
+import { BrowserWindow, app } from 'electron';
 import path from 'path';
 import type { SplashStage, SplashStatusUpdate } from '../types/splash';
 import {
@@ -48,9 +48,7 @@ export const createSplashWindow = (): void => {
   });
 
   // --- SEC-001: Lock down splash window navigation ---
-  installNavigationGuards(splashWindow.webContents, rendererEntry, {
-    openExternal: (url) => shell.openExternal(url),
-  });
+  installNavigationGuards(splashWindow.webContents, rendererEntry);
 
   if (rendererEntry.type === 'url') {
     splashWindow.loadURL(rendererEntry.url);

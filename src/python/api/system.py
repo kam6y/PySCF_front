@@ -26,15 +26,37 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _debug_endpoints_allowed() -> bool:
-    """Allow debug diagnostics only in non-production environments.
+_DEBUG_ALLOWED_ENVIRONMENTS: frozenset[str] = frozenset({"development", "test"})
+_DEBUG_FLAG_TRUTHY_VALUES: frozenset[str] = frozenset({"true", "1"})
 
-    The ``PYSCF_ENV`` env var is checked at request time.  When set to
-    ``"production"`` the debug endpoints return 403.  In all other cases
-    (absent, ``"development"``, etc.) the endpoints are available —
-    they still require the existing auth-token middleware.
+
+def _parse_debug_flag(value: str | None) -> bool:
+    """Return whether *value* is an explicit truthy opt-in.
+
+    Truthy: ``"true"``, ``"1"`` (case-insensitive).
+    Falsy / absent: everything else (``""``, ``"false"``, ``"0"``, ``None``).
     """
-    return os.getenv("PYSCF_ENV", "").lower() != "production"
+    if value is None:
+        return False
+    return value.strip().lower() in _DEBUG_FLAG_TRUTHY_VALUES
+
+
+def _debug_endpoints_allowed() -> bool:
+    """Allow debug diagnostics only when BOTH gates pass (fail-closed).
+
+    Gate 1 — ``PYSCF_ENV`` must be an explicitly recognised non-production
+    value (``"development"`` or ``"test"``).  An absent, empty, or
+    misspelled value fails this gate.
+
+    Gate 2 — ``PYSCF_ENABLE_DEBUG_ENDPOINTS`` must be set to a truthy
+    value (``"true"`` or ``"1"``, case-insensitive).
+
+    Both env vars are read at request time so the check stays dynamic.
+    """
+    env = os.getenv("PYSCF_ENV", "").strip().lower()
+    if env not in _DEBUG_ALLOWED_ENVIRONMENTS:
+        return False
+    return _parse_debug_flag(os.getenv("PYSCF_ENABLE_DEBUG_ENDPOINTS"))
 
 
 def _get_client_host(request: Request) -> str | None:
@@ -121,7 +143,7 @@ async def install_gpu4pyscf(request: Request) -> Any:
 _DEBUG_BLOCKED_STATUS_CODE = 403
 _DEBUG_BLOCKED_CONTENT = {
     "success": False,
-    "error": "Debug endpoints are disabled in production.",
+    "error": "Debug endpoints are not enabled in this environment.",
 }
 
 

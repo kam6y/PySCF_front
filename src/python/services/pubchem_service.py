@@ -66,11 +66,11 @@ class PubChemService:
         try:
             _validate_search_type(search_type)
             
-            logger.info(f"Searching PubChem for '{query}' (type: {search_type})")
+            logger.info(f"Searching PubChem (type: {search_type}, query_length={len(query)})")
             
             compound_data = self.client.search_compound(query, search_type)
             if not compound_data or not compound_data.atoms:
-                raise NotFoundError(f'No compound with a 3D structure found for query: {query}')
+                raise NotFoundError('No compound with a 3D structure found')
             
             logger.info(f"Found CID {compound_data.cid} with {len(compound_data.atoms)} atoms.")
             

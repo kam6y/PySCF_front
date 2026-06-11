@@ -212,10 +212,6 @@ export type NavigationGuardTarget = {
   ): void;
 };
 
-type NavigationGuardDeps = {
-  openExternal: (url: string) => Promise<void>;
-};
-
 /**
  * Install will-navigate, will-redirect, and window-open guards on a webContents.
  * Extracted so both window managers share the same logic and it can be tested
@@ -223,8 +219,7 @@ type NavigationGuardDeps = {
  */
 export const installNavigationGuards = (
   webContents: NavigationGuardTarget,
-  rendererEntry: RendererEntry,
-  deps: NavigationGuardDeps
+  rendererEntry: RendererEntry
 ): void => {
   // Deny same-window navigation to untrusted origins
   webContents.on('will-navigate', (event, url) => {
@@ -242,22 +237,12 @@ export const installNavigationGuards = (
     }
   });
 
-  // Deny new window creation; route http/https links through openExternal
+  // Deny all new window creation unconditionally.
+  // External links are opened via the explicit 'open-external-url' IPC handler
+  // (see ipc.ts), which applies validateExternalUrl and sender verification.
+  // Routing window.open through openExternal would bypass those checks.
   webContents.setWindowOpenHandler(({ url }) => {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        deps.openExternal(url).catch(err => {
-          console.error(`[Security] Failed to open external URL: ${url}`, err);
-        });
-      } else {
-        console.warn(
-          `[Security] Blocked window.open with non-http URL: ${url}`
-        );
-      }
-    } catch {
-      console.warn(`[Security] Blocked window.open with invalid URL: ${url}`);
-    }
+    console.warn(`[Security] Denied window.open for URL: ${url}`);
     return { action: 'deny' as const };
   });
 };

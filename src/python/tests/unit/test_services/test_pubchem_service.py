@@ -403,3 +403,155 @@ def test_pubchem_service_default_timeout(mocker):
     
     # ASSERT
     mock_client_class.assert_called_once_with(timeout=30)
+
+
+# ============================================================================
+# Security Regression Tests — Input Redaction
+# ============================================================================
+
+def test_search_compound_not_found_error_does_not_reflect_query(mocker):
+    """
+    GIVEN PubChemClient returns compound data without atoms (no 3D structure)
+    WHEN search_compound is called with a proprietary query sentinel
+    THEN the raised NotFoundError must NOT contain the sentinel value
+    """
+    # ARRANGE
+    sentinel = 'SECRET_COMPOUND_NAME_%%%_PRIVATE'
+    mock_compound_data = MagicMock()
+    mock_compound_data.cid = 99999
+    mock_compound_data.atoms = []  # No 3D structure
+
+    mocker.patch(
+        'services.pubchem_service.PubChemClient.search_compound',
+        return_value=mock_compound_data
+    )
+
+    service = PubChemService()
+
+    # ACT & ASSERT
+    with pytest.raises(NotFoundError) as exc_info:
+        service.search_compound(sentinel, 'name')
+
+    error_message = str(exc_info.value)
+    assert sentinel not in error_message, (
+        f"Raw query was reflected in not-found error: {error_message}"
+    )
+
+
+def test_search_compound_not_found_error_is_generic(mocker):
+    """
+    GIVEN PubChemClient returns compound data without atoms
+    WHEN search_compound is called
+    THEN the error message should be the generic 'No compound with a 3D structure found'
+    """
+    # ARRANGE
+    mock_compound_data = MagicMock()
+    mock_compound_data.cid = 99999
+    mock_compound_data.atoms = []
+
+    mocker.patch(
+        'services.pubchem_service.PubChemClient.search_compound',
+        return_value=mock_compound_data
+    )
+
+    service = PubChemService()
+
+    # ACT & ASSERT
+    with pytest.raises(NotFoundError, match="No compound with a 3D structure found"):
+        service.search_compound('anything', 'name')
+
+
+def test_search_compound_pubchem_not_found_does_not_reflect_query(mocker):
+    """
+    GIVEN PubChemClient raises PubChemNotFoundError
+    WHEN search_compound is called with a proprietary query sentinel
+    THEN the raised NotFoundError must NOT contain the sentinel value
+    """
+    # ARRANGE
+    sentinel = 'TOP_SECRET_FORMULA_%%%'
+    mocker.patch(
+        'services.pubchem_service.PubChemClient.search_compound',
+        side_effect=PubChemNotFoundError(
+            'A 3D structure is not available for the compound with CID 12345.'
+        )
+    )
+
+    service = PubChemService()
+
+    # ACT & ASSERT
+    with pytest.raises(NotFoundError) as exc_info:
+        service.search_compound(sentinel, 'name')
+
+    error_message = str(exc_info.value)
+    assert sentinel not in error_message, (
+        f"Raw query was reflected in not-found error: {error_message}"
+    )
+
+
+# ============================================================================
+# Security Regression Tests — Exception Chain Redaction
+# ============================================================================
+
+def test_network_error_chain_does_not_leak_query_via_exc_info(mocker, caplog):
+    """
+    GIVEN a name-search where a network error embeds the raw query in its message
+    WHEN the error propagates through client and service, logged with exc_info=True
+    THEN the sentinel must NOT appear anywhere in caplog (including chained tracebacks)
+
+    This exercises the real client._make_request -> _find_cid -> search_compound
+    -> pubchem_service exc_info=True chain. The from None on client line 54
+    suppresses the chained ConnectionError that carries the URL with the query.
+    """
+    import requests.exceptions
+    import logging
+
+    sentinel = 'CHAIN_LEAK_SENTINEL_NET_%%%'
+    fake_url = f'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/{sentinel}/cids/JSON'
+    simulated_err = requests.exceptions.ConnectionError(
+        f'HTTPConnectionPool: Max retries exceeded with url: {fake_url}'
+    )
+
+    service = PubChemService()
+    # Mock at session level so real _make_request except-block runs
+    mocker.patch.object(service.client.session, 'get', side_effect=simulated_err)
+
+    with caplog.at_level(logging.DEBUG, logger='services.pubchem_service'):
+        with pytest.raises(ServiceError):
+            service.search_compound(sentinel, 'name')
+
+    # caplog.text includes exc_info formatted tracebacks
+    assert sentinel not in caplog.text, (
+        f'Sentinel leaked via exception chain in exc_info log'
+    )
+
+
+def test_processing_error_chain_does_not_leak_via_exc_info(mocker, caplog):
+    """
+    GIVEN a downstream ValueError containing a sentinel occurs during compound processing
+    WHEN it is caught by search_compound's (ValueError, KeyError, TypeError) handler
+    AND the resulting PubChemError is logged with exc_info=True at the service layer
+    THEN the sentinel must NOT appear in caplog
+
+    This exercises client.py lines 75-77 (the from None on the re-raise)
+    and line 76 (the sanitized log that no longer includes {e}).
+    """
+    import logging
+
+    sentinel = 'CHAIN_LEAK_SENTINEL_PROC_%%%'
+
+    service = PubChemService()
+    # Mock _find_cid to return a valid CID
+    mocker.patch.object(service.client, '_find_cid', return_value=12345)
+    # Mock _get_compound_properties to raise ValueError with sentinel
+    mocker.patch.object(
+        service.client, '_get_compound_properties',
+        side_effect=ValueError(f'unexpected value: {sentinel}')
+    )
+
+    with caplog.at_level(logging.DEBUG, logger='services.pubchem_service'):
+        with pytest.raises(ServiceError):
+            service.search_compound(sentinel, 'name')
+
+    assert sentinel not in caplog.text, (
+        f'Sentinel leaked via exception chain in exc_info log'
+    )

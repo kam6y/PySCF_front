@@ -641,7 +641,6 @@ class CalculationSummary(BaseModel):
 
 
 class Data4(BaseModel):
-    base_directory: str = Field(..., description='Base directory for calculations')
     calculations: List[CalculationSummary]
     count: int = Field(..., description='Number of calculations')
 
@@ -759,9 +758,6 @@ class Data10(BaseModel):
     cube_data: str = Field(..., description='CUBE file content as string')
     orbital_info: OrbitalInfo
     generation_params: GenerationParams
-    file_path: Optional[str] = Field(
-        None, description='Path to saved CUBE file (if saved to disk)'
-    )
     cached: Optional[bool] = Field(
         None, description='Whether the CUBE file was loaded from cache'
     )
@@ -774,7 +770,6 @@ class OrbitalCubeResponse(BaseModel):
 
 class CubeFile(BaseModel):
     filename: str = Field(..., description='Name of the CUBE file')
-    file_path: str = Field(..., description='Full path to the CUBE file')
     orbital_index: int = Field(..., description='Index of the molecular orbital')
     grid_size: int = Field(..., description='Grid size used for generation')
     file_size_kb: float = Field(..., description='File size in KB')

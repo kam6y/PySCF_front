@@ -247,3 +247,27 @@ def test_convert_smiles_preserves_internal_structure(mocker):
     mock_converter.assert_called_once()
     call_args = mock_converter.call_args[0]
     assert call_args[0] == complex_smiles
+
+
+# ============================================================================
+# Security Regression Tests — Input Redaction
+# ============================================================================
+
+def test_convert_smiles_invalid_error_does_not_reflect_input():
+    """
+    GIVEN an invalid SMILES string containing a proprietary sentinel
+    WHEN convert_smiles is called (real converter, no mocks)
+    THEN the raised ValidationError must NOT contain the sentinel value
+    """
+    # ARRANGE
+    sentinel = 'PROPRIETARY_MOLECULE_%%%_SECRET'
+    service = SMILESService()
+
+    # ACT & ASSERT
+    with pytest.raises(ValidationError) as exc_info:
+        service.convert_smiles(sentinel)
+
+    error_message = str(exc_info.value)
+    assert sentinel not in error_message, (
+        f"Raw SMILES input was reflected in service error: {error_message}"
+    )

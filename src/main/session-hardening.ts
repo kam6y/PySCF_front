@@ -41,6 +41,9 @@ const PRODUCTION_CSP = [
   "worker-src 'self' blob:",
   "child-src 'self' blob:",
   "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
 ].join('; ');
 
 /**
@@ -59,6 +62,9 @@ const DEV_CSP = [
   "worker-src 'self' blob:",
   "child-src 'self' blob:",
   "frame-ancestors 'none'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
 ].join('; ');
 
 /**

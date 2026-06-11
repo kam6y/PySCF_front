@@ -72,7 +72,6 @@ class CalculationQueryService:
             )
 
             return {
-                "base_directory": self.context.repository.get_base_directory(),
                 "calculations": calculations,
                 "count": len(calculations),
             }

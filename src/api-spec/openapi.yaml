@@ -2553,11 +2553,8 @@ components:
           example: true
         data:
           type: object
-          required: [base_directory, calculations, count]
+          required: [calculations, count]
           properties:
-            base_directory:
-              type: string
-              description: Base directory for calculations
             calculations:
               type: array
               items:
@@ -2751,10 +2748,6 @@ components:
                 file_size_kb:
                   type: number
                   description: Generated file size in KB
-            file_path:
-              type: string
-              nullable: true
-              description: Path to saved CUBE file (if saved to disk)
             cached:
               type: boolean
               description: Whether the CUBE file was loaded from cache
@@ -2778,14 +2771,11 @@ components:
               description: List of CUBE files
               items:
                 type: object
-                required: [filename, file_path, orbital_index, grid_size, file_size_kb, modified]
+                required: [filename, orbital_index, grid_size, file_size_kb, modified]
                 properties:
                   filename:
                     type: string
                     description: Name of the CUBE file
-                  file_path:
-                    type: string
-                    description: Full path to the CUBE file
                   orbital_index:
                     type: integer
                     description: Index of the molecular orbital

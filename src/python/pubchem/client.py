@@ -44,14 +44,15 @@ class PubChemClient:
             response = self.session.get(url, timeout=self.timeout)
             
             if response.status_code == 404:
-                raise PubChemNotFoundError(f"Resource not found at {url}", status_code=404)
+                raise PubChemNotFoundError("Resource not found", status_code=404)
             
             response.raise_for_status()
             return response
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request to {url} failed: {e}")
-            raise PubChemError(f"API request failed: {e}")
+            status = getattr(getattr(e, 'response', None), 'status_code', None)
+            logger.error(f"PubChem request failed: {type(e).__name__} (status={status})")
+            raise PubChemError("API request failed") from None
 
     def search_compound(self, query: str, search_type: str = "name") -> Optional[CompoundData]:
         try:
@@ -73,15 +74,15 @@ class PubChemClient:
             # Let not-found errors propagate to the service layer unchanged.
             raise
         except (ValueError, KeyError, TypeError) as e:
-            logger.error(f"Error processing data for query '{query}': {e}")
-            raise PubChemError(f"Failed to process data: {e}")
+            logger.error(f"Error processing compound data: {type(e).__name__}")
+            raise PubChemError("Failed to process compound data") from None
 
     def _find_cid(self, query: str, search_type: str) -> Optional[int]:
         if search_type == "cid":
             try:
                 return int(query)
             except ValueError:
-                raise PubChemError(f"Invalid CID format: {query}")
+                raise PubChemError("Invalid CID format") from None
 
         search_path = f"compound/{search_type}/{query.strip()}/cids/JSON"
         url = f"{self.BASE_URL}/{search_path}"
@@ -91,12 +92,12 @@ class PubChemClient:
             data = response.json()
             cids = data.get('IdentifierList', {}).get('CID')
             if not cids:
-                logger.info(f"No CID found for query: {query}")
+                logger.info(f"No CID found (search_type={search_type})")
                 return None
             return cids[0]
         except PubChemNotFoundError:
             # Treat 404 as a regular "not found" result for CID lookup.
-            logger.warning(f"Could not find CID for '{query}' (type: {search_type})")
+            logger.warning(f"Could not find CID (type: {search_type})")
             return None
 
     def _get_compound_properties(self, cid: int) -> Dict[str, Any]:

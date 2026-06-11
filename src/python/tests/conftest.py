@@ -152,7 +152,7 @@ def app():
     test_settings_manager.save_settings(test_settings)
 
     with (
-        mock.patch.dict(os.environ, {'PYSCF_ENV': 'development'}),
+        mock.patch.dict(os.environ, {'PYSCF_ENV': 'development', 'PYSCF_ENABLE_DEBUG_ENDPOINTS': 'true'}),
         mock.patch('quantum_calc.process_manager.ProcessPoolExecutor', new=DummyExecutor),
         mock.patch.object(settings_manager_module, "_settings_manager", test_settings_manager),
         mock.patch.multiple(
@@ -203,7 +203,7 @@ def asgi_server() -> Generator[str, None, None]:
         with (
             mock.patch.dict(
                 os.environ,
-                {'PYSCF_AUTH_TOKEN': 'test-token', 'PYSCF_ENV': 'development'},
+                {'PYSCF_AUTH_TOKEN': 'test-token', 'PYSCF_ENV': 'development', 'PYSCF_ENABLE_DEBUG_ENDPOINTS': 'true'},
             ),
             mock.patch(
                 'quantum_calc.process_manager.ProcessPoolExecutor',

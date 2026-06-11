@@ -214,6 +214,49 @@ const testProductionCSP_doesNotIncludeUnsafeEval = (): void => {
 };
 
 // ============================================================
+// SEC-L4: CSP baseline directives (object-src, base-uri, form-action)
+// ============================================================
+
+const testCSP_containsBaselineDirectives = (): void => {
+  const { hardenSession } = loadSessionHardening();
+
+  const directives = ["object-src 'none'", "base-uri 'none'", "form-action 'none'"];
+
+  // Verify dev CSP
+  const devSession = createFakeSession();
+  hardenSession(devSession, false);
+  const devHandler = devSession.getHeadersReceivedHandler();
+  assert.ok(devHandler);
+  let devCsp = '';
+  devHandler({ responseHeaders: {} }, (result) => {
+    devCsp = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+  for (const directive of directives) {
+    assert.ok(
+      devCsp.includes(directive),
+      `Dev CSP must include '${directive}'`
+    );
+  }
+
+  // Verify production CSP (fresh module to reset WeakSet)
+  const { hardenSession: hardenProd } = loadSessionHardening();
+  const prodSession = createFakeSession();
+  hardenProd(prodSession, true);
+  const prodHandler = prodSession.getHeadersReceivedHandler();
+  assert.ok(prodHandler);
+  let prodCsp = '';
+  prodHandler({ responseHeaders: {} }, (result) => {
+    prodCsp = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+  for (const directive of directives) {
+    assert.ok(
+      prodCsp.includes(directive),
+      `Production CSP must include '${directive}'`
+    );
+  }
+};
+
+// ============================================================
 // IMP-6: CSP header deduplication (case-insensitive)
 // ============================================================
 
@@ -356,6 +399,9 @@ const run = (): void => {
   testDevCSP_includesUnsafeEval();
   testProductionCSP_doesNotIncludeUnsafeEval();
 
+  // SEC-L4: CSP baseline directives
+  testCSP_containsBaselineDirectives();
+
   // IMP-6: CSP header deduplication
   testHeadersReceived_replacesLowercaseCspHeader();
   testHeadersReceived_undefinedResponseHeaders_isSafe();
@@ -364,7 +410,7 @@ const run = (): void => {
   testHardenSession_calledTwice_registersHandlersOnlyOnce();
   testHardenSession_differentSessions_bothHardened();
 
-  console.log('session-hardening tests passed (8 tests)');
+  console.log('session-hardening tests passed (9 tests)');
 };
 
 run();

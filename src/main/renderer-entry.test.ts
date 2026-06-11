@@ -36,8 +36,7 @@ type RendererEntryModule = {
   ) => boolean;
   installNavigationGuards: (
     webContents: NavigationGuardTargetType,
-    rendererEntry: RendererEntryType,
-    deps: { openExternal: (url: string) => Promise<void> }
+    rendererEntry: RendererEntryType
   ) => void;
 };
 
@@ -431,13 +430,8 @@ const testGuards_willNavigateBlocksDisallowedUrl = (): void => {
   const { installNavigationGuards } = loadRendererEntry();
   const fake = createFakeWebContents();
   const entry = { type: 'url' as const, url: 'http://localhost:5173/' };
-  const openExternalCalls: string[] = [];
 
-  installNavigationGuards(fake, entry, {
-    openExternal: async url => {
-      openExternalCalls.push(url);
-    },
-  });
+  installNavigationGuards(fake, entry);
 
   // Disallowed URL must call preventDefault
   const handler = fake.getHandler('will-navigate');
@@ -465,9 +459,7 @@ const testGuards_willRedirectBlocksDisallowedUrl = (): void => {
   const fake = createFakeWebContents();
   const entry = { type: 'url' as const, url: 'http://localhost:5173/' };
 
-  installNavigationGuards(fake, entry, {
-    openExternal: async () => {},
-  });
+  installNavigationGuards(fake, entry);
 
   const handler = fake.getHandler('will-redirect');
   assert.ok(handler, 'will-redirect handler must be registered');
@@ -491,59 +483,35 @@ const testGuards_willRedirectBlocksDisallowedUrl = (): void => {
   );
 };
 
-const testGuards_windowOpenDeniesAllAndOpensExternalForHttp = (): void => {
+const testGuards_windowOpenDeniesAll = (): void => {
   const { installNavigationGuards } = loadRendererEntry();
   const fake = createFakeWebContents();
   const entry = { type: 'url' as const, url: 'http://localhost:5173/' };
-  const openExternalCalls: string[] = [];
 
-  installNavigationGuards(fake, entry, {
-    openExternal: async url => {
-      openExternalCalls.push(url);
-    },
-  });
+  installNavigationGuards(fake, entry);
 
   const handler = fake.getWindowOpenHandler();
   assert.ok(handler, 'window-open handler must be registered');
 
-  // http URL: deny + call openExternal
+  // http URL: must be denied
   const result1 = handler({ url: 'http://example.com/page' });
-  assert.equal(result1.action, 'deny');
-  assert.equal(openExternalCalls.length, 1);
-  assert.equal(openExternalCalls[0], 'http://example.com/page');
+  assert.equal(result1.action, 'deny', 'window.open must deny http: URL');
 
-  // https URL: deny + call openExternal
+  // https URL: must be denied
   const result2 = handler({ url: 'https://example.com/secure' });
-  assert.equal(result2.action, 'deny');
-  assert.equal(openExternalCalls.length, 2);
-  assert.equal(openExternalCalls[1], 'https://example.com/secure');
+  assert.equal(result2.action, 'deny', 'window.open must deny https: URL');
 
-  // file URL: deny + do NOT call openExternal
+  // file URL: must be denied
   const result3 = handler({ url: 'file:///etc/passwd' });
-  assert.equal(result3.action, 'deny');
-  assert.equal(
-    openExternalCalls.length,
-    2,
-    'openExternal must not be called for file: URLs'
-  );
+  assert.equal(result3.action, 'deny', 'window.open must deny file: URL');
 
-  // about:blank: deny + do NOT call openExternal
+  // about:blank: must be denied
   const result4 = handler({ url: 'about:blank' });
-  assert.equal(result4.action, 'deny');
-  assert.equal(
-    openExternalCalls.length,
-    2,
-    'openExternal must not be called for about: URLs'
-  );
+  assert.equal(result4.action, 'deny', 'window.open must deny about: URL');
 
-  // Malformed URL: deny + do NOT call openExternal
+  // Malformed URL: must be denied
   const result5 = handler({ url: 'not-a-valid-url' });
-  assert.equal(result5.action, 'deny');
-  assert.equal(
-    openExternalCalls.length,
-    2,
-    'openExternal must not be called for malformed URLs'
-  );
+  assert.equal(result5.action, 'deny', 'window.open must deny malformed URL');
 };
 
 // --- F2: file-entry variants for will-navigate / will-redirect ---
@@ -557,9 +525,7 @@ const testGuards_willNavigateBlocksDisallowedUrl_fileEntry = (): void => {
     query: { backend_port: '5060' },
   };
 
-  installNavigationGuards(fake, entry, {
-    openExternal: async () => {},
-  });
+  installNavigationGuards(fake, entry);
 
   const handler = fake.getHandler('will-navigate');
   assert.ok(handler, 'will-navigate handler must be registered (file entry)');
@@ -601,9 +567,7 @@ const testGuards_willRedirectBlocksDisallowedUrl_fileEntry = (): void => {
     query: { backend_port: '5060' },
   };
 
-  installNavigationGuards(fake, entry, {
-    openExternal: async () => {},
-  });
+  installNavigationGuards(fake, entry);
 
   const handler = fake.getHandler('will-redirect');
   assert.ok(handler, 'will-redirect handler must be registered (file entry)');
@@ -747,7 +711,7 @@ const run = (): void => {
   // F4: installNavigationGuards wiring
   testGuards_willNavigateBlocksDisallowedUrl();
   testGuards_willRedirectBlocksDisallowedUrl();
-  testGuards_windowOpenDeniesAllAndOpensExternalForHttp();
+  testGuards_windowOpenDeniesAll();
 
   // F2: file-entry guard variants
   testGuards_willNavigateBlocksDisallowedUrl_fileEntry();

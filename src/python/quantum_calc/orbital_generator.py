@@ -362,7 +362,6 @@ class MolecularOrbitalGenerator:
                                 "isovalue_negative": isovalue_neg,
                                 "file_size_kb": file_size_kb
                             },
-                            "file_path": cube_file_path,
                             "cached": True
                         }
 
@@ -413,7 +412,6 @@ class MolecularOrbitalGenerator:
                             "isovalue_negative": isovalue_neg,
                             "file_size_kb": file_size_kb
                         },
-                        "file_path": cube_file_path,
                         "cached": False
                     }
 
@@ -458,7 +456,6 @@ class MolecularOrbitalGenerator:
                     "isovalue_negative": isovalue_neg,
                     "file_size_kb": file_size_kb
                 },
-                "file_path": None,
                 "cached": False
             }
             

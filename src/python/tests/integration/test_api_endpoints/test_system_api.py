@@ -62,9 +62,9 @@ class TestDebugEndpointProductionGating:
     @pytest.mark.parametrize(
         ("path", "error_contains"),
         [
-            ("/api/debug/system-diagnostics", "production"),
-            ("/api/debug/process-manager-diagnostics", None),
-            ("/api/debug/resource-manager-diagnostics", None),
+            ("/api/debug/system-diagnostics", "not enabled"),
+            ("/api/debug/process-manager-diagnostics", "not enabled"),
+            ("/api/debug/resource-manager-diagnostics", "not enabled"),
         ],
         ids=[
             "system-diagnostics",
@@ -140,6 +140,214 @@ class TestDebugEndpointProductionGating:
         data = response.json()
         assert data["success"] is True
         assert "data" in data
+
+
+    @pytest.mark.parametrize(
+        ("env_value", "env_action"),
+        [
+            (None, "del"),
+            ("", "set"),
+            ("prod", "set"),
+        ],
+        ids=[
+            "env-absent",
+            "env-empty",
+            "env-typo-prod",
+        ],
+    )
+    def test_debug_endpoint_returns_403_when_env_unrecognised(
+        self,
+        client,
+        monkeypatch,
+        env_value,
+        env_action,
+    ):
+        """
+        GIVEN PYSCF_ENV is absent, empty, or a typo (fail-closed default)
+        WHEN GET /api/debug/system-diagnostics is called
+        THEN 403 is returned with 'not enabled' message
+        """
+        # Arrange — override conftest defaults to exercise fail-closed path
+        if env_action == "del":
+            monkeypatch.delenv("PYSCF_ENV", raising=False)
+        else:
+            monkeypatch.setenv("PYSCF_ENV", env_value)
+        monkeypatch.delenv("PYSCF_ENABLE_DEBUG_ENDPOINTS", raising=False)
+
+        # Act
+        response = client.get("/api/debug/system-diagnostics")
+
+        # Assert
+        assert response.status_code == 403
+        data = response.json()
+        assert data["success"] is False
+        assert "not enabled" in data["error"].lower()
+
+    @pytest.mark.parametrize(
+        ("flag_value", "flag_action"),
+        [
+            (None, "del"),
+            ("false", "set"),
+        ],
+        ids=[
+            "flag-absent",
+            "flag-false",
+        ],
+    )
+    def test_debug_endpoint_returns_403_when_flag_not_enabled(
+        self,
+        client,
+        monkeypatch,
+        flag_value,
+        flag_action,
+    ):
+        """
+        GIVEN PYSCF_ENV is 'development' but PYSCF_ENABLE_DEBUG_ENDPOINTS
+              is absent or falsy (Gate-2 failure, fail-closed)
+        WHEN GET /api/debug/system-diagnostics is called
+        THEN 403 is returned with 'not enabled' message
+        """
+        # Arrange — env passes Gate 1 but flag fails Gate 2
+        monkeypatch.setenv("PYSCF_ENV", "development")
+        if flag_action == "del":
+            monkeypatch.delenv("PYSCF_ENABLE_DEBUG_ENDPOINTS", raising=False)
+        else:
+            monkeypatch.setenv("PYSCF_ENABLE_DEBUG_ENDPOINTS", flag_value)
+
+        # Act
+        response = client.get("/api/debug/system-diagnostics")
+
+        # Assert
+        assert response.status_code == 403
+        data = response.json()
+        assert data["success"] is False
+        assert "not enabled" in data["error"].lower()
+
+class TestDebugEndpointDoubleGate:
+    """Unit tests for the fail-closed double-gate in _debug_endpoints_allowed.
+
+    Gate 1: PYSCF_ENV must be in {"development", "test"}.
+    Gate 2: PYSCF_ENABLE_DEBUG_ENDPOINTS must be truthy ("true" or "1").
+    Both gates must pass; any other combination returns False (fail-closed).
+    """
+
+    @pytest.mark.parametrize(
+        ("env_value", "flag_value", "expected"),
+        [
+            # Gate 1 fails: env absent or not in allowed set
+            (None, None, False),
+            (None, "true", False),
+            ("", None, False),
+            ("", "true", False),
+            ("production", None, False),
+            ("production", "true", False),
+            ("prod", None, False),
+            ("prod", "true", False),
+            # Gate 1 passes, gate 2 fails: flag absent or falsy
+            ("development", None, False),
+            ("development", "", False),
+            ("development", "false", False),
+            ("development", "0", False),
+            ("test", None, False),
+            ("test", "0", False),
+            # Both gates pass
+            ("development", "true", True),
+            ("development", "1", True),
+            ("development", "TRUE", True),
+            ("development", "True", True),
+            ("test", "true", True),
+            ("test", "1", True),
+            # Case-insensitive env
+            ("Development", "true", True),
+            ("TEST", "1", True),
+        ],
+        ids=[
+            "env-absent-flag-absent",
+            "env-absent-flag-true",
+            "env-empty-flag-absent",
+            "env-empty-flag-true",
+            "env-production-flag-absent",
+            "env-production-flag-true",
+            "env-prod-typo-flag-absent",
+            "env-prod-typo-flag-true",
+            "env-development-flag-absent",
+            "env-development-flag-empty",
+            "env-development-flag-false",
+            "env-development-flag-zero",
+            "env-test-flag-absent",
+            "env-test-flag-zero",
+            "env-development-flag-true",
+            "env-development-flag-one",
+            "env-development-flag-TRUE",
+            "env-development-flag-True",
+            "env-test-flag-true",
+            "env-test-flag-one",
+            "env-Development-flag-true",
+            "env-TEST-flag-one",
+        ],
+    )
+    def test_debug_endpoints_allowed_double_gate(
+        self,
+        monkeypatch,
+        env_value,
+        flag_value,
+        expected,
+    ):
+        """
+        GIVEN specific PYSCF_ENV and PYSCF_ENABLE_DEBUG_ENDPOINTS values
+        WHEN _debug_endpoints_allowed is called
+        THEN it returns the expected boolean (fail-closed)
+        """
+        from api.system import _debug_endpoints_allowed
+
+        if env_value is None:
+            monkeypatch.delenv("PYSCF_ENV", raising=False)
+        else:
+            monkeypatch.setenv("PYSCF_ENV", env_value)
+
+        if flag_value is None:
+            monkeypatch.delenv("PYSCF_ENABLE_DEBUG_ENDPOINTS", raising=False)
+        else:
+            monkeypatch.setenv("PYSCF_ENABLE_DEBUG_ENDPOINTS", flag_value)
+
+        assert _debug_endpoints_allowed() is expected
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            (None, False),
+            ("", False),
+            ("false", False),
+            ("0", False),
+            ("true", True),
+            ("1", True),
+            ("TRUE", True),
+            ("True", True),
+            (" true ", True),
+            (" 1 ", True),
+        ],
+        ids=[
+            "none",
+            "empty",
+            "false-str",
+            "zero-str",
+            "true-lower",
+            "one-str",
+            "true-upper",
+            "true-title",
+            "true-whitespace",
+            "one-whitespace",
+        ],
+    )
+    def test_parse_debug_flag(self, value, expected):
+        """
+        GIVEN a raw flag string (or None)
+        WHEN _parse_debug_flag is called
+        THEN it returns the correct truthy/falsy interpretation
+        """
+        from api.system import _parse_debug_flag
+
+        assert _parse_debug_flag(value) is expected
 
 
 class TestGpu4PyscfStatusAPI:

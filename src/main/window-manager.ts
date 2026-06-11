@@ -1,4 +1,4 @@
-import { BrowserWindow, app, shell } from 'electron';
+import { BrowserWindow, app } from 'electron';
 import path from 'node:path';
 import {
   getMainRendererEntry,
@@ -104,9 +104,7 @@ export const createWindow = (
   });
 
   // --- SEC-001: Lock down renderer navigation ---
-  installNavigationGuards(newWindow.webContents, rendererEntry, {
-    openExternal: (url) => shell.openExternal(url),
-  });
+  installNavigationGuards(newWindow.webContents, rendererEntry);
 
   if (rendererEntry.type === 'url') {
     newWindow.loadURL(rendererEntry.url);

@@ -33,7 +33,7 @@ def smiles_to_xyz(smiles_string: str, title: str = "Molecule from SMILES") -> st
         # Create the RDKit molecule from SMILES.
         mol = Chem.MolFromSmiles(smiles_string)
         if not mol:
-            raise SMILESError(f"Invalid SMILES string: {smiles_string}")
+            raise SMILESError("Invalid SMILES string")
 
         # Add explicit hydrogens before 3D embedding.
         mol = Chem.AddHs(mol)
@@ -60,4 +60,4 @@ def smiles_to_xyz(smiles_string: str, title: str = "Molecule from SMILES") -> st
         raise
     except Exception as e:
         logger.error(f"An unexpected error occurred during SMILES conversion: {e}")
-        raise SMILESError("An internal error occurred during SMILES conversion.")
+        raise SMILESError("An internal error occurred during SMILES conversion.") from None

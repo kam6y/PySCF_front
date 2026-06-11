@@ -1365,8 +1365,6 @@ export interface components {
             /** @example true */
             success: boolean;
             data: {
-                /** @description Base directory for calculations */
-                base_directory: string;
                 calculations: components["schemas"]["CalculationSummary"][];
                 /** @description Number of calculations */
                 count: number;
@@ -1473,8 +1471,6 @@ export interface components {
                     /** @description Generated file size in KB */
                     file_size_kb?: number;
                 };
-                /** @description Path to saved CUBE file (if saved to disk) */
-                file_path?: string | null;
                 /** @description Whether the CUBE file was loaded from cache */
                 cached?: boolean;
             };
@@ -1489,8 +1485,6 @@ export interface components {
                 cube_files: {
                     /** @description Name of the CUBE file */
                     filename: string;
-                    /** @description Full path to the CUBE file */
-                    file_path: string;
                     /** @description Index of the molecular orbital */
                     orbital_index: number;
                     /** @description Grid size used for generation */

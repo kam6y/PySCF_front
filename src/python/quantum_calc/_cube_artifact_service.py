@@ -99,7 +99,6 @@ class CubeArtifactService:
 
                 cube_files.append({
                     "filename": filename,
-                    "file_path": file_path,
                     "orbital_index": orbital_index,
                     "grid_size": grid_size,
                     "file_size_kb": file_size_kb,

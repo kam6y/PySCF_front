@@ -43,7 +43,7 @@ class SMILESService:
             if len(smiles) > 500:
                 raise ValidationError('SMILES string is too long. Maximum length is 500 characters.')
             
-            logger.info(f"Converting SMILES: {smiles}")
+            logger.info(f"Converting SMILES string (length={len(smiles)})")
             
             # Strip whitespace from SMILES string
             smiles_stripped = smiles.strip()

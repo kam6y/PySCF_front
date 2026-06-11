@@ -80,7 +80,7 @@ def test_generate_cube_file_save_to_disk_uses_atomic_replace(tmp_path, mocker) -
     assert written_paths == [Path(temp_path)]
     assert final_path.read_text(encoding="utf-8") == VALID_CUBE_DATA
     assert result["cube_data"] == VALID_CUBE_DATA
-    assert result["file_path"] == str(final_path)
+    assert "file_path" not in result
     assert result["cached"] is False
 
 
@@ -160,3 +160,69 @@ def test_generate_cube_file_regenerates_invalid_existing_cache(tmp_path, mocker)
     assert final_path.read_text(encoding="utf-8") == VALID_CUBE_DATA
     assert result["cube_data"] == VALID_CUBE_DATA
     assert result["cached"] is False
+
+
+def test_generate_cube_file_cached_hit_does_not_expose_file_path(tmp_path, mocker) -> None:
+    """
+    GIVEN a valid CUBE file already exists in the orbital cache directory
+    WHEN generate_cube_file is called with save_to_disk=True
+    THEN the cached result does NOT contain 'file_path' (absolute-path leak removed)
+         and cubegen is never called (proving the cache-hit branch was taken)
+    """
+    generator = _make_generator(tmp_path)
+    orbital_dir = tmp_path / "orbital"
+    orbital_dir.mkdir()
+    cached_cube = orbital_dir / "orbital_0_grid40.cube"
+    cached_cube.write_text(VALID_CUBE_DATA, encoding="utf-8")
+
+    cubegen_mock = mocker.patch(
+        "quantum_calc.orbital_generator.tools.cubegen.orbital",
+        side_effect=AssertionError("cubegen should not be called for cache hit"),
+    )
+
+    result = generator.generate_cube_file(
+        orbital_index=0,
+        grid_size=40,
+        return_content=True,
+        save_to_disk=True,
+    )
+
+    cubegen_mock.assert_not_called()
+    assert result["cached"] is True
+    assert result["cube_data"] == VALID_CUBE_DATA
+    assert "file_path" not in result
+
+
+def test_generate_cube_file_in_memory_does_not_expose_file_path(tmp_path, mocker) -> None:
+    """
+    GIVEN cubegen successfully generates a CUBE file
+    WHEN generate_cube_file is called with save_to_disk=False (in-memory only)
+    THEN the result does NOT contain 'file_path' (absolute-path leak removed)
+    """
+    generator = _make_generator(tmp_path)
+
+    def write_cube(
+        _mol: object,
+        filename: str,
+        _coeff: object,
+        nx: int,
+        ny: int,
+        nz: int,
+    ) -> None:
+        Path(filename).write_text(VALID_CUBE_DATA, encoding="utf-8")
+
+    mocker.patch(
+        "quantum_calc.orbital_generator.tools.cubegen.orbital",
+        side_effect=write_cube,
+    )
+
+    result = generator.generate_cube_file(
+        orbital_index=0,
+        grid_size=40,
+        return_content=True,
+        save_to_disk=False,
+    )
+
+    assert result["cached"] is False
+    assert result["cube_data"] == VALID_CUBE_DATA
+    assert "file_path" not in result
