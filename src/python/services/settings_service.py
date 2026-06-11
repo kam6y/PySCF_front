@@ -29,6 +29,10 @@ class SettingsService:
     callers (e.g. the Gemini agent chat in ``api/agent.py``) need the
     plaintext key.  Masking for HTTP responses is handled at the API
     boundary (``api/settings.py::_mask_api_key_for_response``).
+
+    Security: the API key is currently stored as plaintext JSON at rest.
+    See the threat-model note in ``quantum_calc.settings_manager`` for the
+    rationale and the deferred keyring-based fix.
     """
 
     DIRECTORY_CHANGE_BLOCKED_MESSAGE = (

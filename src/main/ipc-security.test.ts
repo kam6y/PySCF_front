@@ -190,6 +190,224 @@ const testValidateUrl_validHttpsUrl_returnsValid = (): void => {
 };
 
 // ============================================================
+// M-001: Private/loopback URL blocking tests
+// ============================================================
+
+const testValidateUrl_localhost_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  const result = validateExternalUrl('http://localhost:8080/api');
+  assert.equal(result.valid, false);
+  if (!result.valid) {
+    assert.match(result.error, /localhost|private/i);
+  }
+
+  const result2 = validateExternalUrl('https://localhost/path');
+  assert.equal(result2.valid, false);
+};
+
+const testValidateUrl_loopback127_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  const result = validateExternalUrl('http://127.0.0.1:5000/api');
+  assert.equal(result.valid, false);
+
+  const result2 = validateExternalUrl('https://127.0.0.1/');
+  assert.equal(result2.valid, false);
+};
+
+const testValidateUrl_ipv6Loopback_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  const result = validateExternalUrl('http://[::1]:8080/api');
+  assert.equal(result.valid, false);
+};
+
+const testValidateUrl_privateRfc1918_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  // 10.0.0.0/8
+  assert.equal(validateExternalUrl('http://10.0.0.1/').valid, false);
+  // 172.16.0.0/12
+  assert.equal(validateExternalUrl('http://172.16.0.1/').valid, false);
+  assert.equal(validateExternalUrl('http://172.31.255.255/').valid, false);
+  // 192.168.0.0/16
+  assert.equal(validateExternalUrl('http://192.168.1.1/').valid, false);
+  // 169.254.0.0/16 (link-local)
+  assert.equal(validateExternalUrl('http://169.254.1.1/').valid, false);
+};
+
+const testValidateUrl_publicIp_returnsValid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  // Public IP should be allowed
+  assert.equal(validateExternalUrl('https://8.8.8.8/').valid, true);
+  // 172.32.x.x is outside RFC 1918 range
+  assert.equal(validateExternalUrl('https://172.32.0.1/').valid, true);
+};
+
+const testValidateUrl_zeroAddress_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  assert.equal(validateExternalUrl('http://0.0.0.0/').valid, false);
+};
+
+// C1: Trailing-dot hostname bypass
+const testValidateUrl_trailingDotHostname_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  // 'localhost.' with trailing dot resolves to loopback — must be blocked
+  assert.equal(
+    validateExternalUrl('http://localhost.:8080/').valid,
+    false,
+    'localhost. (trailing dot) must be blocked'
+  );
+};
+
+// C3: Entire 0.0.0.0/8 range is blocked
+const testValidateUrl_zeroSlash8Range_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  assert.equal(
+    validateExternalUrl('http://0.0.0.1/').valid,
+    false,
+    '0.0.0.1 (in 0/8 range) must be blocked'
+  );
+  assert.equal(
+    validateExternalUrl('http://0.1.2.3/').valid,
+    false,
+    '0.1.2.3 (in 0/8 range) must be blocked'
+  );
+  assert.equal(
+    validateExternalUrl('http://0.255.255.255/').valid,
+    false,
+    '0.255.255.255 (in 0/8 range) must be blocked'
+  );
+};
+
+// F7: Non-loopback IPv6 is also blocked (blanket policy)
+const testValidateUrl_nonLoopbackIpv6_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  assert.equal(
+    validateExternalUrl('http://[2001:db8::1]/').valid,
+    false,
+    'Non-loopback IPv6 [2001:db8::1] must be blocked by blanket IPv6 policy'
+  );
+  assert.equal(
+    validateExternalUrl('http://[fe80::1]/').valid,
+    false,
+    'Link-local IPv6 [fe80::1] must be blocked'
+  );
+};
+
+// MINOR: URLs with embedded credentials are rejected
+const testValidateUrl_embeddedCredentials_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  assert.equal(
+    validateExternalUrl('https://user:pass@example.com/').valid,
+    false,
+    'URL with user:pass@ must be rejected'
+  );
+  assert.equal(
+    validateExternalUrl('https://user@example.com/').valid,
+    false,
+    'URL with user@ must be rejected'
+  );
+};
+
+// H9: Bare colon hostname (unbracket IPv6) is blocked
+const testValidateUrl_bareColonHostname_returnsInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  // Hostname with ':' but no brackets — isPrivateIpHostname must return true
+  // new URL normalizes these to bracket-form, but testing the exported function
+  // behavior via the public API: http://::1:8080/ is parsed by URL as
+  // having hostname '[::1]' which is already blocked. Test a synthetic case
+  // where a colon appears — URL('http://foo:bar@evil.com/') puts 'foo' in
+  // username, so instead test a known IPv6 that URL brackets:
+  assert.equal(
+    validateExternalUrl('http://[::ffff:127.0.0.1]/').valid,
+    false,
+    'IPv6-mapped IPv4 loopback must be blocked'
+  );
+};
+
+// ============================================================
+// J15: IP format bypass tests — WHATWG URL parser canonicalizes
+// ends-in-number hosts to dotted-decimal 127.0.0.1, so these
+// are all blocked. Pin this behavior against parser changes.
+// ============================================================
+
+const testValidateUrl_ipFormatBypasses_allInvalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  // Decimal (2130706433 = 127.0.0.1)
+  assert.equal(
+    validateExternalUrl('http://2130706433/').valid,
+    false,
+    'Decimal IP 2130706433 must be blocked (resolves to 127.0.0.1)'
+  );
+  // Hex
+  assert.equal(
+    validateExternalUrl('http://0x7f000001/').valid,
+    false,
+    'Hex IP 0x7f000001 must be blocked'
+  );
+  // Octal (full)
+  assert.equal(
+    validateExternalUrl('http://017700000001/').valid,
+    false,
+    'Octal IP 017700000001 must be blocked'
+  );
+  // Octal first octet
+  assert.equal(
+    validateExternalUrl('http://0177.0.0.1/').valid,
+    false,
+    'Octal-dotted 0177.0.0.1 must be blocked'
+  );
+  // Hex first octet
+  assert.equal(
+    validateExternalUrl('http://0x7f.0.0.1/').valid,
+    false,
+    'Hex-dotted 0x7f.0.0.1 must be blocked'
+  );
+};
+
+// ============================================================
+// J16: Multicast/reserved/broadcast IP ranges
+// ============================================================
+
+const testValidateUrl_multicastReservedBroadcast_invalid = (): void => {
+  const { validateExternalUrl } = loadIpcSecurity();
+
+  // Multicast 224.0.0.0/4
+  assert.equal(
+    validateExternalUrl('http://224.0.0.1/').valid,
+    false,
+    'Multicast 224.0.0.1 must be blocked'
+  );
+  assert.equal(
+    validateExternalUrl('http://239.255.255.255/').valid,
+    false,
+    'Multicast 239.255.255.255 must be blocked'
+  );
+  // Reserved 240.0.0.0/4
+  assert.equal(
+    validateExternalUrl('http://240.0.0.1/').valid,
+    false,
+    'Reserved 240.0.0.1 must be blocked'
+  );
+  // Broadcast
+  assert.equal(
+    validateExternalUrl('http://255.255.255.255/').valid,
+    false,
+    'Broadcast 255.255.255.255 must be blocked'
+  );
+};
+
+// ============================================================
 // Runner
 // ============================================================
 
@@ -210,7 +428,36 @@ const run = (): void => {
   testValidateUrl_validHttpUrl_returnsValid();
   testValidateUrl_validHttpsUrl_returnsValid();
 
-  console.log('ipc-security tests passed (12 tests)');
+  // M-001: Private/loopback URL blocking
+  testValidateUrl_localhost_returnsInvalid();
+  testValidateUrl_loopback127_returnsInvalid();
+  testValidateUrl_ipv6Loopback_returnsInvalid();
+  testValidateUrl_privateRfc1918_returnsInvalid();
+  testValidateUrl_publicIp_returnsValid();
+  testValidateUrl_zeroAddress_returnsInvalid();
+
+  // C1: Trailing-dot hostname bypass
+  testValidateUrl_trailingDotHostname_returnsInvalid();
+
+  // C3: Entire 0/8 range
+  testValidateUrl_zeroSlash8Range_returnsInvalid();
+
+  // F7: Non-loopback IPv6 blanket block
+  testValidateUrl_nonLoopbackIpv6_returnsInvalid();
+
+  // MINOR: Embedded credentials
+  testValidateUrl_embeddedCredentials_returnsInvalid();
+
+  // H9: Bare colon hostname
+  testValidateUrl_bareColonHostname_returnsInvalid();
+
+  // J15: IP format bypass tests
+  testValidateUrl_ipFormatBypasses_allInvalid();
+
+  // J16: Multicast/reserved/broadcast
+  testValidateUrl_multicastReservedBroadcast_invalid();
+
+  console.log('ipc-security tests passed (25 tests)');
 };
 
 run();

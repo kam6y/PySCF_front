@@ -64,7 +64,7 @@ const testMainRendererUsesDevServerWithBackendPort = (): void => {
   });
 };
 
-const testMainRendererUsesFileWhenPackaged = (): void => {
+const testMainRendererUsesAppProtocolWhenPackaged = (): void => {
   const { getMainRendererEntry } = loadRendererEntry();
 
   const entry = getMainRendererEntry({
@@ -74,13 +74,18 @@ const testMainRendererUsesFileWhenPackaged = (): void => {
     rendererUrl: 'http://localhost:5173/',
   });
 
-  assert.deepEqual(entry, {
-    type: 'file',
-    path: '/app/dist/index.html',
-    query: {
-      backend_port: '5061',
-    },
-  });
+  // Packaged mode now uses app:// custom protocol (M-002)
+  assert.equal(entry.type, 'app');
+  if (entry.type === 'app') {
+    assert.ok(
+      entry.url.startsWith('app://renderer/index.html'),
+      `Expected app:// URL, got: ${entry.url}`
+    );
+    assert.ok(
+      entry.url.includes('backend_port=5061'),
+      'Must include backend_port query parameter'
+    );
+  }
 };
 
 const testSplashRendererUsesSplashHtmlOnDevServer = (): void => {
@@ -98,6 +103,27 @@ const testSplashRendererUsesSplashHtmlOnDevServer = (): void => {
   });
 };
 
+// H11(a): getSplashRendererEntry with isPackaged:true
+const testSplashRendererUsesAppProtocolWhenPackaged = (): void => {
+  const { getSplashRendererEntry } = loadRendererEntry();
+
+  const entry = getSplashRendererEntry({
+    htmlPath: '/app/dist/splash.html',
+    isPackaged: true,
+    rendererUrl: 'http://localhost:5173',
+  });
+
+  // Packaged mode must use app:// custom protocol
+  assert.equal(entry.type, 'app');
+  if (entry.type === 'app') {
+    assert.equal(
+      entry.url,
+      'app://renderer/splash.html',
+      'Packaged splash must use app://renderer/splash.html'
+    );
+  }
+};
+
 const testSplashRendererUsesFileWithoutDevServer = (): void => {
   const { getSplashRendererEntry } = loadRendererEntry();
 
@@ -106,10 +132,12 @@ const testSplashRendererUsesFileWithoutDevServer = (): void => {
     isPackaged: false,
   });
 
-  assert.deepEqual(entry, {
-    type: 'file',
-    path: '/app/dist/splash.html',
-  });
+  // Without a dev server URL and isPackaged=false, falls back to file:// entry
+  // (B1 fix: app:// scheme is only registered when isPackaged)
+  assert.equal(entry.type, 'file');
+  if (entry.type === 'file') {
+    assert.equal(entry.path, '/app/dist/splash.html');
+  }
 };
 
 // ============================================================
@@ -192,7 +220,7 @@ const testMainRendererFallsBackOnInvalidDevUrl = (): void => {
     rendererUrl: 'http://evil.com:5173/',
   });
 
-  // Should fall back to file entry, not produce a url entry
+  // B1 fix: isPackaged=false should fall back to file entry, not app://
   assert.equal(entry.type, 'file');
   if (entry.type === 'file') {
     assert.equal(entry.path, '/app/dist/index.html');
@@ -208,6 +236,7 @@ const testSplashRendererFallsBackOnInvalidDevUrl = (): void => {
     rendererUrl: 'https://evil.com:5173',
   });
 
+  // B1 fix: isPackaged=false should fall back to file entry, not app://
   assert.equal(entry.type, 'file');
   if (entry.type === 'file') {
     assert.equal(entry.path, '/app/dist/splash.html');
@@ -256,34 +285,104 @@ const testNavDenied_devModeDifferentOrigin = (): void => {
 
 const testNavAllowed_packagedModeSameDir = (): void => {
   const { isAllowedNavigation } = loadRendererEntry();
-  const entry = {
+  // Legacy file entry test (retained for dev-mode file fallback)
+  const fileEntry = {
     type: 'file' as const,
     path: '/app/dist/index.html',
     query: { backend_port: '5060' },
   };
 
   // The loaded entry itself — must never lock out the packaged app
-  assert.equal(isAllowedNavigation('file:///app/dist/index.html', entry), true);
+  assert.equal(isAllowedNavigation('file:///app/dist/index.html', fileEntry), true);
   // File in same directory
-  assert.equal(isAllowedNavigation('file:///app/dist/other.html', entry), true);
+  assert.equal(isAllowedNavigation('file:///app/dist/other.html', fileEntry), true);
   // File in subdirectory
   assert.equal(
-    isAllowedNavigation('file:///app/dist/sub/page.html', entry),
+    isAllowedNavigation('file:///app/dist/sub/page.html', fileEntry),
     true
+  );
+};
+
+// --- M-002: app:// protocol navigation tests ---
+
+const testNavAllowed_appProtocolSameOrigin = (): void => {
+  const { isAllowedNavigation } = loadRendererEntry();
+  const entry = {
+    type: 'app' as const,
+    url: 'app://renderer/index.html?backend_port=5060',
+  };
+
+  // Same origin, different path — allowed
+  assert.equal(
+    isAllowedNavigation('app://renderer/other-page.html', entry),
+    true
+  );
+  // Same origin, root — allowed
+  assert.equal(isAllowedNavigation('app://renderer/', entry), true);
+  // Same origin with query — allowed
+  assert.equal(
+    isAllowedNavigation('app://renderer/index.html?foo=bar', entry),
+    true
+  );
+};
+
+const testNavDenied_appProtocolDifferentOrigin = (): void => {
+  const { isAllowedNavigation } = loadRendererEntry();
+  const entry = {
+    type: 'app' as const,
+    url: 'app://renderer/index.html?backend_port=5060',
+  };
+
+  // Different host within app scheme
+  assert.equal(isAllowedNavigation('app://evil/steal.html', entry), false);
+  // HTTP URL
+  assert.equal(isAllowedNavigation('http://evil.com/steal', entry), false);
+  // file:// URL (must be rejected in app:// mode)
+  assert.equal(isAllowedNavigation('file:///etc/passwd', entry), false);
+  // Different scheme entirely
+  assert.equal(isAllowedNavigation('https://evil.com/', entry), false);
+  // D4: Same protocol+hostname but different port must be rejected
+  assert.equal(
+    isAllowedNavigation('app://renderer:1234/evil', entry),
+    false,
+    'app:// with non-matching port must be rejected (D4)'
+  );
+};
+
+const testNavDenied_appProtocolFileUrl = (): void => {
+  const { isAllowedNavigation } = loadRendererEntry();
+  const entry = {
+    type: 'app' as const,
+    url: 'app://renderer/index.html?backend_port=5060',
+  };
+
+  // file:// URLs must be rejected when using app:// protocol
+  // This is the key security improvement: removing broad file:// allowance
+  assert.equal(
+    isAllowedNavigation('file:///app/dist/index.html', entry),
+    false,
+    'file:// must be denied when renderer uses app:// protocol'
   );
 };
 
 const testNavDenied_packagedModeHttpUrl = (): void => {
   const { isAllowedNavigation } = loadRendererEntry();
-  const entry = {
+  // Legacy file entry
+  const fileEntry = {
     type: 'file' as const,
     path: '/app/dist/index.html',
     query: { backend_port: '5060' },
   };
+  assert.equal(isAllowedNavigation('http://evil.com/steal', fileEntry), false);
+  assert.equal(isAllowedNavigation('https://phishing.com/', fileEntry), false);
 
-  // HTTP URL in packaged mode — denied
-  assert.equal(isAllowedNavigation('http://evil.com/steal', entry), false);
-  assert.equal(isAllowedNavigation('https://phishing.com/', entry), false);
+  // App entry (M-002)
+  const appEntry = {
+    type: 'app' as const,
+    url: 'app://renderer/index.html?backend_port=5060',
+  };
+  assert.equal(isAllowedNavigation('http://evil.com/steal', appEntry), false);
+  assert.equal(isAllowedNavigation('https://phishing.com/', appEntry), false);
 };
 
 const testNavDenied_packagedModeTraversalAttempt = (): void => {
@@ -321,13 +420,19 @@ const testNavAllowed_aboutBlank = (): void => {
     query: { backend_port: '5060' },
   };
   const urlEntry = { type: 'url' as const, url: 'http://localhost:5173/' };
+  const appEntry = {
+    type: 'app' as const,
+    url: 'app://renderer/index.html?backend_port=5060',
+  };
 
-  // about:blank must be allowed in both modes
+  // about:blank must be allowed in all modes
   assert.equal(isAllowedNavigation('about:blank', fileEntry), true);
   assert.equal(isAllowedNavigation('about:blank', urlEntry), true);
-  // about:srcdoc must be allowed in both modes
+  assert.equal(isAllowedNavigation('about:blank', appEntry), true);
+  // about:srcdoc must be allowed in all modes
   assert.equal(isAllowedNavigation('about:srcdoc', fileEntry), true);
   assert.equal(isAllowedNavigation('about:srcdoc', urlEntry), true);
+  assert.equal(isAllowedNavigation('about:srcdoc', appEntry), true);
 };
 
 const testNavDenied_aboutOther = (): void => {
@@ -630,8 +735,12 @@ const testNavDenied_dataUri = (): void => {
     query: { backend_port: '5060' },
   };
   const urlEntry = { type: 'url' as const, url: 'http://localhost:5173/' };
+  const appEntry = {
+    type: 'app' as const,
+    url: 'app://renderer/index.html?backend_port=5060',
+  };
 
-  // data: URIs must be denied in both file and url modes
+  // data: URIs must be denied in all modes
   assert.equal(
     isAllowedNavigation('data:text/html,<script>alert(1)</script>', fileEntry),
     false,
@@ -641,6 +750,11 @@ const testNavDenied_dataUri = (): void => {
     isAllowedNavigation('data:text/html,<script>alert(1)</script>', urlEntry),
     false,
     'data: URI must be denied for url entry'
+  );
+  assert.equal(
+    isAllowedNavigation('data:text/html,<script>alert(1)</script>', appEntry),
+    false,
+    'data: URI must be denied for app entry'
   );
 };
 
@@ -652,8 +766,12 @@ const testNavDenied_javascriptUri = (): void => {
     query: { backend_port: '5060' },
   };
   const urlEntry = { type: 'url' as const, url: 'http://localhost:5173/' };
+  const appEntry = {
+    type: 'app' as const,
+    url: 'app://renderer/index.html?backend_port=5060',
+  };
 
-  // javascript: URIs must be denied in both file and url modes
+  // javascript: URIs must be denied in all modes
   assert.equal(
     isAllowedNavigation('javascript:alert(1)', fileEntry),
     false,
@@ -664,6 +782,11 @@ const testNavDenied_javascriptUri = (): void => {
     false,
     'javascript: URI must be denied for url entry'
   );
+  assert.equal(
+    isAllowedNavigation('javascript:alert(1)', appEntry),
+    false,
+    'javascript: URI must be denied for app entry'
+  );
 };
 
 // ============================================================
@@ -673,9 +796,10 @@ const testNavDenied_javascriptUri = (): void => {
 const run = (): void => {
   // Existing tests
   testMainRendererUsesDevServerWithBackendPort();
-  testMainRendererUsesFileWhenPackaged();
+  testMainRendererUsesAppProtocolWhenPackaged();
   testSplashRendererUsesSplashHtmlOnDevServer();
   testSplashRendererUsesFileWithoutDevServer();
+  testSplashRendererUsesAppProtocolWhenPackaged(); // H11(a)
 
   // SEC-002: isAllowedDevRendererUrl
   testAllowedDevUrl_localhostHttp();
@@ -725,7 +849,12 @@ const run = (): void => {
   testNavDenied_dataUri();
   testNavDenied_javascriptUri();
 
-  console.log('renderer entry tests passed (34 tests)');
+  // M-002: app:// protocol navigation tests
+  testNavAllowed_appProtocolSameOrigin();
+  testNavDenied_appProtocolDifferentOrigin();
+  testNavDenied_appProtocolFileUrl();
+
+  console.log('renderer entry tests passed (38 tests)');
 };
 
 run();

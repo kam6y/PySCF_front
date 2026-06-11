@@ -87,7 +87,8 @@ export const createWindow = (
 
   // SEC-006: Harden the window session with CSP response headers and
   // permission restrictions before any content is loaded.
-  hardenSession(newWindow.webContents.session, app.isPackaged);
+  // Pass backendPort so production CSP pins connect-src to the exact port (M-003).
+  hardenSession(newWindow.webContents.session, app.isPackaged, backendPort);
 
   // SEC-002: inject the auth token into renderer->backend requests at the
   // network layer so the token never enters the renderer/DOM world. Registered
@@ -106,12 +107,17 @@ export const createWindow = (
   // --- SEC-001: Lock down renderer navigation ---
   installNavigationGuards(newWindow.webContents, rendererEntry);
 
-  if (rendererEntry.type === 'url') {
+  if (rendererEntry.type === 'url' || rendererEntry.type === 'app') {
     newWindow.loadURL(rendererEntry.url);
-  } else {
+  } else if (rendererEntry.type === 'file') {
+    // Legacy file entry fallback (dev mode without dev server URL)
     newWindow.loadFile(rendererEntry.path, {
       query: rendererEntry.query,
     });
+  } else {
+    // J14: Exhaustive check — compile-time safety for future RendererEntry variants
+    const _exhaustive: never = rendererEntry;
+    console.error(`[Security] Unknown renderer entry type: ${(_exhaustive as { type: string }).type}`);
   }
 
   console.log(`[Main] Loading window with backend port: ${backendPort}`);

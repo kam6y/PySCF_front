@@ -55,7 +55,9 @@ const createFakeSession = (): FakeSession => {
 };
 
 type SessionHardeningModule = {
-  hardenSession: (session: FakeSession, isPackaged: boolean) => void;
+  hardenSession: (session: FakeSession, isPackaged: boolean, backendPort?: number) => void;
+  buildCsp: (isPackaged: boolean, backendPort?: number) => string;
+  isValidPort: (port: number | undefined) => boolean;
 };
 
 /**
@@ -363,6 +365,62 @@ const testHardenSession_calledTwice_registersHandlersOnlyOnce = (): void => {
   );
 };
 
+// A2 fix: splash hardens session without port; main window upgrades it
+const testHardenSession_portUpgrade_reRegistersHeaders = (): void => {
+  const { hardenSession } = loadSessionHardening();
+  const session = createFakeSession();
+
+  // First call: splash without port
+  hardenSession(session, true);
+  assert.equal(session.getPermissionRequestHandlerCallCount(), 1);
+  assert.equal(session.getHeadersReceivedCallCount(), 1);
+
+  // Verify initial CSP has no port
+  let cspValue = '';
+  const handler1 = session.getHeadersReceivedHandler();
+  assert.ok(handler1);
+  handler1({ responseHeaders: {} }, (result) => {
+    cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+  assert.ok(
+    !cspValue.includes('127.0.0.1:'),
+    'Initial CSP without port must not contain loopback port'
+  );
+
+  // Second call: main window with port — should upgrade
+  hardenSession(session, true, 5060);
+  assert.equal(
+    session.getPermissionRequestHandlerCallCount(),
+    1,
+    'Permission handler must NOT be re-registered on port upgrade'
+  );
+  assert.equal(
+    session.getHeadersReceivedCallCount(),
+    2,
+    'onHeadersReceived must be re-registered on port upgrade'
+  );
+
+  // Verify upgraded CSP has the port
+  let upgradedCsp = '';
+  const handler2 = session.getHeadersReceivedHandler();
+  assert.ok(handler2);
+  handler2({ responseHeaders: {} }, (result) => {
+    upgradedCsp = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+  assert.ok(
+    upgradedCsp.includes('http://127.0.0.1:5060'),
+    'Upgraded CSP must pin to the backend port'
+  );
+
+  // Third call with same port: should be a no-op
+  hardenSession(session, true, 5060);
+  assert.equal(
+    session.getHeadersReceivedCallCount(),
+    2,
+    'onHeadersReceived must NOT be re-registered when already port-pinned'
+  );
+};
+
 const testHardenSession_differentSessions_bothHardened = (): void => {
   const { hardenSession } = loadSessionHardening();
   const session1 = createFakeSession();
@@ -382,6 +440,218 @@ const testHardenSession_differentSessions_bothHardened = (): void => {
   );
   assert.equal(session1.getPermissionRequestHandlerCallCount(), 1);
   assert.equal(session2.getPermissionRequestHandlerCallCount(), 1);
+};
+
+// ============================================================
+// M-003: Port-pinned CSP tests
+// ============================================================
+
+const testProductionCSP_withBackendPort_pinsConnectSrc = (): void => {
+  const { hardenSession } = loadSessionHardening();
+  const session = createFakeSession();
+
+  hardenSession(session, true, 5060); // production with known port
+
+  const handler = session.getHeadersReceivedHandler();
+  assert.ok(handler);
+
+  let cspValue = '';
+  handler({ responseHeaders: {} }, (result) => {
+    cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+
+  // Must contain the specific port, NOT the wildcard
+  assert.ok(
+    cspValue.includes('http://127.0.0.1:5060'),
+    'Production CSP must pin HTTP connect-src to the backend port'
+  );
+  assert.ok(
+    cspValue.includes('ws://127.0.0.1:5060'),
+    'Production CSP must pin WS connect-src to the backend port'
+  );
+  assert.ok(
+    !cspValue.includes('127.0.0.1:*'),
+    'Production CSP must NOT contain wildcard port when backendPort is provided'
+  );
+};
+
+const testProductionCSP_withoutBackendPort_noLoopbackWildcard = (): void => {
+  const { hardenSession } = loadSessionHardening();
+  const session = createFakeSession();
+
+  hardenSession(session, true); // production without backend port (e.g. splash)
+
+  const handler = session.getHeadersReceivedHandler();
+  assert.ok(handler);
+
+  let cspValue = '';
+  handler({ responseHeaders: {} }, (result) => {
+    cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+
+  // Must NOT contain any loopback wildcard or specific port
+  assert.ok(
+    !cspValue.includes('127.0.0.1:*'),
+    'Production CSP without backendPort must NOT contain wildcard loopback'
+  );
+  assert.ok(
+    !cspValue.includes('127.0.0.1:'),
+    'Production CSP without backendPort must NOT contain any loopback port'
+  );
+  // Must still have connect-src 'self'
+  assert.ok(
+    cspValue.includes("connect-src 'self'"),
+    'Production CSP without backendPort must include connect-src self'
+  );
+};
+
+// E1: Invalid backendPort values are treated as absent (fail-closed)
+const testBuildCsp_invalidPort_failsClosed = (): void => {
+  // J12(c): removed unused `hardenSession` destructure
+
+  const invalidPorts = [0, -1, 65536, NaN, 1.5, Infinity, -Infinity];
+  for (const port of invalidPorts) {
+    const session = createFakeSession();
+    // Each needs a fresh module to reset the WeakMap
+    const { hardenSession: harden } = loadSessionHardening();
+    harden(session, true, port);
+
+    const handler = session.getHeadersReceivedHandler();
+    assert.ok(handler, `Handler must be registered for port=${port}`);
+
+    let cspValue = '';
+    handler({ responseHeaders: {} }, (result) => {
+      cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+    });
+
+    // Invalid port should produce the "no loopback" CSP (fail-closed)
+    assert.ok(
+      !cspValue.includes('127.0.0.1:'),
+      `Invalid port ${port} must not appear in CSP. Got: ${cspValue}`
+    );
+    assert.ok(
+      cspValue.includes("connect-src 'self'"),
+      `Invalid port ${port} must fall back to connect-src 'self'`
+    );
+  }
+};
+
+// H1 regression: hardenSession(session, true, NaN) then hardenSession(session, true, 5060)
+// must end up with a port-pinned CSP (NaN must NOT lock portPinned:true)
+const testHardenSession_nanThenValidPort_upgradesCorrectly = (): void => {
+  const { hardenSession } = loadSessionHardening();
+  const session = createFakeSession();
+
+  // First call with NaN — invalid port, must NOT record portPinned:true
+  hardenSession(session, true, NaN);
+  assert.equal(session.getHeadersReceivedCallCount(), 1);
+
+  // Verify CSP has no port (NaN treated as absent)
+  let cspAfterNaN = '';
+  const handler1 = session.getHeadersReceivedHandler();
+  assert.ok(handler1);
+  handler1({ responseHeaders: {} }, (result) => {
+    cspAfterNaN = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+  assert.ok(
+    !cspAfterNaN.includes('127.0.0.1:'),
+    'CSP after NaN port must not contain loopback port'
+  );
+
+  // Second call with valid port — must upgrade
+  hardenSession(session, true, 5060);
+  assert.equal(
+    session.getHeadersReceivedCallCount(),
+    2,
+    'onHeadersReceived must be re-registered when upgrading from NaN to valid port'
+  );
+
+  // Verify CSP now has the pinned port
+  let cspAfterUpgrade = '';
+  const handler2 = session.getHeadersReceivedHandler();
+  assert.ok(handler2);
+  handler2({ responseHeaders: {} }, (result) => {
+    cspAfterUpgrade = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+  assert.ok(
+    cspAfterUpgrade.includes('http://127.0.0.1:5060'),
+    'CSP must be port-pinned after upgrading from NaN to valid port'
+  );
+  assert.ok(
+    cspAfterUpgrade.includes('ws://127.0.0.1:5060'),
+    'CSP must include WS port-pinned entry after upgrade'
+  );
+};
+
+const testDevCSP_keepsWildcardRegardlessOfPort = (): void => {
+  const { hardenSession } = loadSessionHardening();
+  const session = createFakeSession();
+
+  hardenSession(session, false, 5060); // dev mode with port
+
+  const handler = session.getHeadersReceivedHandler();
+  assert.ok(handler);
+
+  let cspValue = '';
+  handler({ responseHeaders: {} }, (result) => {
+    cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  });
+
+  // Dev mode must keep the wildcard for Vite HMR compatibility
+  assert.ok(
+    cspValue.includes('127.0.0.1:*'),
+    'Dev CSP must keep wildcard port even when backendPort is provided'
+  );
+};
+
+// ============================================================
+// H11(b): Direct buildCsp unit tests
+// ============================================================
+
+const testBuildCsp_productionWithPort = (): void => {
+  const { buildCsp } = loadSessionHardening();
+  const csp = buildCsp(true, 5060);
+  assert.ok(csp.includes('http://127.0.0.1:5060'), 'Must pin HTTP to port 5060');
+  assert.ok(csp.includes('ws://127.0.0.1:5060'), 'Must pin WS to port 5060');
+  assert.ok(!csp.includes('127.0.0.1:*'), 'Must NOT contain wildcard');
+  assert.ok(!csp.includes("'unsafe-eval'"), 'Production must NOT include unsafe-eval');
+};
+
+const testBuildCsp_productionWithoutPort = (): void => {
+  const { buildCsp } = loadSessionHardening();
+  const csp = buildCsp(true, undefined);
+  assert.ok(csp.includes("connect-src 'self'"), 'Must include connect-src self');
+  assert.ok(!csp.includes('127.0.0.1'), 'Must NOT contain any loopback');
+};
+
+const testBuildCsp_devMode = (): void => {
+  const { buildCsp } = loadSessionHardening();
+  const csp = buildCsp(false, 5060);
+  assert.ok(csp.includes('127.0.0.1:*'), 'Dev must keep wildcard');
+  assert.ok(csp.includes("'unsafe-eval'"), 'Dev must include unsafe-eval');
+  assert.ok(csp.includes("'unsafe-inline'"), 'Dev script-src must include unsafe-inline');
+};
+
+// ============================================================
+// J12(a): Direct isValidPort boundary tests
+// ============================================================
+
+const testIsValidPort_boundaries = (): void => {
+  const { isValidPort } = loadSessionHardening();
+
+  // Invalid values
+  assert.equal(isValidPort(undefined), false, 'undefined must be invalid');
+  assert.equal(isValidPort(NaN), false, 'NaN must be invalid');
+  assert.equal(isValidPort(0), false, '0 must be invalid');
+  assert.equal(isValidPort(65536), false, '65536 must be invalid');
+  assert.equal(isValidPort(1.5), false, '1.5 must be invalid');
+  assert.equal(isValidPort(-1), false, '-1 must be invalid');
+  assert.equal(isValidPort(Infinity), false, 'Infinity must be invalid');
+
+  // Valid boundary values
+  assert.equal(isValidPort(1), true, '1 must be valid');
+  assert.equal(isValidPort(65535), true, '65535 must be valid');
+  assert.equal(isValidPort(8080), true, '8080 must be valid');
 };
 
 // ============================================================
@@ -410,7 +680,29 @@ const run = (): void => {
   testHardenSession_calledTwice_registersHandlersOnlyOnce();
   testHardenSession_differentSessions_bothHardened();
 
-  console.log('session-hardening tests passed (9 tests)');
+  // M-003: Port-pinned CSP
+  testProductionCSP_withBackendPort_pinsConnectSrc();
+  testProductionCSP_withoutBackendPort_noLoopbackWildcard();
+  testDevCSP_keepsWildcardRegardlessOfPort();
+
+  // E1: Invalid port validation
+  testBuildCsp_invalidPort_failsClosed();
+
+  // A2: Port-upgrade re-hardening
+  testHardenSession_portUpgrade_reRegistersHeaders();
+
+  // H1: NaN-then-valid-port regression
+  testHardenSession_nanThenValidPort_upgradesCorrectly();
+
+  // H11(b): Direct buildCsp unit tests
+  testBuildCsp_productionWithPort();
+  testBuildCsp_productionWithoutPort();
+  testBuildCsp_devMode();
+
+  // J12(a): Direct isValidPort boundary tests
+  testIsValidPort_boundaries();
+
+  console.log('session-hardening tests passed (19 tests)');
 };
 
 run();

@@ -1,13 +1,18 @@
 import type { Session } from 'electron';
 
 /**
- * Track sessions that have already been hardened.
- * Both splash and main windows share session.defaultSession (no partition),
- * and Electron's onHeadersReceived / setPermissionRequestHandler are
- * single-handler APIs (last-write-wins). The WeakSet ensures we only
- * register handlers once per session, avoiding silent overwrites.
+ * Track sessions that have already been hardened and whether a port-pinned
+ * CSP has been applied. Both splash and main windows share
+ * session.defaultSession (no partition), and Electron's onHeadersReceived /
+ * setPermissionRequestHandler are single-handler APIs (last-write-wins).
+ *
+ * We allow re-hardening a session when a backendPort is provided for the
+ * first time so the main window can upgrade the splash's initial
+ * port-less CSP to a port-pinned one (A2 fix). Only the
+ * onHeadersReceived handler is re-registered in that case (permission
+ * handler stays).
  */
-const hardenedSessions = new WeakSet<Session>();
+const hardenedSessions = new WeakMap<Session, { portPinned: boolean }>();
 
 /**
  * Permissions that the renderer is allowed to request.
@@ -20,52 +25,65 @@ const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Production CSP delivered as a response header.
- *
- * This mirrors the meta CSP in index.html but adds `frame-ancestors 'none'`
- * which cannot be enforced via a meta tag. The header-based CSP provides
- * defense-in-depth alongside the meta CSP and navigation guards.
- *
- * Note: For `file://` content in packaged mode, the browser may not apply
- * response headers (there is no HTTP response). The meta CSP in index.html
- * and splash.html remains the primary enforcement for packaged builds.
- * The header CSP covers dev mode (served over HTTP) and acts as a safety
- * net for any content loaded via HTTP in production.
+ * Validate that a port number is a usable integer in the 1..65535 range.
+ * Shared by both buildCsp and hardenSession so the portPinned flag and the
+ * CSP directive always agree on whether a port is valid (H1 fix).
  */
-const PRODUCTION_CSP = [
-  "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval'",
-  "style-src 'self' 'unsafe-inline'",
-  "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*",
-  "img-src 'self' data:",
-  "worker-src 'self' blob:",
-  "child-src 'self' blob:",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
+export const isValidPort = (port: number | undefined): port is number =>
+  port !== undefined &&
+  Number.isInteger(port) &&
+  port >= 1 &&
+  port <= 65535;
 
 /**
- * Dev CSP relaxes script-src to allow eval AND inline scripts for Vite HMR /
- * React Fast Refresh. In dev, @vitejs/plugin-react injects an inline <script>
- * preamble (head-prepend) which requires 'unsafe-inline' to execute. This is an
- * HTTP response-header CSP, so unlike the meta CSP it governs the whole document
- * regardless of script position. Dev-only; PRODUCTION_CSP stays strict.
+ * Build a CSP string with optional backend port scoping.
+ *
+ * When a backendPort is provided, connect-src is locked to that specific port
+ * on 127.0.0.1 (both HTTP and WS). When omitted (e.g. splash window which
+ * does not contact the backend), connect-src allows only 'self' — no loopback
+ * wildcard at all.
+ *
+ * Dev mode additionally requires 'unsafe-eval' and 'unsafe-inline' in
+ * script-src for Vite HMR / React Fast Refresh, and keeps the loopback
+ * wildcard in connect-src because Vite's dev server port may differ from the
+ * backend port.
  */
-const DEV_CSP = [
-  "default-src 'self'",
-  "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*",
-  "img-src 'self' data:",
-  "worker-src 'self' blob:",
-  "child-src 'self' blob:",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
+export const buildCsp = (isPackaged: boolean, backendPort?: number): string => {
+  // E1/J7: Use the shared isValidPort helper so buildCsp and hardenSession
+  // always agree on what constitutes a valid port. Malformed values (NaN, 0,
+  // negative, non-integer, out-of-range) produce the "no loopback" CSP (fail-closed).
+  const validPort = isValidPort(backendPort) ? backendPort : undefined;
+
+  const scriptSrc = isPackaged
+    ? "script-src 'self' 'wasm-unsafe-eval'"
+    : "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline'";
+
+  let connectSrc: string;
+  if (!isPackaged) {
+    // Dev mode: keep wildcard so Vite HMR and arbitrary dev-server ports work
+    connectSrc = "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*";
+  } else if (validPort !== undefined) {
+    // Production with known backend port: pin to that port only (M-003)
+    connectSrc = `connect-src 'self' http://127.0.0.1:${validPort} ws://127.0.0.1:${validPort}`;
+  } else {
+    // Production without backend (e.g. splash): no loopback at all
+    connectSrc = "connect-src 'self'";
+  }
+
+  return [
+    "default-src 'self'",
+    scriptSrc,
+    "style-src 'self' 'unsafe-inline'",
+    connectSrc,
+    "img-src 'self' data:",
+    "worker-src 'self' blob:",
+    "child-src 'self' blob:",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
+};
 
 /**
  * Harden a session with permission restrictions and CSP response headers.
@@ -73,33 +91,54 @@ const DEV_CSP = [
  * Should be called on each BrowserWindow's session before content is loaded.
  * This is defense-in-depth — the existing meta CSP and navigation guards
  * remain as primary controls.
+ *
+ * @param backendPort - When provided, the production CSP pins connect-src to
+ *   this specific port on 127.0.0.1 instead of using a wildcard (M-003).
+ *   Omit for windows that do not contact the backend (e.g. splash).
  */
 export const hardenSession = (
   windowSession: Session,
-  isPackaged: boolean
+  isPackaged: boolean,
+  backendPort?: number
 ): void => {
-  // Skip if this session has already been hardened (e.g. splash and main
-  // windows sharing session.defaultSession).
-  if (hardenedSessions.has(windowSession)) {
+  // H1 fix: use the same validation for the portPinned flag and the CSP
+  // so that calling hardenSession(session, true, NaN) does NOT record
+  // portPinned:true with a broken CSP.
+  const portIsValid = isValidPort(backendPort);
+
+  const existing = hardenedSessions.get(windowSession);
+  const isPortUpgrade = portIsValid && existing && !existing.portPinned;
+
+  // Skip if this session is already fully hardened (port-pinned or no port
+  // needed). Allow re-hardening when a valid backendPort is now provided for
+  // the first time (A2 fix: splash hardens the shared session without a port;
+  // the main window upgrades it with the port-pinned CSP).
+  if (existing && !isPortUpgrade) {
     return;
   }
-  hardenedSessions.add(windowSession);
 
-  // Deny all permission requests except explicitly allowed ones
-  windowSession.setPermissionRequestHandler(
-    (_webContents, permission, callback) => {
-      if (ALLOWED_PERMISSIONS.has(permission)) {
-        callback(true);
-        return;
+  // Register permission handler only on the first hardening pass — it does
+  // not depend on the backend port.
+  if (!existing) {
+    // Deny all permission requests except explicitly allowed ones
+    windowSession.setPermissionRequestHandler(
+      (_webContents, permission, callback) => {
+        if (ALLOWED_PERMISSIONS.has(permission)) {
+          callback(true);
+          return;
+        }
+        console.warn(`[Security] Denied permission request: ${permission}`);
+        callback(false);
       }
-      console.warn(`[Security] Denied permission request: ${permission}`);
-      callback(false);
-    }
-  );
+    );
+  }
 
   // Inject CSP as a response header for HTTP-served content.
   // This enables frame-ancestors enforcement which meta CSP cannot provide.
-  const cspValue = isPackaged ? PRODUCTION_CSP : DEV_CSP;
+  // On a port-upgrade pass, onHeadersReceived is re-registered (last-write-
+  // wins) so the new port-pinned CSP takes effect for all subsequent
+  // responses on this session.
+  const cspValue = buildCsp(isPackaged, backendPort);
 
   windowSession.webRequest.onHeadersReceived((details, callback) => {
     // Build response headers, removing any pre-existing CSP header regardless
@@ -115,5 +154,9 @@ export const hardenSession = (
     filtered['Content-Security-Policy'] = [cspValue];
 
     callback({ responseHeaders: filtered });
+  });
+
+  hardenedSessions.set(windowSession, {
+    portPinned: portIsValid,
   });
 };

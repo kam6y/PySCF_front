@@ -12,6 +12,7 @@ import {
   closeSplashWindow,
   closeSplashWindowWhenReady,
 } from './main/splash-window-manager';
+import { registerAppScheme, installAppProtocolHandler } from './main/app-protocol';
 
 let backendPort: number | null = null;
 let authToken: string = '';
@@ -19,6 +20,16 @@ let isCreatingWindow = false;
 
 // グローバル設定を読み込み
 let serverConfig: any = null;
+
+// SEC-M002: Register the app:// custom protocol scheme as privileged.
+// MUST be called before app.ready — Electron requires scheme registration
+// to happen synchronously at module load time. This intentionally precedes
+// the single-instance lock (requestSingleInstanceLock) below; scheme
+// registration is a process-level setup that must happen before any
+// app.ready or event-loop work (J17c).
+if (app.isPackaged) {
+  registerAppScheme();
+}
 
 // Increase memory limits for rendering large SVG and 3D graphics
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
@@ -112,6 +123,23 @@ if (!gotTheLock) {
 
   // アプリが準備できたら通常の起動処理
   app.whenReady().then(() => {
+    // SEC-M002: Install the app:// protocol handler for packaged mode.
+    // Must be called after app.ready. The handler serves renderer assets
+    // from the dist/ directory with path traversal protection and CSP headers.
+    // The backendPort is not yet known at this point (it's resolved later in
+    // initializeApp), so we pass a getter that reads the module-level
+    // backendPort variable. The handler evaluates the getter on every request,
+    // so the CSP automatically includes the port once it becomes available.
+    if (app.isPackaged) {
+      // baseDir is __dirname (the build output directory containing the
+      // packaged renderer assets). Path traversal containment validates
+      // against this directory.
+      // J17(d): backendPort is `number | null` (module state) but the handler
+      // getter contract is `() => number | undefined`. The `?? undefined` bridge
+      // is intentional — null means "not yet resolved", same semantics as undefined.
+      installAppProtocolHandler(__dirname, app.isPackaged, () => backendPort ?? undefined);
+    }
+
     createApplicationMenu();
     registerIpcHandlers(getMainWindow);
     initializeApp();

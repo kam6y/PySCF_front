@@ -37,7 +37,12 @@ export const createSplashWindow = (): void => {
     },
   });
 
-  // SEC-006: Harden the splash session before loading content
+  // SEC-006: Harden the splash session before loading content.
+  // H8 note: registerBackendAuthInjection is NOT called here because the
+  // splash window never makes backend requests (no fetch/SSE) and the
+  // authToken + backendPort are not yet available at splash creation time
+  // (they are resolved later in initializeApp). The shared defaultSession
+  // gets auth injection when createWindow is called for the main window.
   hardenSession(splashWindow.webContents.session, app.isPackaged);
 
   const splashPath = path.join(__dirname, 'splash.html');
@@ -50,10 +55,15 @@ export const createSplashWindow = (): void => {
   // --- SEC-001: Lock down splash window navigation ---
   installNavigationGuards(splashWindow.webContents, rendererEntry);
 
-  if (rendererEntry.type === 'url') {
+  if (rendererEntry.type === 'url' || rendererEntry.type === 'app') {
     splashWindow.loadURL(rendererEntry.url);
-  } else {
+  } else if (rendererEntry.type === 'file') {
+    // Legacy file entry fallback (dev mode without dev server URL)
     splashWindow.loadFile(rendererEntry.path);
+  } else {
+    // J14: Exhaustive check — compile-time safety for future RendererEntry variants
+    const _exhaustive: never = rendererEntry;
+    console.error(`[Security] Unknown renderer entry type: ${(_exhaustive as { type: string }).type}`);
   }
 
   // 開発環境でのみDevToolsを自動で開く（オプション）

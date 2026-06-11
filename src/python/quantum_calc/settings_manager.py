@@ -1,4 +1,27 @@
-"""Application settings manager for PySCF_front."""
+"""Application settings manager for PySCF_front.
+
+Threat model – credential storage at rest
+==========================================
+The Gemini API key (gemini_api_key) is persisted as plaintext inside the
+JSON settings file (~/.pyscf_native_app/app-settings.json).  Current
+mitigations:
+
+* File permissions hardened to 0600 (owner-only) on POSIX systems.
+* Directory permissions hardened to 0700.
+* HTTP responses never expose the raw key (masked at the API boundary).
+* Log output masks the key via mask_settings().
+
+Residual risk: any process running under the same OS user account can read
+the settings file.  For a single-user local desktop application this is an
+accepted tradeoff — the same user already has access to process memory,
+browser cookies and other per-user secrets.
+
+Full fix (deferred): store the key in the OS credential store (macOS
+Keychain / Windows Credential Manager / freedesktop Secret Service) via
+the keyring library.  This requires adding keyring to the packaged
+conda environment and updating save_settings / load_settings to read/write
+the key through the keyring API instead of the JSON file.
+"""
 
 import os
 import json

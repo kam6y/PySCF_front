@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildAppUrl, sanitizeForLog } from './app-protocol';
 
 type MainRendererEntryParams = {
   backendPort: number;
@@ -25,7 +26,16 @@ type UrlRendererEntry = {
   url: string;
 };
 
-export type RendererEntry = FileRendererEntry | UrlRendererEntry;
+/**
+ * Custom app:// protocol entry for packaged mode.
+ * Uses the app:// scheme registered by app-protocol.ts.
+ */
+type AppRendererEntry = {
+  type: 'app';
+  url: string;
+};
+
+export type RendererEntry = FileRendererEntry | UrlRendererEntry | AppRendererEntry;
 
 // --- SEC-002: Dev renderer URL validation ---
 
@@ -112,24 +122,69 @@ export const isAllowedNavigation = (
     }
 
     if (rendererEntry.type === 'url') {
-      // Dev mode: origins must match exactly
-      const allowed = new URL(rendererEntry.url);
+      // Dev mode: origins must match exactly.
+      // H12: Parse entry URL separately to log a distinct config-error message
+      // if the renderer entry URL itself is malformed.
+      let allowed: URL;
+      try {
+        allowed = new URL(rendererEntry.url);
+      } catch {
+        console.error(
+          `[Security] Config error: renderer entry URL is malformed: ${sanitizeForLog(rendererEntry.url)}`
+        );
+        return false;
+      }
       return target.origin === allowed.origin;
     }
 
-    // Packaged mode (file entry): only allow file: protocol
-    // file:// origins are opaque ("null"), so compare directory paths instead
-    if (target.protocol !== 'file:') {
-      return false;
+    if (rendererEntry.type === 'app') {
+      // Packaged mode (app:// protocol): only allow app:// with matching
+      // protocol, hostname, and port. We cannot use origin comparison because
+      // the WHATWG URL spec returns origin "null" for non-standard schemes
+      // (app:// is a custom Electron scheme), which would incorrectly match
+      // other opaque-origin URLs like data: and javascript:.
+      // Port check added per D4: app://renderer:1234/evil would otherwise
+      // pass with only protocol+hostname comparison.
+      // H12: Parse entry URL separately to distinguish config errors from
+      // target URL issues.
+      let allowed: URL;
+      try {
+        allowed = new URL(rendererEntry.url);
+      } catch {
+        console.error(
+          `[Security] Config error: renderer entry URL is malformed: ${sanitizeForLog(rendererEntry.url)}`
+        );
+        return false;
+      }
+      return (
+        target.protocol === allowed.protocol &&
+        target.hostname === allowed.hostname &&
+        target.port === allowed.port
+      );
     }
 
-    const allowedDir = path.dirname(rendererEntry.path);
-    // Use fileURLToPath for correct conversion on all platforms (Windows drive letters, etc.)
-    const targetPath = fileURLToPath(target);
-    // Target path must be within the allowed directory
-    const resolved = path.resolve(targetPath);
-    const resolvedAllowed = path.resolve(allowedDir);
-    return resolved.startsWith(resolvedAllowed + path.sep);
+    if (rendererEntry.type === 'file') {
+      // Legacy file entry path (fallback — retained for dev-mode file entries
+      // when no dev server URL is provided): only allow file: protocol.
+      // file:// origins are opaque ("null"), so compare directory paths instead.
+      if (target.protocol !== 'file:') {
+        return false;
+      }
+
+      const allowedDir = path.dirname(rendererEntry.path);
+      // Use fileURLToPath for correct conversion on all platforms (Windows drive letters, etc.)
+      const targetPath = fileURLToPath(target);
+      // Target path must be within the allowed directory
+      const resolved = path.resolve(targetPath);
+      const resolvedAllowed = path.resolve(allowedDir);
+      return resolved.startsWith(resolvedAllowed + path.sep);
+    }
+
+    // J14: Exhaustive check — a future 4th RendererEntry variant would be
+    // caught at compile time rather than silently falling through.
+    const _exhaustive: never = rendererEntry;
+    console.error(`[Security] Unknown renderer entry type: ${(_exhaustive as RendererEntry).type}`);
+    return false;
   } catch {
     // Malformed URL → deny
     return false;
@@ -161,12 +216,23 @@ export const getMainRendererEntry = ({
     );
   }
 
+  if (isPackaged) {
+    // Packaged mode: use app:// custom protocol for defense-in-depth.
+    // The app-protocol handler serves files from the dist/ directory with
+    // path traversal protection and CSP headers.
+    return {
+      type: 'app',
+      url: buildAppUrl('index.html', { backend_port: String(backendPort) }),
+    };
+  }
+
+  // Dev mode without a dev server URL: fall back to file:// entry.
+  // The app:// scheme is only registered when app.isPackaged, so using
+  // it here would load an unregistered scheme and produce a blank window (B1).
   return {
     type: 'file',
     path: htmlPath,
-    query: {
-      backend_port: String(backendPort),
-    },
+    query: { backend_port: String(backendPort) },
   };
 };
 
@@ -187,6 +253,15 @@ export const getSplashRendererEntry = ({
     );
   }
 
+  if (isPackaged) {
+    // Packaged mode: use app:// custom protocol (consistent with main window).
+    return {
+      type: 'app',
+      url: buildAppUrl('splash.html'),
+    };
+  }
+
+  // Dev mode without a dev server URL: fall back to file:// entry (B1 fix).
   return {
     type: 'file',
     path: htmlPath,
@@ -225,7 +300,8 @@ export const installNavigationGuards = (
   webContents.on('will-navigate', (event, url) => {
     if (!isAllowedNavigation(url, rendererEntry)) {
       event.preventDefault();
-      console.warn(`[Security] Blocked navigation to: ${url}`);
+      // H3: sanitize attacker-controlled URL before logging (truncate + strip control chars)
+      console.warn(`[Security] Blocked navigation to: ${sanitizeForLog(url)}`);
     }
   });
 
@@ -233,7 +309,8 @@ export const installNavigationGuards = (
   webContents.on('will-redirect', (event, url) => {
     if (!isAllowedNavigation(url, rendererEntry)) {
       event.preventDefault();
-      console.warn(`[Security] Blocked redirect to: ${url}`);
+      // H3: sanitize attacker-controlled URL before logging
+      console.warn(`[Security] Blocked redirect to: ${sanitizeForLog(url)}`);
     }
   });
 
@@ -242,7 +319,8 @@ export const installNavigationGuards = (
   // (see ipc.ts), which applies validateExternalUrl and sender verification.
   // Routing window.open through openExternal would bypass those checks.
   webContents.setWindowOpenHandler(({ url }) => {
-    console.warn(`[Security] Denied window.open for URL: ${url}`);
+    // H3: sanitize attacker-controlled URL before logging
+    console.warn(`[Security] Denied window.open for URL: ${sanitizeForLog(url)}`);
     return { action: 'deny' as const };
   });
 };

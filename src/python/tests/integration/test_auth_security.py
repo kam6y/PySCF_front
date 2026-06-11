@@ -273,8 +273,23 @@ def test_cors_development_rejects_null_origin(monkeypatch):
     assert allow_origin != "null"
 
 
-def test_cors_production_allows_null_origin(monkeypatch):
-    """In production (packaged) mode, null origin is allowed for file:// renderer."""
+def test_cors_production_allows_null_origin_transitional(monkeypatch):
+    """In production mode, the literal Origin 'null' is ACCEPTED (transitional).
+
+    Opaque origins (data: URIs, sandboxed iframes, local file:// pages)
+    send ``Origin: null``.  This is a deliberate transition fallback while
+    the app:// custom protocol migration is validated.
+
+    REMOVAL CONDITION (see ``register_cors_middleware`` in app.py):
+      Remove 'null' from ``allow_origins`` once:
+        1. app:// is GUI-smoke-tested on all target platforms.
+        2. Electron serializes the origin as 'app://renderer' in every
+           IPC and fetch path.
+        3. No production crash/error reports reference a CORS rejection
+           for 'null' or 'file://' origins.
+      When 'null' is removed, this test SHOULD fail -- update or delete
+      it to confirm the intentional policy change.
+    """
     monkeypatch.setenv("PYSCF_ENV", "production")
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
@@ -313,8 +328,18 @@ def test_cors_production_rejects_loopback_origin(monkeypatch):
     assert allow_origin != "http://127.0.0.1:5173"
 
 
-def test_cors_production_allows_file_origin(monkeypatch):
-    """In production (packaged) mode, file:// origin is allowed for Electron renderer."""
+def test_cors_production_allows_file_origin_transitional(monkeypatch):
+    """In production mode, 'file://' origin is ACCEPTED (transitional).
+
+    Electron's file:// renderer sends ``Origin: file://``.  This is a
+    deliberate transition fallback alongside 'null' while the app://
+    custom protocol migration is validated.
+
+    REMOVAL CONDITION (see ``register_cors_middleware`` in app.py):
+      Same conditions as ``test_cors_production_allows_null_origin_transitional``.
+      When 'file://' is removed from the origin list, this test SHOULD
+      fail -- update or delete it to confirm the intentional change.
+    """
     monkeypatch.setenv("PYSCF_ENV", "production")
     monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
     monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
@@ -331,6 +356,34 @@ def test_cors_production_allows_file_origin(monkeypatch):
 
     assert response.status_code in {200, 204}
     assert response.headers.get("access-control-allow-origin") == "file://"
+
+
+def test_cors_production_allows_app_renderer_origin(monkeypatch):
+    """In production mode, Origin 'app://renderer' is ACCEPTED.
+
+    This is the PRIMARY origin for the packaged Electron app (NOT
+    transitional).  Electron's custom ``app://`` protocol scheme causes
+    the renderer to send ``Origin: app://renderer`` on every fetch to
+    the local backend.  If this origin were accidentally dropped from
+    ``allow_origins``, the packaged app would silently break with no
+    test signal.
+    """
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        response = client.options(
+            "/health",
+            headers={
+                "Origin": "app://renderer",
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "X-Auth-Token",
+            },
+        )
+
+    assert response.status_code in {200, 204}
+    assert response.headers.get("access-control-allow-origin") == "app://renderer"
 
 
 def test_cors_production_rejects_external_origin(monkeypatch):

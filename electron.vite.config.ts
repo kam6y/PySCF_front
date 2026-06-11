@@ -38,10 +38,70 @@ const devCspRelaxPlugin = (): Plugin => ({
   name: 'dev-csp-relax',
   apply: 'serve',
   transformIndexHtml(html) {
-    return html.replace(
+    // Relax script-src for Vite HMR + React Fast Refresh preamble
+    let result = html.replace(
       "script-src 'self' 'wasm-unsafe-eval'",
       "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline'"
     );
+    // H5: Fail loud if the marker was not found (CSP format changed)
+    if (result === html) {
+      throw new Error(
+        '[dev-csp-relax] Failed to relax script-src — CSP marker not found in index.html. ' +
+        'Has the meta CSP format changed?'
+      );
+    }
+
+    const beforeConnect = result;
+    // Add connect-src wildcards for dev-server and backend (A3: production
+    // meta CSP no longer has the wildcard, so dev must inject it here)
+    result = result.replace(
+      "connect-src 'self'",
+      "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*"
+    );
+    // H5: Fail loud if the connect-src marker was not found
+    if (result === beforeConnect) {
+      throw new Error(
+        '[dev-csp-relax] Failed to relax connect-src — CSP marker not found in index.html. ' +
+        'Has the meta CSP format changed?'
+      );
+    }
+
+    return result;
+  },
+});
+
+/**
+ * Production CSP stripping plugin (H2 fix).
+ *
+ * In packaged mode, the authoritative CSP is delivered as a response header
+ * by the app:// protocol handler (app-protocol.ts) and session-hardening.ts.
+ * The meta CSP in index.html/splash.html would create a SECOND policy that
+ * intersects with the header CSP — per the CSP spec, EVERY policy must allow
+ * a request for it to succeed. The meta `connect-src 'self'` (origin
+ * app://renderer) does NOT allow http://127.0.0.1:<port>, so backend
+ * fetch/SSE would be blocked regardless of the header CSP.
+ *
+ * This plugin strips the entire <meta http-equiv="Content-Security-Policy">
+ * tag from HTML files during the build, leaving only the header CSP as the
+ * single authoritative policy in production.
+ */
+const stripMetaCspPlugin = (): Plugin => ({
+  name: 'strip-meta-csp',
+  apply: 'build',
+  transformIndexHtml(html) {
+    // Match the entire <meta http-equiv="Content-Security-Policy" ...> tag
+    // across multiple lines. Uses [\s\S]*? instead of [^>]* so the pattern
+    // still matches if a formatter wraps the tag's attributes across lines (J10).
+    // The tag may be self-closing or not.
+    const metaCspPattern = /\s*<meta\s[\s\S]*?http-equiv=["']Content-Security-Policy["'][\s\S]*?\/?>\s*/i;
+    const result = html.replace(metaCspPattern, '\n');
+    if (result === html) {
+      throw new Error(
+        '[strip-meta-csp] Failed to strip meta CSP tag — pattern not found in HTML. ' +
+        'Has the meta CSP tag been removed or reformatted?'
+      );
+    }
+    return result;
   },
 });
 
@@ -119,7 +179,7 @@ const rendererConfig = {
       plugins: [disableKetcherMacromoleculesEditorInOptimizeDeps()],
     },
   },
-  plugins: [devCspRelaxPlugin(), disableKetcherMacromoleculesEditor(), react()],
+  plugins: [devCspRelaxPlugin(), stripMetaCspPlugin(), disableKetcherMacromoleculesEditor(), react()],
   build: {
     outDir: resolveProject('dist'),
     emptyOutDir: false,

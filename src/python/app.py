@@ -225,15 +225,31 @@ def register_cors_middleware(fastapi_app: FastAPI) -> None:
         )
         origin_regex: str | None = rf"^http://(127\.0\.0\.1|localhost):({_VALID_PORT})$"
     else:
-        # Production / unknown: Packaged Electron builds load the renderer
-        # via ``file://``, which causes the browser to send ``Origin: null``
-        # (or ``file://``).  Only those origins are permitted.
+        # Production / unknown: Packaged Electron builds use the custom
+        # ``app://renderer`` protocol (M-002), which sends
+        # ``Origin: app://renderer``.  Legacy ``file://`` / ``null`` origins
+        # are retained during the transition period for safety; they will be
+        # removed once the app:// migration is fully validated.
+        #
+        # REMOVAL CONDITION for 'file://' and 'null':
+        #   Remove both once all of the following are confirmed:
+        #     1. The app:// custom protocol is GUI-smoke-tested on all
+        #        target platforms (macOS, Windows, Linux).
+        #     2. Electron's registerSchemesAsPrivileged serializes the
+        #        origin as 'app://renderer' (not 'null') in every IPC
+        #        and fetch path (verified via DevTools Network tab).
+        #     3. No production crash/error reports reference a CORS
+        #        rejection for 'null' or 'file://' origins.
+        #   Until then, keeping them is the safer choice because a false
+        #   CORS block would silently break the packaged app with no
+        #   static test able to catch it.
+        #
         # CORS is NOT the authentication boundary — the mandatory
         # ``X-Auth-Token`` custom header is.  A cross-origin attacker cannot
         # read or forge this header (browsers block cross-origin custom
         # headers unless the preflight succeeds).  ``allow_credentials`` is
         # False so no cookies are ever reflected.
-        origins = ["file://", "null"]
+        origins = ["app://renderer", "file://", "null"]
         origin_regex = None
 
     fastapi_app.add_middleware(

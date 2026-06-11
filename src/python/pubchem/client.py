@@ -4,6 +4,7 @@
 
 import requests
 import logging
+from urllib.parse import quote as _urlquote
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
@@ -28,6 +29,9 @@ class PubChemError(Exception):
 class PubChemNotFoundError(PubChemError):
     """Exception for 404 Not Found errors."""
     pass
+
+_ALLOWED_SEARCH_TYPES: frozenset[str] = frozenset({'name', 'cid', 'formula'})
+
 
 class PubChemClient:
     """Client for interacting with the PubChem PUG REST API."""
@@ -78,13 +82,17 @@ class PubChemClient:
             raise PubChemError("Failed to process compound data") from None
 
     def _find_cid(self, query: str, search_type: str) -> Optional[int]:
+        if search_type not in _ALLOWED_SEARCH_TYPES:
+            raise PubChemError("Invalid search type")
+
         if search_type == "cid":
             try:
                 return int(query)
             except ValueError:
                 raise PubChemError("Invalid CID format") from None
 
-        search_path = f"compound/{search_type}/{query.strip()}/cids/JSON"
+        encoded_query = _urlquote(query.strip(), safe="")
+        search_path = f"compound/{search_type}/{encoded_query}/cids/JSON"
         url = f"{self.BASE_URL}/{search_path}"
         
         try:

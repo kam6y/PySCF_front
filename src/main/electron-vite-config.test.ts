@@ -140,10 +140,160 @@ const testKetcherReactIsNotExcludedFromPrebundling = (): void => {
   assert.ok(!exclude.includes('ketcher-react'));
 };
 
+// ============================================================
+// J1/J13: devCspRelaxPlugin tests — simulate transformIndexHtml
+// ============================================================
+
+/**
+ * Extract the devCspRelaxPlugin's transformIndexHtml function by evaluating
+ * the factory source. We read the actual HTML files to detect marker drift.
+ */
+
+const indexHtmlPath = path.resolve(__dirname, '../../index.html');
+const splashHtmlPath = path.resolve(__dirname, '../../splash.html');
+
+const readHtml = (htmlPath: string): string => fs.readFileSync(htmlPath, 'utf8');
+
+/**
+ * Simulate the devCspRelaxPlugin transformIndexHtml logic.
+ * We replicate the exact string replacements from the plugin source
+ * to verify they work on the actual HTML content.
+ */
+const simulateDevCspRelax = (html: string): string => {
+  let result = html.replace(
+    "script-src 'self' 'wasm-unsafe-eval'",
+    "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline'"
+  );
+  if (result === html) {
+    throw new Error('script-src marker not found');
+  }
+
+  const beforeConnect = result;
+  result = result.replace(
+    "connect-src 'self'",
+    "connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:*"
+  );
+  if (result === beforeConnect) {
+    throw new Error('connect-src marker not found');
+  }
+
+  return result;
+};
+
+/**
+ * Simulate the stripMetaCspPlugin transformIndexHtml logic.
+ */
+const simulateStripMetaCsp = (html: string): string => {
+  const metaCspPattern = /\s*<meta\s[\s\S]*?http-equiv=["']Content-Security-Policy["'][\s\S]*?\/?>\s*/i;
+  const result = html.replace(metaCspPattern, '\n');
+  if (result === html) {
+    throw new Error('meta CSP tag not found');
+  }
+  return result;
+};
+
+// J1: devCspRelaxPlugin works on index.html
+const testDevCspRelax_indexHtml = (): void => {
+  const html = readHtml(indexHtmlPath);
+  const relaxed = simulateDevCspRelax(html);
+
+  // Must have relaxed script-src
+  assert.ok(
+    relaxed.includes("'unsafe-eval'"),
+    'index.html: relaxed CSP must include unsafe-eval'
+  );
+  assert.ok(
+    relaxed.includes("'unsafe-inline'"),
+    'index.html: relaxed CSP must include unsafe-inline in script-src'
+  );
+  // Must have relaxed connect-src
+  assert.ok(
+    relaxed.includes('http://127.0.0.1:*'),
+    'index.html: relaxed CSP must include connect-src wildcard'
+  );
+};
+
+// J1: devCspRelaxPlugin works on splash.html (the regression case)
+const testDevCspRelax_splashHtml = (): void => {
+  const html = readHtml(splashHtmlPath);
+  // This would throw before the J1 fix (splash.html lacked wasm-unsafe-eval)
+  const relaxed = simulateDevCspRelax(html);
+
+  assert.ok(
+    relaxed.includes("'unsafe-eval'"),
+    'splash.html: relaxed CSP must include unsafe-eval'
+  );
+  assert.ok(
+    relaxed.includes('http://127.0.0.1:*'),
+    'splash.html: relaxed CSP must include connect-src wildcard'
+  );
+};
+
+// J13: devCspRelaxPlugin throws when marker is genuinely absent
+const testDevCspRelax_failLoudOnMissingMarker = (): void => {
+  assert.throws(
+    () => simulateDevCspRelax('<html><head></head><body></body></html>'),
+    /script-src marker not found/,
+    'Must throw when CSP marker is absent'
+  );
+};
+
+// J13: stripMetaCspPlugin strips meta CSP from index.html
+const testStripMetaCsp_indexHtml = (): void => {
+  const html = readHtml(indexHtmlPath);
+  const stripped = simulateStripMetaCsp(html);
+
+  assert.ok(
+    !stripped.includes('Content-Security-Policy'),
+    'index.html: meta CSP tag must be stripped'
+  );
+  // Other content must survive
+  assert.ok(
+    stripped.includes('<div id="root">'),
+    'index.html: non-CSP content must survive'
+  );
+};
+
+// J13: stripMetaCspPlugin strips meta CSP from splash.html
+const testStripMetaCsp_splashHtml = (): void => {
+  const html = readHtml(splashHtmlPath);
+  const stripped = simulateStripMetaCsp(html);
+
+  assert.ok(
+    !stripped.includes('Content-Security-Policy'),
+    'splash.html: meta CSP tag must be stripped'
+  );
+  // Other content must survive
+  assert.ok(
+    stripped.includes('splash-container'),
+    'splash.html: non-CSP content must survive'
+  );
+};
+
+// J13: stripMetaCspPlugin throws when tag is absent
+const testStripMetaCsp_failLoudOnMissingTag = (): void => {
+  assert.throws(
+    () => simulateStripMetaCsp('<html><head></head><body></body></html>'),
+    /meta CSP tag not found/,
+    'Must throw when meta CSP tag is absent'
+  );
+};
+
 const run = (): void => {
   testKetcherCommonJsDependenciesArePrebundled();
   testKetcherReactIsNotExcludedFromPrebundling();
-  console.log('electron-vite config tests passed');
+
+  // J1/J13: devCspRelaxPlugin
+  testDevCspRelax_indexHtml();
+  testDevCspRelax_splashHtml();
+  testDevCspRelax_failLoudOnMissingMarker();
+
+  // J13: stripMetaCspPlugin
+  testStripMetaCsp_indexHtml();
+  testStripMetaCsp_splashHtml();
+  testStripMetaCsp_failLoudOnMissingTag();
+
+  console.log('electron-vite config tests passed (8 tests)');
 };
 
 run();
