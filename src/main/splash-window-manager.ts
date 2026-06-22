@@ -37,7 +37,6 @@ export const createSplashWindow = (): void => {
     },
   });
 
-  // SEC-006: Harden the splash session before loading content.
   // H8 note: registerBackendAuthInjection is NOT called here because the
   // splash window never makes backend requests (no fetch/SSE) and the
   // authToken + backendPort are not yet available at splash creation time
@@ -52,13 +51,11 @@ export const createSplashWindow = (): void => {
     rendererUrl: process.env.ELECTRON_RENDERER_URL,
   });
 
-  // --- SEC-001: Lock down splash window navigation ---
   installNavigationGuards(splashWindow.webContents, rendererEntry);
 
   if (rendererEntry.type === 'url' || rendererEntry.type === 'app') {
     splashWindow.loadURL(rendererEntry.url);
   } else if (rendererEntry.type === 'file') {
-    // Legacy file entry fallback (dev mode without dev server URL)
     splashWindow.loadFile(rendererEntry.path);
   } else {
     // J14: Exhaustive check — compile-time safety for future RendererEntry variants

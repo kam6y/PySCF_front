@@ -7,10 +7,6 @@
          'unsafe-eval' is NOT included in this production CSP. In dev mode, the
          devCspRelaxPlugin in electron.vite.config.ts appends 'unsafe-eval' to
          script-src via transformIndexHtml (apply: 'serve' only). -->
-    <!-- Production meta CSP: no loopback wildcard. The actual port-pinned
-         connect-src is delivered via response headers (session-hardening.ts
-         and app-protocol.ts). In dev mode, devCspRelaxPlugin (electron.vite.config.ts)
-         relaxes script-src and adds connect-src wildcards for Vite HMR. -->
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; worker-src 'self' blob:; child-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none';"

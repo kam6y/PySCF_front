@@ -80,18 +80,11 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
 
 const DEFAULT_MIME_TYPE = 'application/octet-stream';
 
-/**
- * Get the MIME type for a file path based on its extension.
- */
 export const getMimeType = (filePath: string): string => {
   const ext = path.extname(filePath).toLowerCase();
   return MIME_TYPES[ext] ?? DEFAULT_MIME_TYPE;
 };
 
-/**
- * Decoded path segments that indicate path traversal attempts.
- * We check both the raw URL path and after decoding for double-encoding.
- */
 // Patterns checked against the raw URL path. Double-encoding (e.g. %252e)
 // decodes to literal '%2e' which is a harmless directory name on disk — the
 // final containment check (resolved.startsWith(baseDir)) catches any actual
@@ -128,15 +121,12 @@ export const validateRequestPath = (
   requestPath: string,
   baseDir: string
 ): string | null => {
-  // Reject any raw traversal patterns in the original URL path
-  // (before URL decoding which new URL already performs)
   for (const pattern of TRAVERSAL_PATTERNS) {
     if (requestPath.includes(pattern)) {
       return null;
     }
   }
 
-  // Decode the path (URL class already decodes, but be explicit for safety)
   let decodedPath: string;
   try {
     decodedPath = decodeURIComponent(requestPath);
@@ -145,30 +135,24 @@ export const validateRequestPath = (
     return null;
   }
 
-  // Reject null bytes which can cause path truncation in native file APIs (D2)
+  // D2: null bytes cause path truncation in native file APIs
   if (decodedPath.includes('\0')) {
     return null;
   }
 
-  // Check decoded path for traversal patterns
   if (decodedPath.includes('..')) {
     return null;
   }
 
-  // Reject absolute paths (e.g. /C:/... on Windows, or paths starting with //)
-  // The path from URL should be relative to our base directory
-  // Remove leading slash from URL path to make it relative
+  // Strip leading slashes to make the path relative to baseDir
   const relativePath = decodedPath.replace(/^\/+/, '');
 
-  // Empty path means root — serve index.html
   const targetRelative = relativePath || 'index.html';
 
-  // Reject if the relative path is absolute (Windows drive letter check)
   if (path.isAbsolute(targetRelative)) {
     return null;
   }
 
-  // Resolve against the base directory
   const resolved = path.resolve(baseDir, targetRelative);
   const normalizedBase = path.resolve(baseDir);
 
@@ -240,7 +224,6 @@ export const createAppProtocolRequestHandler = (
     // becomes available (the handler is installed before the port is known).
     const csp = buildCsp(deps.isPackaged, deps.getBackendPort());
 
-    // Only allow GET requests
     if (request.method !== 'GET') {
       return new Response('Method not allowed', {
         status: 405,
@@ -258,7 +241,6 @@ export const createAppProtocolRequestHandler = (
       });
     }
 
-    // Validate the path
     const filePath = validateRequestPath(requestUrl.pathname, normalizedBaseDir);
     if (!filePath) {
       // Truncate and sanitize the pathname for logging to prevent log
@@ -271,7 +253,6 @@ export const createAppProtocolRequestHandler = (
       });
     }
 
-    // Determine MIME type
     const mimeType = getMimeType(filePath);
 
     // Use fetchImpl to serve the file. In production this is net.fetch with

@@ -27,6 +27,17 @@ def make_auth_client(
     return TestClient(app, base_url=base_url)
 
 
+def make_production_client(
+    monkeypatch: pytest.MonkeyPatch,
+) -> TestClient:
+    """Create a TestClient configured for production mode."""
+    monkeypatch.setenv("PYSCF_ENV", "production")
+    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
+    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    return TestClient(app, base_url="http://127.0.0.1")
+
+
 def test_request_without_token(monkeypatch):
     """Test that requests without a token are rejected."""
     with make_auth_client(monkeypatch) as client:
@@ -290,11 +301,7 @@ def test_cors_production_allows_null_origin_transitional(monkeypatch):
       When 'null' is removed, this test SHOULD fail -- update or delete
       it to confirm the intentional policy change.
     """
-    monkeypatch.setenv("PYSCF_ENV", "production")
-    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
-    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
-    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with make_production_client(monkeypatch) as client:
         response = client.options(
             "/health",
             headers={
@@ -310,11 +317,7 @@ def test_cors_production_allows_null_origin_transitional(monkeypatch):
 
 def test_cors_production_rejects_loopback_origin(monkeypatch):
     """In production (packaged) mode, loopback HTTP origins are not allowed."""
-    monkeypatch.setenv("PYSCF_ENV", "production")
-    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
-    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
-    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with make_production_client(monkeypatch) as client:
         response = client.options(
             "/health",
             headers={
@@ -340,11 +343,7 @@ def test_cors_production_allows_file_origin_transitional(monkeypatch):
       When 'file://' is removed from the origin list, this test SHOULD
       fail -- update or delete it to confirm the intentional change.
     """
-    monkeypatch.setenv("PYSCF_ENV", "production")
-    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
-    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
-    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with make_production_client(monkeypatch) as client:
         response = client.options(
             "/health",
             headers={
@@ -368,11 +367,7 @@ def test_cors_production_allows_app_renderer_origin(monkeypatch):
     ``allow_origins``, the packaged app would silently break with no
     test signal.
     """
-    monkeypatch.setenv("PYSCF_ENV", "production")
-    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
-    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
-    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with make_production_client(monkeypatch) as client:
         response = client.options(
             "/health",
             headers={
@@ -388,11 +383,7 @@ def test_cors_production_allows_app_renderer_origin(monkeypatch):
 
 def test_cors_production_rejects_external_origin(monkeypatch):
     """In production mode, an external origin is rejected."""
-    monkeypatch.setenv("PYSCF_ENV", "production")
-    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
-    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
-    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with make_production_client(monkeypatch) as client:
         response = client.options(
             "/health",
             headers={
@@ -590,11 +581,7 @@ def test_mixed_case_env_consistent_across_auth_and_cors(monkeypatch):
 
 def test_cors_production_does_not_send_credentials_header(monkeypatch):
     """In production mode, Access-Control-Allow-Credentials is not sent."""
-    monkeypatch.setenv("PYSCF_ENV", "production")
-    monkeypatch.setenv("PYSCF_AUTH_TOKEN", TEST_TOKEN)
-    monkeypatch.delenv("PYSCF_RESOURCES_PATH", raising=False)
-    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
-    with TestClient(app, base_url="http://127.0.0.1") as client:
+    with make_production_client(monkeypatch) as client:
         response = client.options(
             "/health",
             headers={

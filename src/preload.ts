@@ -19,7 +19,6 @@ if (!isValidPort) {
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Backend port from URL parameters
   backendPort: isValidPort ? backendPort : null,
 
   // Electron API methods

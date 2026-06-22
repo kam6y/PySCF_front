@@ -28,10 +28,6 @@ export const assertAllowedIpcSender = (
   }
 };
 
-// ============================================================
-// External URL validation
-// ============================================================
-
 /** Maximum length for URLs passed to open-external-url. */
 const MAX_EXTERNAL_URL_LENGTH = 2048;
 

@@ -38,7 +38,6 @@ const devCspRelaxPlugin = (): Plugin => ({
   name: 'dev-csp-relax',
   apply: 'serve',
   transformIndexHtml(html) {
-    // Relax script-src for Vite HMR + React Fast Refresh preamble
     let result = html.replace(
       "script-src 'self' 'wasm-unsafe-eval'",
       "script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval' 'unsafe-inline'"

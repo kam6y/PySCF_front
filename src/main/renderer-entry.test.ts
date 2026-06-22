@@ -44,10 +44,6 @@ const loadRendererEntry = (): RendererEntryModule => {
   return require('./renderer-entry') as RendererEntryModule;
 };
 
-// ============================================================
-// Existing tests (preserved)
-// ============================================================
-
 const testMainRendererUsesDevServerWithBackendPort = (): void => {
   const { getMainRendererEntry } = loadRendererEntry();
 

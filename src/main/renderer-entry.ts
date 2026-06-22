@@ -37,8 +37,6 @@ type AppRendererEntry = {
 
 export type RendererEntry = FileRendererEntry | UrlRendererEntry | AppRendererEntry;
 
-// --- SEC-002: Dev renderer URL validation ---
-
 const ALLOWED_DEV_HOSTNAMES: ReadonlySet<string> = new Set([
   'localhost',
   '127.0.0.1',
@@ -53,17 +51,14 @@ export const isAllowedDevRendererUrl = (rendererUrl: string): boolean => {
   try {
     const parsed = new URL(rendererUrl);
 
-    // Only plain http allowed (not https — dev server is local)
     if (parsed.protocol !== 'http:') {
       return false;
     }
 
-    // Reject credentials in URL (user:pass@host)
     if (parsed.username || parsed.password) {
       return false;
     }
 
-    // Only loopback hostnames
     if (!ALLOWED_DEV_HOSTNAMES.has(parsed.hostname)) {
       return false;
     }
@@ -83,12 +78,9 @@ export const isAllowedDevRendererUrl = (rendererUrl: string): boolean => {
 
     return true;
   } catch {
-    // Malformed URL → reject
     return false;
   }
 };
-
-// --- SEC-001: Navigation origin validation ---
 
 /**
  * Inert about: URLs that Electron may navigate to internally.
@@ -122,7 +114,6 @@ export const isAllowedNavigation = (
     }
 
     if (rendererEntry.type === 'url') {
-      // Dev mode: origins must match exactly.
       // H12: Parse entry URL separately to log a distinct config-error message
       // if the renderer entry URL itself is malformed.
       let allowed: URL;
@@ -186,7 +177,7 @@ export const isAllowedNavigation = (
     console.error(`[Security] Unknown renderer entry type: ${(_exhaustive as RendererEntry).type}`);
     return false;
   } catch {
-    // Malformed URL → deny
+    // Malformed URL — deny
     return false;
   }
 };
@@ -226,7 +217,6 @@ export const getMainRendererEntry = ({
     };
   }
 
-  // Dev mode without a dev server URL: fall back to file:// entry.
   // The app:// scheme is only registered when app.isPackaged, so using
   // it here would load an unregistered scheme and produce a blank window (B1).
   return {
@@ -261,14 +251,11 @@ export const getSplashRendererEntry = ({
     };
   }
 
-  // Dev mode without a dev server URL: fall back to file:// entry (B1 fix).
   return {
     type: 'file',
     path: htmlPath,
   };
 };
-
-// --- SEC-001: Shared navigation guard wiring ---
 
 /**
  * Minimal interface for the webContents methods used by navigation guards.
@@ -296,7 +283,6 @@ export const installNavigationGuards = (
   webContents: NavigationGuardTarget,
   rendererEntry: RendererEntry
 ): void => {
-  // Deny same-window navigation to untrusted origins
   webContents.on('will-navigate', (event, url) => {
     if (!isAllowedNavigation(url, rendererEntry)) {
       event.preventDefault();

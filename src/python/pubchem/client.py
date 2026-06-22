@@ -30,6 +30,7 @@ class PubChemNotFoundError(PubChemError):
     """Exception for 404 Not Found errors."""
     pass
 
+# Keep in sync with VALID_SEARCH_TYPES in services/pubchem_service.py (defense-in-depth).
 _ALLOWED_SEARCH_TYPES: frozenset[str] = frozenset({'name', 'cid', 'formula'})
 
 

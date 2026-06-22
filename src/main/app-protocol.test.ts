@@ -2,15 +2,6 @@ const assert: typeof import('node:assert/strict') = require('node:assert/strict'
 
 /**
  * Tests for the app:// custom protocol handler (M-002).
- *
- * These tests cover:
- * - Path traversal rejection (validateRequestPath)
- * - MIME type resolution (getMimeType)
- * - URL construction (buildAppUrl)
- *
- * The actual protocol.handle registration requires a running Electron process
- * and cannot be unit-tested here. These tests cover the pure-function security
- * logic that the handler depends on.
  */
 
 type AppProtocolHandlerDeps = {

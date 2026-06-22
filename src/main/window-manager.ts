@@ -85,9 +85,7 @@ export const createWindow = (
     mainWindow = null;
   });
 
-  // SEC-006: Harden the window session with CSP response headers and
-  // permission restrictions before any content is loaded.
-  // Pass backendPort so production CSP pins connect-src to the exact port (M-003).
+  // M-003: port-pinned CSP; must run before any content loads.
   hardenSession(newWindow.webContents.session, app.isPackaged, backendPort);
 
   // SEC-002: inject the auth token into renderer->backend requests at the
@@ -104,13 +102,11 @@ export const createWindow = (
     rendererUrl: process.env.ELECTRON_RENDERER_URL,
   });
 
-  // --- SEC-001: Lock down renderer navigation ---
   installNavigationGuards(newWindow.webContents, rendererEntry);
 
   if (rendererEntry.type === 'url' || rendererEntry.type === 'app') {
     newWindow.loadURL(rendererEntry.url);
   } else if (rendererEntry.type === 'file') {
-    // Legacy file entry fallback (dev mode without dev server URL)
     newWindow.loadFile(rendererEntry.path, {
       query: rendererEntry.query,
     });

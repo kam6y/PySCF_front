@@ -145,8 +145,7 @@ const testKetcherReactIsNotExcludedFromPrebundling = (): void => {
 // ============================================================
 
 /**
- * Extract the devCspRelaxPlugin's transformIndexHtml function by evaluating
- * the factory source. We read the actual HTML files to detect marker drift.
+ * Simulate the Vite CSP plugins against the actual HTML files to detect marker drift.
  */
 
 const indexHtmlPath = path.resolve(__dirname, '../../index.html');

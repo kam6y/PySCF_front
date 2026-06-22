@@ -46,10 +46,6 @@ CUDA_PACKAGE_MAP = {
 # The version is kept separate from CUDA_PACKAGE_MAP so that the status
 # endpoint can display the package name without the ``==`` suffix.
 #
-# Verified against PyPI as of 2026-06-02:
-#   gpu4pyscf-cuda11x: 0.6.1 .. 1.7.1
-#   gpu4pyscf-cuda12x: 0.6.1 .. 1.7.1
-#   gpu4pyscf-cuda13x: 1.4.3 .. 1.7.1
 GPU4PYSCF_VERSION_BY_CUDA: dict[int, str] = {
     11: "1.7.1",
     12: "1.7.1",
@@ -473,7 +469,6 @@ class SystemService:
         force_reinstall: bool = False,
         confirm_install: bool = False,
     ) -> Dict[str, Any]:
-        # In packaged builds, deny runtime installs unless explicitly opted in.
         if not self._runtime_install_allowed():
             raise ValidationError(
                 "Runtime package installation is disabled in packaged builds. "
@@ -507,8 +502,6 @@ class SystemService:
 
         gpu4pyscf_package = CUDA_PACKAGE_MAP[cuda_major][0]
 
-        # Pin the top-level gpu4pyscf package to a known-good version so that
-        # ``pip install`` never silently pulls an unvetted release.
         gpu4pyscf_install_spec = self._build_gpu4pyscf_install_spec(
             gpu4pyscf_package, cuda_major
         )

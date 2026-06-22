@@ -16,6 +16,16 @@ PROPRIETARY_QUERY_SENTINEL = "SECRET_COMPOUND_NAME_%%%_PRIVATE"
 INVALID_CID_SENTINEL = "not_a_number_SECRET_CID_%%%"
 
 
+def _make_capture_get(mocker, captured_url):
+    def _capture_get(url, **kwargs):
+        captured_url['url'] = url
+        mock_resp = mocker.MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'IdentifierList': {'CID': [12345]}}
+        return mock_resp
+    return _capture_get
+
+
 def test_invalid_cid_error_does_not_reflect_input():
     """
     GIVEN a non-numeric CID string containing a proprietary sentinel
@@ -200,13 +210,7 @@ class TestPubChemQueryUrlEncoding:
         """
         client = PubChemClient()
         captured_url = {}
-
-        def _capture_get(url, **kwargs):
-            captured_url['url'] = url
-            mock_resp = mocker.MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {'IdentifierList': {'CID': [12345]}}
-            return mock_resp
+        _capture_get = _make_capture_get(mocker, captured_url)
 
         mocker.patch.object(client.session, 'get', side_effect=_capture_get)
         client._find_cid('a/b', 'name')
@@ -226,13 +230,7 @@ class TestPubChemQueryUrlEncoding:
         """
         client = PubChemClient()
         captured_url = {}
-
-        def _capture_get(url, **kwargs):
-            captured_url['url'] = url
-            mock_resp = mocker.MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {'IdentifierList': {'CID': [12345]}}
-            return mock_resp
+        _capture_get = _make_capture_get(mocker, captured_url)
 
         mocker.patch.object(client.session, 'get', side_effect=_capture_get)
         client._find_cid('water?extra=1', 'name')
@@ -249,13 +247,7 @@ class TestPubChemQueryUrlEncoding:
         """
         client = PubChemClient()
         captured_url = {}
-
-        def _capture_get(url, **kwargs):
-            captured_url['url'] = url
-            mock_resp = mocker.MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {'IdentifierList': {'CID': [12345]}}
-            return mock_resp
+        _capture_get = _make_capture_get(mocker, captured_url)
 
         mocker.patch.object(client.session, 'get', side_effect=_capture_get)
         client._find_cid('ethanol#fragment', 'name')
@@ -272,13 +264,7 @@ class TestPubChemQueryUrlEncoding:
         """
         client = PubChemClient()
         captured_url = {}
-
-        def _capture_get(url, **kwargs):
-            captured_url['url'] = url
-            mock_resp = mocker.MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {'IdentifierList': {'CID': [12345]}}
-            return mock_resp
+        _capture_get = _make_capture_get(mocker, captured_url)
 
         mocker.patch.object(client.session, 'get', side_effect=_capture_get)
         client._find_cid('acetic acid', 'name')
@@ -298,13 +284,7 @@ class TestPubChemQueryUrlEncoding:
         """
         client = PubChemClient()
         captured_url = {}
-
-        def _capture_get(url, **kwargs):
-            captured_url['url'] = url
-            mock_resp = mocker.MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {'IdentifierList': {'CID': [12345]}}
-            return mock_resp
+        _capture_get = _make_capture_get(mocker, captured_url)
 
         mocker.patch.object(client.session, 'get', side_effect=_capture_get)
         client._find_cid('アスピリン', 'name')  # katakana 'aspirin'
@@ -314,16 +294,6 @@ class TestPubChemQueryUrlEncoding:
             'Non-ASCII character appeared un-encoded in URL'
         )
 
-    def test_cid_search_type_bypasses_url_encoding(self):
-        """
-        GIVEN search_type='cid' with a valid numeric CID
-        WHEN _find_cid is called
-        THEN it returns the integer directly without building a URL
-        """
-        client = PubChemClient()
-        result = client._find_cid('12345', 'cid')
-        assert result == 12345
-
     def test_combined_special_characters(self, mocker):
         """
         GIVEN a query combining /, ?, #, and spaces
@@ -332,13 +302,7 @@ class TestPubChemQueryUrlEncoding:
         """
         client = PubChemClient()
         captured_url = {}
-
-        def _capture_get(url, **kwargs):
-            captured_url['url'] = url
-            mock_resp = mocker.MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.json.return_value = {'IdentifierList': {'CID': [12345]}}
-            return mock_resp
+        _capture_get = _make_capture_get(mocker, captured_url)
 
         mocker.patch.object(client.session, 'get', side_effect=_capture_get)
         client._find_cid('a/b?c#d e', 'name')

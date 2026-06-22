@@ -49,9 +49,7 @@ export const isValidPort = (port: number | undefined): port is number =>
  * backend port.
  */
 export const buildCsp = (isPackaged: boolean, backendPort?: number): string => {
-  // E1/J7: Use the shared isValidPort helper so buildCsp and hardenSession
-  // always agree on what constitutes a valid port. Malformed values (NaN, 0,
-  // negative, non-integer, out-of-range) produce the "no loopback" CSP (fail-closed).
+  // E1/J7: shared isValidPort keeps buildCsp and hardenSession in agreement (fail-closed).
   const validPort = isValidPort(backendPort) ? backendPort : undefined;
 
   const scriptSrc = isPackaged
@@ -101,9 +99,7 @@ export const hardenSession = (
   isPackaged: boolean,
   backendPort?: number
 ): void => {
-  // H1 fix: use the same validation for the portPinned flag and the CSP
-  // so that calling hardenSession(session, true, NaN) does NOT record
-  // portPinned:true with a broken CSP.
+  // H1: must match buildCsp's port validation.
   const portIsValid = isValidPort(backendPort);
 
   const existing = hardenedSessions.get(windowSession);
@@ -120,7 +116,6 @@ export const hardenSession = (
   // Register permission handler only on the first hardening pass — it does
   // not depend on the backend port.
   if (!existing) {
-    // Deny all permission requests except explicitly allowed ones
     windowSession.setPermissionRequestHandler(
       (_webContents, permission, callback) => {
         if (ALLOWED_PERMISSIONS.has(permission)) {

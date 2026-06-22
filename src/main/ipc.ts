@@ -83,13 +83,11 @@ export const confirmAndOpenExternal = async (
 export const registerIpcHandlers = (
   getMainWindow: () => BrowserWindow | null
 ): void => {
-  // IPC handler for getting platform information
   ipcMain.handle('get-platform', (event) => {
     assertAllowedIpcSender(event, getMainWindow);
     return process.platform;
   });
 
-  // IPC handler for getting fullscreen state
   ipcMain.handle('get-fullscreen', (event) => {
     assertAllowedIpcSender(event, getMainWindow);
     const mainWindow = getMainWindow();
@@ -126,13 +124,11 @@ export const registerIpcHandlers = (
     });
   });
 
-  // IPC handler for showing About dialog
   ipcMain.handle('show-about-dialog', (event) => {
     assertAllowedIpcSender(event, getMainWindow);
     showAboutDialog();
   });
 
-  // IPC handler for selecting a folder
   ipcMain.handle('dialog:select-folder', async (event) => {
     assertAllowedIpcSender(event, getMainWindow);
 
