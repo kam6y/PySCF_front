@@ -3,8 +3,8 @@
 import os
 import tempfile
 import logging
-from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime
+import threading
+from typing import ClassVar, Dict, List, Any, Optional
 import numpy as np
 from pyscf import gto, lib, tools
 from .exceptions import CalculationError, FileManagerError
@@ -17,6 +17,9 @@ HARTREE_TO_EV = 27.211386245988
 
 class MolecularOrbitalGenerator:
     """Generate molecular orbital CUBE files and orbital information for visualization."""
+
+    _cube_generation_locks: ClassVar[Dict[str, threading.Lock]] = {}
+    _cube_generation_locks_guard: ClassVar[threading.Lock] = threading.Lock()
     
     def __init__(self, working_dir: str):
         """
@@ -30,6 +33,72 @@ class MolecularOrbitalGenerator:
         self.mol: Optional[gto.Mole] = None
         self.mf = None
         self._orbital_info_cache: Optional[List[Dict[str, Any]]] = None
+
+    @classmethod
+    def _get_cube_generation_lock(cls, cube_file_path: str) -> threading.Lock:
+        """Return a process-local lock for one final CUBE file path."""
+        lock_key = os.path.abspath(cube_file_path)
+        with cls._cube_generation_locks_guard:
+            lock = cls._cube_generation_locks.get(lock_key)
+            if lock is None:
+                lock = threading.Lock()
+                cls._cube_generation_locks[lock_key] = lock
+            return lock
+
+    @staticmethod
+    def _is_valid_cube_file(cube_file_path: str) -> bool:
+        """Perform a minimal Gaussian CUBE structure check."""
+        if not os.path.exists(cube_file_path) or os.path.getsize(cube_file_path) == 0:
+            return False
+
+        try:
+            with open(cube_file_path, 'r') as cube_file:
+                header_lines = [cube_file.readline() for _ in range(6)]
+                if any(line == "" for line in header_lines):
+                    return False
+
+                atom_line_parts = header_lines[2].split()
+                if len(atom_line_parts) < 4:
+                    return False
+                atom_count = abs(int(atom_line_parts[0]))
+
+                for grid_line in header_lines[3:6]:
+                    grid_line_parts = grid_line.split()
+                    if len(grid_line_parts) < 4 or abs(int(grid_line_parts[0])) == 0:
+                        return False
+
+                for _ in range(atom_count):
+                    if cube_file.readline() == "":
+                        return False
+
+                data_line = cube_file.readline()
+                if data_line == "":
+                    return False
+                float(data_line.split()[0])
+                return True
+        except (OSError, ValueError, IndexError):
+            return False
+
+    def _generate_orbital_cube_to_path(
+        self,
+        cube_file_path: str,
+        orbital_index: int,
+        grid_size: int,
+    ) -> None:
+        """Generate one orbital CUBE file at the provided path."""
+        mo_coeff = self.mf.mo_coeff
+        if hasattr(mo_coeff, 'ndim') and mo_coeff.ndim == 3:
+            # UKS/UHF case: use alpha orbitals
+            mo_coeff = mo_coeff[0]
+
+        tools.cubegen.orbital(
+            self.mol,
+            cube_file_path,
+            mo_coeff[:, orbital_index],
+            nx=grid_size,
+            ny=grid_size,
+            nz=grid_size,
+        )
         
     def _load_calculation_data(self) -> None:
         """Load molecular and SCF data from checkpoint file."""
@@ -266,73 +335,118 @@ class MolecularOrbitalGenerator:
             raise CalculationError(f"Invalid orbital index: {orbital_index}. Available range: 0-{len(orbitals)-1}")
         
         orbital_info = orbitals[orbital_index]
-        
-        # Determine cube file path
         cube_filename = f"orbital_{orbital_index}_grid{grid_size}.cube"
-        
+
         if save_to_disk:
-            # Create orbital subdirectory and save there
             orbital_dir = os.path.join(self.working_dir, "orbital")
             os.makedirs(orbital_dir, exist_ok=True)
             cube_file_path = os.path.join(orbital_dir, cube_filename)
-            
-            # Check if file already exists and is valid
-            if os.path.exists(cube_file_path):
-                logger.info(f"Using existing CUBE file: {cube_file_path}")
-                cube_content = ""
-                file_size_kb = 0
-                
-                if return_content:
-                    with open(cube_file_path, 'r') as f:
-                        cube_content = f.read()
+            generation_lock = self._get_cube_generation_lock(cube_file_path)
+
+            with generation_lock:
+                if os.path.exists(cube_file_path):
+                    if self._is_valid_cube_file(cube_file_path):
+                        logger.info(f"Using existing CUBE file: {cube_file_path}")
+                        cube_content = ""
+                        if return_content:
+                            with open(cube_file_path, 'r') as f:
+                                cube_content = f.read()
+                        file_size_kb = os.path.getsize(cube_file_path) / 1024.0
+
+                        return {
+                            "cube_data": cube_content,
+                            "orbital_info": orbital_info,
+                            "generation_params": {
+                                "grid_size": grid_size,
+                                "isovalue_positive": isovalue_pos,
+                                "isovalue_negative": isovalue_neg,
+                                "file_size_kb": file_size_kb
+                            },
+                            "cached": True
+                        }
+
+                    logger.warning(f"Ignoring invalid cached CUBE file: {cube_file_path}")
+                    try:
+                        os.unlink(cube_file_path)
+                    except OSError as e:
+                        raise CalculationError(f"Failed to remove invalid cached CUBE file: {e}")
+
+                temp_cube_file_path = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        mode='w',
+                        suffix='.cube',
+                        prefix=f".{cube_filename}.",
+                        dir=orbital_dir,
+                        delete=False,
+                    ) as temp_file:
+                        temp_cube_file_path = temp_file.name
+
+                    self._generate_orbital_cube_to_path(
+                        temp_cube_file_path,
+                        orbital_index,
+                        grid_size,
+                    )
+
+                    if not self._is_valid_cube_file(temp_cube_file_path):
+                        raise CalculationError("Generated CUBE file is invalid or incomplete.")
+
+                    os.replace(temp_cube_file_path, cube_file_path)
+                    temp_cube_file_path = None
+
+                    cube_content = ""
+                    if return_content:
+                        with open(cube_file_path, 'r') as f:
+                            cube_content = f.read()
                     file_size_kb = os.path.getsize(cube_file_path) / 1024.0
-                
-                return {
-                    "cube_data": cube_content,
-                    "orbital_info": orbital_info,
-                    "generation_params": {
-                        "grid_size": grid_size,
-                        "isovalue_positive": isovalue_pos,
-                        "isovalue_negative": isovalue_neg,
-                        "file_size_kb": file_size_kb
-                    },
-                    "file_path": cube_file_path,
-                    "cached": True
-                }
-        else:
-            # Create temporary file for CUBE output
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.cube', delete=False) as temp_file:
-                cube_file_path = temp_file.name
-        
+
+                    logger.info(f"Generated CUBE file for orbital {orbital_index} ({orbital_info['label']})")
+                    logger.info(f"Grid size: {grid_size}x{grid_size}x{grid_size}, File size: {file_size_kb:.1f} KB")
+
+                    return {
+                        "cube_data": cube_content,
+                        "orbital_info": orbital_info,
+                        "generation_params": {
+                            "grid_size": grid_size,
+                            "isovalue_positive": isovalue_pos,
+                            "isovalue_negative": isovalue_neg,
+                            "file_size_kb": file_size_kb
+                        },
+                        "cached": False
+                    }
+
+                except Exception as e:
+                    if temp_cube_file_path and os.path.exists(temp_cube_file_path):
+                        try:
+                            os.unlink(temp_cube_file_path)
+                        except OSError as cleanup_error:
+                            logger.warning(f"Failed to clean up temporary CUBE file: {cleanup_error}")
+                    logger.error(f"Failed to generate CUBE file for orbital {orbital_index}: {e}")
+                    raise CalculationError(f"CUBE file generation failed: {e}")
+
+        # Create temporary file for non-persistent CUBE output.
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.cube', delete=False) as temp_file:
+            cube_file_path = temp_file.name
+
         try:
-            # Generate CUBE file using PySCF
-            # Handle both RKS/RHF and UKS/UHF cases
-            mo_coeff = self.mf.mo_coeff
-            if hasattr(mo_coeff, 'ndim') and mo_coeff.ndim == 3:
-                # UKS/UHF case: use alpha orbitals
-                mo_coeff = mo_coeff[0]
-            
-            tools.cubegen.orbital(
-                self.mol, 
-                cube_file_path, 
-                mo_coeff[:, orbital_index],
-                nx=grid_size, 
-                ny=grid_size, 
-                nz=grid_size
+            self._generate_orbital_cube_to_path(
+                cube_file_path,
+                orbital_index,
+                grid_size,
             )
-            
-            # Read the generated CUBE file
+
+            if not self._is_valid_cube_file(cube_file_path):
+                raise CalculationError("Generated CUBE file is invalid or incomplete.")
+
             cube_content = ""
-            file_size_kb = 0
-            
-            if return_content and os.path.exists(cube_file_path):
+            if return_content:
                 with open(cube_file_path, 'r') as f:
                     cube_content = f.read()
-                file_size_kb = os.path.getsize(cube_file_path) / 1024.0
-            
+            file_size_kb = os.path.getsize(cube_file_path) / 1024.0
+
             logger.info(f"Generated CUBE file for orbital {orbital_index} ({orbital_info['label']})")
             logger.info(f"Grid size: {grid_size}x{grid_size}x{grid_size}, File size: {file_size_kb:.1f} KB")
-            
+
             return {
                 "cube_data": cube_content,
                 "orbital_info": orbital_info,
@@ -342,7 +456,6 @@ class MolecularOrbitalGenerator:
                     "isovalue_negative": isovalue_neg,
                     "file_size_kb": file_size_kb
                 },
-                "file_path": cube_file_path if save_to_disk else None,
                 "cached": False
             }
             
@@ -351,130 +464,12 @@ class MolecularOrbitalGenerator:
             raise CalculationError(f"CUBE file generation failed: {e}")
         
         finally:
-            # Clean up temporary file only if not saved to disk
-            if not save_to_disk and os.path.exists(cube_file_path):
+            if os.path.exists(cube_file_path):
                 try:
                     os.unlink(cube_file_path)
-                except Exception as e:
+                except OSError as e:
                     logger.warning(f"Failed to clean up temporary CUBE file: {e}")
     
-    def list_cube_files(self) -> List[Dict[str, Any]]:
-        """
-        List all CUBE files in the working directory.
-        
-        Returns:
-            List of CUBE file information
-        """
-        cube_files = []
-        
-        orbital_dir = os.path.join(self.working_dir, "orbital")
-        if not os.path.exists(orbital_dir):
-            return cube_files
-        
-        # Find all cube files matching our naming pattern
-        import glob
-        pattern = os.path.join(orbital_dir, "orbital_*_grid*.cube")
-        
-        for file_path in glob.glob(pattern):
-            filename = os.path.basename(file_path)
-            
-            # Extract orbital index and grid size from filename
-            try:
-                # Parse filename: orbital_{index}_grid{size}.cube
-                parts = filename.replace('.cube', '').split('_')
-                if len(parts) >= 3 and parts[0] == 'orbital' and parts[2].startswith('grid'):
-                    orbital_index = int(parts[1])
-                    grid_size = int(parts[2].replace('grid', ''))
-                    
-                    file_size_kb = os.path.getsize(file_path) / 1024.0
-                    modified_time = datetime.fromtimestamp(os.path.getmtime(file_path))
-                    
-                    cube_files.append({
-                        "filename": filename,
-                        "file_path": file_path,
-                        "orbital_index": orbital_index,
-                        "grid_size": grid_size,
-                        "file_size_kb": file_size_kb,
-                        "modified": modified_time.isoformat()
-                    })
-            except (ValueError, IndexError) as e:
-                logger.warning(f"Failed to parse CUBE filename {filename}: {e}")
-                continue
-        
-        return sorted(cube_files, key=lambda x: x["orbital_index"])
-    
-    def delete_cube_file(self, orbital_index: int, grid_size: int = None) -> bool:
-        """
-        Delete a specific CUBE file or all CUBE files for an orbital.
-        
-        Args:
-            orbital_index: Index of the orbital
-            grid_size: Specific grid size to delete, or None to delete all grid sizes
-        
-        Returns:
-            True if file(s) were deleted successfully
-        """
-        deleted_count = 0
-        orbital_dir = os.path.join(self.working_dir, "orbital")
-        
-        if not os.path.exists(orbital_dir):
-            return False
-        
-        if grid_size is not None:
-            # Delete specific file
-            filename = f"orbital_{orbital_index}_grid{grid_size}.cube"
-            file_path = os.path.join(orbital_dir, filename)
-            
-            if os.path.exists(file_path):
-                try:
-                    os.unlink(file_path)
-                    deleted_count += 1
-                    logger.info(f"Deleted CUBE file: {filename}")
-                except Exception as e:
-                    logger.error(f"Failed to delete CUBE file {filename}: {e}")
-                    return False
-        else:
-            # Delete all grid sizes for this orbital
-            import glob
-            pattern = os.path.join(orbital_dir, f"orbital_{orbital_index}_grid*.cube")
-            
-            for file_path in glob.glob(pattern):
-                try:
-                    os.unlink(file_path)
-                    deleted_count += 1
-                    logger.info(f"Deleted CUBE file: {os.path.basename(file_path)}")
-                except Exception as e:
-                    logger.error(f"Failed to delete CUBE file {file_path}: {e}")
-        
-        return deleted_count > 0
-    
-    def delete_all_cube_files(self) -> int:
-        """
-        Delete all CUBE files in the working directory.
-        
-        Returns:
-            Number of files deleted
-        """
-        deleted_count = 0
-        orbital_dir = os.path.join(self.working_dir, "orbital")
-        
-        if not os.path.exists(orbital_dir):
-            return deleted_count
-        
-        import glob
-        pattern = os.path.join(orbital_dir, "orbital_*_grid*.cube")
-        
-        for file_path in glob.glob(pattern):
-            try:
-                os.unlink(file_path)
-                deleted_count += 1
-                logger.info(f"Deleted CUBE file: {os.path.basename(file_path)}")
-            except Exception as e:
-                logger.error(f"Failed to delete CUBE file {file_path}: {e}")
-        
-        logger.info(f"Deleted {deleted_count} CUBE files from {orbital_dir}")
-        return deleted_count
-
     def validate_calculation(self) -> bool:
         """
         Validate that the calculation data is available for orbital generation.

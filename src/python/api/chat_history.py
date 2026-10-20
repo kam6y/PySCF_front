@@ -1,207 +1,61 @@
-"""
-Chat History API endpoints.
+"""Chat history API endpoints."""
 
-Provides REST API for managing chat history sessions and messages.
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
-Note:
-    - Input validation is handled by flask_pydantic @validate decorator
-    - Business logic errors are handled by service layer (ServiceError)
-    - All endpoints return consistent JSON response format
-"""
-
-import logging
-from flask import Blueprint, jsonify
-from flask_pydantic import validate
-
-from generated_models import (
-    CreateChatSessionRequest,
-    UpdateChatSessionRequest
-)
+from generated_models import CreateChatSessionRequest, UpdateChatSessionRequest
 from services.chat_history_service import get_chat_history_service
-from services.exceptions import ServiceError
 
-# Set up logging
-logger = logging.getLogger(__name__)
-
-# Create chat history blueprint
-chat_history_bp = Blueprint('chat_history', __name__)
+router = APIRouter(prefix='/api/chat-history')
 
 
-@chat_history_bp.route('/api/chat-history/sessions', methods=['GET'])
-def get_chat_sessions():
-    """Get all chat sessions, ordered by most recent update."""
-    try:
-        logger.info("Processing request to get all chat sessions")
-        service = get_chat_history_service()
-        data = service.list_sessions()
-
-        return jsonify({
-            'success': True,
-            'data': data
-        }), 200
-
-    except ServiceError as e:
-        logger.error(f"Service error in get_chat_sessions: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-    except Exception as e:
-        logger.error(f"Unexpected error in get_chat_sessions: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred. Please contact support if this persists.'
-        }), 500
+def _chat_session_not_found_response(session_id: str) -> JSONResponse:
+    return JSONResponse(
+        {'success': False, 'error': f'Chat session not found: {session_id}'},
+        status_code=404,
+    )
 
 
-@chat_history_bp.route('/api/chat-history/sessions', methods=['POST'])
-@validate()
-def create_chat_session(body: CreateChatSessionRequest):
-    """
-    Create a new chat session.
-
-    Request validation is handled by @validate decorator.
-    Default value for 'name' is provided by Pydantic model.
-    """
-    try:
-        # body.name already has default value from Pydantic model ("新しいチャット")
-        logger.info(f"Processing request to create chat session: '{body.name}'")
-        service = get_chat_history_service()
-        session = service.create_session(name=body.name)
-
-        return jsonify({
-            'success': True,
-            'data': {
-                'session': session
-            }
-        }), 201
-
-    except ServiceError as e:
-        logger.error(f"Service error in create_chat_session: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-    except Exception as e:
-        logger.error(f"Unexpected error in create_chat_session: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred. Please contact support if this persists.'
-        }), 500
+@router.get('/sessions')
+def get_chat_sessions() -> dict:
+    data = get_chat_history_service().list_sessions()
+    return {'success': True, 'data': data}
 
 
-@chat_history_bp.route('/api/chat-history/sessions/<session_id>', methods=['GET'])
-def get_chat_session(session_id: str):
-    """Get a specific chat session with all messages."""
-    try:
-        logger.info(f"Processing request to get chat session: {session_id}")
-        service = get_chat_history_service()
-        session_data = service.get_session_with_messages(session_id)
-
-        if session_data is None:
-            logger.warning(f"Chat session not found: {session_id}")
-            return jsonify({
-                'success': False,
-                'error': f'Chat session not found: {session_id}'
-            }), 404
-
-        return jsonify({
-            'success': True,
-            'data': session_data
-        }), 200
-
-    except ServiceError as e:
-        logger.error(f"Service error in get_chat_session: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-    except Exception as e:
-        logger.error(f"Unexpected error in get_chat_session: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred. Please contact support if this persists.'
-        }), 500
+@router.post('/sessions', status_code=201)
+def create_chat_session(body: CreateChatSessionRequest) -> dict:
+    session = get_chat_history_service().create_session(name=body.name)
+    return {'success': True, 'data': {'session': session}}
 
 
-@chat_history_bp.route('/api/chat-history/sessions/<session_id>', methods=['PATCH'])
-@validate()
-def update_chat_session(session_id: str, body: UpdateChatSessionRequest):
-    """
-    Update a chat session's metadata (name).
-
-    Request validation is handled by @validate decorator.
-    """
-    try:
-        logger.info(f"Processing request to update chat session: {session_id}")
-        service = get_chat_history_service()
-        session = service.update_session(session_id, body.name)
-
-        if session is None:
-            logger.warning(f"Chat session not found: {session_id}")
-            return jsonify({
-                'success': False,
-                'error': f'Chat session not found: {session_id}'
-            }), 404
-
-        return jsonify({
-            'success': True,
-            'data': {
-                'session': session
-            }
-        }), 200
-
-    except ServiceError as e:
-        logger.error(f"Service error in update_chat_session: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-    except Exception as e:
-        logger.error(f"Unexpected error in update_chat_session: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred. Please contact support if this persists.'
-        }), 500
+@router.get('/sessions/{session_id}', response_model=None)
+def get_chat_session(session_id: str) -> dict | JSONResponse:
+    session_data = get_chat_history_service().get_session_with_messages(session_id)
+    if session_data is None:
+        return _chat_session_not_found_response(session_id)
+    return {'success': True, 'data': session_data}
 
 
-@chat_history_bp.route('/api/chat-history/sessions/<session_id>', methods=['DELETE'])
-def delete_chat_session(session_id: str):
-    """Delete a chat session and all its messages."""
-    try:
-        logger.info(f"Processing request to delete chat session: {session_id}")
-        service = get_chat_history_service()
-        deleted = service.delete_session(session_id)
+@router.patch('/sessions/{session_id}', response_model=None)
+def update_chat_session(
+    session_id: str,
+    body: UpdateChatSessionRequest,
+) -> dict | JSONResponse:
+    session = get_chat_history_service().update_session(session_id, body.name)
+    if session is None:
+        return _chat_session_not_found_response(session_id)
+    return {'success': True, 'data': {'session': session}}
 
-        if not deleted:
-            logger.warning(f"Chat session not found: {session_id}")
-            return jsonify({
-                'success': False,
-                'error': f'Chat session not found: {session_id}'
-            }), 404
 
-        return jsonify({
-            'success': True,
-            'data': {
-                'message': 'Chat session deleted successfully',
-                'deleted_id': session_id
-            }
-        }), 200
-
-    except ServiceError as e:
-        logger.error(f"Service error in delete_chat_session: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-    except Exception as e:
-        logger.error(f"Unexpected error in delete_chat_session: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred. Please contact support if this persists.'
-        }), 500
+@router.delete('/sessions/{session_id}', response_model=None)
+def delete_chat_session(session_id: str) -> dict | JSONResponse:
+    deleted = get_chat_history_service().delete_session(session_id)
+    if not deleted:
+        return _chat_session_not_found_response(session_id)
+    return {
+        'success': True,
+        'data': {
+            'message': 'Chat session deleted successfully',
+            'deleted_id': session_id,
+        },
+    }

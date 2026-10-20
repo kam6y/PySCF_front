@@ -1,6 +1,6 @@
 # PySCF_front
 
-This is a quantum chemistry application built with **Electron**, **React (TypeScript)**, and **Python (Flask)**. It leverages PySCF and RDKit on the backend, providing a desktop application for molecular structure visualization, data retrieval from PubChem, and the execution of quantum chemistry calculations such as Density Functional Theory (DFT).
+This is a quantum chemistry application built with **Electron**, **React (TypeScript)**, and a **Python FastAPI/ASGI backend**. It leverages PySCF and RDKit on the backend, providing a desktop application for molecular structure visualization, data retrieval from PubChem, and the execution of quantum chemistry calculations such as Density Functional Theory (DFT).
 
 ---
 
@@ -15,10 +15,12 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
     -   Perform **geometry optimization** and **vibrational frequency analysis**.
     -   Analyze results, including SCF energy, molecular orbitals (HOMO/LUMO), and more.
 -   **Calculation History**: View, rename, and delete past calculation results.
--   **AI-Powered Multi-Agent System**:
-    -   **Molecular Agent**: Assists with quantum chemistry calculations and molecular analysis using natural language.
-    -   **Research Agent**: Searches arXiv for relevant academic papers and provides summaries with PDF links.
-    -   **Intelligent Routing**: Automatically routes queries to the appropriate specialist agent based on user intent.
+-   **Realtime Calculation Updates**: Reflect calculation progress in the UI through Server-Sent Events endpoints.
+-   **AI Chat Assistant (Gemini API)**:
+    -   **Single Assistant Chat**: Supports quantum chemistry Q&A and interpretation help in natural language.
+    -   **SSE Streaming**: `/api/agent/chat` streams responses in real time via Server-Sent Events.
+    -   **Optional Chat History Persistence**: When `session_id` is provided, messages are stored and can be browsed later.
+-   **GPU Acceleration (Linux)**: Accelerate DFT, HF, and TDDFT calculations using GPU4PySCF on NVIDIA GPUs. Install directly from the Settings page with automatic CUDA detection.
 -   **Automated Environment Setup**: Set up the complete development environment with a single command (`npm run setup-env`).
 -   **Environment Validation**: Automatically verify Python dependencies and environment health (`npm run verify-env`).
 -   **Unified Execution Environment**: Uses a Gunicorn-based server for both development and production to eliminate environment-specific issues.
@@ -29,9 +31,9 @@ This is a quantum chemistry application built with **Electron**, **React (TypeSc
 ## Tech Stack
 
 -   **Frontend**: React, TypeScript, TanStack Query, Zustand
--   **Backend**: Python, Flask, Gunicorn, PySCF, RDKit
+-   **Backend**: Python, FastAPI, Gunicorn/Uvicorn, PySCF, RDKit, GPU4PySCF (optional, Linux)
 -   **Desktop Framework**: Electron
--   **Build Tools**: Webpack, Electron Builder, conda-pack
+-   **Build Tools**: electron-vite, Electron Builder, conda-pack
 -   **Package Management**: npm (Node.js), conda (Python)
 -   **API Specification**: OpenAPI (Swagger)
 
@@ -77,6 +79,7 @@ Follow these steps to set up the development environment easily:
     conda activate pyscf-env
     npm run dev
     ```
+    `npm run dev` starts the electron-vite development server without regenerating OpenAPI artifacts. After editing `src/api-spec/openapi.yaml`, run `npm run dev:codegen` once, or run `npm run codegen` separately before starting dev.
 
 ### Manual Setup
 
@@ -137,10 +140,14 @@ npm run package
 
 ### Generated Files
 
-The packaging process creates platform-specific installers in the `dist/` directory:
--   `PySCF_front-darwin-arm64.dmg` (For macOS)
+The packaging process creates platform-specific installers in the `release/` directory:
+-   `Pyscf_front-<version>-arm64.dmg` (For macOS)
 
--   `PySCF_front-linux-x86_64.AppImage` (For Linux)
+-   `Pyscf_front-<version>.AppImage` (For Linux)
+
+### macOS Code Signing and Notarization
+
+Release builds for macOS are signed with a **Developer ID Application** certificate (Hardened Runtime enabled) and notarized by Apple, so users can open the DMG without Gatekeeper warnings. `electron-builder` performs both steps automatically when the certificate and notarization credentials are available; `npm run verify:mac-signing` checks the result. The one-time setup (certificate, credentials, GitHub Actions secrets) is described in [docs/release-signing.md](docs/release-signing.md).
 
 ### Building for Linux on Windows
 
@@ -167,11 +174,11 @@ This command automatically:
 
 **Advanced Usage:**
 ```bash
-# Build Docker image only
-npm run docker:build
+# Clean Docker build cache before building
+npm run package:linux:docker:clean
 
-# Run build with existing image (faster for subsequent builds)
-npm run docker:package
+# Rebuild the Docker image without cache
+npm run package:linux:docker:no-cache
 ```
 
 #### Method 2: Using WSL Directly
@@ -223,7 +230,7 @@ npm run package:linux
 
 The built AppImage will be available in the `dist/` directory.
 
-**Note**: The `package:linux` script automatically runs the full build process (code generation, webpack build, conda-pack, PyInstaller, and electron-builder) in the Linux environment.
+**Note**: The `package:linux` script automatically runs the full build process (code generation, electron-vite build, conda-pack, packaged backend source verification, and electron-builder) in the Linux environment.
 
 ---
 
@@ -250,37 +257,56 @@ http://127.0.0.1:5000/api-docs/
 
 **Note:** Swagger UI is automatically enabled when running the development server and uses the OpenAPI specification from [src/api-spec/openapi.yaml](src/api-spec/openapi.yaml).
 
-### Codebase Visualization (uitnize)
+### OpenAPI Code Generation
 
-The `uitnize` script generates a comprehensive text file containing the entire codebase structure and contents, useful for sharing context with AI assistants or documentation purposes.
+`src/api-spec/openapi.yaml` is the source of truth for API contracts. Generated API files are read-only by convention:
 
-**Usage:**
+- `src/python/generated_models.py`
+- `src/web/types/generated-api.ts`
+
+After editing the OpenAPI spec, regenerate both files through the shared local/CI command path:
+
 ```bash
-# Scan entire project
-npm run uitnize
-
-# Scan specific directory
-./scripts/uitnize.sh src/python
-./scripts/uitnize.sh config
+npm run codegen
 ```
 
-**Output:**
-- Creates `code.txt` in the project root directory
-- Includes directory tree structure (using `tree` command)
-- Contains all file contents with line numbers
-- Automatically excludes build artifacts, dependencies, and generated files
+For development startup immediately after an API contract edit, use:
 
-**Requirements:**
-- Install `tree` command for better directory visualization:
-  ```bash
-  # macOS
-  brew install tree
+```bash
+npm run dev:codegen
+```
 
-  # Ubuntu/Debian
-  sudo apt-get install tree
-  ```
+Before opening a pull request, check that generated artifacts are current:
 
-**Recommendation:** For large projects, scan specific directories instead of the entire project to keep the output manageable.
+```bash
+npm run codegen:check
+```
+
+CI runs the same `npm run codegen:check` path and fails if either generated file changes. Do not edit generated files directly; update `src/api-spec/openapi.yaml` first and regenerate.
+
+### Python Environment Reproducibility
+
+`.github/environment.yml` remains the canonical human-edited Python environment source. Reproducible macOS/Linux dependency resolution is captured in committed conda-lock artifacts:
+
+- `.github/pyscf-env.conda-lock.yml` — unified multi-platform lockfile used by CI and release workflows
+- `.github/conda-locks/pyscf-env-linux-64.lock`
+- `.github/conda-locks/pyscf-env-osx-arm64.lock`
+- `.github/conda-locks/pyscf-env-osx-64.lock`
+
+Locked target platforms:
+
+- `osx-arm64` for Apple Silicon macOS development
+- `osx-64` for Intel macOS compatibility if needed
+- `linux-64` for CI, WSL, and Linux packaging
+
+Install the lock tool and refresh lock artifacts after changing `.github/environment.yml`:
+
+```bash
+conda install -n base -c conda-forge conda-lock=4.0.3
+npm run conda-lock:generate
+```
+
+CI and release jobs install from the unified lockfile with `conda-lock install` so both conda and pip dependencies are applied. The explicit per-platform lock files are kept for platform-specific cache keys and inspection.
 
 ---
 
@@ -308,7 +334,7 @@ These commands provide detailed diagnostic information and troubleshooting steps
 
 # PySCF_front (日本語)
 
-これは、**Electron**、**React (TypeScript)**、**Python (Flask)** を使用して構築された、量子化学計算アプリケーションです。
+これは、**Electron**、**React (TypeScript)**、**Python FastAPI/ASGI バックエンド**を使用して構築された、量子化学計算アプリケーションです。
 
 PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubChemからの分子データ取得、そしてDFT（密度汎関数理論）、HF（ハートリー・フォック法）、MP2、CCSD、TDDFT計算などを実行できるデスクトップアプリケーションを目指して開発しています。
 
@@ -323,21 +349,22 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     -   **構造最適化**と**振動数解析**をサポート。
     -   計算結果（SCFエネルギー、分子軌道、NTO解析など）を表示します。
 -   **計算履歴の管理:** 過去の計算結果を一覧表示し、名前の変更や削除が可能です。
--   **AIマルチエージェントシステム:**
-    -   **分子エージェント:** 自然言語を使用して量子化学計算と分子解析をサポート。
-    -   **リサーチエージェント:** arXivから関連論文を検索し、PDFリンク付きの要約を提供。
-    -   **知的ルーティング:** ユーザーの質問内容に基づいて、適切な専門エージェントに自動的にルーティング。
+-   **AIチャットアシスタント (Gemini API):**
+    -   **単一チャットアシスタント:** 自然言語で量子化学の質問応答や結果解釈を支援します。
+    -   **SSEストリーミング:** `/api/agent/chat` でServer-Sent Eventsによるリアルタイム応答を提供します。
+    -   **任意のチャット履歴保存:** `session_id` を指定した場合、会話を保存して後から参照できます。
+-   **GPUアクセラレーション (Linux):** GPU4PySCFを使用してDFT、HF、TDDFT計算をNVIDIA GPUで高速化。設定ページからCUDA自動検出とワンクリックインストールが可能。
 -   **自動環境構築:** ワンコマンドで開発環境をセットアップできます（`npm run setup-env`）。
 -   **環境検証機能:** Python依存関係と環境の健全性を自動チェックします（`npm run verify-env`）。
 -   **統一実行環境:** 開発・本番環境で同一のGunicornベースサーバーを使用し、環境差異問題を解決。
--   **リアルタイム更新:** WebSocketを利用して計算状況をリアルタイムにUIへ反映します。
+-   **リアルタイム更新:** Server-Sent Eventsエンドポイントで計算状況をリアルタイムにUIへ反映します。
 
 ## 技術スタック
 
 -   **フロントエンド:** React, TypeScript, TanStack Query, Zustand
--   **バックエンド:** Python, Flask, Gunicorn, PySCF, RDKit
+-   **バックエンド:** Python, FastAPI, Gunicorn/Uvicorn, PySCF, RDKit, GPU4PySCF (オプション、Linux)
 -   **デスクトップフレームワーク:** Electron
--   **ビルドツール:** Webpack, Electron Builder, conda-pack
+-   **ビルドツール:** electron-vite, Electron Builder, conda-pack
 -   **パッケージ管理:** npm (Node.js), conda (Python)
 -   **API仕様:** OpenAPI (Swagger)
 
@@ -376,6 +403,7 @@ PySCFとRDKitをバックエンドに利用し、分子構造の可視化、PubC
     conda activate pyscf-env
     npm run dev
     ```
+    `npm run dev` は electron-vite の開発サーバーを起動し、OpenAPI生成物は再生成しません。`src/api-spec/openapi.yaml` を変更した後は、初回のみ `npm run dev:codegen` を使うか、事前に `npm run codegen` を実行してください。
 
 ### 手動セットアップ
 
@@ -431,10 +459,14 @@ npm run package
 
 ### 生成されるファイル
 
-`dist/`ディレクトリに各OS用のインストーラーが生成されます。
--   `PySCF_front-darwin-arm64.dmg` (macOS)
+`release/`ディレクトリに各OS用のインストーラーが生成されます。
+-   `Pyscf_front-<version>-arm64.dmg` (macOS)
 
--   `PySCF_front-linux-x86_64.AppImage` (Linux)
+-   `Pyscf_front-<version>.AppImage` (Linux)
+
+### macOS の署名と公証
+
+macOS 向けのリリースビルドは **Developer ID Application** 証明書で署名 (Hardened Runtime 有効) し、Apple の公証を通しているため、利用者は Gatekeeper の警告なしに DMG を開いてアプリを起動できます。証明書と公証用の認証情報があれば `electron-builder` が自動で両方を行い、`npm run verify:mac-signing` で結果を検証できます。初回のみ必要な準備 (証明書の作成、認証情報、GitHub Actions の Secrets) は [docs/release-signing.md](docs/release-signing.md) を参照してください。
 
 ## 開発ツール
 
@@ -459,37 +491,56 @@ http://127.0.0.1:5000/api-docs/
 
 **注記:** Swagger UIは開発サーバー起動時に自動的に有効化され、[src/api-spec/openapi.yaml](src/api-spec/openapi.yaml)のOpenAPI仕様を使用します。
 
-### コードベース可視化 (uitnize)
+### OpenAPIコード生成
 
-`uitnize`スクリプトは、コードベース全体の構造と内容を包括的なテキストファイルとして生成します。AIアシスタントへのコンテキスト共有やドキュメント作成に便利です。
+API契約の正本は `src/api-spec/openapi.yaml` です。以下の生成ファイルは手編集しない運用です。
 
-**使用方法:**
+- `src/python/generated_models.py`
+- `src/web/types/generated-api.ts`
+
+OpenAPI仕様を変更したら、ローカルとCIで共通のコマンド経路を使って再生成します。
+
 ```bash
-# プロジェクト全体をスキャン
-npm run uitnize
-
-# 特定ディレクトリのみスキャン
-./scripts/uitnize.sh src/python
-./scripts/uitnize.sh config
+npm run codegen
 ```
 
-**出力内容:**
-- プロジェクトルートに`code.txt`を生成
-- ディレクトリツリー構造を表示（`tree`コマンド使用）
-- 全ファイルの内容を行番号付きで出力
-- ビルド成果物、依存関係、生成ファイルは自動除外
+API契約を変更した直後に開発起動までまとめて行う場合は、以下を使います。
 
-**必要な準備:**
-- より見やすいディレクトリ表示のため、`tree`コマンドをインストールすることを推奨:
-  ```bash
-  # macOS
-  brew install tree
+```bash
+npm run dev:codegen
+```
 
-  # Ubuntu/Debian
-  sudo apt-get install tree
-  ```
+PR作成前には、生成物が最新か確認します。
 
-**推奨:** 大規模プロジェクトでは、プロジェクト全体ではなく特定のディレクトリをスキャンすることで、出力を管理しやすいサイズに保つことができます。
+```bash
+npm run codegen:check
+```
+
+CIも同じ `npm run codegen:check` を実行し、生成後に上記2ファイルへ差分が出た場合は失敗します。生成ファイルを直接編集せず、先に `src/api-spec/openapi.yaml` を更新してから再生成してください。
+
+### Python環境の再現性
+
+`.github/environment.yml` は引き続き人が編集するPython環境定義の正本です。macOS/Linuxで再現可能な依存解決は、以下のコミット済みconda-lock成果物で固定します。
+
+- `.github/pyscf-env.conda-lock.yml`: CIとrelease workflowで使う複数platform対応の統合lockfile
+- `.github/conda-locks/pyscf-env-linux-64.lock`
+- `.github/conda-locks/pyscf-env-osx-arm64.lock`
+- `.github/conda-locks/pyscf-env-osx-64.lock`
+
+lock対象プラットフォーム:
+
+- `osx-arm64`: Apple Silicon macOS開発環境
+- `osx-64`: 必要に応じたIntel macOS互換
+- `linux-64`: CI、WSL、Linuxパッケージング
+
+`.github/environment.yml` を変更したら、lockツールを用意して成果物を更新します。
+
+```bash
+conda install -n base -c conda-forge conda-lock=4.0.3
+npm run conda-lock:generate
+```
+
+CIとrelease workflowは `conda-lock install` で統合lockfileから環境を作るため、conda依存とpip依存の両方が反映されます。明示的なplatform別lockfileは、platform別キャッシュキーと内容確認のために保持します。
 
 ---
 

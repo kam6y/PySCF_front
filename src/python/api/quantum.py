@@ -1,456 +1,237 @@
 """
 Quantum chemistry calculation API endpoints.
-Handles all quantum chemistry calculation operations including job submission,
-monitoring, results retrieval, and orbital/spectrum analysis.
+Handles job submission, monitoring, results retrieval, and orbital/spectrum analysis.
 """
 
+import json
 import logging
 from datetime import datetime
-from flask import Blueprint, request, jsonify
-from flask_pydantic import validate
+from typing import Annotated, Any
 
-from services import get_quantum_service, ServiceError, ValidationError
-from generated_models import QuantumCalculationRequest, CalculationUpdateRequest
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
-# Set up logging
+from generated_models import CalculationUpdateRequest, QuantumCalculationRequest
+from quantum_calc.method_defaults import validate_parameters_for_method
+from services import get_quantum_service
+
 logger = logging.getLogger(__name__)
 
-# Create quantum blueprint
-quantum_bp = Blueprint('quantum', __name__)
+# --- Input size caps (enforced before Pydantic validation) ---
+# XYZ data for very large molecules (e.g. proteins) can be hundreds of KB.
+# 1 MB is a generous chemistry-aware cap.
+MAX_XYZ_LENGTH: int = 1_000_000
+# Ketcher JSON for complex drawn structures.
+MAX_KETCHER_DATA_LENGTH: int = 1_000_000
+# Basis function / solvent / exchange-correlation names are short identifiers.
+MAX_SHORT_FIELD_LENGTH: int = 200
+
+router = APIRouter(prefix="/api/quantum")
 
 
+@router.get("/supported-parameters")
+def get_supported_parameters() -> dict[str, Any]:
+    """Get supported quantum chemistry parameters."""
+    parameters = get_quantum_service().get_supported_parameters()
+    return {"success": True, "data": parameters}
 
 
-@quantum_bp.route('/api/quantum/supported-parameters', methods=['GET'])
-def get_supported_parameters():
-    """Get supported quantum chemistry parameters including basis functions, exchange-correlation functionals, and solvents."""
+@router.post("/calculate")
+async def quantum_calculate(request: Request) -> JSONResponse:
+    """Start a quantum chemistry calculation after method-aware validation."""
+    raw_body = await request.body()
+    if not raw_body:
+        raise HTTPException(status_code=400, detail="Request body is required")
+
     try:
-        quantum_service = get_quantum_service()
-        
-        # Call service layer
-        parameters = quantum_service.get_supported_parameters()
-        
-        return jsonify({
-            'success': True,
-            'data': parameters
-        }), 200
-        
-    except ServiceError as e:
-        logger.error(f"Service error getting supported parameters: {e}")
-        return jsonify({
-            'success': False,
-            'error': e.message
-        }), e.status_code
-    except Exception as e:
-        logger.error(f"Error getting supported parameters: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred.'
-        }), 500
-
-
-@quantum_bp.route('/api/quantum/calculate', methods=['POST'])
-def quantum_calculate():
-    """
-    Starts a quantum chemistry calculation in the background.
-    Immediately returns a calculation ID to track the job.
-    """
-    try:
-        quantum_service = get_quantum_service()
-
-        # Get raw JSON data before Pydantic validation
-        raw_data = request.get_json()
-        if not raw_data:
-            return jsonify({
-                'success': False,
-                'error': 'Request body is required'
-            }), 400
-
-        # Extract calculation method for early validation
-        calculation_method = raw_data.get('calculation_method')
-        if not calculation_method:
-            return jsonify({
-                'success': False,
-                'error': 'calculation_method is required'
-            }), 400
-
-        # Validate parameter applicability BEFORE Pydantic validation
-        # This ensures we catch inapplicable parameters that Pydantic would ignore
-        from quantum_calc.method_defaults import validate_parameters_for_method
-        is_valid, applicability_error = validate_parameters_for_method(
-            calculation_method,
-            raw_data
-        )
-        if not is_valid:
-            logger.warning(f"Parameter applicability check failed: {applicability_error}")
-            return jsonify({
-                'success': False,
-                'validation_error': applicability_error
-            }), 400
-
-        # Now validate with Pydantic
-        try:
-            body = QuantumCalculationRequest.model_validate(raw_data)
-        except Exception as e:
-            logger.warning(f"Pydantic validation failed: {e}")
-            return jsonify({
-                'success': False,
-                'validation_error': str(e)
-            }), 400
-
-        # Extract enum values helper function
-        def get_enum_value(field_value):
-            if hasattr(field_value, 'value'):
-                return field_value.value
-            return field_value
-
-        # Handle Pydantic RootModel[Union[...]] structure
-        # Access .root attribute if present (discriminated union from OpenAPI)
-        if hasattr(body, 'root'):
-            validated_model = body.root
-        else:
-            validated_model = body
-
-        # Pydanticモデルを辞書に変換
-        parameters = validated_model.model_dump(exclude_none=False, mode='python')
-
-        # Enum値を文字列に変換
-        for key, value in list(parameters.items()):
-            parameters[key] = get_enum_value(value)
-
-        # タイムスタンプを追加
-        parameters['created_at'] = datetime.now().isoformat()
-
-        # Call service layer (also validates parameters for defense-in-depth and AI agent calls)
-        result = quantum_service.start_calculation(parameters)
-
-        return jsonify({'success': True, 'data': {'calculation': result}}), 202
-
-    except ServiceError as e:
-        logger.error(f"Service error starting calculation: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error queuing calculation: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
-
-
-@quantum_bp.route('/api/quantum/calculations', methods=['GET'])
-def list_calculations():
-    """
-    List calculation directories with optional filtering.
-
-    Query Parameters:
-        name_query (str, optional): Partial match search in calculation name (case-insensitive)
-        status (str, optional): Filter by status ("completed", "running", "error")
-        calculation_method (str, optional): Filter by calculation method ("DFT", "HF", "MP2", etc.)
-        basis_function (str, optional): Filter by basis set (case-insensitive)
-        date_from (str, optional): Start date for date range filtering (ISO format: YYYY-MM-DD)
-        date_to (str, optional): End date for date range filtering (ISO format: YYYY-MM-DD)
-    """
-    try:
-        quantum_service = get_quantum_service()
-
-        # Get query parameters for filtering
-        name_query = request.args.get('name_query', type=str)
-        status = request.args.get('status', type=str)
-        calculation_method = request.args.get('calculation_method', type=str)
-        basis_function = request.args.get('basis_function', type=str)
-        date_from = request.args.get('date_from', type=str)
-        date_to = request.args.get('date_to', type=str)
-
-        # Call service layer with filters
-        result = quantum_service.list_calculations(
-            name_query=name_query,
-            status=status,
-            calculation_method=calculation_method,
-            basis_function=basis_function,
-            date_from=date_from,
-            date_to=date_to
+        raw_data = json.loads(raw_body)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from None
+    if not raw_data:
+        raise HTTPException(status_code=400, detail="Request body is required")
+    if not isinstance(raw_data, dict):
+        raise HTTPException(
+            status_code=400, detail="Request body must be a JSON object"
         )
 
-        return jsonify({
-            'success': True,
-            'data': result
-        })
+    # --- Field-level size caps (SEC-002) ---
+    xyz_value = raw_data.get("xyz")
+    if isinstance(xyz_value, str) and len(xyz_value) > MAX_XYZ_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"xyz data exceeds maximum length ({MAX_XYZ_LENGTH} characters)",
+        )
+    ketcher_value = raw_data.get("ketcher_data")
+    if isinstance(ketcher_value, str) and len(ketcher_value) > MAX_KETCHER_DATA_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"ketcher_data exceeds maximum length ({MAX_KETCHER_DATA_LENGTH} characters)",
+        )
+    for short_field in (
+        "basis_function",
+        "solvent",
+        "exchange_correlation",
+        "auxiliary_basis",
+    ):
+        field_value = raw_data.get(short_field)
+        if isinstance(field_value, str) and len(field_value) > MAX_SHORT_FIELD_LENGTH:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{short_field} exceeds maximum length ({MAX_SHORT_FIELD_LENGTH} characters)",
+            )
 
-    except ServiceError as e:
-        logger.error(f"Service error listing calculations: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error listing calculations: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    calculation_method = raw_data.get("calculation_method")
+    if not calculation_method:
+        raise HTTPException(status_code=400, detail="calculation_method is required")
+
+    is_valid, applicability_error = validate_parameters_for_method(
+        calculation_method,
+        raw_data,
+    )
+    if not is_valid:
+        logger.warning("Parameter applicability check failed: %s", applicability_error)
+        return JSONResponse(
+            {"success": False, "error": applicability_error},
+            status_code=400,
+        )
+
+    body = QuantumCalculationRequest.model_validate(raw_data)
+    validated_model = body.root if hasattr(body, "root") else body
+    parameters = validated_model.model_dump(exclude_none=False, mode="python")
+    for key, value in list(parameters.items()):
+        parameters[key] = value.value if hasattr(value, "value") else value
+    parameters["created_at"] = datetime.now().isoformat()
+
+    result = get_quantum_service().start_calculation(parameters)
+    return JSONResponse(
+        {"success": True, "data": {"calculation": result}},
+        status_code=202,
+    )
 
 
-@quantum_bp.route('/api/quantum/status', methods=['GET'])
-def get_calculation_status():
+@router.get("/calculations")
+def list_calculations(
+    name_query: str | None = None,
+    status: str | None = None,
+    calculation_method: str | None = None,
+    basis_function: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict[str, Any]:
+    """List calculation directories with optional filtering."""
+    result = get_quantum_service().list_calculations(
+        name_query=name_query,
+        status=status,
+        calculation_method=calculation_method,
+        basis_function=basis_function,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    return {"success": True, "data": result}
+
+
+@router.get("/status")
+def get_calculation_status() -> dict[str, Any]:
     """Get status information about the calculation system."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Call service layer
-        result = quantum_service.get_calculation_status()
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error getting calculation status: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error getting calculation status: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().get_calculation_status()
+    return {"success": True, "data": result}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>', methods=['GET'])
-def get_calculation_details(calculation_id):
+@router.get("/calculations/{calculation_id}")
+def get_calculation_details(calculation_id: str) -> dict[str, Any]:
     """Get detailed information about a specific calculation."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Call service layer
-        result = quantum_service.get_calculation_details(calculation_id)
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error getting calculation {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error getting calculation details for {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().get_calculation_details(calculation_id)
+    return {"success": True, "data": result}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>', methods=['PUT'])
-@validate()
-def update_calculation(calculation_id, body: CalculationUpdateRequest):
-    """Update calculation metadata (currently only name)."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Call service layer
-        result = quantum_service.update_calculation(calculation_id, body.name)
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-
-    except ServiceError as e:
-        logger.error(f"Service error updating calculation {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error updating calculation {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+@router.put("/calculations/{calculation_id}")
+def update_calculation(
+    calculation_id: str,
+    body: CalculationUpdateRequest,
+) -> dict[str, Any]:
+    """Update calculation metadata."""
+    result = get_quantum_service().update_calculation(calculation_id, body.name)
+    return {"success": True, "data": result}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/pause', methods=['POST'])
-def pause_calculation(calculation_id):
+@router.post("/calculations/{calculation_id}/pause")
+def pause_calculation(calculation_id: str) -> JSONResponse:
     """Pause a running calculation."""
-    try:
-        quantum_service = get_quantum_service()
-
-        # Call service layer
-        result = quantum_service.pause_calculation(calculation_id)
-
-        return jsonify({
-            'success': True,
-            'data': result
-        }), 202
-
-    except ValidationError as e:
-        logger.error(f"Validation error pausing calculation {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), 400
-    except ServiceError as e:
-        logger.error(f"Service error pausing calculation {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error pausing calculation {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().pause_calculation(calculation_id)
+    return JSONResponse({"success": True, "data": result}, status_code=202)
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/resume', methods=['POST'])
-def resume_calculation(calculation_id):
+@router.post("/calculations/{calculation_id}/resume")
+def resume_calculation(calculation_id: str) -> JSONResponse:
     """Resume a paused calculation."""
-    try:
-        quantum_service = get_quantum_service()
-
-        # Call service layer
-        result = quantum_service.resume_calculation(calculation_id)
-
-        return jsonify({
-            'success': True,
-            'data': result
-        }), 202
-
-    except ValidationError as e:
-        logger.error(f"Validation error resuming calculation {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), 400
-    except ServiceError as e:
-        logger.error(f"Service error resuming calculation {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error resuming calculation {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().resume_calculation(calculation_id)
+    return JSONResponse({"success": True, "data": result}, status_code=202)
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>', methods=['DELETE'])
-def delete_calculation(calculation_id):
+@router.delete("/calculations/{calculation_id}")
+def delete_calculation(calculation_id: str) -> dict[str, Any]:
     """Delete a calculation and its files."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Call service layer
-        result = quantum_service.delete_calculation(calculation_id)
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error deleting calculation {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error deleting calculation {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().delete_calculation(calculation_id)
+    return {"success": True, "data": result}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/orbitals', methods=['GET'])
-def get_orbitals(calculation_id):
+@router.get("/calculations/{calculation_id}/orbitals")
+def get_orbitals(calculation_id: str) -> dict[str, Any]:
     """Get molecular orbital information for a calculation."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Call service layer
-        orbital_summary = quantum_service.get_molecular_orbitals(calculation_id)
-        
-        return jsonify({
-            'success': True,
-            'data': orbital_summary
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error getting orbitals for {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error getting orbitals for {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    orbital_summary = get_quantum_service().get_molecular_orbitals(calculation_id)
+    return {"success": True, "data": orbital_summary}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/orbitals/<int:orbital_index>/cube', methods=['GET'])
-def get_orbital_cube(calculation_id, orbital_index):
-    """Generate and return CUBE file for specific molecular orbital."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Get parameters from query parameters with default values
-        grid_size = request.args.get('gridSize', default=80, type=int)
-        isovalue_pos = request.args.get('isovaluePos', type=float)
-        isovalue_neg = request.args.get('isovalueNeg', type=float)
-        
-        # Call service layer
-        cube_data = quantum_service.generate_orbital_cube(
-            calculation_id,
-            orbital_index,
-            grid_size=grid_size,
-            isovalue_pos=isovalue_pos,
-            isovalue_neg=isovalue_neg
-        )
-        
-        return jsonify({
-            'success': True,
-            'data': cube_data
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error generating CUBE for {calculation_id}, orbital {orbital_index}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+@router.get("/calculations/{calculation_id}/orbitals/{orbital_index}/cube")
+def get_orbital_cube(
+    calculation_id: str,
+    orbital_index: int,
+    gridSize: Annotated[int, Query(alias="gridSize")] = 80,
+    isovaluePos: Annotated[float | None, Query(alias="isovaluePos")] = None,
+    isovalueNeg: Annotated[float | None, Query(alias="isovalueNeg")] = None,
+) -> dict[str, Any]:
+    """Generate and return CUBE file for a molecular orbital."""
+    cube_data = get_quantum_service().generate_orbital_cube(
+        calculation_id,
+        orbital_index,
+        grid_size=gridSize,
+        isovalue_pos=isovaluePos,
+        isovalue_neg=isovalueNeg,
+    )
+    return {"success": True, "data": cube_data}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/orbitals/cube-files', methods=['GET'])
-def list_cube_files(calculation_id):
+@router.get("/calculations/{calculation_id}/orbitals/cube-files")
+def list_cube_files(calculation_id: str) -> dict[str, Any]:
     """List all CUBE files for a calculation."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Call service layer
-        result = quantum_service.list_cube_files(calculation_id)
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error listing CUBE files for {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error listing CUBE files for {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().list_cube_files(calculation_id)
+    return {"success": True, "data": result}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/orbitals/cube-files', methods=['DELETE'])
-def delete_cube_files(calculation_id):
+@router.delete("/calculations/{calculation_id}/orbitals/cube-files")
+def delete_cube_files(
+    calculation_id: str,
+    orbital_index: int | None = None,
+) -> dict[str, Any]:
     """Delete CUBE files for a calculation."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Get query parameters
-        orbital_index = request.args.get('orbital_index', type=int)
-        
-        # Call service layer
-        result = quantum_service.delete_cube_files(calculation_id, orbital_index)
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error deleting CUBE files for {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error deleting CUBE files for {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().delete_cube_files(calculation_id, orbital_index)
+    return {"success": True, "data": result}
 
 
-@quantum_bp.route('/api/quantum/calculations/<calculation_id>/ir-spectrum', methods=['GET'])
-def get_ir_spectrum(calculation_id):
+@router.get("/calculations/{calculation_id}/ir-spectrum")
+def get_ir_spectrum(
+    calculation_id: str,
+    broadening_fwhm: float = 100.0,
+    x_min: float = 400.0,
+    x_max: float = 4000.0,
+    show_peaks: bool = True,
+) -> dict[str, Any]:
     """Generate and return IR spectrum for a calculation."""
-    try:
-        quantum_service = get_quantum_service()
-        
-        # Get query parameters for spectrum customization
-        broadening_fwhm = request.args.get('broadening_fwhm', default=100.0, type=float)
-        x_min = request.args.get('x_min', default=400.0, type=float)
-        x_max = request.args.get('x_max', default=4000.0, type=float)
-        show_peaks = request.args.get('show_peaks', default=True, type=bool)
-        
-        # Call service layer
-        result = quantum_service.generate_ir_spectrum(
-            calculation_id,
-            broadening_fwhm=broadening_fwhm,
-            x_min=x_min,
-            x_max=x_max,
-            show_peaks=show_peaks
-        )
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error generating IR spectrum for {calculation_id}: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error generating IR spectrum for {calculation_id}: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+    result = get_quantum_service().generate_ir_spectrum(
+        calculation_id,
+        broadening_fwhm=broadening_fwhm,
+        x_min=x_min,
+        x_max=x_max,
+        show_peaks=show_peaks,
+    )
+    return {"success": True, "data": result}

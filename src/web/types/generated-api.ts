@@ -7,7 +7,10 @@ export interface paths {
     "/health": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -27,7 +30,10 @@ export interface paths {
     "/api/pubchem/search": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -47,7 +53,10 @@ export interface paths {
     "/api/smiles/convert": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -67,7 +76,10 @@ export interface paths {
     "/api/pubchem/validate": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -87,7 +99,10 @@ export interface paths {
     "/api/quantum/calculate": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -107,7 +122,10 @@ export interface paths {
     "/api/quantum/calculations": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -124,10 +142,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/quantum/calculations/updates/stream": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream calculation updates
+         * @description Opens a Server-Sent Events stream for all calculation updates.
+         *     Each event line contains a JSON `CalculationUpdateStreamEvent`.
+         *
+         */
+        get: operations["streamCalculationUpdates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/calculations/{calculationId}/updates/stream": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream updates for one calculation
+         * @description Opens a Server-Sent Events stream for one calculation and emits the
+         *     current calculation payload before future updates.
+         *
+         */
+        get: operations["streamCalculationUpdatesForCalculation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quantum/status": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get calculation system status
+         * @description Get current process pool and host system status for quantum calculations
+         */
+        get: operations["getCalculationStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/quantum/calculations/{calculationId}": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -136,7 +230,11 @@ export interface paths {
          * @description Get detailed information about a specific calculation
          */
         get: operations["getCalculationDetails"];
-        put?: never;
+        /**
+         * Update calculation metadata
+         * @description Update calculation name and other metadata
+         */
+        put: operations["updateCalculation"];
         post?: never;
         /**
          * Delete calculation
@@ -145,17 +243,16 @@ export interface paths {
         delete: operations["deleteCalculation"];
         options?: never;
         head?: never;
-        /**
-         * Update calculation metadata
-         * @description Update calculation name and other metadata
-         */
-        patch: operations["patchCalculation"];
+        patch?: never;
         trace?: never;
     };
     "/api/quantum/calculations/{calculationId}/pause": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -175,7 +272,10 @@ export interface paths {
     "/api/quantum/calculations/{calculationId}/resume": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -195,7 +295,10 @@ export interface paths {
     "/api/quantum/calculations/{calculationId}/orbitals": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -215,7 +318,10 @@ export interface paths {
     "/api/quantum/calculations/{calculationId}/orbitals/{orbitalIndex}/cube": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -235,7 +341,10 @@ export interface paths {
     "/api/quantum/calculations/{calculationId}/orbitals/cube-files": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -259,7 +368,10 @@ export interface paths {
     "/api/quantum/calculations/{calculationId}/ir-spectrum": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -279,7 +391,10 @@ export interface paths {
     "/api/quantum/supported-parameters": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -299,7 +414,10 @@ export interface paths {
     "/api/settings": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -323,7 +441,10 @@ export interface paths {
     "/api/system/resource-status": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -340,10 +461,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/system/gpu4pyscf-status": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get GPU4PySCF status
+         * @description Detect CUDA version and GPU4PySCF installation status (Linux only)
+         */
+        get: operations["getGpu4PyscfStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/system/gpu4pyscf-install": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install GPU4PySCF
+         * @description Install GPU4PySCF and recommended cuTENSOR for detected CUDA version (Linux only)
+         */
+        post: operations["installGpu4Pyscf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat-history/sessions": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -367,7 +537,10 @@ export interface paths {
     "/api/chat-history/sessions/{sessionId}": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -395,7 +568,10 @@ export interface paths {
     "/api/agent/chat": {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -458,7 +634,7 @@ export interface components {
             xyz: string;
         };
         CalculationRequestBase: {
-            /** @description XYZ molecular structure data */
+            /** @description XYZ molecular structure data (chemistry-aware cap ~1 MB) */
             xyz: string;
             calculation_method: components["schemas"]["CalculationMethod"];
             /** @description Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ) */
@@ -510,6 +686,24 @@ export interface components {
              * @default true
              */
             optimize_geometry: boolean;
+            /**
+             * @description Maximum number of geometry optimization steps
+             * @default 100
+             */
+            geomopt_maxsteps: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             * @default 0.000001
+             */
+            geomopt_conv_energy: number | null;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -524,6 +718,24 @@ export interface components {
             basis_function: string;
             /** @default true */
             optimize_geometry: boolean;
+            /**
+             * @description Maximum number of geometry optimization steps
+             * @default 100
+             */
+            geomopt_maxsteps: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             * @default 0.000001
+             */
+            geomopt_conv_energy: number | null;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -538,6 +750,24 @@ export interface components {
             basis_function: string;
             /** @default true */
             optimize_geometry: boolean;
+            /**
+             * @description Maximum number of geometry optimization steps
+             * @default 100
+             */
+            geomopt_maxsteps: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             * @default 0.000001
+             */
+            geomopt_conv_energy: number | null;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -555,6 +785,13 @@ export interface components {
              * @default true
              */
             frozen_core: boolean;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -572,6 +809,13 @@ export interface components {
              * @default true
              */
             frozen_core: boolean;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -605,6 +849,13 @@ export interface components {
              * @default false
              */
             tddft_analyze_nto: boolean;
+            /**
+             * @description Enable density fitting (RI/DF) approximation for faster integral evaluation
+             * @default false
+             */
+            density_fitting: boolean;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
         } & {
             /**
              * @description discriminator enum property added by openapi-typescript
@@ -787,6 +1038,8 @@ export interface components {
             molecule_name?: string | null;
             cpu_cores?: number | null;
             memory_mb?: number | null;
+            /** @description GPU acceleration setting snapshot captured when the calculation job was submitted */
+            gpu_acceleration_enabled?: boolean | null;
             /** Format: date-time */
             created_at?: string | null;
             /** @description Number of excited states (TDDFT only) */
@@ -815,6 +1068,17 @@ export interface components {
              * @description Gradient convergence tolerance used
              */
             conv_tol_grad?: number | null;
+            /** @description Maximum number of geometry optimization steps */
+            geomopt_maxsteps?: number | null;
+            /**
+             * Format: float
+             * @description Energy convergence threshold (Hartree)
+             */
+            geomopt_conv_energy?: number | null;
+            /** @description Enable density fitting (RI/DF) approximation for faster integral evaluation */
+            density_fitting?: boolean | null;
+            /** @description Auxiliary basis set for density fitting. If null, PySCF auto-selects. */
+            auxiliary_basis?: string | null;
             /** @description Ketcher molecule format (JSON) for preserving the original drawn structure */
             ketcher_data?: string | null;
         };
@@ -823,6 +1087,8 @@ export interface components {
             scf_energy?: number;
             /** @description Whether calculation converged */
             converged?: boolean;
+            /** @description Whether GPU acceleration was used for this calculation */
+            gpu_enabled?: boolean;
             /** @description HOMO orbital index */
             homo_index?: number;
             /** @description LUMO orbital index */
@@ -891,6 +1157,8 @@ export interface components {
             num_primitive_gaussians?: number | null;
             /** @description Total number of electrons in the molecule */
             total_electrons?: number | null;
+            /** @description Actual auxiliary basis selected by PySCF for density fitting */
+            resolved_auxiliary_basis?: string | null;
             /** @description MP2 same-spin correlation energy in hartree */
             mp2_same_spin_correlation?: number | null;
             /** @description MP2 opposite-spin correlation energy in hartree */
@@ -929,8 +1197,6 @@ export interface components {
                 wavelength?: number;
                 /** @description Oscillator strength */
                 oscillator_strength?: number;
-                /** @description Main orbital transition (e.g., HOMO -> LUMO) */
-                dominant_transition?: string;
             }[] | null;
             /** @description Natural Transition Orbital analysis results (TDDFT only) */
             nto_analysis?: {
@@ -1057,18 +1323,36 @@ export interface components {
                 calculation_phase?: "geometry_optimization" | "scf_calculation" | "post_scf";
             } | null;
         };
+        CalculationUpdateStreamEvent: {
+            /** @enum {string} */
+            type: "calculation_update" | "heartbeat" | "error";
+            payload: {
+                [key: string]: unknown;
+            };
+        };
+        CalculationUpdateStreamPayload: {
+            calculation: components["schemas"]["CalculationInstance"];
+        };
+        CalculationUpdateStreamErrorPayload: {
+            message: string;
+            calculation_id?: string;
+        };
         CalculationSummary: {
             /** @description Unique calculation ID */
             id: string;
             /** @description Display name */
             name: string;
-            /** @description Directory path */
-            path: string;
             /** @description Date string */
             date: string;
-            /** @description Whether checkpoint file exists */
-            has_checkpoint: boolean;
             status: components["schemas"]["CalculationStatus"];
+            /** @description Calculation method (DFT, HF, MP2, etc.) */
+            calculation_method?: string | null;
+            /** @description Basis set used */
+            basis_function?: string | null;
+            /** @description Exchange-correlation functional (DFT/TDDFT only) */
+            exchange_correlation?: string | null;
+            /** @description ISO format creation timestamp */
+            created_at?: string | null;
         };
         StartCalculationResponse: {
             /** @example true */
@@ -1081,11 +1365,26 @@ export interface components {
             /** @example true */
             success: boolean;
             data: {
-                /** @description Base directory for calculations */
-                base_directory: string;
                 calculations: components["schemas"]["CalculationSummary"][];
                 /** @description Number of calculations */
                 count: number;
+            };
+        };
+        CalculationStatusResponse: {
+            /** @example true */
+            success: boolean;
+            data: {
+                process_pool: {
+                    max_workers: number;
+                    /** @description Currently active calculation IDs */
+                    active_calculations: string[];
+                    active_count: number;
+                    is_shutdown: boolean;
+                };
+                system: {
+                    /** @description Number of CPU cores available on host machine */
+                    cpu_count: number | null;
+                };
             };
         };
         CalculationDetailsResponse: {
@@ -1133,7 +1432,7 @@ export interface components {
              * @description Type of orbital
              * @enum {string}
              */
-            orbital_type: "core" | "homo" | "lumo" | "virtual";
+            orbital_type: "core" | "homo" | "lumo" | "occupied" | "virtual";
             /** @description Human-readable label (e.g., "HOMO", "LUMO", "HOMO-1", "LUMO+2") */
             label?: string;
         };
@@ -1172,8 +1471,6 @@ export interface components {
                     /** @description Generated file size in KB */
                     file_size_kb?: number;
                 };
-                /** @description Path to saved CUBE file (if saved to disk) */
-                file_path?: string | null;
                 /** @description Whether the CUBE file was loaded from cache */
                 cached?: boolean;
             };
@@ -1188,8 +1485,6 @@ export interface components {
                 cube_files: {
                     /** @description Name of the CUBE file */
                     filename: string;
-                    /** @description Full path to the CUBE file */
-                    file_path: string;
                     /** @description Index of the molecular orbital */
                     orbital_index: number;
                     /** @description Grid size used for generation */
@@ -1237,6 +1532,10 @@ export interface components {
             basis_functions: {
                 [key: string]: string[];
             };
+            /** @description Supported auxiliary basis sets for density fitting, grouped by category */
+            auxiliary_basis_functions: {
+                [key: string]: string[];
+            };
             /** @description Supported exchange-correlation functionals grouped by category (e.g., Hybrid, GGA, etc.) */
             exchange_correlation: {
                 [key: string]: string[];
@@ -1265,6 +1564,8 @@ export interface components {
                 optimize_geometry?: boolean;
                 /** @description Default frozen core approximation setting (CCSD/CCSD_T) */
                 frozen_core?: boolean;
+                /** @description Default density fitting setting */
+                density_fitting?: boolean;
                 /** @description Default number of excited states (TDDFT) */
                 tddft_nstates?: number;
                 /** @description Default TDDFT method (TDDFT) */
@@ -1285,6 +1586,10 @@ export interface components {
                 conv_tol?: number;
                 /** @description Default gradient convergence tolerance (CASSCF) */
                 conv_tol_grad?: number;
+                /** @description Default maximum geometry optimization steps (DFT/HF/MP2) */
+                geomopt_maxsteps?: number;
+                /** @description Default energy convergence threshold for geometry optimization (DFT/HF/MP2) */
+                geomopt_conv_energy?: number;
             };
         };
         /** @description Constraint definition for a calculation parameter */
@@ -1326,6 +1631,12 @@ export interface components {
              */
             max_memory_utilization_percent: number;
             /**
+             * @description Whether GPU acceleration is enabled for calculations (Linux only)
+             * @default false
+             * @example false
+             */
+            gpu_acceleration_enabled: boolean;
+            /**
              * @description Total number of CPU cores in the system (auto-detected)
              * @example 8
              */
@@ -1348,8 +1659,68 @@ export interface components {
              */
             timezone: "UTC" | "Asia/Tokyo" | "Asia/Shanghai" | "Asia/Seoul" | "Asia/Singapore" | "Asia/Kolkata" | "Australia/Sydney" | "Europe/London" | "Europe/Paris" | "Europe/Berlin" | "America/New_York" | "America/Chicago" | "America/Denver" | "America/Los_Angeles";
             /**
-             * @description Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
+             * @description Google Gemini API key required for AI agent chat functionality.
              * @example null
+             */
+            gemini_api_key?: string | null;
+            /**
+             * @description Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
+             * @example pyscf-research-agent@example.com
+             */
+            research_email?: string | null;
+        };
+        AppSettingsResponse: {
+            /**
+             * @description Maximum number of parallel calculation instances
+             * @example 4
+             */
+            max_parallel_instances: number;
+            /**
+             * @description Maximum CPU utilization percentage for the system
+             * @example 95
+             */
+            max_cpu_utilization_percent: number;
+            /**
+             * @description Maximum memory utilization percentage for the system
+             * @example 95
+             */
+            max_memory_utilization_percent: number;
+            /**
+             * @description Whether GPU acceleration is enabled for calculations (Linux only)
+             * @default false
+             * @example false
+             */
+            gpu_acceleration_enabled: boolean;
+            /**
+             * @description Total number of CPU cores in the system (auto-detected)
+             * @example 8
+             */
+            system_total_cores: number;
+            /**
+             * @description Total system memory in MB (auto-detected)
+             * @example 16384
+             */
+            system_total_memory_mb: number;
+            /**
+             * @description Directory path where calculation data is stored
+             * @example /Users/username/PySCF_calculations
+             */
+            calculations_directory: string;
+            /**
+             * @description Display timezone for timestamps in chat history and calculation history
+             * @default UTC
+             * @example UTC
+             * @enum {string}
+             */
+            timezone: "UTC" | "Asia/Tokyo" | "Asia/Shanghai" | "Asia/Seoul" | "Asia/Singapore" | "Asia/Kolkata" | "Australia/Sydney" | "Europe/London" | "Europe/Paris" | "Europe/Berlin" | "America/New_York" | "America/Chicago" | "America/Denver" | "America/Los_Angeles";
+            /**
+             * @description Whether a non-empty Gemini API key is stored. The actual key value is never returned.
+             * @example false
+             */
+            gemini_api_key_configured: boolean;
+            /**
+             * @description Always returned as empty string. The real key is never exposed via GET.
+             * @example
              */
             gemini_api_key?: string | null;
             /**
@@ -1362,7 +1733,7 @@ export interface components {
             /** @example true */
             success: boolean;
             data: {
-                settings: components["schemas"]["AppSettings"];
+                settings: components["schemas"]["AppSettingsResponse"];
             };
         };
         SettingsUpdateRequest: components["schemas"]["AppSettings"];
@@ -1462,6 +1833,86 @@ export interface components {
             /** @example true */
             success: boolean;
             data: components["schemas"]["SystemResourceSummary"];
+        };
+        Gpu4PyscfStatus: {
+            /** @description Whether the application is running on Linux */
+            is_linux: boolean;
+            /** @description Whether CUDA Toolkit was detected via nvcc */
+            cuda_detected: boolean;
+            /**
+             * @description Detected CUDA Toolkit version (major.minor)
+             * @example 12.4
+             */
+            cuda_version?: string | null;
+            /**
+             * @description Detected CUDA major version
+             * @example 12
+             */
+            cuda_major?: number | null;
+            /**
+             * @description Detected CUDA minor version
+             * @example 4
+             */
+            cuda_minor?: number | null;
+            /** @description Whether detected CUDA version is supported by GPU4PySCF */
+            cuda_supported: boolean;
+            /** @description Additional message for CUDA detection failures or warnings */
+            cuda_detection_message?: string | null;
+            /**
+             * @description Recommended GPU4PySCF package for the detected CUDA version
+             * @example gpu4pyscf-cuda12x
+             */
+            recommended_gpu4pyscf_package?: string | null;
+            /**
+             * @description Recommended cuTENSOR package for the detected CUDA version
+             * @example cutensor-cu12
+             */
+            recommended_cutensor_package?: string | null;
+            /** @description Whether GPU4PySCF is installed */
+            gpu4pyscf_installed: boolean;
+            /** @description Installed GPU4PySCF version */
+            gpu4pyscf_version?: string | null;
+            /** @description Whether cuTENSOR is installed */
+            cutensor_installed: boolean;
+            /** @description Installed cuTENSOR version */
+            cutensor_version?: string | null;
+        };
+        Gpu4PyscfInstallRequest: {
+            /**
+             * @description Whether to install cuTENSOR alongside GPU4PySCF
+             * @default true
+             */
+            include_cutensor: boolean;
+            /**
+             * @description Force reinstall of GPU4PySCF and cuTENSOR packages
+             * @default false
+             */
+            force_reinstall: boolean;
+            /**
+             * @description Must be true to confirm the installation and allow environment mutation. Prevents accidental installs.
+             * @default false
+             */
+            confirm_install: boolean;
+        };
+        Gpu4PyscfInstallResult: {
+            status: components["schemas"]["Gpu4PyscfStatus"];
+            packages: string[];
+            /** @description Whether pip installed into the user site-packages directory */
+            used_user_site: boolean;
+            /** @description Tail of pip stdout output */
+            pip_stdout: string;
+            /** @description Tail of pip stderr output */
+            pip_stderr: string;
+        };
+        Gpu4PyscfStatusResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Gpu4PyscfStatus"];
+        };
+        Gpu4PyscfInstallResponse: {
+            /** @example true */
+            success: boolean;
+            data: components["schemas"]["Gpu4PyscfInstallResult"];
         };
         IRSpectrumResponse: {
             /** @example true */
@@ -1913,6 +2364,7 @@ export interface components {
             history: {
                 /** @enum {string} */
                 role?: "user" | "model";
+                /** @description Content parts within a single history item. A normal message contains 1 part; the cap of 100 is intentionally generous for legitimate multi-part use while preventing DoS amplification through unbounded iteration. */
                 parts?: {
                     text?: string;
                 }[];
@@ -2066,8 +2518,21 @@ export interface components {
             };
         };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Authentication token is missing or invalid */
+        UnauthorizedError: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+    };
+    parameters: {
+        /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+        AuthTokenHeader: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -2077,7 +2542,10 @@ export interface operations {
     healthCheck: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2092,12 +2560,16 @@ export interface operations {
                     "application/json": components["schemas"]["HealthResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
         };
     };
     searchPubChem: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2125,6 +2597,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Compound not found */
             404: {
                 headers: {
@@ -2148,7 +2621,10 @@ export interface operations {
     convertSmiles: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2176,6 +2652,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Internal server error */
             500: {
                 headers: {
@@ -2190,7 +2667,10 @@ export interface operations {
     validateXYZ: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2209,6 +2689,16 @@ export interface operations {
                     "application/json": components["schemas"]["XYZValidateResponse"];
                 };
             };
+            /** @description Invalid request (e.g., XYZ string exceeds maximum length) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Internal server error */
             500: {
                 headers: {
@@ -2223,7 +2713,10 @@ export interface operations {
     startCalculation: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2251,6 +2744,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to queue calculation */
             500: {
                 headers: {
@@ -2270,7 +2764,7 @@ export interface operations {
                 /** @description Filter by calculation status */
                 status?: "pending" | "running" | "completed" | "error" | "waiting" | "pausing" | "paused";
                 /** @description Filter by calculation method */
-                calculation_method?: "DFT" | "HF" | "MP2" | "CCSD" | "TDDFT" | "CASCI" | "CASSCF";
+                calculation_method?: components["schemas"]["CalculationMethod"];
                 /** @description Filter by basis set (case-insensitive) */
                 basis_function?: string;
                 /** @description Start date for date range filtering (ISO format YYYY-MM-DD) */
@@ -2278,7 +2772,10 @@ export interface operations {
                 /** @description End date for date range filtering (ISO format YYYY-MM-DD) */
                 date_to?: string;
             };
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2293,8 +2790,102 @@ export interface operations {
                     "application/json": components["schemas"]["CalculationListResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to list calculations */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    streamCalculationUpdates: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully opened a calculation update SSE stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
+        };
+    };
+    streamCalculationUpdatesForCalculation: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path: {
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successfully opened a calculation-specific SSE stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
+        };
+    };
+    getCalculationStatus: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculation system status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationStatusResponse"];
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
+            /** @description Failed to get calculation system status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Process manager temporarily unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2307,9 +2898,12 @@ export interface operations {
     getCalculationDetails: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2325,6 +2919,7 @@ export interface operations {
                     "application/json": components["schemas"]["CalculationDetailsResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found */
             404: {
                 headers: {
@@ -2345,53 +2940,15 @@ export interface operations {
             };
         };
     };
-    deleteCalculation: {
+    updateCalculation: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
-                calculationId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Calculation deleted successfully */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CalculationDeleteResponse"];
-                };
-            };
-            /** @description Calculation not found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Failed to delete calculation */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-        };
-    };
-    patchCalculation: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2411,6 +2968,7 @@ export interface operations {
                     "application/json": components["schemas"]["CalculationUpdateResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found */
             404: {
                 headers: {
@@ -2440,12 +2998,69 @@ export interface operations {
             };
         };
     };
+    deleteCalculation: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path: {
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
+                calculationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Calculation deleted successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalculationDeleteResponse"];
+                };
+            };
+            /** @description Calculation cannot be deleted while it is non-terminal */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
+            /** @description Calculation not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to delete calculation */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     pauseCalculation: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2470,6 +3085,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found */
             404: {
                 headers: {
@@ -2493,9 +3109,12 @@ export interface operations {
     resumeCalculation: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2520,6 +3139,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found */
             404: {
                 headers: {
@@ -2543,9 +3163,12 @@ export interface operations {
     getOrbitals: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2561,6 +3184,7 @@ export interface operations {
                     "application/json": components["schemas"]["OrbitalsResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found or no orbital data available */
             404: {
                 headers: {
@@ -2591,9 +3215,12 @@ export interface operations {
                 /** @description Negative isovalue for orbital visualization (default -0.02) */
                 isovalueNeg?: number;
             };
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
                 /** @description Molecular orbital index */
                 orbitalIndex: number;
@@ -2611,6 +3238,7 @@ export interface operations {
                     "application/json": components["schemas"]["OrbitalCubeResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation or orbital not found */
             404: {
                 headers: {
@@ -2634,9 +3262,12 @@ export interface operations {
     listCubeFiles: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2652,6 +3283,7 @@ export interface operations {
                     "application/json": components["schemas"]["CubeFilesListResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found */
             404: {
                 headers: {
@@ -2676,11 +3308,14 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Specific orbital index to delete (if not provided, deletes all) */
-                orbitalIndex?: number;
+                orbital_index?: number;
             };
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2696,6 +3331,7 @@ export interface operations {
                     "application/json": components["schemas"]["CubeFilesDeleteResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found */
             404: {
                 headers: {
@@ -2720,17 +3356,20 @@ export interface operations {
         parameters: {
             query?: {
                 /** @description Full width at half maximum for Lorentzian broadening in cm⁻¹ */
-                broadeningFwhm?: number;
+                broadening_fwhm?: number;
                 /** @description Minimum wavenumber for spectrum range in cm⁻¹ */
-                xMin?: number;
+                x_min?: number;
                 /** @description Maximum wavenumber for spectrum range in cm⁻¹ */
-                xMax?: number;
+                x_max?: number;
                 /** @description Whether to mark individual peaks in the plot */
-                showPeaks?: boolean;
+                show_peaks?: boolean;
             };
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
-                /** @description Unique calculation ID */
+                /** @description Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed. */
                 calculationId: string;
             };
             cookie?: never;
@@ -2755,6 +3394,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Calculation not found or no frequency data available */
             404: {
                 headers: {
@@ -2778,7 +3418,10 @@ export interface operations {
     getSupportedParameters: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2793,6 +3436,7 @@ export interface operations {
                     "application/json": components["schemas"]["SupportedParametersResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to retrieve supported parameters */
             500: {
                 headers: {
@@ -2807,7 +3451,10 @@ export interface operations {
     getSettings: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2822,6 +3469,7 @@ export interface operations {
                     "application/json": components["schemas"]["SettingsResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to retrieve settings */
             500: {
                 headers: {
@@ -2836,7 +3484,10 @@ export interface operations {
     updateSettings: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2864,6 +3515,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to update settings */
             500: {
                 headers: {
@@ -2878,7 +3530,10 @@ export interface operations {
     getSystemResourceStatus: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2893,7 +3548,96 @@ export interface operations {
                     "application/json": components["schemas"]["SystemResourceResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to retrieve system resource status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getGpu4PyscfStatus: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description GPU4PySCF status retrieved successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Gpu4PyscfStatusResponse"];
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
+            /** @description Failed to retrieve GPU4PySCF status */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    installGpu4Pyscf: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["Gpu4PyscfInstallRequest"];
+            };
+        };
+        responses: {
+            /** @description GPU4PySCF installed successfully */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Gpu4PyscfInstallResponse"];
+                };
+            };
+            /** @description Invalid installation request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            401: components["responses"]["UnauthorizedError"];
+            /** @description GPU4PySCF installation is only available from the local machine */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Failed to install GPU4PySCF */
             500: {
                 headers: {
                     [name: string]: unknown;
@@ -2907,7 +3651,10 @@ export interface operations {
     getChatSessions: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2922,6 +3669,7 @@ export interface operations {
                     "application/json": components["schemas"]["ChatHistoryListResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to retrieve chat sessions */
             500: {
                 headers: {
@@ -2936,7 +3684,10 @@ export interface operations {
     createChatSession: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -2964,6 +3715,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Failed to create chat session */
             500: {
                 headers: {
@@ -2978,7 +3730,10 @@ export interface operations {
     getChatSession: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
                 /** @description Chat session ID */
                 sessionId: string;
@@ -2996,6 +3751,7 @@ export interface operations {
                     "application/json": components["schemas"]["ChatSessionDetailResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Chat session not found */
             404: {
                 headers: {
@@ -3019,7 +3775,10 @@ export interface operations {
     deleteChatSession: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
                 /** @description Chat session ID */
                 sessionId: string;
@@ -3037,6 +3796,7 @@ export interface operations {
                     "application/json": components["schemas"]["ChatSessionDeleteResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Chat session not found */
             404: {
                 headers: {
@@ -3060,7 +3820,10 @@ export interface operations {
     updateChatSession: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path: {
                 /** @description Chat session ID */
                 sessionId: string;
@@ -3082,6 +3845,7 @@ export interface operations {
                     "application/json": components["schemas"]["ChatSessionResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Chat session not found */
             404: {
                 headers: {
@@ -3105,7 +3869,10 @@ export interface operations {
     streamChatWithAgent: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Required when `PYSCF_AUTH_TOKEN` is configured. */
+                "X-Auth-Token"?: components["parameters"]["AuthTokenHeader"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -3134,6 +3901,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            401: components["responses"]["UnauthorizedError"];
             /** @description Server error during AI processing */
             500: {
                 headers: {

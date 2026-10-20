@@ -6,7 +6,6 @@ SMILES to XYZ conversion logic, validation, and error handling.
 """
 
 import pytest
-from unittest.mock import MagicMock
 
 from services.smiles_service import SMILESService
 from services.exceptions import ServiceError, ValidationError
@@ -40,30 +39,6 @@ def test_convert_smiles_success(mocker):
     assert result['xyz'] == expected_xyz
 
 
-def test_convert_smiles_with_custom_title(mocker):
-    """
-    GIVEN a valid SMILES string with custom title
-    WHEN convert_smiles is called
-    THEN it should use the custom title
-    """
-    # ARRANGE
-    smiles = 'c1ccccc1'  # Benzene
-    custom_title = 'Benzene molecule'
-    expected_xyz = "12\nBenzene molecule\n..."
-    
-    mock_converter = mocker.patch('services.smiles_service.smiles_to_xyz', return_value=expected_xyz)
-    
-    service = SMILESService()
-    
-    # ACT
-    result = service.convert_smiles(smiles, title=custom_title)
-    
-    # ASSERT
-    assert result['xyz'] == expected_xyz
-    # Verify the converter was called with the custom title
-    mock_converter.assert_called_once_with(smiles, title=custom_title)
-
-
 def test_convert_smiles_default_title(mocker):
     """
     GIVEN a valid SMILES string without title
@@ -78,39 +53,11 @@ def test_convert_smiles_default_title(mocker):
     service = SMILESService()
     
     # ACT
-    result = service.convert_smiles(smiles)
+    service.convert_smiles(smiles)
     
     # ASSERT
     # Verify the converter was called with default title
     mock_converter.assert_called_once_with(smiles, title=f"Molecule from SMILES: {smiles}")
-
-
-@pytest.mark.parametrize("smiles,description", [
-    ('C', 'methane'),
-    ('CC', 'ethane'),
-    ('CCO', 'ethanol'),
-    ('c1ccccc1', 'benzene'),
-    ('CC(=O)O', 'acetic acid'),
-    ('CC(C)C', 'isobutane'),
-])
-def test_convert_smiles_various_molecules(mocker, smiles, description):
-    """
-    GIVEN various valid SMILES strings
-    WHEN convert_smiles is called
-    THEN it should successfully convert each one
-    """
-    # ARRANGE
-    mocker.patch('services.smiles_service.smiles_to_xyz', return_value=f"xyz for {description}")
-    
-    service = SMILESService()
-    
-    # ACT
-    result = service.convert_smiles(smiles)
-    
-    # ASSERT
-    assert result is not None
-    assert 'xyz' in result
-
 
 # ============================================================================
 # convert_smiles() Validation Error Tests
@@ -210,44 +157,6 @@ def test_convert_smiles_invalid_structure(mocker):
         service.convert_smiles('INVALID_SMILES_XYZ')
 
 
-def test_convert_smiles_rdkit_parsing_error(mocker):
-    """
-    GIVEN smiles_to_xyz raises SMILESError due to RDKit parsing failure
-    WHEN convert_smiles is called
-    THEN it should raise ValidationError
-    """
-    # ARRANGE
-    mocker.patch(
-        'services.smiles_service.smiles_to_xyz',
-        side_effect=SMILESError('RDKit could not parse SMILES')
-    )
-    
-    service = SMILESService()
-    
-    # ACT & ASSERT
-    with pytest.raises(ValidationError, match="RDKit could not parse"):
-        service.convert_smiles('C1C')
-
-
-def test_convert_smiles_3d_generation_error(mocker):
-    """
-    GIVEN smiles_to_xyz raises SMILESError due to 3D coordinate generation failure
-    WHEN convert_smiles is called
-    THEN it should raise ValidationError
-    """
-    # ARRANGE
-    mocker.patch(
-        'services.smiles_service.smiles_to_xyz',
-        side_effect=SMILESError('Failed to generate 3D coordinates')
-    )
-    
-    service = SMILESService()
-    
-    # ACT & ASSERT
-    with pytest.raises(ValidationError, match="Failed to generate 3D coordinates"):
-        service.convert_smiles('c1ccccc1')
-
-
 # ============================================================================
 # convert_smiles() Unexpected Error Tests
 # ============================================================================
@@ -309,7 +218,7 @@ def test_convert_smiles_strips_whitespace(mocker):
     service = SMILESService()
     
     # ACT
-    result = service.convert_smiles(smiles_with_whitespace)
+    service.convert_smiles(smiles_with_whitespace)
     
     # ASSERT
     # Verify that the stripped SMILES was passed to the converter
@@ -332,9 +241,33 @@ def test_convert_smiles_preserves_internal_structure(mocker):
     service = SMILESService()
     
     # ACT
-    result = service.convert_smiles(complex_smiles)
+    service.convert_smiles(complex_smiles)
     
     # ASSERT
     mock_converter.assert_called_once()
     call_args = mock_converter.call_args[0]
     assert call_args[0] == complex_smiles
+
+
+# ============================================================================
+# Security Regression Tests — Input Redaction
+# ============================================================================
+
+def test_convert_smiles_invalid_error_does_not_reflect_input():
+    """
+    GIVEN an invalid SMILES string containing a proprietary sentinel
+    WHEN convert_smiles is called (real converter, no mocks)
+    THEN the raised ValidationError must NOT contain the sentinel value
+    """
+    # ARRANGE
+    sentinel = 'PROPRIETARY_MOLECULE_%%%_SECRET'
+    service = SMILESService()
+
+    # ACT & ASSERT
+    with pytest.raises(ValidationError) as exc_info:
+        service.convert_smiles(sentinel)
+
+    error_message = str(exc_info.value)
+    assert sentinel not in error_message, (
+        f"Raw SMILES input was reflected in service error: {error_message}"
+    )

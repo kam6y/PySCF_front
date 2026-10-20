@@ -3,158 +3,184 @@ System and debug API endpoints.
 Handles system resource monitoring and diagnostic information.
 """
 
+import ipaddress
+import json
 import logging
+import os
 from datetime import datetime
-from flask import Blueprint, jsonify
+from typing import Any
 
-from services import get_system_service, ServiceError
-from generated_models import SystemResourceSummary, SystemResourceInfo, ResourceConstraints, AllocatedResources
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
-# Set up logging
+from generated_models import (
+    AllocatedResources,
+    ResourceConstraints,
+    SystemResourceInfo,
+    SystemResourceSummary,
+)
+from services import get_system_service
+
 logger = logging.getLogger(__name__)
 
-# Create system blueprint
-system_bp = Blueprint('system', __name__)
+router = APIRouter()
 
 
-@system_bp.route('/api/system/resource-status', methods=['GET'])
-def get_system_resource_status():
+_DEBUG_ALLOWED_ENVIRONMENTS: frozenset[str] = frozenset({"development", "test"})
+_DEBUG_FLAG_TRUTHY_VALUES: frozenset[str] = frozenset({"true", "1"})
+
+
+def _parse_debug_flag(value: str | None) -> bool:
+    """Return whether *value* is an explicit truthy opt-in.
+
+    Truthy: ``"true"``, ``"1"`` (case-insensitive).
+    Falsy / absent: everything else (``""``, ``"false"``, ``"0"``, ``None``).
+    """
+    if value is None:
+        return False
+    return value.strip().lower() in _DEBUG_FLAG_TRUTHY_VALUES
+
+
+def _debug_endpoints_allowed() -> bool:
+    """Allow debug diagnostics only when BOTH gates pass (fail-closed).
+
+    Gate 1 — ``PYSCF_ENV`` must be an explicitly recognised non-production
+    value (``"development"`` or ``"test"``).  An absent, empty, or
+    misspelled value fails this gate.
+
+    Gate 2 — ``PYSCF_ENABLE_DEBUG_ENDPOINTS`` must be set to a truthy
+    value (``"true"`` or ``"1"``, case-insensitive).
+
+    Both env vars are read at request time so the check stays dynamic.
+    """
+    env = os.getenv("PYSCF_ENV", "").strip().lower()
+    if env not in _DEBUG_ALLOWED_ENVIRONMENTS:
+        return False
+    return _parse_debug_flag(os.getenv("PYSCF_ENABLE_DEBUG_ENDPOINTS"))
+
+
+def _get_client_host(request: Request) -> str | None:
+    return request.client.host if request.client else None
+
+
+def _is_loopback_address(address: str | None) -> bool:
+    if not address:
+        return False
+    try:
+        ip = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+        return ip.ipv4_mapped.is_loopback
+    return False
+
+
+@router.get("/api/system/resource-status")
+def get_system_resource_status() -> dict[str, Any]:
     """Get current system resource status including constraints and allocation."""
-    try:
-        system_service = get_system_service()
-        
-        # Call service layer
-        resource_summary = system_service.get_resource_status()
-        
-        # Create response using Pydantic models
-        system_info = SystemResourceInfo(
-            total_cpu_cores=resource_summary['system_info']['total_cpu_cores'],
-            total_memory_mb=resource_summary['system_info']['total_memory_mb'],
-            available_memory_mb=resource_summary['system_info']['available_memory_mb'],
-            cpu_usage_percent=resource_summary['system_info']['cpu_usage_percent'],
-            memory_usage_percent=resource_summary['system_info']['memory_usage_percent'],
-            timestamp=datetime.fromisoformat(resource_summary['system_info']['timestamp'].replace('Z', '+00:00'))
-        )
-        
-        resource_constraints = ResourceConstraints(
-            max_cpu_utilization_percent=resource_summary['resource_constraints']['max_cpu_utilization_percent'],
-            max_memory_utilization_percent=resource_summary['resource_constraints']['max_memory_utilization_percent'],
-            max_allowed_cpu_cores=resource_summary['resource_constraints']['max_allowed_cpu_cores'],
-            max_allowed_memory_mb=resource_summary['resource_constraints']['max_allowed_memory_mb']
-        )
-        
-        allocated_resources = AllocatedResources(
-            total_allocated_cpu_cores=resource_summary['allocated_resources']['total_allocated_cpu_cores'],
-            total_allocated_memory_mb=resource_summary['allocated_resources']['total_allocated_memory_mb'],
-            available_cpu_cores=resource_summary['allocated_resources']['available_cpu_cores'],
-            available_memory_mb=resource_summary['allocated_resources']['available_memory_mb'],
-            active_calculations_count=resource_summary['allocated_resources']['active_calculations_count']
-        )
-        
-        summary = SystemResourceSummary(
-            system_info=system_info,
-            resource_constraints=resource_constraints,
-            allocated_resources=allocated_resources
-        )
-        
-        return jsonify({
-            'success': True,
-            'data': summary.model_dump()
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error retrieving system resource status: {e}")
-        return jsonify({
-            'success': False,
-            'error': e.message
-        }), e.status_code
-    except Exception as e:
-        logger.error(f"Failed to retrieve system resource status: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred.'
-        }), 500
+    resource_summary = get_system_service().get_resource_status()
+    system_info = SystemResourceInfo(
+        total_cpu_cores=resource_summary["system_info"]["total_cpu_cores"],
+        total_memory_mb=resource_summary["system_info"]["total_memory_mb"],
+        available_memory_mb=resource_summary["system_info"]["available_memory_mb"],
+        cpu_usage_percent=resource_summary["system_info"]["cpu_usage_percent"],
+        memory_usage_percent=resource_summary["system_info"]["memory_usage_percent"],
+        timestamp=datetime.fromisoformat(
+            resource_summary["system_info"]["timestamp"].replace("Z", "+00:00")
+        ),
+    )
+    constraints = ResourceConstraints(**resource_summary["resource_constraints"])
+    allocated = AllocatedResources(**resource_summary["allocated_resources"])
+    summary = SystemResourceSummary(
+        system_info=system_info,
+        resource_constraints=constraints,
+        allocated_resources=allocated,
+    )
+    return {"success": True, "data": summary.model_dump(mode="json")}
 
 
-@system_bp.route('/api/debug/system-diagnostics', methods=['GET'])
-def get_system_diagnostics():
+@router.get("/api/system/gpu4pyscf-status")
+def get_gpu4pyscf_status() -> dict[str, Any]:
+    """Get CUDA detection and GPU4PySCF installation status."""
+    status = get_system_service().get_gpu4pyscf_status()
+    return {"success": True, "data": status}
+
+
+@router.post("/api/system/gpu4pyscf-install")
+async def install_gpu4pyscf(request: Request) -> Any:
+    """Install GPU4PySCF and recommended cuTENSOR from local requests only."""
+    client_host = _get_client_host(request)
+    if not _is_loopback_address(client_host):
+        logger.warning(
+            "Blocked non-local GPU4PySCF install request from %s",
+            client_host,
+        )
+        return JSONResponse(
+            {
+                "success": False,
+                "error": "GPU4PySCF installation is only available from the local machine.",
+            },
+            status_code=403,
+        )
+
+    raw_body = await request.body()
+    payload = json.loads(raw_body) if raw_body else {}
+    if not isinstance(payload, dict):
+        payload = {}
+    include_cutensor = payload.get("include_cutensor", True) is True
+    force_reinstall = payload.get("force_reinstall") is True
+    confirm_install = payload.get("confirm_install") is True
+    result = get_system_service().install_gpu4pyscf(
+        include_cutensor=include_cutensor,
+        force_reinstall=force_reinstall,
+        confirm_install=confirm_install,
+    )
+    return {"success": True, "data": result}
+
+
+_DEBUG_BLOCKED_STATUS_CODE = 403
+_DEBUG_BLOCKED_CONTENT = {
+    "success": False,
+    "error": "Debug endpoints are not enabled in this environment.",
+}
+
+
+def _debug_blocked_response() -> JSONResponse:
+    """Create a fresh JSONResponse for blocked debug requests.
+
+    Returns a new object per call to avoid shared mutable state —
+    Starlette Response objects are mutated in-place by middleware
+    (e.g. CORS raw_headers), and sync endpoints run in a threadpool.
+    """
+    return JSONResponse(
+        content=_DEBUG_BLOCKED_CONTENT, status_code=_DEBUG_BLOCKED_STATUS_CODE
+    )
+
+
+@router.get("/api/debug/system-diagnostics", response_model=None)
+def get_system_diagnostics() -> dict[str, Any] | JSONResponse:
     """Get comprehensive system diagnostics for troubleshooting."""
-    try:
-        system_service = get_system_service()
-        
-        # Call service layer
-        diagnostics = system_service.get_system_diagnostics()
-        
-        return jsonify({
-            'success': True,
-            'data': diagnostics
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error retrieving system diagnostics: {e}")
-        return jsonify({
-            'success': False,
-            'error': e.message
-        }), e.status_code
-    except Exception as e:
-        logger.error(f"Failed to retrieve system diagnostics: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred.'
-        }), 500
+    if not _debug_endpoints_allowed():
+        return _debug_blocked_response()
+    diagnostics = get_system_service().get_system_diagnostics()
+    return {"success": True, "data": diagnostics}
 
 
-@system_bp.route('/api/debug/process-manager-diagnostics', methods=['GET'])
-def get_process_manager_diagnostics():
+@router.get("/api/debug/process-manager-diagnostics", response_model=None)
+def get_process_manager_diagnostics() -> dict[str, Any] | JSONResponse:
     """Get detailed process manager diagnostics."""
-    try:
-        system_service = get_system_service()
-        
-        # Call service layer
-        diagnostics = system_service.get_process_manager_diagnostics()
-        
-        return jsonify({
-            'success': True,
-            'data': diagnostics
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error retrieving process manager diagnostics: {e}")
-        return jsonify({
-            'success': False,
-            'error': e.message
-        }), e.status_code
-    except Exception as e:
-        logger.error(f"Failed to retrieve process manager diagnostics: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred.'
-        }), 500
+    if not _debug_endpoints_allowed():
+        return _debug_blocked_response()
+    diagnostics = get_system_service().get_process_manager_diagnostics()
+    return {"success": True, "data": diagnostics}
 
 
-@system_bp.route('/api/debug/resource-manager-diagnostics', methods=['GET'])
-def get_resource_manager_diagnostics():
+@router.get("/api/debug/resource-manager-diagnostics", response_model=None)
+def get_resource_manager_diagnostics() -> dict[str, Any] | JSONResponse:
     """Get detailed resource manager diagnostics."""
-    try:
-        system_service = get_system_service()
-        
-        # Call service layer
-        diagnostics = system_service.get_resource_manager_diagnostics()
-        
-        return jsonify({
-            'success': True,
-            'data': diagnostics
-        })
-        
-    except ServiceError as e:
-        logger.error(f"Service error retrieving resource manager diagnostics: {e}")
-        return jsonify({
-            'success': False,
-            'error': e.message
-        }), e.status_code
-    except Exception as e:
-        logger.error(f"Failed to retrieve resource manager diagnostics: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred.'
-        }), 500
+    if not _debug_endpoints_allowed():
+        return _debug_blocked_response()
+    diagnostics = get_system_service().get_resource_manager_diagnostics()
+    return {"success": True, "data": diagnostics}

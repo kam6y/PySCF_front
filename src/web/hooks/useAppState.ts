@@ -1,5 +1,6 @@
 import { useUIStore } from '../store/uiStore';
 import { useCalculationStore } from '../store/calculationStore';
+import { useShallow } from 'zustand/react/shallow';
 
 /**
  * UIStoreとCalculationStoreを統合したアプリケーション状態へのアクセス
@@ -8,8 +9,8 @@ import { useCalculationStore } from '../store/calculationStore';
  * 単一のインターフェースで提供し、App.tsxの複雑さを軽減
  */
 export const useAppState = () => {
-  const uiState = useUIStore();
-  const calculationState = useCalculationStore();
+  const uiState = useUIStore(useShallow(state => state));
+  const calculationState = useCalculationStore(useShallow(state => state));
 
   return {
     // UI状態
@@ -41,7 +42,6 @@ export const useAppState = () => {
       isUserMenuOpen: uiState.isUserMenuOpen,
       isSettingsOpen: uiState.isSettingsOpen,
       toggleUserMenu: uiState.toggleUserMenu,
-      closeUserMenu: uiState.closeUserMenu,
       openSettings: uiState.openSettings,
       closeSettings: uiState.closeSettings,
     },
@@ -57,8 +57,7 @@ export const useAppState = () => {
       createNewCalculation: calculationState.createNewCalculation,
       createNewFromExisting: calculationState.createNewFromExisting,
       updateStagedCalculation: calculationState.updateStagedCalculation,
-      clearStaged: calculationState.clearStaged,
-      isStagedCalculation: calculationState.isStagedCalculation,
+      clearStagedCalculation: calculationState.clearStagedCalculation,
     },
 
     // 統合されたアクション（複数ストアにまたがる操作）
@@ -66,13 +65,14 @@ export const useAppState = () => {
       // 新規計算作成（UI状態も更新、Agent画面をオフ）
       handleCreateNew: () => {
         calculationState.createNewCalculation();
+        uiState.setCurrentPage('calculation-settings');
+        uiState.closeSidebar();
         uiState.setAIAgentEnabled(false);
       },
 
       // 計算選択（UI状態も更新、Agent画面をオフ）
       handleCalculationSelect: (calculationId: string) => {
         calculationState.selectCalculation(calculationId);
-        calculationState.clearStaged();
         uiState.closeSidebar();
         uiState.setAIAgentEnabled(false);
       },

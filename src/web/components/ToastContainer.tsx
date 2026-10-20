@@ -1,30 +1,33 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useNotificationStore } from '../store/notificationStore';
 import { ToastNotification } from './ToastNotification';
 import { useAppState } from '../hooks/useAppState';
 import styles from './ToastContainer.module.css';
 
-export const ToastContainer: React.FC = () => {
+export const ToastContainer = React.memo(() => {
   const { notifications, removeNotification } = useNotificationStore();
   const appState = useAppState();
 
-  const handleNavigate = (calculationId: string) => {
-    // Select the corresponding calculation
-    appState.calculation.selectCalculation(calculationId);
+  const handleNavigate = useCallback(
+    (calculationId: string) => {
+      // Select the corresponding calculation
+      appState.calculation.selectCalculation(calculationId);
 
-    // Navigate to appropriate page
-    // For success notifications, go to results page; for error notifications, go to settings page
-    const notification = notifications.find(
-      n => n.calculationId === calculationId
-    );
-    if (notification) {
-      if (notification.type === 'success') {
-        appState.ui.setCurrentPage('calculation-results');
-      } else if (notification.type === 'error') {
-        appState.ui.setCurrentPage('calculation-settings');
+      // Navigate to appropriate page
+      // For success notifications, go to results page; for error notifications, go to settings page
+      const notification = notifications.find(
+        n => n.calculationId === calculationId
+      );
+      if (notification) {
+        if (notification.type === 'success') {
+          appState.ui.setCurrentPage('calculation-results');
+        } else if (notification.type === 'error') {
+          appState.ui.setCurrentPage('calculation-settings');
+        }
       }
-    }
-  };
+    },
+    [notifications, appState]
+  );
 
   if (notifications.length === 0) {
     return null;
@@ -42,4 +45,4 @@ export const ToastContainer: React.FC = () => {
       ))}
     </div>
   );
-};
+});

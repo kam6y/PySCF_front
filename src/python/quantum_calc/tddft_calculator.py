@@ -1,14 +1,13 @@
 """TDDFT calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
 from typing import Dict, Any, List, Optional, Tuple
 from pyscf import gto, dft, tddft, tdscf
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
-from .file_manager import CalculationFileManager
+from .exceptions import CalculationError, ConvergenceError, InputError, PauseRequestedException
+from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
 
@@ -20,7 +19,7 @@ class TDDFTCalculator(BaseCalculator):
     
     def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
-        self.file_manager = CalculationFileManager()
+        self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
         super().__init__(working_dir, optimize_geometry)
@@ -30,11 +29,6 @@ class TDDFTCalculator(BaseCalculator):
         self.keep_files = keep_files
         self.molecule_name = molecule_name
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup TDDFT calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate TDDFT-specific parameters."""
         # DFT-related parameters
@@ -88,10 +82,20 @@ class TDDFTCalculator(BaseCalculator):
         
         if tddft_method == 'TDA':
             # Tamm-Dancoff approximation
-            self.mytd = tdscf.TDA(self.mf)
+            if self.gpu_enabled:
+                if not hasattr(self.mf, "TDA"):
+                    raise CalculationError("GPU4PySCF TDA factory is unavailable")
+                self.mytd = self.mf.TDA()
+            else:
+                self.mytd = tdscf.TDA(self.mf)
         else:
             # Full TDDFT
-            self.mytd = tddft.TDDFT(self.mf)
+            if self.gpu_enabled:
+                if not hasattr(self.mf, "TDDFT"):
+                    raise CalculationError("GPU4PySCF TDDFT factory is unavailable")
+                self.mytd = self.mf.TDDFT()
+            else:
+                self.mytd = tddft.TDDFT(self.mf)
         
         self.mytd.nstates = nstates
         
@@ -100,8 +104,21 @@ class TDDFTCalculator(BaseCalculator):
             raise InputError(f"Invalid number of excited states: {nstates}. Must be positive.")
         
         # Check if requested number of states is reasonable for the system
-        n_orb = len(self.mf.mo_energy) if hasattr(self.mf, 'mo_energy') else 0
-        n_occupied = int(np.sum(self.mf.mo_occ > 0)) if hasattr(self.mf, 'mo_occ') else 0
+        mo_energy = self._as_numpy_array(self.mf.mo_energy) if hasattr(self.mf, 'mo_energy') else None
+        mo_occ = self._as_numpy_array(self.mf.mo_occ) if hasattr(self.mf, 'mo_occ') else None
+
+        if mo_energy is not None and hasattr(mo_energy, 'ndim') and mo_energy.ndim == 2:
+            mo_energy_alpha = mo_energy[0]
+        else:
+            mo_energy_alpha = mo_energy
+
+        if mo_occ is not None and hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            mo_occ_alpha = mo_occ[0]
+        else:
+            mo_occ_alpha = mo_occ
+
+        n_orb = len(mo_energy_alpha) if mo_energy_alpha is not None else 0
+        n_occupied = int(np.sum(mo_occ_alpha > 0)) if mo_occ_alpha is not None else 0
         n_virtual = n_orb - n_occupied
         
         # Calculate a reasonable maximum number of excited states
@@ -129,8 +146,12 @@ class TDDFTCalculator(BaseCalculator):
         
         # Run TDDFT calculation
         try:
-            excitation_energies = self.mytd.kernel()
+            self.mytd.kernel()
+        except PauseRequestedException:
+            raise
         except Exception as e:
+            if self.gpu_enabled:
+                raise CalculationError(f"GPU4PySCF TDDFT calculation failed: {e}") from e
             error_msg = str(e).lower()
             if "singular" in error_msg or "convergence" in error_msg:
                 raise ConvergenceError(f"TDDFT calculation failed to converge: {str(e)}")
@@ -168,17 +189,31 @@ class TDDFTCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create DFT method object for TDDFT ground state (RKS/UKS)."""
         spin = self.results.get('spin', 0)
-        
+        if self._require_gpu4pyscf_available():
+            try:
+                import gpu4pyscf
+                if spin == 0:
+                    mf = gpu4pyscf.dft.RKS(mol, xc=self.xc_functional)
+                    logger.info("Using GPU4PySCF RKS for TDDFT ground state")
+                else:
+                    mf = gpu4pyscf.dft.UKS(mol, xc=self.xc_functional)
+                    logger.info("Using GPU4PySCF UKS for TDDFT ground state")
+                self.gpu_enabled = True
+                return mf
+            except Exception as exc:
+                self.gpu_enabled = False
+                raise CalculationError(f"GPU4PySCF TDDFT setup failed: {exc}") from exc
+
         if spin == 0:
             mf = dft.RKS(mol)
             logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell TDDFT ground state")
         else:
             mf = dft.UKS(mol)
             logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell TDDFT ground state")
-        
+
         # Set XC functional
         mf.xc = self.xc_functional
-        
+        self.gpu_enabled = False
         return mf
     
     def _apply_solvent_effects(self, mf):
@@ -210,16 +245,19 @@ class TDDFTCalculator(BaseCalculator):
         ev_to_hartree = 27.2114
         
         # 堅牢なエネルギーフィルタリング - None、NaN、無限大、非数値をチェック
-        logger.debug(f"Raw excitation energies type: {type(self.mytd.e)}")
-        logger.debug(f"Raw excitation energies shape: {getattr(self.mytd.e, 'shape', 'no shape')}")
-        logger.debug(f"Raw excitation energies contents: {self.mytd.e}")
+        excitation_values = self._as_numpy_array(self.mytd.e)
+        excitation_values = np.atleast_1d(excitation_values)
+
+        logger.debug(f"Raw excitation energies type: {type(excitation_values)}")
+        logger.debug(f"Raw excitation energies shape: {getattr(excitation_values, 'shape', 'no shape')}")
+        logger.debug(f"Raw excitation energies contents: {excitation_values}")
         
         valid_energies_hartree = []
         invalid_count = 0
         
         # 安全にイテレートしてフィルタリング
         try:
-            for i, energy in enumerate(self.mytd.e):
+            for i, energy in enumerate(excitation_values):
                 # 詳細な値チェック
                 if energy is None:
                     logger.warning(f"Excitation energy {i} is None")
@@ -285,13 +323,20 @@ class TDDFTCalculator(BaseCalculator):
         # Calculate oscillator strengths using length gauge (standard approach)
         try:
             # 計算された状態の数だけスライスする
-            osc_strengths_result = self.mytd.oscillator_strength(gauge='length')[:len(valid_energies_hartree)]
+            osc_strengths_result = self.mytd.oscillator_strength(gauge='length')
             if osc_strengths_result is not None:
+                osc_strengths_result = self._as_numpy_array(osc_strengths_result)
+                osc_strengths_result = np.atleast_1d(osc_strengths_result)[:len(valid_energies_hartree)]
                 # 安全にfloatに変換
                 for i, f in enumerate(osc_strengths_result):
                     try:
-                        if f is not None and np.isfinite(f):
-                            oscillator_strengths.append(float(f))
+                        if f is None:
+                            logger.warning(f"Invalid oscillator strength at index {i}: {f}")
+                            oscillator_strengths.append(0.0)
+                            continue
+                        f_val = float(f)
+                        if np.isfinite(f_val):
+                            oscillator_strengths.append(f_val)
                         else:
                             logger.warning(f"Invalid oscillator strength at index {i}: {f}")
                             oscillator_strengths.append(0.0)
@@ -305,15 +350,17 @@ class TDDFTCalculator(BaseCalculator):
         # Calculate transition dipole moments
         try:
             # 計算された状態の数だけスライスする
-            dipole_result = self.mytd.transition_dipole()[:len(valid_energies_hartree)]
+            dipole_result = self.mytd.transition_dipole()
             if dipole_result is not None:
+                dipole_result = self._as_numpy_array(dipole_result)
+                dipole_result = np.atleast_1d(dipole_result)[:len(valid_energies_hartree)]
                 for i, dipole in enumerate(dipole_result):
                     try:
                         if hasattr(dipole, '__len__') and len(dipole) >= 3:
                             # 各成分を安全に変換
-                            x = float(dipole[0]) if dipole[0] is not None and np.isfinite(dipole[0]) else 0.0
-                            y = float(dipole[1]) if dipole[1] is not None and np.isfinite(dipole[1]) else 0.0
-                            z = float(dipole[2]) if dipole[2] is not None and np.isfinite(dipole[2]) else 0.0
+                            x = float(dipole[0]) if dipole[0] is not None and np.isfinite(float(dipole[0])) else 0.0
+                            y = float(dipole[1]) if dipole[1] is not None and np.isfinite(float(dipole[1])) else 0.0
+                            z = float(dipole[2]) if dipole[2] is not None and np.isfinite(float(dipole[2])) else 0.0
                             
                             transition_dipoles.append({
                                 'x': x,
@@ -377,60 +424,15 @@ class TDDFTCalculator(BaseCalculator):
         
         for i, (energy, wavelength) in enumerate(zip(energies, wavelengths)):
             osc_strength = oscillator_strengths[i] if i < len(oscillator_strengths) else 0.0
-            
-            # Determine dominant transition type based on energy and oscillator strength
-            dominant_transition = self._identify_transition_type(energy, osc_strength)
-            
+
             major_transitions.append({
                 'state': i + 1,
                 'energy': energy,
                 'wavelength': wavelength,
-                'oscillator_strength': osc_strength,
-                'dominant_transition': dominant_transition
+                'oscillator_strength': osc_strength
             })
         
         return major_transitions
-    
-    def _identify_transition_type(self, energy_ev: float, osc_strength: float) -> str:
-        """
-        Identify the likely transition type based on wavelength and oscillator strength.
-        """
-        # Convert energy to wavelength (nm)
-        wavelength_nm = 1239.84 / energy_ev if energy_ev > 0 else float('inf')
-        
-        # High energy transitions (UV-C region)
-        if wavelength_nm < 200:
-            return "σ→σ*/n→σ* transition"
-        
-        # UV-B and UV-A region analysis
-        elif wavelength_nm < 280:
-            # UV-C to UV-B boundary - likely σ→π* or very high energy π→π*
-            if osc_strength > 0.1:
-                return "π→π* transition (high energy)"
-            else:
-                return "n→σ*/σ→π* transition"
-        
-        elif wavelength_nm < 350:
-            # UV-B region - characteristic of n→π* and some π→π* transitions
-            if osc_strength > 0.01:
-                return "π→π* transition"
-            else:
-                return "n→π* transition (forbidden)"
-        
-        elif wavelength_nm < 400:
-            # UV-A region - primarily π→π* transitions in conjugated systems
-            if osc_strength > 0.01:
-                return "π→π* transition (conjugated)"
-            else:
-                return "n→π* transition (weak)"
-        
-        elif wavelength_nm < 700:
-            # Visible region - extended conjugation π→π*
-            return "π→π* transition (extended conjugation)"
-        
-        else:
-            # Near-IR region - very low energy transitions
-            return "Low energy transition (>700 nm)"
     
     
     def _analyze_natural_transition_orbitals(self, excitation_energies: List[float]) -> List[Dict[str, Any]]:
@@ -463,6 +465,8 @@ class TDDFTCalculator(BaseCalculator):
                     continue
                     
                 weights, nto_coeff = nto_result
+                weights = self._as_numpy_array(weights)
+                nto_coeff = self._as_numpy_array(nto_coeff)
                 logger.info(f"Successfully retrieved NTO data for state S{state_number}")
                 logger.debug(f"Weights type: {type(weights)}, shape: {getattr(weights, 'shape', 'unknown')}")
                 logger.debug(f"NTO coeff type: {type(nto_coeff)}, shape: {getattr(nto_coeff, 'shape', 'unknown')}")
@@ -495,8 +499,11 @@ class TDDFTCalculator(BaseCalculator):
         """Process NTO weights and coefficients to extract orbital pair information."""
         logger.info(f"Processing NTO data for state S{state_number}")
         nto_pairs = []
-        
+
         # Validate input data
+        weights = self._as_numpy_array(weights)
+        nto_coeff = self._as_numpy_array(nto_coeff)
+
         if weights is None or nto_coeff is None:
             logger.error(f"Invalid NTO data: weights={weights}, nto_coeff={nto_coeff}")
             return nto_pairs
@@ -512,9 +519,12 @@ class TDDFTCalculator(BaseCalculator):
         if self.mf.mo_occ is None:
             logger.warning("Orbital occupations not available for NTO analysis")
             return nto_pairs
-        
-        occupied_indices = np.where(self.mf.mo_occ > 0)[0]
-        virtual_indices = np.where(self.mf.mo_occ == 0)[0]
+
+        mo_occ = self._as_numpy_array(self.mf.mo_occ)
+        if hasattr(mo_occ, 'ndim') and mo_occ.ndim == 2:
+            mo_occ = mo_occ[0]
+        occupied_indices = np.where(mo_occ > 0)[0]
+        virtual_indices = np.where(mo_occ == 0)[0]
         
         if len(occupied_indices) == 0 or len(virtual_indices) == 0:
             logger.warning("Cannot determine HOMO/LUMO for NTO analysis")

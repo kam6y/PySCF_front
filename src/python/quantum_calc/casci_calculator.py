@@ -1,14 +1,13 @@
 """CASCI calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional
 from pyscf import gto, scf, mcscf
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
-from .file_manager import CalculationFileManager
+from .exceptions import CalculationError, InputError
+from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
 
@@ -20,7 +19,7 @@ class CASCICalculator(BaseCalculator):
     
     def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
-        self.file_manager = CalculationFileManager()
+        self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
         super().__init__(working_dir, optimize_geometry)
@@ -32,11 +31,6 @@ class CASCICalculator(BaseCalculator):
         # Set calculation method for memory management
         self.calculation_method = 'CASCI'
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup CASCI calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate CASCI-specific parameters."""
         # CASCI-specific parameters
@@ -255,6 +249,3 @@ class CASCICalculator(BaseCalculator):
         
         logger.info("CASCI results analysis completed")
         return analysis_results
-
-
-

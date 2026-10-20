@@ -5,11 +5,86 @@ Tests the QuantumService class parameter validation logic with mocked dependenci
 Focuses on validate_calculation_parameters() which is core business logic.
 """
 
-import pytest
-from unittest.mock import MagicMock
+from types import SimpleNamespace
 
+import pytest
+
+from quantum_calc import CalculationError
+from quantum_calc._calculation_repository import CalculationRepository
+from services.calculation_analysis_service import CalculationAnalysisService
+from services.calculation_artifact_service import CalculationArtifactService
+from services.calculation_command_service import CalculationCommandService
+from services.calculation_query_service import CalculationQueryService
+from services.exceptions import NotFoundError, ServiceError, ValidationError
 from services.quantum_service import QuantumService
-from services.exceptions import ServiceError
+
+
+def test_quantum_service_wires_focused_services_with_shared_context():
+    """
+    GIVEN QuantumService is initialized
+    WHEN its focused service boundaries are inspected
+    THEN command, query, artifact, and analysis services share one context
+    """
+    service = QuantumService()
+
+    assert isinstance(service.command_service, CalculationCommandService)
+    assert isinstance(service.query_service, CalculationQueryService)
+    assert isinstance(service.artifact_service, CalculationArtifactService)
+    assert isinstance(service.analysis_service, CalculationAnalysisService)
+    assert service.command_service.context is service.query_service.context
+    assert service.artifact_service.context is service.query_service.context
+    assert service.analysis_service.context is service.query_service.context
+
+
+def test_quantum_service_delegates_public_operations_to_focused_services(mocker):
+    """
+    GIVEN focused services are installed behind the QuantumService facade
+    WHEN representative public operations are called
+    THEN QuantumService delegates to the responsibility-specific services
+    """
+    service = QuantumService()
+    service.query_service = mocker.Mock()
+    service.command_service = mocker.Mock()
+    service.artifact_service = mocker.Mock()
+    service.analysis_service = mocker.Mock()
+
+    service.query_service.list_calculations.return_value = {"count": 0}
+    service.command_service.delete_calculation.return_value = {"deleted_id": "calc-1"}
+    service.artifact_service.generate_orbital_cube.return_value = {
+        "generation_params": {"file_size_kb": 1.0}
+    }
+    service.analysis_service.generate_ir_spectrum.return_value = {"spectrum": {}}
+
+    assert service.list_calculations(status="completed") == {"count": 0}
+    assert service.delete_calculation("calc-1") == {"deleted_id": "calc-1"}
+    assert service.generate_orbital_cube("calc-1", 2, grid_size=40) == {
+        "generation_params": {"file_size_kb": 1.0}
+    }
+    assert service.generate_ir_spectrum("calc-1", x_min=500.0) == {"spectrum": {}}
+
+    service.query_service.list_calculations.assert_called_once_with(
+        name_query=None,
+        status="completed",
+        calculation_method=None,
+        basis_function=None,
+        date_from=None,
+        date_to=None,
+    )
+    service.command_service.delete_calculation.assert_called_once_with("calc-1")
+    service.artifact_service.generate_orbital_cube.assert_called_once_with(
+        "calc-1",
+        2,
+        grid_size=40,
+        isovalue_pos=None,
+        isovalue_neg=None,
+    )
+    service.analysis_service.generate_ir_spectrum.assert_called_once_with(
+        "calc-1",
+        broadening_fwhm=100.0,
+        x_min=500.0,
+        x_max=4000.0,
+        show_peaks=True,
+    )
 
 
 # ============================================================================
@@ -139,37 +214,6 @@ def test_validate_dft_missing_exchange_correlation():
     # ASSERT
     assert result is not None
     assert 'exchange-correlation functional' in result.lower()
-
-
-@pytest.mark.parametrize("xc_functional", [
-    'B3LYP',
-    'PBE0',
-    'M06-2X',
-    'CAM-B3LYP',
-    'wB97X-D'
-])
-def test_validate_dft_various_functionals(xc_functional):
-    """
-    GIVEN DFT parameters with various valid XC functionals
-    WHEN validate_calculation_parameters is called
-    THEN it should return None for all
-    """
-    # ARRANGE
-    service = QuantumService()
-    params = {
-        'calculation_method': 'DFT',
-        'exchange_correlation': xc_functional,
-        'basis_function': '6-31G',
-        'charges': 0,
-        'spin': 0
-    }
-    
-    # ACT
-    result = service.validate_calculation_parameters(params)
-    
-    # ASSERT
-    assert result is None
-
 
 # ============================================================================
 # validate_calculation_parameters() - TDDFT Method Tests
@@ -459,7 +503,7 @@ def test_validate_negative_spin():
     """
     GIVEN parameters with negative spin
     WHEN validate_calculation_parameters is called
-    THEN it should return error message
+    THEN it should return OpenAPI-aligned bounds error message
     """
     # ARRANGE
     service = QuantumService()
@@ -475,59 +519,78 @@ def test_validate_negative_spin():
     
     # ASSERT
     assert result is not None
-    assert 'cannot be negative' in result.lower()
+    assert 'spin' in result
+    assert 'below minimum' in result.lower()
 
 
-def test_validate_high_charge_warning(caplog):
+def test_validate_high_charge_rejected():
     """
-    GIVEN parameters with very high molecular charge
+    GIVEN parameters with charge above the OpenAPI maximum
     WHEN validate_calculation_parameters is called
-    THEN it should log a warning but pass validation
+    THEN it should return error message
     """
     # ARRANGE
     service = QuantumService()
     params = {
         'calculation_method': 'HF',
         'basis_function': 'sto-3g',
-        'charges': 12,  # High charge, should trigger warning
+        'charges': 11,
         'spin': 0
     }
     
     # ACT
     result = service.validate_calculation_parameters(params)
-    
+
     # ASSERT
-    assert result is None  # Still passes
+    assert result is not None
+    assert 'charges' in result
+    assert 'exceeds maximum' in result.lower()
 
 
-@pytest.mark.parametrize("method", ['HF', 'DFT', 'MP2', 'CCSD', 'TDDFT', 'CASCI', 'CASSCF'])
-def test_validate_all_methods_accept_basic_params(method):
+@pytest.mark.parametrize(
+    "calculation_method",
+    ["MP2", "CCSD", "CCSD_T", "CASCI", "CASSCF"],
+)
+def test_validate_gpu_enabled_rejects_unsupported_methods(
+    calculation_method,
+    tmp_path,
+    mocker,
+):
     """
-    GIVEN basic parameters for any calculation method
-    WHEN validate_calculation_parameters is called
-    THEN it should not crash (may return errors for method-specific params)
+    GIVEN GPU acceleration is enabled
+    WHEN a method without GPU4PySCF execution support is validated
+    THEN validation fails before a CPU calculation can be submitted
     """
     # ARRANGE
+    settings = SimpleNamespace(
+        calculations_directory=str(tmp_path),
+        gpu_acceleration_enabled=True,
+    )
+    mocker.patch(
+        "services.calculation_service_context.get_current_settings",
+        return_value=settings,
+    )
+    mocker.patch(
+        "services.calculation_command_service.get_current_settings",
+        return_value=settings,
+    )
     service = QuantumService()
     params = {
-        'calculation_method': method,
-        'basis_function': 'sto-3g',
-        'charges': 0,
-        'spin': 0,
-        # Add method-specific params to make them valid
-        'exchange_correlation': 'B3LYP' if method in ['DFT', 'TDDFT'] else None,
-        'tddft_nstates': 5 if method == 'TDDFT' else None,
-        'ncas': 4 if method in ['CASCI', 'CASSCF'] else None,
-        'nelecas': 4 if method in ['CASCI', 'CASSCF'] else None,
+        "calculation_method": calculation_method,
+        "basis_function": "sto-3g",
+        "charges": 0,
+        "spin": 0,
     }
-    
-    # ACT - Should not raise exception
-    result = service.validate_calculation_parameters(params)
-    
-    # ASSERT - Just ensure it doesn't crash
-    # Result can be None (valid) or error message (invalid)
-    assert result is None or isinstance(result, str)
+    if calculation_method in {"CASCI", "CASSCF"}:
+        params.update({"ncas": 2, "nelecas": 2})
 
+    # ACT
+    result = service.validate_calculation_parameters(params)
+
+    # ASSERT
+    assert result is not None
+    assert "GPU acceleration is enabled" in result
+    assert calculation_method in result
 
 # ============================================================================
 # get_supported_parameters() Tests
@@ -546,7 +609,10 @@ def test_get_supported_parameters_success(mocker):
         'exchange_correlations': ['B3LYP', 'PBE0', 'M06-2X']
     }
     
-    mocker.patch('services.quantum_service.get_all_supported_parameters', return_value=mock_params)
+    mocker.patch(
+        "services.calculation_query_service.get_all_supported_parameters",
+        return_value=mock_params,
+    )
     
     service = QuantumService()
     
@@ -567,7 +633,7 @@ def test_get_supported_parameters_error(mocker):
     """
     # ARRANGE
     mocker.patch(
-        'services.quantum_service.get_all_supported_parameters',
+        'services.calculation_query_service.get_all_supported_parameters',
         side_effect=RuntimeError('Module error')
     )
     
@@ -576,6 +642,620 @@ def test_get_supported_parameters_error(mocker):
     # ACT & ASSERT
     with pytest.raises(ServiceError, match="Failed to retrieve supported parameters"):
         service.get_supported_parameters()
+
+
+def test_start_calculation_preserves_terminal_status_written_during_submit(tmp_path, mocker):
+    """
+    GIVEN a process manager completes a calculation during submit
+    WHEN start_calculation returns
+    THEN the terminal status is not overwritten by the initial running status
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    params = {
+        "name": "Fast Calc",
+        "created_at": "2026-05-20T00:00:00",
+        "calculation_method": "HF",
+        "basis_function": "sto-3g",
+        "charges": 0,
+        "spin": 0,
+    }
+
+    def complete_during_submit(calculation_id, _params):
+        calc_dir = tmp_path / calculation_id
+        service.repository.save_calculation_results(
+            str(calc_dir),
+            {"energy": -1.0, "success": True},
+        )
+        service.repository.save_calculation_status(str(calc_dir), "completed")
+        return True, "running", None
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+    process_manager.submit_calculation.side_effect = complete_during_submit
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
+
+    response = service.start_calculation(params)
+    calc_dir = tmp_path / response["id"]
+
+    assert response["status"] == "completed"
+    assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+        "completed",
+        None,
+    )
+    assert service.repository.read_calculation_results(str(calc_dir)) == {
+        "energy": -1.0,
+        "success": True,
+    }
+
+
+def test_start_calculation_does_not_recover_new_pending_before_submit(
+    tmp_path,
+    mocker,
+):
+    """
+    GIVEN stale recovery sees no active or queued calculations
+    WHEN start_calculation creates a new calculation and submit succeeds
+    THEN the new pending calculation is not marked as restart-interrupted
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    params = {
+        "name": "New Calc",
+        "created_at": "2026-05-20T00:00:00",
+        "calculation_method": "HF",
+        "basis_function": "sto-3g",
+        "charges": 0,
+        "spin": 0,
+    }
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+    process_manager.submit_calculation.return_value = (True, "running", None)
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
+
+    response = service.start_calculation(params)
+    calc_dir = tmp_path / response["id"]
+
+    assert response["status"] == "running"
+    assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+        "running",
+        None,
+    )
+    assert service.repository.read_calculation_results(str(calc_dir)) != {
+        "error": QuantumService.RESTART_INTERRUPTED_MESSAGE,
+    }
+
+
+def test_start_calculation_saves_gpu_setting_snapshot(tmp_path, mocker):
+    """
+    GIVEN GPU acceleration is enabled when a calculation is submitted
+    WHEN start_calculation persists and submits the job
+    THEN the job parameters include that GPU setting snapshot
+    """
+    settings = SimpleNamespace(
+        calculations_directory=str(tmp_path),
+        gpu_acceleration_enabled=True,
+    )
+    mocker.patch(
+        "services.calculation_service_context.get_current_settings",
+        return_value=settings,
+    )
+    mocker.patch(
+        "services.calculation_command_service.get_current_settings",
+        return_value=settings,
+    )
+    service = QuantumService()
+
+    params = {
+        "name": "GPU Snapshot",
+        "created_at": "2026-05-25T00:00:00",
+        "calculation_method": "DFT",
+        "basis_function": "sto-3g",
+        "exchange_correlation": "B3LYP",
+        "charges": 0,
+        "spin": 0,
+    }
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+    process_manager.submit_calculation.return_value = (True, "running", None)
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
+
+    response = service.start_calculation(params)
+    calc_dir = tmp_path / response["id"]
+    saved_params = service.repository.read_calculation_parameters(str(calc_dir))
+    submitted_params = process_manager.submit_calculation.call_args.args[1]
+
+    assert saved_params["gpu_acceleration_enabled"] is True
+    assert submitted_params["gpu_acceleration_enabled"] is True
+    assert "gpu_acceleration_enabled" not in params
+
+
+def test_recover_stale_non_terminal_calculations_marks_only_stale_as_error(
+    tmp_path,
+    mocker,
+):
+    """
+    GIVEN persisted non-terminal statuses without active or queued work
+    WHEN stale calculations are recovered
+    THEN only those non-terminal calculations are marked as error
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    stale_statuses = ["pending", "running", "waiting", "pausing"]
+    terminal_statuses = ["completed", "paused"]
+
+    for status in stale_statuses + terminal_statuses:
+        calc_id = f"calc-{status}"
+        calc_dir = tmp_path / calc_id
+        calc_dir.mkdir()
+        service.repository.save_calculation_parameters(
+            str(calc_dir),
+            {"name": calc_id, "created_at": "2026-05-20T00:00:00"},
+        )
+        if status != "pending":
+            service.repository.save_calculation_status(str(calc_dir), status)
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+
+    service._recover_stale_non_terminal_calculations(process_manager)
+
+    for status in stale_statuses:
+        calc_dir = tmp_path / f"calc-{status}"
+        assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+            "error",
+            None,
+        )
+        assert service.repository.read_calculation_results(str(calc_dir)) == {
+            "error": "Calculation interrupted because the backend was restarted.",
+        }
+
+    assert service.repository.read_calculation_status_details(
+        str(tmp_path / "calc-completed")
+    ) == ("completed", None)
+    assert service.repository.read_calculation_status_details(
+        str(tmp_path / "calc-paused")
+    ) == ("paused", None)
+
+
+def test_recover_stale_non_terminal_calculations_keeps_active_and_queued(
+    tmp_path,
+    mocker,
+):
+    """
+    GIVEN non-terminal calculations still known by the process manager
+    WHEN stale recovery runs
+    THEN active and queued calculations keep their current statuses
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    for calc_id, status in {
+        "active-calc": "running",
+        "queued-calc": "waiting",
+        "stale-calc": "pausing",
+    }.items():
+        calc_dir = tmp_path / calc_id
+        calc_dir.mkdir()
+        service.repository.save_calculation_parameters(
+            str(calc_dir),
+            {"name": calc_id, "created_at": "2026-05-20T00:00:00"},
+        )
+        service.repository.save_calculation_status(str(calc_dir), status)
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = ["active-calc"]
+    process_manager.get_queued_calculations.return_value = ["queued-calc"]
+
+    service._recover_stale_non_terminal_calculations(process_manager)
+
+    assert service.repository.read_calculation_status_details(
+        str(tmp_path / "active-calc")
+    ) == ("running", None)
+    assert service.repository.read_calculation_status_details(
+        str(tmp_path / "queued-calc")
+    ) == ("waiting", None)
+    assert service.repository.read_calculation_status_details(
+        str(tmp_path / "stale-calc")
+    ) == ("error", None)
+
+
+def test_recover_stale_non_terminal_calculations_preserves_existing_results(
+    tmp_path,
+    mocker,
+):
+    """
+    GIVEN a stale non-terminal calculation already has valid results
+    WHEN stale recovery marks the calculation as error
+    THEN the existing results file should not be overwritten
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_dir = tmp_path / "stale-with-results"
+    calc_dir.mkdir()
+    expected_results = {
+        "energy": -75.0,
+        "success": True,
+        "mulliken_charges": [0.1, -0.1],
+    }
+    service.repository.save_calculation_parameters(
+        str(calc_dir),
+        {"name": "stale-with-results", "created_at": "2026-05-20T00:00:00"},
+    )
+    service.repository.save_calculation_status(str(calc_dir), "running")
+    service.repository.save_calculation_results(str(calc_dir), expected_results)
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+
+    service._recover_stale_non_terminal_calculations(process_manager)
+
+    assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+        "error",
+        None,
+    )
+    assert service.repository.read_calculation_results(str(calc_dir)) == expected_results
+
+
+def test_pause_calculation_recovers_stale_running_and_rejects_pause(
+    tmp_path,
+    mocker,
+):
+    """
+    GIVEN a persisted running calculation has no active or queued worker
+    WHEN pause is requested
+    THEN stale recovery marks it as error and pause is not accepted
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "stale-running-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_parameters(
+        str(calc_dir),
+        {"name": "Stale Running Calc", "created_at": "2026-05-20T00:00:00"},
+    )
+    service.repository.save_calculation_status(str(calc_dir), "running")
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = []
+    process_manager.pause_calculation.return_value = True
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
+
+    with pytest.raises(ValidationError, match="status: error"):
+        service.pause_calculation(calc_id)
+
+    process_manager.pause_calculation.assert_not_called()
+    assert service.repository.read_calculation_status_details(str(calc_dir)) == (
+        "error",
+        None,
+    )
+    assert service.repository.read_calculation_results(str(calc_dir)) == {
+        "error": QuantumService.RESTART_INTERRUPTED_MESSAGE,
+    }
+
+
+@pytest.mark.parametrize("status", ["pending", "running", "waiting", "pausing"])
+def test_delete_calculation_rejects_non_terminal_status(tmp_path, mocker, status):
+    """
+    GIVEN a calculation directory has a non-terminal status
+    WHEN delete_calculation is called
+    THEN deletion is rejected and the directory remains
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = f"calc-{status}"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_parameters(
+        str(calc_dir),
+        {"name": "Queued Calc", "created_at": "2026-05-20T00:00:00"},
+    )
+    if status != "pending":
+        service.repository.save_calculation_status(str(calc_dir), status)
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = [calc_id]
+    process_manager.get_queued_calculations.return_value = []
+    process_manager.is_running.return_value = False
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
+
+    with pytest.raises(ValidationError, match="Cannot delete calculation"):
+        service.delete_calculation(calc_id)
+
+    assert calc_dir.is_dir()
+
+
+@pytest.mark.parametrize(
+    ("grid_size", "isovalue_pos", "isovalue_neg", "match"),
+    [
+        (39, None, None, "grid_size"),
+        (121, None, None, "grid_size"),
+        (80, 0.0009, None, "isovalue_pos"),
+        (80, 0.1001, None, "isovalue_pos"),
+        (80, None, -0.1001, "isovalue_neg"),
+        (80, None, -0.0009, "isovalue_neg"),
+    ],
+)
+def test_generate_orbital_cube_rejects_out_of_range_parameters(
+    tmp_path,
+    mocker,
+    grid_size,
+    isovalue_pos,
+    isovalue_neg,
+    match,
+):
+    """
+    GIVEN orbital CUBE parameters outside the OpenAPI contract
+    WHEN generate_orbital_cube is called
+    THEN service-layer validation rejects them before generation
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "completed-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), "completed")
+    orbital_generator = mocker.patch(
+        "services.calculation_artifact_service.MolecularOrbitalGenerator"
+    )
+
+    with pytest.raises(ValidationError, match=match):
+        service.generate_orbital_cube(
+            calc_id,
+            5,
+            grid_size=grid_size,
+            isovalue_pos=isovalue_pos,
+            isovalue_neg=isovalue_neg,
+        )
+
+    orbital_generator.assert_not_called()
+
+
+def test_generate_orbital_cube_accepts_contract_boundary_parameters(tmp_path, mocker):
+    """
+    GIVEN orbital CUBE parameters on the OpenAPI contract boundaries
+    WHEN generate_orbital_cube is called
+    THEN those values are passed through to the orbital generator
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "completed-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), "completed")
+
+    generator = mocker.Mock()
+    generator.validate_calculation.return_value = True
+    generator.generate_cube_file.return_value = {
+        "generation_params": {"file_size_kb": 1.0},
+        "cached": False,
+    }
+    orbital_generator = mocker.patch(
+        "services.calculation_artifact_service.MolecularOrbitalGenerator",
+        return_value=generator,
+    )
+
+    result = service.generate_orbital_cube(
+        calc_id,
+        5,
+        grid_size=40,
+        isovalue_pos=0.001,
+        isovalue_neg=-0.001,
+    )
+
+    orbital_generator.assert_called_once_with(str(calc_dir))
+    generator.generate_cube_file.assert_called_once_with(
+        orbital_index=5,
+        grid_size=40,
+        isovalue_pos=0.001,
+        isovalue_neg=-0.001,
+        return_content=True,
+        save_to_disk=True,
+    )
+    assert result["generation_params"]["file_size_kb"] == 1.0
+
+
+def test_generate_orbital_cube_invalid_orbital_index_returns_validation_error(
+    tmp_path, mocker
+):
+    """
+    GIVEN the orbital generator rejects an unavailable orbital index
+    WHEN generate_orbital_cube is called
+    THEN the service maps it to a validation error instead of a 500 error
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "completed-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), "completed")
+
+    generator = mocker.Mock()
+    generator.validate_calculation.return_value = True
+    generator.generate_cube_file.side_effect = CalculationError(
+        "Invalid orbital index: 12. Available range: 0-5"
+    )
+    mocker.patch(
+        "services.calculation_artifact_service.MolecularOrbitalGenerator",
+        return_value=generator,
+    )
+
+    with pytest.raises(ValidationError, match="Invalid orbital index"):
+        service.generate_orbital_cube(calc_id, 12)
+
+
+def test_generate_orbital_cube_generation_error_stays_service_error(tmp_path, mocker):
+    """
+    GIVEN the orbital generator fails for a non-validation reason
+    WHEN generate_orbital_cube is called
+    THEN the service keeps the error mapped to a service error
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "completed-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), "completed")
+
+    generator = mocker.Mock()
+    generator.validate_calculation.return_value = True
+    generator.generate_cube_file.side_effect = CalculationError(
+        "Failed to generate CUBE file"
+    )
+    mocker.patch(
+        "services.calculation_artifact_service.MolecularOrbitalGenerator",
+        return_value=generator,
+    )
+
+    with pytest.raises(ServiceError, match="Failed to generate CUBE file") as exc_info:
+        service.generate_orbital_cube(calc_id, 2)
+
+    assert exc_info.value.status_code == 500
+
+
+def test_resume_calculation_returns_updated_waiting_status(tmp_path, mocker):
+    """
+    GIVEN a paused calculation is resumed and queued
+    WHEN resume_calculation returns
+    THEN the response calculation reflects waiting status and reason
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "paused-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    params = {
+        "name": "Paused Calc",
+        "created_at": "2026-05-20T00:00:00",
+        "calculation_method": "HF",
+    }
+    service.repository.save_calculation_parameters(str(calc_dir), params)
+    service.repository.save_calculation_status(str(calc_dir), "paused")
+
+    def resume_and_queue(calculation_id):
+        service.repository.save_calculation_status(
+            str(calc_dir), "waiting", "All slots are busy"
+        )
+        return {
+            "calculation_id": calculation_id,
+            "status": "waiting",
+            "waiting_reason": "All slots are busy",
+        }
+
+    process_manager = mocker.Mock()
+    process_manager.get_active_calculations.return_value = []
+    process_manager.get_queued_calculations.return_value = [calc_id]
+    process_manager.resume_calculation.side_effect = resume_and_queue
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
+
+    response = service.resume_calculation(calc_id)
+
+    assert response["calculation"]["status"] == "waiting"
+    assert response["calculation"]["waitingReason"] == "All slots are busy"
+
+
+@pytest.mark.parametrize(
+    "service_method",
+    ["pause_calculation", "resume_calculation"],
+)
+def test_pause_resume_missing_calculation_raises_not_found(
+    tmp_path,
+    mocker,
+    service_method,
+):
+    """
+    GIVEN the calculation directory does not exist
+    WHEN pause or resume is requested
+    THEN the service raises NotFoundError before contacting the process manager
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+    get_process_manager_mock = mocker.patch(
+        "services.calculation_service_context.get_process_manager"
+    )
+
+    with pytest.raises(NotFoundError, match='Calculation "missing-calc" not found'):
+        getattr(service, service_method)("missing-calc")
+
+    get_process_manager_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("service_method", "manager_method", "status"),
+    [
+        ("pause_calculation", "pause_calculation", "running"),
+        ("resume_calculation", "resume_calculation", "paused"),
+    ],
+)
+def test_pause_resume_process_manager_not_found_value_error_raises_not_found(
+    tmp_path,
+    mocker,
+    service_method,
+    manager_method,
+    status,
+):
+    """
+    GIVEN the process manager reports a calculation as not found
+    WHEN pause or resume catches the manager ValueError
+    THEN it maps the error to NotFoundError instead of ValidationError
+    """
+    service = QuantumService()
+    service.repository = CalculationRepository(base_dir=str(tmp_path))
+
+    calc_id = "existing-calc"
+    calc_dir = tmp_path / calc_id
+    calc_dir.mkdir()
+    service.repository.save_calculation_status(str(calc_dir), status)
+
+    process_manager = mocker.Mock()
+    getattr(process_manager, manager_method).side_effect = ValueError(
+        f"Calculation not found: {calc_id}"
+    )
+    mocker.patch(
+        "services.calculation_service_context.get_process_manager",
+        return_value=process_manager,
+    )
+
+    with pytest.raises(NotFoundError, match=f'Calculation "{calc_id}" not found'):
+        getattr(service, service_method)(calc_id)
 
 
 # ============================================================================

@@ -1,0 +1,396 @@
+"""
+OpenAPI contract tests.
+
+These tests ensure that public API routes and OpenAPI definitions stay aligned:
+- HTTP method + path contracts
+- Query parameter names
+"""
+
+from __future__ import annotations
+
+import ast
+from collections.abc import Iterator
+import re
+from functools import lru_cache
+from pathlib import Path
+
+from fastapi.routing import APIRoute
+import yaml
+from app import create_fastapi_app
+from quantum_calc.method_defaults import PARAMETER_CONSTRAINTS
+
+
+HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
+
+PYTHON_DIR = Path(__file__).resolve().parents[3]
+OPENAPI_PATH = PYTHON_DIR.parent / "api-spec" / "openapi.yaml"
+ORBITAL_GENERATOR_PATH = PYTHON_DIR / "quantum_calc" / "orbital_generator.py"
+
+_OPENAPI_PATH_PARAM_PATTERN = re.compile(r"\{[^}]+\}")
+AUTH_SECURITY_SCHEME_NAME = "AuthToken"
+AUTH_SECURITY_REQUIREMENT = [{AUTH_SECURITY_SCHEME_NAME: []}]
+AUTH_TOKEN_HEADER_PARAMETER_REF = "#/components/parameters/AuthTokenHeader"
+UNAUTHORIZED_RESPONSE_REF = "#/components/responses/UnauthorizedError"
+
+
+def _is_public_contract_path(path: str) -> bool:
+    if path == "/health":
+        return True
+
+    if not path.startswith("/api/"):
+        return False
+
+    # Debug endpoints are intentionally internal and not part of OpenAPI contract.
+    return not path.startswith("/api/debug/")
+
+
+def _normalize_impl_path(path: str) -> str:
+    return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
+
+
+def _normalize_openapi_path(path: str) -> str:
+    return _OPENAPI_PATH_PARAM_PATTERN.sub("{}", path)
+
+
+def _extract_route_query_params(route: APIRoute) -> set[str]:
+    query_params: set[str] = set()
+    for field in route.dependant.query_params:
+        name = getattr(field, "alias", None) or getattr(field, "name", None)
+        if isinstance(name, str):
+            query_params.add(name)
+    return query_params
+
+
+@lru_cache(maxsize=1)
+def _extract_implementation_contract() -> (
+    tuple[set[tuple[str, str]], dict[tuple[str, str], set[str]]]
+):
+    routes: set[tuple[str, str]] = set()
+    query_params_by_route: dict[tuple[str, str], set[str]] = {}
+
+    app = create_fastapi_app(server_port=5000, test_config={"TESTING": True})
+    for route in app.routes:
+        if not isinstance(route, APIRoute):
+            continue
+
+        if not _is_public_contract_path(route.path):
+            continue
+
+        normalized_path = _normalize_impl_path(route.path)
+        query_params = _extract_route_query_params(route)
+        for method in (route.methods or set()) & HTTP_METHODS:
+            key = (method, normalized_path)
+            routes.add(key)
+            query_params_by_route[key] = query_params
+
+    return routes, query_params_by_route
+
+
+@lru_cache(maxsize=1)
+def _extract_openapi_contract() -> (
+    tuple[set[tuple[str, str]], dict[tuple[str, str], set[str]]]
+):
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    path_items = spec.get("paths", {})
+
+    routes: set[tuple[str, str]] = set()
+    query_params_by_route: dict[tuple[str, str], set[str]] = {}
+
+    for raw_path, path_item in path_items.items():
+        if not _is_public_contract_path(raw_path):
+            continue
+
+        normalized_path = _normalize_openapi_path(raw_path)
+        path_level_parameters = path_item.get("parameters", [])
+
+        for method, operation in path_item.items():
+            upper_method = method.upper()
+            if upper_method not in HTTP_METHODS:
+                continue
+
+            key = (upper_method, normalized_path)
+            routes.add(key)
+
+            all_parameters = []
+            if isinstance(path_level_parameters, list):
+                all_parameters.extend(path_level_parameters)
+            if isinstance(operation, dict) and isinstance(
+                operation.get("parameters"), list
+            ):
+                all_parameters.extend(operation["parameters"])
+
+            query_names = {
+                parameter["name"]
+                for parameter in all_parameters
+                if isinstance(parameter, dict)
+                and parameter.get("in") == "query"
+                and isinstance(parameter.get("name"), str)
+            }
+            query_params_by_route[key] = query_names
+
+    return routes, query_params_by_route
+
+
+def _iter_openapi_public_operations(
+    spec: dict,
+) -> Iterator[tuple[tuple[str, str], dict, dict]]:
+    for raw_path, path_item in spec.get("paths", {}).items():
+        if not _is_public_contract_path(raw_path):
+            continue
+
+        normalized_path = _normalize_openapi_path(raw_path)
+        for method, operation in path_item.items():
+            upper_method = method.upper()
+            if upper_method not in HTTP_METHODS:
+                continue
+
+            yield (upper_method, normalized_path), path_item, operation
+
+
+def _format_route(route: tuple[str, str]) -> str:
+    method, path = route
+    return f"{method} {path}"
+
+
+def _resolve_schema(spec: dict, schema: dict) -> dict:
+    ref = schema.get("$ref")
+    if not isinstance(ref, str):
+        return schema
+
+    prefix = "#/components/schemas/"
+    assert ref.startswith(prefix), f"Unsupported schema reference: {ref}"
+    schema_name = ref.removeprefix(prefix)
+    return spec["components"]["schemas"][schema_name]
+
+
+def _extract_string_assignments(path: Path, variable_name: str) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    values: set[str] = set()
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not isinstance(node.value, ast.Constant) or not isinstance(
+            node.value.value, str
+        ):
+            continue
+        if any(
+            isinstance(target, ast.Name) and target.id == variable_name
+            for target in node.targets
+        ):
+            values.add(node.value.value)
+
+    return values
+
+
+def test_openapi_and_implementation_have_same_public_routes() -> None:
+    impl_routes, _ = _extract_implementation_contract()
+    openapi_routes, _ = _extract_openapi_contract()
+
+    only_in_impl = sorted(impl_routes - openapi_routes)
+    only_in_openapi = sorted(openapi_routes - impl_routes)
+
+    issues = []
+    if only_in_impl:
+        formatted = ", ".join(_format_route(route) for route in only_in_impl)
+        issues.append(f"Implemented but missing in OpenAPI: {formatted}")
+    if only_in_openapi:
+        formatted = ", ".join(_format_route(route) for route in only_in_openapi)
+        issues.append(f"Defined in OpenAPI but missing in implementation: {formatted}")
+
+    assert not issues, "\n".join(issues)
+
+
+def test_openapi_defines_auth_token_security_contract() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    components = spec["components"]
+
+    auth_scheme = components["securitySchemes"][AUTH_SECURITY_SCHEME_NAME]
+    assert auth_scheme["type"] == "apiKey"
+    assert auth_scheme["in"] == "header"
+    assert auth_scheme["name"] == "X-Auth-Token"
+
+    auth_header = components["parameters"]["AuthTokenHeader"]
+    assert auth_header["name"] == "X-Auth-Token"
+    assert auth_header["in"] == "header"
+    assert auth_header["required"] is False
+    assert auth_header["schema"] == {"type": "string"}
+
+    unauthorized_response = components["responses"]["UnauthorizedError"]
+    assert unauthorized_response["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
+
+
+def test_openapi_public_operations_require_auth_token_and_document_401() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    missing_security = []
+    missing_header = []
+    missing_unauthorized_response = []
+
+    for route, path_item, operation in _iter_openapi_public_operations(spec):
+        if operation.get("security") != AUTH_SECURITY_REQUIREMENT:
+            missing_security.append(_format_route(route))
+
+        path_parameters = path_item.get("parameters", [])
+        operation_parameters = operation.get("parameters", [])
+        has_auth_header = any(
+            parameter.get("$ref") == AUTH_TOKEN_HEADER_PARAMETER_REF
+            for parameter in [*path_parameters, *operation_parameters]
+            if isinstance(parameter, dict)
+        )
+        if not has_auth_header:
+            missing_header.append(_format_route(route))
+
+        responses = operation.get("responses", {})
+        if responses.get("401") != {"$ref": UNAUTHORIZED_RESPONSE_REF}:
+            missing_unauthorized_response.append(_format_route(route))
+
+    issues = []
+    if missing_security:
+        issues.append("Missing AuthToken security: " + ", ".join(missing_security))
+    if missing_header:
+        issues.append(
+            "Missing X-Auth-Token header parameter: " + ", ".join(missing_header)
+        )
+    if missing_unauthorized_response:
+        issues.append(
+            "Missing 401 Unauthorized response: "
+            + ", ".join(missing_unauthorized_response)
+        )
+
+    assert not issues, "\n".join(issues)
+
+
+def test_openapi_excludes_development_api_docs_routes_from_public_contract() -> None:
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+
+    assert "/api-docs" not in spec["paths"]
+    assert "/api-docs/spec.json" not in spec["paths"]
+
+
+def test_openapi_and_implementation_have_same_query_parameter_names() -> None:
+    impl_routes, impl_query_params = _extract_implementation_contract()
+    openapi_routes, openapi_query_params = _extract_openapi_contract()
+
+    mismatches = []
+    for route in sorted(impl_routes & openapi_routes):
+        impl_query = impl_query_params.get(route, set())
+        openapi_query = openapi_query_params.get(route, set())
+
+        only_in_impl = sorted(impl_query - openapi_query)
+        only_in_openapi = sorted(openapi_query - impl_query)
+
+        if only_in_impl or only_in_openapi:
+            mismatch_lines = [f"{_format_route(route)}:"]
+            if only_in_impl:
+                mismatch_lines.append(
+                    f"  - Implemented but undocumented query params: {', '.join(only_in_impl)}"
+                )
+            if only_in_openapi:
+                mismatch_lines.append(
+                    f"  - Documented but unused query params: {', '.join(only_in_openapi)}"
+                )
+            mismatches.append("\n".join(mismatch_lines))
+
+    assert not mismatches, "\n".join(mismatches)
+
+
+def test_openapi_active_space_limits_match_runtime_constraints() -> None:
+    """CASCI/CASSCF OpenAPI limits must match runtime validation constraints."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    schemas = spec["components"]["schemas"]
+
+    for schema_name in ("CASCICalculationRequest", "CASSCFCalculationRequest"):
+        properties = schemas[schema_name]["allOf"][1]["properties"]
+        for param_name in ("ncas", "nelecas", "max_cycle_micro"):
+            assert (
+                properties[param_name]["maximum"]
+                == PARAMETER_CONSTRAINTS[param_name]["max"]
+            )
+
+
+def test_list_calculations_method_filter_matches_calculation_method_schema() -> None:
+    """The list endpoint method filter must allow every supported calculation method."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    operation = spec["paths"]["/api/quantum/calculations"]["get"]
+    method_parameter = next(
+        parameter
+        for parameter in operation["parameters"]
+        if parameter["name"] == "calculation_method"
+    )
+
+    parameter_schema = _resolve_schema(spec, method_parameter["schema"])
+    calculation_method_schema = spec["components"]["schemas"]["CalculationMethod"]
+
+    assert parameter_schema["enum"] == calculation_method_schema["enum"]
+
+
+def test_openapi_orbital_type_enum_allows_runtime_orbital_generator_values() -> None:
+    """OpenAPI must allow every orbital_type emitted by MolecularOrbitalGenerator."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    orbital_type_schema = spec["components"]["schemas"]["OrbitalInfo"]["properties"][
+        "orbital_type"
+    ]
+
+    runtime_orbital_types = _extract_string_assignments(
+        ORBITAL_GENERATOR_PATH,
+        "orbital_type",
+    )
+
+    assert runtime_orbital_types <= set(orbital_type_schema["enum"])
+
+
+def test_delete_calculation_documents_validation_error_response() -> None:
+    """DELETE calculation must document the 400 response used for non-terminal statuses."""
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    responses = spec["paths"]["/api/quantum/calculations/{calculationId}"]["delete"][
+        "responses"
+    ]
+
+    assert responses["400"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ErrorResponse"
+    }
+
+
+def test_openapi_additional_properties_false_matches_pydantic_extra_forbid() -> None:
+    """OpenAPI schemas with additionalProperties: false must have extra='forbid' in Pydantic.
+
+    This guards against codegen drift: if the OpenAPI spec declares that a
+    request schema rejects unknown properties, the generated Pydantic model
+    must enforce the same constraint via model_config extra='forbid'.
+    """
+    import generated_models
+
+    spec = yaml.safe_load(OPENAPI_PATH.read_text(encoding="utf-8"))
+    schemas = spec.get("components", {}).get("schemas", {})
+
+    hardened_schemas: list[str] = [
+        name
+        for name, schema in schemas.items()
+        if isinstance(schema, dict) and schema.get("additionalProperties") is False
+    ]
+
+    assert (
+        hardened_schemas
+    ), "Expected at least one schema with additionalProperties: false"
+
+    missing_extra_forbid: list[str] = []
+    for schema_name in hardened_schemas:
+        model_class = getattr(generated_models, schema_name, None)
+        if model_class is None:
+            missing_extra_forbid.append(f"{schema_name}: not found in generated_models")
+            continue
+
+        config = getattr(model_class, "model_config", {})
+        extra_value = config.get("extra")
+        if extra_value != "forbid":
+            missing_extra_forbid.append(
+                f"{schema_name}: expected extra='forbid', got extra={extra_value!r}"
+            )
+
+    assert not missing_extra_forbid, (
+        "OpenAPI additionalProperties: false / Pydantic extra='forbid' mismatch:\n"
+        + "\n".join(f"  - {item}" for item in missing_extra_forbid)
+    )

@@ -4,6 +4,7 @@
 
 import requests
 import logging
+from urllib.parse import quote as _urlquote
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
@@ -29,6 +30,10 @@ class PubChemNotFoundError(PubChemError):
     """Exception for 404 Not Found errors."""
     pass
 
+# Keep in sync with VALID_SEARCH_TYPES in services/pubchem_service.py (defense-in-depth).
+_ALLOWED_SEARCH_TYPES: frozenset[str] = frozenset({'name', 'cid', 'formula'})
+
+
 class PubChemClient:
     """Client for interacting with the PubChem PUG REST API."""
 
@@ -44,14 +49,15 @@ class PubChemClient:
             response = self.session.get(url, timeout=self.timeout)
             
             if response.status_code == 404:
-                raise PubChemNotFoundError(f"Resource not found at {url}", status_code=404)
+                raise PubChemNotFoundError("Resource not found", status_code=404)
             
             response.raise_for_status()
             return response
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request to {url} failed: {e}")
-            raise PubChemError(f"API request failed: {e}")
+            status = getattr(getattr(e, 'response', None), 'status_code', None)
+            logger.error(f"PubChem request failed: {type(e).__name__} (status={status})")
+            raise PubChemError("API request failed") from None
 
     def search_compound(self, query: str, search_type: str = "name") -> Optional[CompoundData]:
         try:
@@ -70,20 +76,24 @@ class PubChemClient:
             return CompoundData(**compound_info)
 
         except PubChemNotFoundError:
-             # 見つからなかった場合はそのまま上位に伝播させる
+            # Let not-found errors propagate to the service layer unchanged.
             raise
         except (ValueError, KeyError, TypeError) as e:
-            logger.error(f"Error processing data for query '{query}': {e}")
-            raise PubChemError(f"Failed to process data: {e}")
+            logger.error(f"Error processing compound data: {type(e).__name__}")
+            raise PubChemError("Failed to process compound data") from None
 
     def _find_cid(self, query: str, search_type: str) -> Optional[int]:
+        if search_type not in _ALLOWED_SEARCH_TYPES:
+            raise PubChemError("Invalid search type")
+
         if search_type == "cid":
             try:
                 return int(query)
             except ValueError:
-                raise PubChemError(f"Invalid CID format: {query}")
+                raise PubChemError("Invalid CID format") from None
 
-        search_path = f"compound/{search_type}/{query.strip()}/cids/JSON"
+        encoded_query = _urlquote(query.strip(), safe="")
+        search_path = f"compound/{search_type}/{encoded_query}/cids/JSON"
         url = f"{self.BASE_URL}/{search_path}"
         
         try:
@@ -91,12 +101,12 @@ class PubChemClient:
             data = response.json()
             cids = data.get('IdentifierList', {}).get('CID')
             if not cids:
-                logger.info(f"No CID found for query: {query}")
+                logger.info(f"No CID found (search_type={search_type})")
                 return None
             return cids[0]
         except PubChemNotFoundError:
-            # 404の場合は単に見つからなかったケースとしてNoneを返す
-            logger.warning(f"Could not find CID for '{query}' (type: {search_type})")
+            # Treat 404 as a regular "not found" result for CID lookup.
+            logger.warning(f"Could not find CID (type: {search_type})")
             return None
 
     def _get_compound_properties(self, cid: int) -> Dict[str, Any]:
@@ -158,65 +168,3 @@ class PubChemClient:
             raise PubChemError("Could not parse SDF atom block.")
 
         return atoms
-
-    def get_compound_smiles(self, query: str, search_type: str = "name") -> Dict[str, Any]:
-        """
-        Get the canonical SMILES and properties for a compound.
-
-        Args:
-            query: Search query (compound name, CID, or formula)
-            search_type: Type of search ('name', 'cid', or 'formula'). Default: 'name'
-
-        Returns:
-            Dict containing SMILES and compound information:
-            {
-                'cid': int,
-                'smiles': str,
-                'iupac_name': str,
-                'molecular_formula': str,
-                'molecular_weight': float
-            }
-
-        Raises:
-            PubChemNotFoundError: If compound not found
-            PubChemError: For other API errors
-        """
-        try:
-            # Find CID first
-            cid = self._find_cid(query, search_type)
-            if cid is None:
-                raise PubChemNotFoundError(f"No compound found for query: {query}")
-
-            # Get SMILES and properties
-            # Note: When requesting IsomericSMILES, PubChem returns it as "SMILES" in the response
-            prop_url = f"{self.BASE_URL}/compound/cid/{cid}/property/IsomericSMILES,IUPACName,MolecularFormula,MolecularWeight/JSON"
-            response = self._make_request(prop_url)
-            data = response.json()
-
-            logger.debug(f"PubChem response for CID {cid}: {data}")
-
-            props = data.get('PropertyTable', {}).get('Properties', [{}])[0]
-
-            # PubChem returns SMILES as "SMILES" when we request "IsomericSMILES"
-            smiles = props.get('SMILES')
-
-            result = {
-                'cid': cid,
-                'smiles': smiles,
-                'iupac_name': props.get('IUPACName', 'Unknown'),
-                'molecular_formula': props.get('MolecularFormula', 'Unknown'),
-                'molecular_weight': props.get('MolecularWeight')
-            }
-
-            if not result['smiles']:
-                logger.error(f"No SMILES in response. Available properties: {props.keys()}")
-                raise PubChemError(f"No SMILES found for CID {cid}. Available properties: {list(props.keys())}")
-
-            logger.info(f"Retrieved SMILES for '{query}' (CID: {cid}): {result['smiles']}")
-            return result
-
-        except PubChemNotFoundError:
-            raise
-        except (ValueError, KeyError, TypeError) as e:
-            logger.error(f"Error processing SMILES data for query '{query}': {e}")
-            raise PubChemError(f"Failed to process SMILES data: {e}")

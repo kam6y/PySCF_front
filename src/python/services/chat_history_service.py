@@ -6,7 +6,7 @@ providing a unified interface for both API endpoints and potential future featur
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 
 from database.chat_history import ChatHistoryDatabase
 from .exceptions import ServiceError, ValidationError
@@ -62,27 +62,6 @@ class ChatHistoryService:
         except Exception as e:
             logger.error(f"Failed to create chat session: {e}", exc_info=True)
             raise ServiceError(f'Failed to create chat session: {str(e)}')
-
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """
-        Get a chat session by ID.
-
-        Args:
-            session_id: Session ID to retrieve
-
-        Returns:
-            Dict containing session data, or None if not found
-
-        Raises:
-            ServiceError: If retrieval fails
-        """
-        try:
-            logger.debug(f"Getting chat session: {session_id}")
-            return self.db.get_session(session_id)
-
-        except Exception as e:
-            logger.error(f"Failed to get chat session: {e}", exc_info=True)
-            raise ServiceError(f'Failed to get chat session: {str(e)}')
 
     def list_sessions(self, limit: int = 100, offset: int = 0) -> Dict[str, Any]:
         """
@@ -228,27 +207,6 @@ class ChatHistoryService:
             logger.error(f"Failed to add message: {e}", exc_info=True)
             raise ServiceError(f'Failed to add message: {str(e)}')
 
-    def get_messages(self, session_id: str) -> List[Dict[str, Any]]:
-        """
-        Get all messages for a chat session.
-
-        Args:
-            session_id: Session ID to get messages for
-
-        Returns:
-            List of message dicts
-
-        Raises:
-            ServiceError: If retrieval fails
-        """
-        try:
-            logger.debug(f"Getting messages for session: {session_id}")
-            return self.db.get_messages(session_id)
-
-        except Exception as e:
-            logger.error(f"Failed to get messages: {e}", exc_info=True)
-            raise ServiceError(f'Failed to get messages: {str(e)}')
-
     def get_session_with_messages(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
         Get a session with all its messages.
@@ -269,26 +227,6 @@ class ChatHistoryService:
         except Exception as e:
             logger.error(f"Failed to get session with messages: {e}", exc_info=True)
             raise ServiceError(f'Failed to get session with messages: {str(e)}')
-
-    # Utility methods
-
-    def get_stats(self) -> Dict[str, int]:
-        """
-        Get database statistics.
-
-        Returns:
-            Dict with session_count and message_count
-
-        Raises:
-            ServiceError: If retrieval fails
-        """
-        try:
-            return self.db.get_stats()
-
-        except Exception as e:
-            logger.error(f"Failed to get stats: {e}", exc_info=True)
-            raise ServiceError(f'Failed to get stats: {str(e)}')
-
 
 # Global service instance (lazy-loaded)
 _chat_history_service: Optional[ChatHistoryService] = None

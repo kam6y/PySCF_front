@@ -1,13 +1,11 @@
 import { app, Menu, shell, dialog } from 'electron';
 import path from 'node:path';
+import packageJson from '../../package.json';
 
 /**
  * Aboutダイアログを表示する関数
  */
 export const showAboutDialog = (): void => {
-  // In dev: dist/main/menu.js -> ../../package.json
-  const packageJson = require('../../package.json');
-
   const aboutMessage = `${packageJson.description}
 
 Version: ${packageJson.version}
@@ -21,7 +19,7 @@ Key Features:
 
 Tech Stack:
 Frontend: Electron, React, TypeScript
-Backend: Python, Flask, PySCF, RDKit
+Backend: Python, FastAPI, PySCF, RDKit
 
 License: ${packageJson.license}
 Author: ${packageJson.author}
@@ -113,7 +111,8 @@ export const createApplicationMenu = (): void => {
       submenu: [
         { role: 'reload' as const },
         { role: 'forceReload' as const },
-        { role: 'toggleDevTools' as const },
+        // Only expose DevTools in development builds
+        ...(!app.isPackaged ? [{ role: 'toggleDevTools' as const }] : []),
         { type: 'separator' as const },
         { role: 'resetZoom' as const },
         { role: 'zoomIn' as const },
@@ -145,14 +144,12 @@ export const createApplicationMenu = (): void => {
         {
           label: 'Learn More',
           click: async () => {
-            const packageJson = require('../../package.json');
             await shell.openExternal(packageJson.homepage);
           },
         },
         {
           label: 'Report Issue',
           click: async () => {
-            const packageJson = require('../../package.json');
             await shell.openExternal(packageJson.bugs.url);
           },
         },

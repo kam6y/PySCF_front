@@ -1,5 +1,11 @@
-import { BrowserWindow, app, screen } from 'electron';
+import { BrowserWindow, app } from 'electron';
 import path from 'node:path';
+import {
+  getMainRendererEntry,
+  installNavigationGuards,
+} from './renderer-entry';
+import { hardenSession } from './session-hardening';
+import { registerBackendAuthInjection } from './backend-auth-injection';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -7,12 +13,8 @@ export const getMainWindow = (): BrowserWindow | null => {
   return mainWindow;
 };
 
-export const setMainWindow = (window: BrowserWindow | null): void => {
-  mainWindow = window;
-};
-
 export const createWindow = (
-  flaskPort: number,
+  backendPort: number,
   authToken: string
 ): BrowserWindow => {
   // Create the browser window.
@@ -32,7 +34,7 @@ export const createWindow = (
       preload: path.join(__dirname, 'preload.js'), // dist/preload.js
       nodeIntegration: false,
       contextIsolation: true,
-      devTools: true,
+      devTools: !app.isPackaged,
     },
   });
 
@@ -83,24 +85,44 @@ export const createWindow = (
     mainWindow = null;
   });
 
-  // ポート番号をURLパラメータとして渡す
-  // 認証トークンはセキュリティのためIPC経由で送信
-  // dist/index.html
+  // M-003: port-pinned CSP; must run before any content loads.
+  hardenSession(newWindow.webContents.session, app.isPackaged, backendPort);
+
+  // SEC-002: inject the auth token into renderer->backend requests at the
+  // network layer so the token never enters the renderer/DOM world. Registered
+  // before any content loads; backendPort and authToken are valid here (resolved
+  // in main.ts before createWindow is called).
+  registerBackendAuthInjection(
+    newWindow.webContents.session,
+    backendPort,
+    authToken
+  );
+
   const htmlPath = path.join(__dirname, 'index.html');
-  newWindow.loadFile(htmlPath, {
-    query: {
-      flask_port: String(flaskPort),
-    },
+  const rendererEntry = getMainRendererEntry({
+    backendPort,
+    htmlPath,
+    isPackaged: app.isPackaged,
+    rendererUrl: process.env.ELECTRON_RENDERER_URL,
   });
 
-  // ウィンドウのロード完了後にIPCで認証トークンを送信
-  // リロード時にもトークンを送信するため 'on' を使用
-  newWindow.webContents.on('did-finish-load', () => {
-    newWindow.webContents.send('auth-token', authToken);
-    console.log('[Main] Auth token sent via IPC');
-  });
+  installNavigationGuards(newWindow.webContents, rendererEntry);
 
-  console.log(`[Main] Loading window with Flask port: ${flaskPort}`);
+  if (rendererEntry.type === 'url' || rendererEntry.type === 'app') {
+    newWindow.loadURL(rendererEntry.url);
+  } else if (rendererEntry.type === 'file') {
+    newWindow.loadFile(rendererEntry.path, {
+      query: rendererEntry.query,
+    });
+  } else {
+    // J14: Exhaustive check — compile-time safety for future RendererEntry variants
+    const _exhaustive: never = rendererEntry;
+    console.error(
+      `[Security] Unknown renderer entry type: ${(_exhaustive as { type: string }).type}`
+    );
+  }
+
+  console.log(`[Main] Loading window with backend port: ${backendPort}`);
 
   mainWindow = newWindow;
   return newWindow;

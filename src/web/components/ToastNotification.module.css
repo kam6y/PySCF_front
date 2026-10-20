@@ -126,19 +126,3 @@
   transform: translateY(-1px) translateX(0);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
-
-/* Add subtle pointer indication */
-
-.toastClickable:hover::after {
-  opacity: 0.6;
-}
-
-/* Animation for progress bar (if we want to add auto-close indicator) */
-@keyframes shrink {
-  from {
-    width: 100%;
-  }
-  to {
-    width: 0%;
-  }
-}

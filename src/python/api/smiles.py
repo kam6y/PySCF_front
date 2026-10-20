@@ -1,39 +1,23 @@
-"""
-SMILES conversion API endpoints.
-Handles conversion of SMILES strings to XYZ format.
-"""
+"""SMILES conversion API endpoints."""
 
-import logging
-from flask import Blueprint, jsonify
-from flask_pydantic import validate
+from fastapi import APIRouter, HTTPException
 
-from services import get_smiles_service, ServiceError
 from generated_models import SMILESConvertRequest
+from services import get_smiles_service
 
-# Set up logging
-logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/smiles")
 
-# Create smiles blueprint
-smiles_bp = Blueprint('smiles', __name__)
+# Endpoint-level length cap matching openapi.yaml maxLength constraint.
+# Acts as defense-in-depth even when the Pydantic model enforces it.
+MAX_SMILES_LENGTH = 10_000
 
 
-@smiles_bp.route('/api/smiles/convert', methods=['POST'])
-@validate()
-def convert_smiles(body: SMILESConvertRequest):
-    """Converts a SMILES string to XYZ format."""
-    try:
-        smiles_service = get_smiles_service()
-        
-        smiles = body.smiles
-        
-        # Call service layer
-        result = smiles_service.convert_smiles(smiles)
-        
-        return jsonify({'success': True, 'data': result})
-
-    except ServiceError as e:
-        logger.error(f"Service error during SMILES conversion: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during SMILES conversion: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+@router.post("/convert")
+def convert_smiles(body: SMILESConvertRequest) -> dict:
+    if len(body.smiles) > MAX_SMILES_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"smiles must be at most {MAX_SMILES_LENGTH} characters",
+        )
+    result = get_smiles_service().convert_smiles(body.smiles)
+    return {"success": True, "data": result}

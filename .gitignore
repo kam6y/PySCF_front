@@ -73,9 +73,12 @@ htmlcov/
 # IDE and Editor configuration
 # IDEやエディタの設定ファイル
 # -----------------------------------------------------------------------------
+AGENTS.md
 .idea/
 .vscode/
 .claude/
+.codex/
+.gemini/
 .serena/
 *.suo
 *.ntvs*
@@ -117,3 +120,6 @@ data/settings.json
 # Codebase visualization output
 # コードベース可視化スクリプトの出力
 code.txt
+
+# Local git worktrees
+.worktrees/

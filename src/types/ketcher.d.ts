@@ -14,6 +14,7 @@ declare module 'ketcher-react' {
     structServiceProvider: any;
     errorHandler?: (message: string) => void;
     onInit?: (ketcher: Ketcher) => void;
+    disableMacromoleculesEditor?: boolean;
   }
 
   export const Editor: (props: EditorProps) => ReactElement;

@@ -1,15 +1,13 @@
 """DFT calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pyscf import gto, dft
-# geometric_solver is now imported in BaseCalculator
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
-from .file_manager import CalculationFileManager
+from .exceptions import CalculationError
+from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
 
@@ -20,23 +18,25 @@ logger = logging.getLogger(__name__)
 class DFTCalculator(BaseCalculator):
     """DFT calculator using PySCF for structure optimization and orbital analysis."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(
+        self,
+        working_dir: Optional[str] = None,
+        keep_files: bool = False,
+        molecule_name: Optional[str] = None,
+        optimize_geometry: bool = True,
+        **kwargs
+    ):
         # Use file manager for better organization
-        self.file_manager = CalculationFileManager()
+        self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry)
+        super().__init__(working_dir, optimize_geometry, **kwargs)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[dft.RKS] = None
         self.optimized_geometry: Optional[np.ndarray] = None
         self.keep_files = keep_files
         self.molecule_name = molecule_name
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup DFT calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate DFT-specific parameters."""
         # DFT-specific parameters
@@ -81,17 +81,31 @@ class DFTCalculator(BaseCalculator):
     def _create_scf_method(self, mol):
         """Create DFT method object (RKS/UKS)."""
         spin = self.results.get('spin', 0)
-        
+        if self._require_gpu4pyscf_available():
+            try:
+                from gpu4pyscf import dft as gpu_dft
+                if spin == 0:
+                    mf = gpu_dft.RKS(mol, xc=self.xc_functional)
+                    logger.info("Using GPU4PySCF RKS for closed-shell system")
+                else:
+                    mf = gpu_dft.UKS(mol, xc=self.xc_functional)
+                    logger.info("Using GPU4PySCF UKS for open-shell system")
+                self.gpu_enabled = True
+                return mf
+            except Exception as exc:
+                self.gpu_enabled = False
+                raise CalculationError(f"GPU4PySCF DFT setup failed: {exc}") from exc
+
         if spin == 0:
             mf = dft.RKS(mol)
             logger.info("Using Restricted Kohn-Sham (RKS) for closed-shell system")
         else:
             mf = dft.UKS(mol)
             logger.info("Using Unrestricted Kohn-Sham (UKS) for open-shell system")
-        
+
         # Set XC functional
         mf.xc = self.xc_functional
-        
+        self.gpu_enabled = False
         return mf
     
     def _apply_solvent_effects(self, mf):
