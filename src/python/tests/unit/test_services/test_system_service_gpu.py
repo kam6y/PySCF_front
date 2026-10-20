@@ -63,13 +63,15 @@ def test_get_gpu4pyscf_status_nvcc_missing(monkeypatch):
     assert status["cuda_detection_message"] == "nvcc command not found"
 
 
-def test_install_gpu4pyscf_with_confirm_false_raises_validation_error():
+def test_install_gpu4pyscf_with_confirm_false_raises_validation_error(monkeypatch):
     """
-    GIVEN confirm_install is False (default)
+    GIVEN runtime installation is permitted (PYSCF_ENV=test)
+      AND confirm_install is False (default)
     WHEN install_gpu4pyscf is called
     THEN ValidationError is raised with the confirmation prompt message
     """
     # Arrange
+    monkeypatch.setenv("PYSCF_ENV", "test")
     service = SystemService()
 
     # Act & Assert
@@ -82,12 +84,14 @@ def test_install_gpu4pyscf_with_confirm_false_raises_validation_error():
 
 def test_install_gpu4pyscf_with_confirm_true_proceeds_to_install(monkeypatch):
     """
-    GIVEN confirm_install is True and Linux with supported CUDA
+    GIVEN runtime installation is permitted (PYSCF_ENV=test)
+      AND confirm_install is True and Linux with supported CUDA
     WHEN install_gpu4pyscf is called
     THEN it proceeds past the confirmation gate and attempts installation
          (subprocess.run is mocked so no real pip install occurs)
     """
     # Arrange
+    monkeypatch.setenv("PYSCF_ENV", "test")
     service = SystemService()
 
     monkeypatch.setattr(system_service.sys, "platform", "linux")
