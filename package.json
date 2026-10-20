@@ -35,7 +35,8 @@
     "debug:config": "node -e \"const fs = require('fs'); const path = require('path'); const configPath = path.join(__dirname, 'config', 'server-config.json'); console.log('Config file:', configPath); console.log('Exists:', fs.existsSync(configPath)); if (fs.existsSync(configPath)) { console.log('Content:', JSON.stringify(JSON.parse(fs.readFileSync(configPath, 'utf8')), null, 2)); }\"",
     "test:python-standalone": "node scripts/test-python-standalone.js",
     "release": "node scripts/bump-version.js",
-    "verify:asar-artifacts": "node scripts/verify-asar-artifacts.js"
+    "verify:asar-artifacts": "node scripts/verify-asar-artifacts.js",
+    "verify:mac-signing": "bash scripts/verify-mac-signing.sh"
   },
   "repository": {
     "type": "git",
@@ -135,7 +136,8 @@
           "!**/__pycache__",
           "!**/__pycache__/**",
           "!**/*.pyc",
-          "!**/*.pyo"
+          "!**/*.pyo",
+          "!**/*.o"
         ]
       },
       {
@@ -186,7 +188,23 @@
     ],
     "mac": {
       "target": "dmg",
-      "icon": "src/assets/icon/mac/Pyscf_front.icns"
+      "icon": "src/assets/icon/mac/Pyscf_front.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "src/assets/mac/entitlements.mac.plist",
+      "entitlementsInherit": "src/assets/mac/entitlements.mac.inherit.plist",
+      "notarize": true,
+      "signIgnore": [
+        "/Contents/Resources/conda_env/lib/python3\\.1/",
+        "/Contents/Resources/conda_env/lib/terminfo/",
+        "/Contents/Resources/conda_env/lib/icu/current/",
+        "/Contents/Resources/conda_env/share/(terminfo|zoneinfo|locale|doc|info|man)/",
+        "/Contents/Resources/conda_env/lib/python3\\.[0-9]+/site-packages/(tzdata|pytz)/zoneinfo/",
+        "/Contents/Resources/conda_env/.*\\.(pyc|pyo|mo|ttf|otf|pfb|afm|png|gif|jpe?g|svg|pbm|pgm|ppm|pil|pdf|gz|bz2|xz|zip|whl|tar|npy|npz|pkl|h5|hdf5|db|sqlite3?|typelib|a|mod|exe|dll|pyd|icns|ico|pdb)$"
+      ]
+    },
+    "dmg": {
+      "sign": false
     },
     "linux": {
       "target": "AppImage",

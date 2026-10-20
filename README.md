@@ -140,10 +140,14 @@ npm run package
 
 ### Generated Files
 
-The packaging process creates platform-specific installers in the `dist/` directory:
--   `PySCF_front-darwin-arm64.dmg` (For macOS)
+The packaging process creates platform-specific installers in the `release/` directory:
+-   `Pyscf_front-<version>-arm64.dmg` (For macOS)
 
--   `PySCF_front-linux-x86_64.AppImage` (For Linux)
+-   `Pyscf_front-<version>.AppImage` (For Linux)
+
+### macOS Code Signing and Notarization
+
+Release builds for macOS are signed with a **Developer ID Application** certificate (Hardened Runtime enabled) and notarized by Apple, so users can open the DMG without Gatekeeper warnings. `electron-builder` performs both steps automatically when the certificate and notarization credentials are available; `npm run verify:mac-signing` checks the result. The one-time setup (certificate, credentials, GitHub Actions secrets) is described in [docs/release-signing.md](docs/release-signing.md).
 
 ### Building for Linux on Windows
 
@@ -455,10 +459,14 @@ npm run package
 
 ### 生成されるファイル
 
-`dist/`ディレクトリに各OS用のインストーラーが生成されます。
--   `PySCF_front-darwin-arm64.dmg` (macOS)
+`release/`ディレクトリに各OS用のインストーラーが生成されます。
+-   `Pyscf_front-<version>-arm64.dmg` (macOS)
 
--   `PySCF_front-linux-x86_64.AppImage` (Linux)
+-   `Pyscf_front-<version>.AppImage` (Linux)
+
+### macOS の署名と公証
+
+macOS 向けのリリースビルドは **Developer ID Application** 証明書で署名 (Hardened Runtime 有効) し、Apple の公証を通しているため、利用者は Gatekeeper の警告なしに DMG を開いてアプリを起動できます。証明書と公証用の認証情報があれば `electron-builder` が自動で両方を行い、`npm run verify:mac-signing` で結果を検証できます。初回のみ必要な準備 (証明書の作成、認証情報、GitHub Actions の Secrets) は [docs/release-signing.md](docs/release-signing.md) を参照してください。
 
 ## 開発ツール
 

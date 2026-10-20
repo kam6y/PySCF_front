@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!--
+      Entitlements applied to every nested binary (Electron helpers and all
+      Mach-O files inside Resources/conda_env such as bin/python3.12 and
+      the compiled Python extensions).
+
+      At first launch the conda environment is copied to userData and
+      conda-unpack rewrites some binaries, re-signing them ad-hoc. The
+      bundled Python keeps its Developer ID signature with the Hardened
+      Runtime, so it must be allowed to load those ad-hoc signed libraries:
+      that is what disable-library-validation is for.
+    -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+  </dict>
+</plist>

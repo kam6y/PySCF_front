@@ -89,15 +89,78 @@ jobs:
             npm run build
           fi
 
-      - name: Package application
+      # ---------------------------------------------------------------------
+      # macOS: sign with a Developer ID Application certificate, notarize with
+      # Apple, staple the ticket and verify the result. Required secrets are
+      # documented in docs/release-signing.md.
+      # ---------------------------------------------------------------------
+      - name: Check macOS code-signing secrets
+        if: matrix.platform == 'darwin'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          missing=()
+          [ -n "$CSC_LINK" ] || missing+=(CSC_LINK)
+          [ -n "$CSC_KEY_PASSWORD" ] || missing+=(CSC_KEY_PASSWORD)
+          if [ -n "$APPLE_API_KEY_CONTENT$APPLE_API_KEY_ID$APPLE_API_ISSUER" ]; then
+            # App Store Connect API key flow
+            [ -n "$APPLE_API_KEY_CONTENT" ] || missing+=(APPLE_API_KEY_CONTENT)
+            [ -n "$APPLE_API_KEY_ID" ] || missing+=(APPLE_API_KEY_ID)
+            [ -n "$APPLE_API_ISSUER" ] || missing+=(APPLE_API_ISSUER)
+          else
+            # Apple ID + app-specific password flow
+            [ -n "$APPLE_ID" ] || missing+=(APPLE_ID)
+            [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] || missing+=(APPLE_APP_SPECIFIC_PASSWORD)
+            [ -n "$APPLE_TEAM_ID" ] || missing+=(APPLE_TEAM_ID)
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing GitHub secrets for macOS signing/notarization: ${missing[*]} (see docs/release-signing.md)"
+            exit 1
+          fi
+          echo "All macOS signing secrets are present"
+
+      - name: Package application (macOS, signed and notarized)
+        if: matrix.platform == 'darwin'
+        shell: bash -l {0}
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          conda activate pyscf-env
+          if [ -n "$APPLE_API_KEY_CONTENT" ]; then
+            # electron-builder expects the .p8 key as a file path in APPLE_API_KEY.
+            export APPLE_API_KEY="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+            printf '%s\n' "$APPLE_API_KEY_CONTENT" > "$APPLE_API_KEY"
+            # electron-builder prefers Apple ID credentials when both are set.
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD
+          fi
+          unset APPLE_API_KEY_CONTENT
+          npx electron-builder --mac
+          npm run verify:asar-artifacts
+
+      - name: Verify macOS signature and notarization
+        if: matrix.platform == 'darwin'
+        run: bash scripts/verify-mac-signing.sh
+
+      - name: Package application (Linux)
+        if: matrix.platform == 'linux'
         shell: bash -l {0}
         run: |
           conda activate pyscf-env
-          if [ "${{ matrix.platform }}" = "linux" ]; then
-            npx electron-builder --linux
-          else
-            npx electron-builder --mac
-          fi
+          npx electron-builder --linux
           npm run verify:asar-artifacts
 
       - name: Upload release artifacts
