@@ -166,5 +166,9 @@ npm run release -- 0.1.8-beta
   `conda-unpack` を実行します。`conda-unpack` はプレフィックスを書き換えたバイナリを **ad-hoc で再署名**するため、
   同梱 Python がそれらを読み込めるように `entitlements.mac.inherit.plist` で
   `com.apple.security.cs.disable-library-validation` を付けています。
+- electron-builder は **26.16.1 以上** が必要です。それより前のバージョンは CI 用の一時キーチェーンを作るときに
+  `.p12` のパスワードをキーチェーンのパスワードとして `security set-key-partition-list` に渡すバグがあり
+  (electron-builder #10066)、macOS 26 以降のランナーでは
+  `The user name or passphrase you entered is not correct.` で署名前に失敗します。
 - DMG 自体は署名・公証していません (electron-builder の既定)。Gatekeeper は DMG 内の `.app` に
   ステープルされたチケットを見るため、これで問題なく起動できます。
