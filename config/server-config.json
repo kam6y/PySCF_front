@@ -61,7 +61,7 @@
     }
   },
   "app_info": {
-    "version": "0.1.7-beta"
+    "version": "0.1.8-beta"
   },
   "external_services": {
     "pubchem_timeout": 30,

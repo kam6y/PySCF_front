@@ -76,7 +76,7 @@ info:
     Runtime API routes are protected by the `X-Auth-Token` header when `PYSCF_AUTH_TOKEN` is configured.
     Development-only API documentation routes (`/api-docs` and `/api-docs/spec.json`) are intentionally not part of this OpenAPI contract.
     
-  version: 0.1.7-beta
+  version: 0.1.8-beta
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
