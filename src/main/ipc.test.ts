@@ -51,7 +51,9 @@ const testConfirmAndOpen_userCancels_doesNotOpen = async (): Promise<void> => {
   let openCalled = false;
   const result = await confirmAndOpenExternal('https://example.com/', {
     showDialog: async () => ({ response: 1 }), // Cancel button (index 1)
-    openExternal: async () => { openCalled = true; },
+    openExternal: async () => {
+      openCalled = true;
+    },
   });
 
   assert.equal(result.success, false, 'Must return failure on cancel');
@@ -67,7 +69,9 @@ const testConfirmAndOpen_userConfirms_opensUrl = async (): Promise<void> => {
   let openedUrl = '';
   const result = await confirmAndOpenExternal('https://example.com/', {
     showDialog: async () => ({ response: 0 }), // Open button (index 0)
-    openExternal: async (url) => { openedUrl = url; },
+    openExternal: async url => {
+      openedUrl = url;
+    },
   });
 
   assert.equal(result.success, true, 'Must return success on confirm');
@@ -79,37 +83,52 @@ const testConfirmAndOpen_dialogThrows_failsClosed = async (): Promise<void> => {
 
   let openCalled = false;
   const result = await confirmAndOpenExternal('https://example.com/', {
-    showDialog: async () => { throw new Error('Window destroyed'); },
-    openExternal: async () => { openCalled = true; },
+    showDialog: async () => {
+      throw new Error('Window destroyed');
+    },
+    openExternal: async () => {
+      openCalled = true;
+    },
   });
 
   assert.equal(result.success, false, 'Must return failure on dialog throw');
-  assert.equal(openCalled, false, 'openExternal must NOT be called on dialog failure');
+  assert.equal(
+    openCalled,
+    false,
+    'openExternal must NOT be called on dialog failure'
+  );
   if (!result.success) {
     assert.equal(result.error, 'Dialog failed');
   }
 };
 
-const testConfirmAndOpen_openExternalThrows_returnsFailure = async (): Promise<void> => {
-  const { confirmAndOpenExternal } = loadIpc();
+const testConfirmAndOpen_openExternalThrows_returnsFailure =
+  async (): Promise<void> => {
+    const { confirmAndOpenExternal } = loadIpc();
 
-  const result = await confirmAndOpenExternal('https://example.com/', {
-    showDialog: async () => ({ response: 0 }), // User confirms
-    openExternal: async () => { throw new Error('Shell error'); },
-  });
+    const result = await confirmAndOpenExternal('https://example.com/', {
+      showDialog: async () => ({ response: 0 }), // User confirms
+      openExternal: async () => {
+        throw new Error('Shell error');
+      },
+    });
 
-  assert.equal(result.success, false, 'Must return failure when openExternal throws');
-  if (!result.success) {
-    assert.equal(result.error, 'Failed to open URL');
-  }
-};
+    assert.equal(
+      result.success,
+      false,
+      'Must return failure when openExternal throws'
+    );
+    if (!result.success) {
+      assert.equal(result.error, 'Failed to open URL');
+    }
+  };
 
 const testConfirmAndOpen_dialogOptions_correct = async (): Promise<void> => {
   const { confirmAndOpenExternal } = loadIpc();
 
   let capturedOptions: MessageBoxOptions | null = null;
   await confirmAndOpenExternal('https://example.com/path', {
-    showDialog: async (options) => {
+    showDialog: async options => {
       capturedOptions = options;
       return { response: 1 }; // Cancel
     },
@@ -120,7 +139,11 @@ const testConfirmAndOpen_dialogOptions_correct = async (): Promise<void> => {
   const opts = capturedOptions as MessageBoxOptions;
   assert.equal(opts.defaultId, 1, 'defaultId must be Cancel (1)');
   assert.equal(opts.cancelId, 1, 'cancelId must be Cancel (1)');
-  assert.equal(opts.detail, 'https://example.com/path', 'detail must show the URL');
+  assert.equal(
+    opts.detail,
+    'https://example.com/path',
+    'detail must show the URL'
+  );
 };
 
 // ============================================================
@@ -137,7 +160,7 @@ const run = async (): Promise<void> => {
   console.log('ipc tests passed (5 tests)');
 };
 
-run().catch((err) => {
+run().catch(err => {
   console.error(err);
   process.exit(1);
 });

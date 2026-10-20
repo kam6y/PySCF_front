@@ -39,7 +39,10 @@ export const APP_HOST = 'renderer';
  * Construct a full app:// URL for a given asset path relative to the
  * renderer directory (e.g. 'index.html', 'assets/foo.js').
  */
-export const buildAppUrl = (assetPath: string, query?: Record<string, string>): string => {
+export const buildAppUrl = (
+  assetPath: string,
+  query?: Record<string, string>
+): string => {
   const url = new URL(`${APP_SCHEME}://${APP_HOST}/${assetPath}`);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
@@ -93,8 +96,17 @@ export const getMimeType = (filePath: string): string => {
 // Windows-like path interpretations, even though Node path.resolve on POSIX
 // treats backslash as a literal character.
 const TRAVERSAL_PATTERNS = [
-  '..', '%2e%2e', '%2E%2E', '%2e.', '%2E.', '.%2e', '.%2E',
-  '..%5c', '..%5C', '%5c..', '%5C..',
+  '..',
+  '%2e%2e',
+  '%2E%2E',
+  '%2e.',
+  '%2E.',
+  '.%2e',
+  '.%2E',
+  '..%5c',
+  '..%5C',
+  '%5c..',
+  '%5C..',
 ];
 
 /** Maximum length of a pathname to include in log messages (D3). */
@@ -162,7 +174,10 @@ export const validateRequestPath = (
   // as the prefix, so a case-variant URL path resolves as a literal child under
   // baseDir (e.g. /APP/index.html → baseDir/APP/index.html). No directory escape
   // is possible — at most, the FS serves the same in-dir file via case aliasing.
-  if (!resolved.startsWith(normalizedBase + path.sep) && resolved !== normalizedBase) {
+  if (
+    !resolved.startsWith(normalizedBase + path.sep) &&
+    resolved !== normalizedBase
+  ) {
     return null;
   }
 
@@ -216,10 +231,16 @@ export type AppProtocolHandlerDeps = {
  */
 export const createAppProtocolRequestHandler = (
   deps: AppProtocolHandlerDeps
-): ((request: { method: string; url: string }) => Response | Promise<Response>) => {
+): ((request: {
+  method: string;
+  url: string;
+}) => Response | Promise<Response>) => {
   const normalizedBaseDir = path.resolve(deps.baseDir);
 
-  return (request: { method: string; url: string }): Response | Promise<Response> => {
+  return (request: {
+    method: string;
+    url: string;
+  }): Response | Promise<Response> => {
     // Compute the CSP on every request so we pick up backendPort once it
     // becomes available (the handler is installed before the port is known).
     const csp = buildCsp(deps.isPackaged, deps.getBackendPort());
@@ -241,12 +262,17 @@ export const createAppProtocolRequestHandler = (
       });
     }
 
-    const filePath = validateRequestPath(requestUrl.pathname, normalizedBaseDir);
+    const filePath = validateRequestPath(
+      requestUrl.pathname,
+      normalizedBaseDir
+    );
     if (!filePath) {
       // Truncate and sanitize the pathname for logging to prevent log
       // injection/flooding from attacker-controlled input (D3).
       const safePath = sanitizeForLog(requestUrl.pathname);
-      console.warn(`[Security] Blocked app:// path traversal attempt: ${safePath}`);
+      console.warn(
+        `[Security] Blocked app:// path traversal attempt: ${safePath}`
+      );
       return new Response('Forbidden', {
         status: 403,
         headers: { 'Content-Security-Policy': csp },
@@ -259,7 +285,7 @@ export const createAppProtocolRequestHandler = (
     // a file:// URL; in tests it is a stub.
     const fileUrl = pathToFileURL(filePath).href;
     return deps.fetchImpl(fileUrl).then(
-      (response) => {
+      response => {
         if (!response.ok) {
           // J2: Log non-OK responses for debuggability in packaged builds
           console.warn(
@@ -326,7 +352,7 @@ export const installAppProtocolHandler = (
   if (!fs.existsSync(indexPath)) {
     throw new Error(
       `[app-protocol] baseDir does not contain index.html: ${baseDir}. ` +
-      'Check that the renderer build output directory matches the protocol handler baseDir.'
+        'Check that the renderer build output directory matches the protocol handler baseDir.'
     );
   }
 
@@ -337,5 +363,8 @@ export const installAppProtocolHandler = (
     fetchImpl: (url: string) => net.fetch(url),
   });
 
-  protocol.handle(APP_SCHEME, handler as (request: GlobalRequest) => Response | Promise<Response>);
+  protocol.handle(
+    APP_SCHEME,
+    handler as (request: GlobalRequest) => Response | Promise<Response>
+  );
 };

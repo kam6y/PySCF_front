@@ -7,7 +7,10 @@ type ExternalUrlValidationResult =
 type IpcSecurityModule = {
   assertAllowedIpcSender: (
     event: { sender: unknown },
-    getMainWindow: () => { webContents: unknown; isDestroyed: () => boolean } | null
+    getMainWindow: () => {
+      webContents: unknown;
+      isDestroyed: () => boolean;
+    } | null
   ) => void;
   validateExternalUrl: (url: unknown) => ExternalUrlValidationResult;
 };

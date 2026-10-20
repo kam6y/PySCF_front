@@ -34,7 +34,6 @@ interface SettingsFormValues {
   gpuAccelerationEnabled: boolean;
 }
 
-
 export const SettingsPage: React.FC<SettingsPageProps> = () => {
   const [formValues, setFormValues] = useState<SettingsFormValues>({
     geminiApiKey: '',
@@ -71,9 +70,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   };
 
   // Whether the backend reports a Gemini API key is already stored.
-  const geminiApiKeyConfigured = Boolean(
-    settings?.gemini_api_key_configured
-  );
+  const geminiApiKeyConfigured = Boolean(settings?.gemini_api_key_configured);
 
   // Update local state when settings are loaded
   useEffect(() => {

@@ -68,7 +68,7 @@ const isPrivateIpHostname = (hostname: string): boolean => {
   if (parts.length !== 4) return false;
 
   const octets = parts.map(Number);
-  if (octets.some((o) => !Number.isInteger(o) || o < 0 || o > 255)) {
+  if (octets.some(o => !Number.isInteger(o) || o < 0 || o > 255)) {
     return false;
   }
 
@@ -153,14 +153,19 @@ export const validateExternalUrl = (
   // Reject URLs with embedded credentials (user:pass@host) — these can be
   // used for phishing (displaying a misleading domain in the URL bar).
   if (parsedUrl.username || parsedUrl.password) {
-    return { valid: false, error: 'URLs with embedded credentials are not allowed' };
+    return {
+      valid: false,
+      error: 'URLs with embedded credentials are not allowed',
+    };
   }
 
   // Normalize hostname: strip trailing dot (DNS root label) which can
   // bypass hostname checks — 'localhost.' resolves to loopback but would
   // not match BLOCKED_HOSTNAMES without normalization (C1 fix).
   const rawHostname = parsedUrl.hostname.toLowerCase();
-  const hostname = rawHostname.endsWith('.') ? rawHostname.slice(0, -1) : rawHostname;
+  const hostname = rawHostname.endsWith('.')
+    ? rawHostname.slice(0, -1)
+    : rawHostname;
   if (BLOCKED_HOSTNAMES.has(hostname) || isPrivateIpHostname(hostname)) {
     return {
       valid: false,

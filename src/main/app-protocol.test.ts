@@ -20,7 +20,10 @@ type AppProtocolModule = {
   sanitizeForLog: (input: string) => string;
   createAppProtocolRequestHandler: (
     deps: AppProtocolHandlerDeps
-  ) => (request: { method: string; url: string }) => Response | Promise<Response>;
+  ) => (request: {
+    method: string;
+    url: string;
+  }) => Response | Promise<Response>;
 };
 
 const loadModule = (): AppProtocolModule => {
@@ -101,7 +104,10 @@ const testMimeType_wasm = (): void => {
 
 const testMimeType_unknown = (): void => {
   const { getMimeType } = loadModule();
-  assert.equal(getMimeType('/dist/assets/file.xyz'), 'application/octet-stream');
+  assert.equal(
+    getMimeType('/dist/assets/file.xyz'),
+    'application/octet-stream'
+  );
   assert.equal(getMimeType('/dist/noext'), 'application/octet-stream');
 };
 
@@ -311,7 +317,10 @@ const testSanitizeForLog_truncatesLongString = (): void => {
   const long = 'a'.repeat(300);
   const result = sanitizeForLog(long);
   assert.ok(result.length < 300, 'Must be truncated');
-  assert.ok(result.endsWith('...(truncated)'), 'Must end with truncation marker');
+  assert.ok(
+    result.endsWith('...(truncated)'),
+    'Must end with truncation marker'
+  );
 };
 
 const testSanitizeForLog_stripsControlChars = (): void => {
@@ -325,7 +334,10 @@ const testSanitizeForLog_stripsControlChars = (): void => {
 
 const testValidPath_deeplyNested = (): void => {
   const { validateRequestPath } = loadModule();
-  const result = validateRequestPath('/assets/fonts/sub/deep/file.woff2', BASE_DIR);
+  const result = validateRequestPath(
+    '/assets/fonts/sub/deep/file.woff2',
+    BASE_DIR
+  );
   assert.ok(result, 'Deeply nested valid path must be allowed');
   assert.equal(result, '/app/dist/assets/fonts/sub/deep/file.woff2');
 };
@@ -336,7 +348,10 @@ const testValidPath_deeplyNested = (): void => {
 
 const createTestHandler = (
   overrides: Partial<AppProtocolHandlerDeps> = {}
-): ((request: { method: string; url: string }) => Response | Promise<Response>) => {
+): ((request: {
+  method: string;
+  url: string;
+}) => Response | Promise<Response>) => {
   const { createAppProtocolRequestHandler } = loadModule();
   return createAppProtocolRequestHandler({
     baseDir: BASE_DIR,
@@ -349,7 +364,10 @@ const createTestHandler = (
 
 const testHandler_nonGetMethod_returns405 = async (): Promise<void> => {
   const handler = createTestHandler();
-  const response = await handler({ method: 'POST', url: 'app://renderer/index.html' });
+  const response = await handler({
+    method: 'POST',
+    url: 'app://renderer/index.html',
+  });
   assert.equal(response.status, 405, 'Non-GET must return 405');
   assert.ok(
     response.headers.get('Content-Security-Policy'),
@@ -368,49 +386,77 @@ const testHandler_traversalPath_returns403 = async (): Promise<void> => {
   // Note: new URL() normalizes .. and %2e%2e, so standard traversal patterns
   // are resolved by the URL parser before reaching validateRequestPath.
   // Test with null byte injection which validateRequestPath rejects (D2).
-  const response = await handler({ method: 'GET', url: 'app://renderer/index.html%00.txt' });
+  const response = await handler({
+    method: 'GET',
+    url: 'app://renderer/index.html%00.txt',
+  });
   assert.equal(response.status, 403, 'Null byte path must return 403');
 };
 
 const testHandler_validPath_fetchOk_returns200 = async (): Promise<void> => {
   const handler = createTestHandler({
-    fetchImpl: () => Promise.resolve(new Response('file content', { status: 200 })),
+    fetchImpl: () =>
+      Promise.resolve(new Response('file content', { status: 200 })),
   });
-  const response = await handler({ method: 'GET', url: 'app://renderer/index.html' });
-  assert.equal(response.status, 200, 'Valid path with ok fetch must return 200');
+  const response = await handler({
+    method: 'GET',
+    url: 'app://renderer/index.html',
+  });
+  assert.equal(
+    response.status,
+    200,
+    'Valid path with ok fetch must return 200'
+  );
   assert.equal(response.headers.get('Content-Type'), 'text/html');
-  assert.ok(response.headers.get('Content-Security-Policy'), 'Must include CSP');
+  assert.ok(
+    response.headers.get('Content-Security-Policy'),
+    'Must include CSP'
+  );
   assert.equal(response.headers.get('X-Content-Type-Options'), 'nosniff');
 };
 
 const testHandler_validPath_fetchNotOk_returns404 = async (): Promise<void> => {
   const handler = createTestHandler({
-    fetchImpl: () => Promise.resolve(new Response('not found', { status: 404 })),
+    fetchImpl: () =>
+      Promise.resolve(new Response('not found', { status: 404 })),
   });
-  const response = await handler({ method: 'GET', url: 'app://renderer/missing.js' });
+  const response = await handler({
+    method: 'GET',
+    url: 'app://renderer/missing.js',
+  });
   assert.equal(response.status, 404, 'Non-OK fetch must return 404');
 };
 
-const testHandler_validPath_fetchRejects_returns404 = async (): Promise<void> => {
-  const handler = createTestHandler({
-    fetchImpl: () => Promise.reject(new Error('EACCES: permission denied')),
-  });
-  const response = await handler({ method: 'GET', url: 'app://renderer/index.html' });
-  assert.equal(response.status, 404, 'Fetch rejection must return 404');
-  assert.ok(
-    response.headers.get('Content-Security-Policy'),
-    '404 from rejection must include CSP'
-  );
-};
+const testHandler_validPath_fetchRejects_returns404 =
+  async (): Promise<void> => {
+    const handler = createTestHandler({
+      fetchImpl: () => Promise.reject(new Error('EACCES: permission denied')),
+    });
+    const response = await handler({
+      method: 'GET',
+      url: 'app://renderer/index.html',
+    });
+    assert.equal(response.status, 404, 'Fetch rejection must return 404');
+    assert.ok(
+      response.headers.get('Content-Security-Policy'),
+      '404 from rejection must include CSP'
+    );
+  };
 
 const testHandler_cspIncludesBackendPort = async (): Promise<void> => {
   const handler = createTestHandler({
     getBackendPort: () => 9999,
     fetchImpl: () => Promise.resolve(new Response('ok', { status: 200 })),
   });
-  const response = await handler({ method: 'GET', url: 'app://renderer/index.html' });
+  const response = await handler({
+    method: 'GET',
+    url: 'app://renderer/index.html',
+  });
   const csp = response.headers.get('Content-Security-Policy') ?? '';
-  assert.ok(csp.includes('127.0.0.1:9999'), 'CSP must pin to provided backend port');
+  assert.ok(
+    csp.includes('127.0.0.1:9999'),
+    'CSP must pin to provided backend port'
+  );
 };
 
 const testHandler_cspWithoutPort_noLoopback = async (): Promise<void> => {
@@ -418,9 +464,15 @@ const testHandler_cspWithoutPort_noLoopback = async (): Promise<void> => {
     getBackendPort: () => undefined,
     fetchImpl: () => Promise.resolve(new Response('ok', { status: 200 })),
   });
-  const response = await handler({ method: 'GET', url: 'app://renderer/index.html' });
+  const response = await handler({
+    method: 'GET',
+    url: 'app://renderer/index.html',
+  });
   const csp = response.headers.get('Content-Security-Policy') ?? '';
-  assert.ok(!csp.includes('127.0.0.1:'), 'CSP without port must not contain loopback port');
+  assert.ok(
+    !csp.includes('127.0.0.1:'),
+    'CSP without port must not contain loopback port'
+  );
   assert.ok(csp.includes("connect-src 'self'"), 'Must have connect-src self');
 };
 
@@ -428,7 +480,10 @@ const testHandler_mimeTypeForJs = async (): Promise<void> => {
   const handler = createTestHandler({
     fetchImpl: () => Promise.resolve(new Response('code', { status: 200 })),
   });
-  const response = await handler({ method: 'GET', url: 'app://renderer/assets/main.js' });
+  const response = await handler({
+    method: 'GET',
+    url: 'app://renderer/assets/main.js',
+  });
   assert.equal(response.headers.get('Content-Type'), 'application/javascript');
 };
 
@@ -491,7 +546,7 @@ const run = async (): Promise<void> => {
   console.log('app-protocol tests passed (39 tests)');
 };
 
-run().catch((err) => {
+run().catch(err => {
   console.error(err);
   process.exit(1);
 });

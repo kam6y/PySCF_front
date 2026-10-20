@@ -87,8 +87,11 @@ const testHandlerInjectsTokenAndPreservesHeaders = (): void => {
 
   let result: { requestHeaders?: Record<string, string> } | undefined;
   handler(
-    { url: 'http://127.0.0.1:5057/api/health', requestHeaders: { Accept: 'text/event-stream' } },
-    (response) => {
+    {
+      url: 'http://127.0.0.1:5057/api/health',
+      requestHeaders: { Accept: 'text/event-stream' },
+    },
+    response => {
       result = response;
     }
   );
@@ -122,9 +125,12 @@ const testInjectedTokenMatchesArgument = (): void => {
   assert.ok(handler);
 
   let result: { requestHeaders?: Record<string, string> } | undefined;
-  handler({ url: 'http://127.0.0.1:8080/api/calc', requestHeaders: {} }, (response) => {
-    result = response;
-  });
+  handler(
+    { url: 'http://127.0.0.1:8080/api/calc', requestHeaders: {} },
+    response => {
+      result = response;
+    }
+  );
 
   assert.equal(
     result!.requestHeaders!['X-Auth-Token'],
@@ -185,8 +191,11 @@ const testHandlerWithEmptyHeaders_injectsToken = (): void => {
   // Simulate undefined requestHeaders (some Electron versions may pass this)
   let result: { requestHeaders?: Record<string, string> } | undefined;
   handler(
-    { url: 'http://127.0.0.1:5057/api/health', requestHeaders: undefined as unknown as Record<string, string> },
-    (response) => {
+    {
+      url: 'http://127.0.0.1:5057/api/health',
+      requestHeaders: undefined as unknown as Record<string, string>,
+    },
+    response => {
       result = response;
     }
   );
@@ -259,8 +268,11 @@ const testPortGate_matchingPort_injectsToken = (): void => {
 
   let result: { requestHeaders?: Record<string, string> } | undefined;
   handler(
-    { url: 'http://127.0.0.1:5057/health', requestHeaders: { Accept: 'application/json' } },
-    (response) => {
+    {
+      url: 'http://127.0.0.1:5057/health',
+      requestHeaders: { Accept: 'application/json' },
+    },
+    response => {
       result = response;
     }
   );
@@ -291,11 +303,14 @@ const testPortGate_differentPort_passesThrough = (): void => {
   const handler = session.getCapturedHandler();
   assert.ok(handler);
 
-  const originalHeaders = { Accept: 'text/html', 'Content-Type': 'application/json' };
+  const originalHeaders = {
+    Accept: 'text/html',
+    'Content-Type': 'application/json',
+  };
   let result: { requestHeaders?: Record<string, string> } | undefined;
   handler(
     { url: 'http://127.0.0.1:9999/x', requestHeaders: originalHeaders },
-    (response) => {
+    response => {
       result = response;
     }
   );
@@ -330,7 +345,7 @@ const testPortGate_malformedUrl_passesThrough = (): void => {
   let result: { requestHeaders?: Record<string, string> } | undefined;
   handler(
     { url: 'not-a-valid-url', requestHeaders: originalHeaders },
-    (response) => {
+    response => {
       result = response;
     }
   );

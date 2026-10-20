@@ -151,7 +151,8 @@ const testKetcherReactIsNotExcludedFromPrebundling = (): void => {
 const indexHtmlPath = path.resolve(__dirname, '../../index.html');
 const splashHtmlPath = path.resolve(__dirname, '../../splash.html');
 
-const readHtml = (htmlPath: string): string => fs.readFileSync(htmlPath, 'utf8');
+const readHtml = (htmlPath: string): string =>
+  fs.readFileSync(htmlPath, 'utf8');
 
 /**
  * Simulate the devCspRelaxPlugin transformIndexHtml logic.
@@ -183,7 +184,8 @@ const simulateDevCspRelax = (html: string): string => {
  * Simulate the stripMetaCspPlugin transformIndexHtml logic.
  */
 const simulateStripMetaCsp = (html: string): string => {
-  const metaCspPattern = /\s*<meta\s[\s\S]*?http-equiv=["']Content-Security-Policy["'][\s\S]*?\/?>\s*/i;
+  const metaCspPattern =
+    /\s*<meta\s[\s\S]*?http-equiv=["']Content-Security-Policy["'][\s\S]*?\/?>\s*/i;
   const result = html.replace(metaCspPattern, '\n');
   if (result === html) {
     throw new Error('meta CSP tag not found');

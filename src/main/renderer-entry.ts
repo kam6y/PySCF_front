@@ -35,7 +35,10 @@ type AppRendererEntry = {
   url: string;
 };
 
-export type RendererEntry = FileRendererEntry | UrlRendererEntry | AppRendererEntry;
+export type RendererEntry =
+  | FileRendererEntry
+  | UrlRendererEntry
+  | AppRendererEntry;
 
 const ALLOWED_DEV_HOSTNAMES: ReadonlySet<string> = new Set([
   'localhost',
@@ -174,7 +177,9 @@ export const isAllowedNavigation = (
     // J14: Exhaustive check — a future 4th RendererEntry variant would be
     // caught at compile time rather than silently falling through.
     const _exhaustive: never = rendererEntry;
-    console.error(`[Security] Unknown renderer entry type: ${(_exhaustive as RendererEntry).type}`);
+    console.error(
+      `[Security] Unknown renderer entry type: ${(_exhaustive as RendererEntry).type}`
+    );
     return false;
   } catch {
     // Malformed URL — deny
@@ -306,7 +311,9 @@ export const installNavigationGuards = (
   // Routing window.open through openExternal would bypass those checks.
   webContents.setWindowOpenHandler(({ url }) => {
     // H3: sanitize attacker-controlled URL before logging
-    console.warn(`[Security] Denied window.open for URL: ${sanitizeForLog(url)}`);
+    console.warn(
+      `[Security] Denied window.open for URL: ${sanitizeForLog(url)}`
+    );
     return { action: 'deny' as const };
   });
 };

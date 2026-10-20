@@ -289,9 +289,15 @@ const testNavAllowed_packagedModeSameDir = (): void => {
   };
 
   // The loaded entry itself — must never lock out the packaged app
-  assert.equal(isAllowedNavigation('file:///app/dist/index.html', fileEntry), true);
+  assert.equal(
+    isAllowedNavigation('file:///app/dist/index.html', fileEntry),
+    true
+  );
   // File in same directory
-  assert.equal(isAllowedNavigation('file:///app/dist/other.html', fileEntry), true);
+  assert.equal(
+    isAllowedNavigation('file:///app/dist/other.html', fileEntry),
+    true
+  );
   // File in subdirectory
   assert.equal(
     isAllowedNavigation('file:///app/dist/sub/page.html', fileEntry),

@@ -18,7 +18,9 @@ export type ConfirmAndOpenExternalDeps = {
 /**
  * Result type for the open-external-url flow.
  */
-export type OpenExternalResult = { success: true } | { success: false; error: string };
+export type OpenExternalResult =
+  | { success: true }
+  | { success: false; error: string };
 
 /**
  * Show confirmation dialog and open external URL if user confirms.
@@ -83,12 +85,12 @@ export const confirmAndOpenExternal = async (
 export const registerIpcHandlers = (
   getMainWindow: () => BrowserWindow | null
 ): void => {
-  ipcMain.handle('get-platform', (event) => {
+  ipcMain.handle('get-platform', event => {
     assertAllowedIpcSender(event, getMainWindow);
     return process.platform;
   });
 
-  ipcMain.handle('get-fullscreen', (event) => {
+  ipcMain.handle('get-fullscreen', event => {
     assertAllowedIpcSender(event, getMainWindow);
     const mainWindow = getMainWindow();
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -107,7 +109,9 @@ export const registerIpcHandlers = (
     if (!validation.valid) {
       if (typeof url === 'string') {
         // J9: Use sanitizeForLog for consistent truncation + control-char stripping
-        console.warn(`Blocked attempt to open invalid URL: ${sanitizeForLog(url)}`);
+        console.warn(
+          `Blocked attempt to open invalid URL: ${sanitizeForLog(url)}`
+        );
       }
       return { success: false, error: validation.error };
     }
@@ -119,17 +123,17 @@ export const registerIpcHandlers = (
           ? dialog.showMessageBox(parent, options)
           : dialog.showMessageBox(options);
       },
-      openExternal: (u) => shell.openExternal(u),
+      openExternal: u => shell.openExternal(u),
       parentWindow,
     });
   });
 
-  ipcMain.handle('show-about-dialog', (event) => {
+  ipcMain.handle('show-about-dialog', event => {
     assertAllowedIpcSender(event, getMainWindow);
     showAboutDialog();
   });
 
-  ipcMain.handle('dialog:select-folder', async (event) => {
+  ipcMain.handle('dialog:select-folder', async event => {
     assertAllowedIpcSender(event, getMainWindow);
 
     try {

@@ -30,10 +30,7 @@ const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set([
  * CSP directive always agree on whether a port is valid (H1 fix).
  */
 export const isValidPort = (port: number | undefined): port is number =>
-  port !== undefined &&
-  Number.isInteger(port) &&
-  port >= 1 &&
-  port <= 65535;
+  port !== undefined && Number.isInteger(port) && port >= 1 && port <= 65535;
 
 /**
  * Build a CSP string with optional backend port scoping.

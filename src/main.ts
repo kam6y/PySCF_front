@@ -12,7 +12,10 @@ import {
   closeSplashWindow,
   closeSplashWindowWhenReady,
 } from './main/splash-window-manager';
-import { registerAppScheme, installAppProtocolHandler } from './main/app-protocol';
+import {
+  registerAppScheme,
+  installAppProtocolHandler,
+} from './main/app-protocol';
 
 let backendPort: number | null = null;
 let authToken: string = '';
@@ -122,7 +125,11 @@ if (!gotTheLock) {
     // SEC-M002: must run after app.ready; the getter defers backendPort to module state.
     if (app.isPackaged) {
       // J17(d): null means "not yet resolved" — bridge to the getter's number | undefined contract.
-      installAppProtocolHandler(__dirname, app.isPackaged, () => backendPort ?? undefined);
+      installAppProtocolHandler(
+        __dirname,
+        app.isPackaged,
+        () => backendPort ?? undefined
+      );
     }
 
     createApplicationMenu();

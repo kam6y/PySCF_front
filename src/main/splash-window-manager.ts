@@ -60,7 +60,9 @@ export const createSplashWindow = (): void => {
   } else {
     // J14: Exhaustive check — compile-time safety for future RendererEntry variants
     const _exhaustive: never = rendererEntry;
-    console.error(`[Security] Unknown renderer entry type: ${(_exhaustive as { type: string }).type}`);
+    console.error(
+      `[Security] Unknown renderer entry type: ${(_exhaustive as { type: string }).type}`
+    );
   }
 
   // 開発環境でのみDevToolsを自動で開く（オプション）

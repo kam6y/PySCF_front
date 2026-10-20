@@ -46,7 +46,7 @@ const devCspRelaxPlugin = (): Plugin => ({
     if (result === html) {
       throw new Error(
         '[dev-csp-relax] Failed to relax script-src — CSP marker not found in index.html. ' +
-        'Has the meta CSP format changed?'
+          'Has the meta CSP format changed?'
       );
     }
 
@@ -61,7 +61,7 @@ const devCspRelaxPlugin = (): Plugin => ({
     if (result === beforeConnect) {
       throw new Error(
         '[dev-csp-relax] Failed to relax connect-src — CSP marker not found in index.html. ' +
-        'Has the meta CSP format changed?'
+          'Has the meta CSP format changed?'
       );
     }
 
@@ -92,12 +92,13 @@ const stripMetaCspPlugin = (): Plugin => ({
     // across multiple lines. Uses [\s\S]*? instead of [^>]* so the pattern
     // still matches if a formatter wraps the tag's attributes across lines (J10).
     // The tag may be self-closing or not.
-    const metaCspPattern = /\s*<meta\s[\s\S]*?http-equiv=["']Content-Security-Policy["'][\s\S]*?\/?>\s*/i;
+    const metaCspPattern =
+      /\s*<meta\s[\s\S]*?http-equiv=["']Content-Security-Policy["'][\s\S]*?\/?>\s*/i;
     const result = html.replace(metaCspPattern, '\n');
     if (result === html) {
       throw new Error(
         '[strip-meta-csp] Failed to strip meta CSP tag — pattern not found in HTML. ' +
-        'Has the meta CSP tag been removed or reformatted?'
+          'Has the meta CSP tag been removed or reformatted?'
       );
     }
     return result;
@@ -178,7 +179,12 @@ const rendererConfig = {
       plugins: [disableKetcherMacromoleculesEditorInOptimizeDeps()],
     },
   },
-  plugins: [devCspRelaxPlugin(), stripMetaCspPlugin(), disableKetcherMacromoleculesEditor(), react()],
+  plugins: [
+    devCspRelaxPlugin(),
+    stripMetaCspPlugin(),
+    disableKetcherMacromoleculesEditor(),
+    react(),
+  ],
   build: {
     outDir: resolveProject('dist'),
     emptyOutDir: false,

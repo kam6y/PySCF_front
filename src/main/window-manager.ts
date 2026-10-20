@@ -92,7 +92,11 @@ export const createWindow = (
   // network layer so the token never enters the renderer/DOM world. Registered
   // before any content loads; backendPort and authToken are valid here (resolved
   // in main.ts before createWindow is called).
-  registerBackendAuthInjection(newWindow.webContents.session, backendPort, authToken);
+  registerBackendAuthInjection(
+    newWindow.webContents.session,
+    backendPort,
+    authToken
+  );
 
   const htmlPath = path.join(__dirname, 'index.html');
   const rendererEntry = getMainRendererEntry({
@@ -113,7 +117,9 @@ export const createWindow = (
   } else {
     // J14: Exhaustive check — compile-time safety for future RendererEntry variants
     const _exhaustive: never = rendererEntry;
-    console.error(`[Security] Unknown renderer entry type: ${(_exhaustive as { type: string }).type}`);
+    console.error(
+      `[Security] Unknown renderer entry type: ${(_exhaustive as { type: string }).type}`
+    );
   }
 
   console.log(`[Main] Loading window with backend port: ${backendPort}`);

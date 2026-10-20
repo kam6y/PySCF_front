@@ -55,7 +55,11 @@ const createFakeSession = (): FakeSession => {
 };
 
 type SessionHardeningModule = {
-  hardenSession: (session: FakeSession, isPackaged: boolean, backendPort?: number) => void;
+  hardenSession: (
+    session: FakeSession,
+    isPackaged: boolean,
+    backendPort?: number
+  ) => void;
   buildCsp: (isPackaged: boolean, backendPort?: number) => string;
   isValidPort: (port: number | undefined) => boolean;
 };
@@ -86,14 +90,14 @@ const testUnlistedPermission_isDenied = (): void => {
 
   // Request an unlisted permission — should be denied
   let granted: boolean | undefined;
-  handler(null, 'camera', (result) => {
+  handler(null, 'camera', result => {
     granted = result;
   });
   assert.equal(granted, false, 'Unlisted permission "camera" must be denied');
 
   // Another unlisted permission
   let granted2: boolean | undefined;
-  handler(null, 'geolocation', (result) => {
+  handler(null, 'geolocation', result => {
     granted2 = result;
   });
   assert.equal(
@@ -118,7 +122,7 @@ const testHeadersReceived_injectsCSP = (): void => {
 
   // Invoke the handler with synthetic details
   let resultHeaders: Record<string, string[]> | undefined;
-  handler({ responseHeaders: { 'X-Existing': ['value'] } }, (result) => {
+  handler({ responseHeaders: { 'X-Existing': ['value'] } }, result => {
     resultHeaders = result.responseHeaders;
   });
 
@@ -154,17 +158,13 @@ const testDevCSP_includesUnsafeEval = (): void => {
   assert.ok(handler);
 
   let cspValue = '';
-  handler({ responseHeaders: {} }, (result) => {
+  handler({ responseHeaders: {} }, result => {
     cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
 
   // Dev CSP must contain the quoted token 'unsafe-eval' (not just the
   // substring inside 'wasm-unsafe-eval')
-  assert.match(
-    cspValue,
-    /'unsafe-eval'/,
-    "Dev CSP must include 'unsafe-eval'"
-  );
+  assert.match(cspValue, /'unsafe-eval'/, "Dev CSP must include 'unsafe-eval'");
 
   // Dev script-src must also allow 'unsafe-inline' for the @vitejs/plugin-react
   // inline preamble (React Fast Refresh). Scope the match to the script-src
@@ -186,7 +186,7 @@ const testProductionCSP_doesNotIncludeUnsafeEval = (): void => {
   assert.ok(handler);
 
   let cspValue = '';
-  handler({ responseHeaders: {} }, (result) => {
+  handler({ responseHeaders: {} }, result => {
     cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
 
@@ -222,7 +222,11 @@ const testProductionCSP_doesNotIncludeUnsafeEval = (): void => {
 const testCSP_containsBaselineDirectives = (): void => {
   const { hardenSession } = loadSessionHardening();
 
-  const directives = ["object-src 'none'", "base-uri 'none'", "form-action 'none'"];
+  const directives = [
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+  ];
 
   // Verify dev CSP
   const devSession = createFakeSession();
@@ -230,7 +234,7 @@ const testCSP_containsBaselineDirectives = (): void => {
   const devHandler = devSession.getHeadersReceivedHandler();
   assert.ok(devHandler);
   let devCsp = '';
-  devHandler({ responseHeaders: {} }, (result) => {
+  devHandler({ responseHeaders: {} }, result => {
     devCsp = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
   for (const directive of directives) {
@@ -247,7 +251,7 @@ const testCSP_containsBaselineDirectives = (): void => {
   const prodHandler = prodSession.getHeadersReceivedHandler();
   assert.ok(prodHandler);
   let prodCsp = '';
-  prodHandler({ responseHeaders: {} }, (result) => {
+  prodHandler({ responseHeaders: {} }, result => {
     prodCsp = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
   for (const directive of directives) {
@@ -280,7 +284,7 @@ const testHeadersReceived_replacesLowercaseCspHeader = (): void => {
         'X-Other': ['keep-me'],
       },
     },
-    (result) => {
+    result => {
       resultHeaders = result.responseHeaders;
     }
   );
@@ -290,7 +294,7 @@ const testHeadersReceived_replacesLowercaseCspHeader = (): void => {
   // The lowercase variant must be removed — only the canonical Title-Case key
   // should exist, and it must carry the injected CSP value (not the upstream one).
   const cspKeys = Object.keys(resultHeaders!).filter(
-    (k) => k.toLowerCase() === 'content-security-policy'
+    k => k.toLowerCase() === 'content-security-policy'
   );
   assert.equal(
     cspKeys.length,
@@ -303,7 +307,9 @@ const testHeadersReceived_replacesLowercaseCspHeader = (): void => {
     'CSP key must be the canonical Title-Case form'
   );
   assert.ok(
-    !resultHeaders!['Content-Security-Policy'][0].includes("default-src 'none'"),
+    !resultHeaders!['Content-Security-Policy'][0].includes(
+      "default-src 'none'"
+    ),
     'Injected CSP must replace the upstream value, not preserve it'
   );
 
@@ -326,11 +332,14 @@ const testHeadersReceived_undefinedResponseHeaders_isSafe = (): void => {
 
   // Simulate responseHeaders being undefined (some Electron versions)
   let resultHeaders: Record<string, string[]> | undefined;
-  handler({ responseHeaders: undefined }, (result) => {
+  handler({ responseHeaders: undefined }, result => {
     resultHeaders = result.responseHeaders;
   });
 
-  assert.ok(resultHeaders, 'Callback must receive responseHeaders even when input is undefined');
+  assert.ok(
+    resultHeaders,
+    'Callback must receive responseHeaders even when input is undefined'
+  );
   assert.ok(
     resultHeaders!['Content-Security-Policy'],
     'CSP header must be present even when upstream headers are undefined'
@@ -379,7 +388,7 @@ const testHardenSession_portUpgrade_reRegistersHeaders = (): void => {
   let cspValue = '';
   const handler1 = session.getHeadersReceivedHandler();
   assert.ok(handler1);
-  handler1({ responseHeaders: {} }, (result) => {
+  handler1({ responseHeaders: {} }, result => {
     cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
   assert.ok(
@@ -404,8 +413,9 @@ const testHardenSession_portUpgrade_reRegistersHeaders = (): void => {
   let upgradedCsp = '';
   const handler2 = session.getHeadersReceivedHandler();
   assert.ok(handler2);
-  handler2({ responseHeaders: {} }, (result) => {
-    upgradedCsp = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  handler2({ responseHeaders: {} }, result => {
+    upgradedCsp =
+      result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
   assert.ok(
     upgradedCsp.includes('http://127.0.0.1:5060'),
@@ -456,7 +466,7 @@ const testProductionCSP_withBackendPort_pinsConnectSrc = (): void => {
   assert.ok(handler);
 
   let cspValue = '';
-  handler({ responseHeaders: {} }, (result) => {
+  handler({ responseHeaders: {} }, result => {
     cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
 
@@ -485,7 +495,7 @@ const testProductionCSP_withoutBackendPort_noLoopbackWildcard = (): void => {
   assert.ok(handler);
 
   let cspValue = '';
-  handler({ responseHeaders: {} }, (result) => {
+  handler({ responseHeaders: {} }, result => {
     cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
 
@@ -520,7 +530,7 @@ const testBuildCsp_invalidPort_failsClosed = (): void => {
     assert.ok(handler, `Handler must be registered for port=${port}`);
 
     let cspValue = '';
-    handler({ responseHeaders: {} }, (result) => {
+    handler({ responseHeaders: {} }, result => {
       cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
     });
 
@@ -550,8 +560,9 @@ const testHardenSession_nanThenValidPort_upgradesCorrectly = (): void => {
   let cspAfterNaN = '';
   const handler1 = session.getHeadersReceivedHandler();
   assert.ok(handler1);
-  handler1({ responseHeaders: {} }, (result) => {
-    cspAfterNaN = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  handler1({ responseHeaders: {} }, result => {
+    cspAfterNaN =
+      result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
   assert.ok(
     !cspAfterNaN.includes('127.0.0.1:'),
@@ -570,8 +581,9 @@ const testHardenSession_nanThenValidPort_upgradesCorrectly = (): void => {
   let cspAfterUpgrade = '';
   const handler2 = session.getHeadersReceivedHandler();
   assert.ok(handler2);
-  handler2({ responseHeaders: {} }, (result) => {
-    cspAfterUpgrade = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
+  handler2({ responseHeaders: {} }, result => {
+    cspAfterUpgrade =
+      result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
   assert.ok(
     cspAfterUpgrade.includes('http://127.0.0.1:5060'),
@@ -593,7 +605,7 @@ const testDevCSP_keepsWildcardRegardlessOfPort = (): void => {
   assert.ok(handler);
 
   let cspValue = '';
-  handler({ responseHeaders: {} }, (result) => {
+  handler({ responseHeaders: {} }, result => {
     cspValue = result.responseHeaders?.['Content-Security-Policy']?.[0] ?? '';
   });
 
@@ -611,16 +623,25 @@ const testDevCSP_keepsWildcardRegardlessOfPort = (): void => {
 const testBuildCsp_productionWithPort = (): void => {
   const { buildCsp } = loadSessionHardening();
   const csp = buildCsp(true, 5060);
-  assert.ok(csp.includes('http://127.0.0.1:5060'), 'Must pin HTTP to port 5060');
+  assert.ok(
+    csp.includes('http://127.0.0.1:5060'),
+    'Must pin HTTP to port 5060'
+  );
   assert.ok(csp.includes('ws://127.0.0.1:5060'), 'Must pin WS to port 5060');
   assert.ok(!csp.includes('127.0.0.1:*'), 'Must NOT contain wildcard');
-  assert.ok(!csp.includes("'unsafe-eval'"), 'Production must NOT include unsafe-eval');
+  assert.ok(
+    !csp.includes("'unsafe-eval'"),
+    'Production must NOT include unsafe-eval'
+  );
 };
 
 const testBuildCsp_productionWithoutPort = (): void => {
   const { buildCsp } = loadSessionHardening();
   const csp = buildCsp(true, undefined);
-  assert.ok(csp.includes("connect-src 'self'"), 'Must include connect-src self');
+  assert.ok(
+    csp.includes("connect-src 'self'"),
+    'Must include connect-src self'
+  );
   assert.ok(!csp.includes('127.0.0.1'), 'Must NOT contain any loopback');
 };
 
@@ -629,7 +650,10 @@ const testBuildCsp_devMode = (): void => {
   const csp = buildCsp(false, 5060);
   assert.ok(csp.includes('127.0.0.1:*'), 'Dev must keep wildcard');
   assert.ok(csp.includes("'unsafe-eval'"), 'Dev must include unsafe-eval');
-  assert.ok(csp.includes("'unsafe-inline'"), 'Dev script-src must include unsafe-inline');
+  assert.ok(
+    csp.includes("'unsafe-inline'"),
+    'Dev script-src must include unsafe-inline'
+  );
 };
 
 // ============================================================
