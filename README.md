@@ -302,7 +302,7 @@ Locked target platforms:
 Install the lock tool and refresh lock artifacts after changing `.github/environment.yml`:
 
 ```bash
-conda install -n base -c conda-forge conda-lock=3.0.4
+conda install -n base -c conda-forge conda-lock=4.0.3
 npm run conda-lock:generate
 ```
 
@@ -536,7 +536,7 @@ lock対象プラットフォーム:
 `.github/environment.yml` を変更したら、lockツールを用意して成果物を更新します。
 
 ```bash
-conda install -n base -c conda-forge conda-lock=3.0.4
+conda install -n base -c conda-forge conda-lock=4.0.3
 npm run conda-lock:generate
 ```
 

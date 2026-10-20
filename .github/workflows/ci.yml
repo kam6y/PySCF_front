@@ -51,7 +51,7 @@ jobs:
     - name: Install locked conda environment
       shell: bash -l {0}
       run: |
-        conda install -n base -c conda-forge conda-lock=3.0.4 -y
+        conda install -n base -c conda-forge conda-lock=4.0.3 -y
         conda-lock install --name pyscf-env .github/pyscf-env.conda-lock.yml
     
     - name: Install Node.js dependencies
