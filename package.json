@@ -67,7 +67,7 @@
     "buffer": "^6.0.3",
     "cross-env": "^10.0.0",
     "electron": "^42.3.3",
-    "electron-builder": "^26.17.0",
+    "electron-builder": "^26.18.0",
     "electron-vite": "^5.0.0",
     "openapi-typescript": "^7.4.2",
     "prettier": "^3.4.2",
