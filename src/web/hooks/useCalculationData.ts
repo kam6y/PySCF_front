@@ -12,7 +12,12 @@ import { useCalculationStore } from '../store/calculationStore';
  * データフェッチングのロジックを単一の場所に集約
  */
 export const useCalculationData = () => {
-  const { activeCalculationId, stagedCalculation } = useCalculationStore();
+  const activeCalculationId = useCalculationStore(
+    state => state.activeCalculationId
+  );
+  const stagedCalculation = useCalculationStore(
+    state => state.stagedCalculation
+  );
 
   // サーバーデータの取得
   const {
@@ -21,8 +26,11 @@ export const useCalculationData = () => {
     error: calculationsError,
   } = useGetCalculations();
 
-  const { data: detailsData, isLoading: detailsLoading } =
-    useGetCalculationDetails(activeCalculationId);
+  const {
+    data: detailsData,
+    isLoading: detailsLoading,
+    error: detailsError,
+  } = useGetCalculationDetails(activeCalculationId);
 
   // アクティブ計算の決定（優先順位付き）
   const activeCalculation = useMemo(() => {
@@ -40,51 +48,24 @@ export const useCalculationData = () => {
     return null;
   }, [stagedCalculation, detailsData?.calculation]);
 
-  // 計算の種類を判定
-  const calculationType = useMemo(() => {
-    if (stagedCalculation) return 'staged';
-    if (detailsData?.calculation) return 'detailed';
-    return 'none';
-  }, [stagedCalculation, detailsData?.calculation]);
-
-  // ステージド計算かどうか
-  const isStagedCalculation = useMemo(
-    () => calculationType === 'staged',
-    [calculationType]
-  );
-
-  // ローディング状態
-  const isLoading =
-    calculationsLoading ||
-    (activeCalculationId && !stagedCalculation && detailsLoading);
-
   // サイドバー用の計算リスト
   const sidebarCalculations = useMemo(() => {
-    if (!calculationsData?.calculations) return [];
-
-    return calculationsData.calculations.filter(
-      calc => calc.status !== 'pending' || true // 必要に応じてフィルタリング条件を調整
-    );
+    return calculationsData?.calculations ?? [];
   }, [calculationsData]);
 
   return {
     // メイン状態
     activeCalculation,
     activeCalculationId,
-    calculationType,
-    isStagedCalculation,
+    isStagedCalculation: !!stagedCalculation,
 
     // ローディングとエラー状態
-    isLoading,
     detailsLoading,
     calculationsLoading,
     calculationsError,
+    detailsError,
 
     // 補助データ
     sidebarCalculations,
-
-    // 生のデータ（必要に応じて）
-    calculationsData,
-    detailsData,
   };
 };

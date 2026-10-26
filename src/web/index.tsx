@@ -4,7 +4,8 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
-import { ApiError } from './apiClient';
+import { ApiError } from './api/core';
+import { getBackendRuntimeConfig } from './runtime-config';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -57,24 +58,48 @@ const queryClient = new QueryClient({
 const root = createRoot(document.getElementById('root') as Element);
 
 // URLパラメータ経由で取得したポート番号（preloadで設定済み）
-const flaskPort = window.electronAPI?.flaskPort;
+const { backendPort } = getBackendRuntimeConfig();
 
-if (!flaskPort) {
-  console.error('[index.tsx] CRITICAL: Flask port not available from preload.');
-  console.error('[index.tsx] This indicates a serious initialization failure.');
-  // 本番環境では、ここでユーザーにエラーダイアログを表示することを推奨
+if (!backendPort) {
+  console.error(
+    '[index.tsx] CRITICAL: Backend port not available from preload.'
+  );
+
+  // ポート未取得時はエラーUIをレンダリングし、アプリを起動しない（fail-fast）
+  root.render(
+    <StrictMode>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          fontFamily: 'system-ui, sans-serif',
+          color: '#c0392b',
+          textAlign: 'center',
+          padding: '2rem',
+        }}
+      >
+        <h1 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>
+          アプリケーションの起動に失敗しました
+        </h1>
+        <p>
+          バックエンドサーバーのポート番号を取得できませんでした。
+          <br />
+          アプリを再起動してください。
+        </p>
+      </div>
+    </StrictMode>
+  );
+} else {
+  console.log('[index.tsx] Rendering app with backend port:', backendPort);
+
+  root.render(
+    <StrictMode>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </StrictMode>
+  );
 }
-
-// グローバル変数に保存（WebSocket接続用）
-window.flaskPort = flaskPort || 5000;
-
-console.log('[index.tsx] Rendering app with Flask port:', window.flaskPort);
-
-// 即座にレンダリング開始（ポートは既に確定済み）
-root.render(
-  <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
-  </StrictMode>
-);

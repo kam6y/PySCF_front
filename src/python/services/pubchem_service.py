@@ -14,6 +14,26 @@ from .exceptions import ServiceError, NotFoundError, ValidationError
 
 logger = logging.getLogger(__name__)
 
+VALID_SEARCH_TYPES = ("name", "cid", "formula")
+
+
+def _validate_search_type(search_type: str) -> None:
+    """Validate PubChem search type."""
+    if search_type not in VALID_SEARCH_TYPES:
+        raise ValidationError(
+            f"Invalid search type. Must be one of: {', '.join(VALID_SEARCH_TYPES)}"
+        )
+
+
+def _raise_service_error_from_pubchem(error: PubChemError) -> None:
+    """Map PubChem client errors to service-layer exceptions."""
+    if hasattr(error, "status_code"):
+        if error.status_code == 404:
+            raise NotFoundError(str(error))
+        if error.status_code == 400:
+            raise ValidationError(str(error))
+    raise ServiceError(str(error))
+
 
 class PubChemService:
     """Service for PubChem molecular data operations."""
@@ -44,16 +64,13 @@ class PubChemService:
             ServiceError: For other errors
         """
         try:
-            # Validate search type
-            valid_types = ['name', 'cid', 'formula']
-            if search_type not in valid_types:
-                raise ValidationError(f"Invalid search type. Must be one of: {', '.join(valid_types)}")
+            _validate_search_type(search_type)
             
-            logger.info(f"Searching PubChem for '{query}' (type: {search_type})")
+            logger.info(f"Searching PubChem (type: {search_type}, query_length={len(query)})")
             
             compound_data = self.client.search_compound(query, search_type)
             if not compound_data or not compound_data.atoms:
-                raise NotFoundError(f'No compound with a 3D structure found for query: {query}')
+                raise NotFoundError('No compound with a 3D structure found')
             
             logger.info(f"Found CID {compound_data.cid} with {len(compound_data.atoms)} atoms.")
             
@@ -83,13 +100,7 @@ class PubChemService:
             raise NotFoundError(str(e))
         except PubChemError as e:
             logger.error(f"A PubChem API error occurred: {e}", exc_info=True)
-            # Map PubChem error status codes to service exceptions
-            if hasattr(e, 'status_code'):
-                if e.status_code == 404:
-                    raise NotFoundError(str(e))
-                elif e.status_code == 400:
-                    raise ValidationError(str(e))
-            raise ServiceError(str(e))
+            _raise_service_error_from_pubchem(e)
         except Exception as e:
             logger.error(f"An unexpected error occurred: {e}", exc_info=True)
             raise ServiceError('An internal server error occurred.')
@@ -127,74 +138,4 @@ class PubChemService:
             raise ServiceError('XYZ string too large to process.', status_code=413)
         except Exception as e:
             logger.error(f"Unexpected error during XYZ validation: {e}", exc_info=True)
-            raise ServiceError('An internal server error occurred.')
-
-    def get_compound_smiles(self, query: str, search_type: str = 'name') -> Dict[str, Any]:
-        """
-        Get the canonical SMILES and properties for a compound from PubChem.
-
-        Args:
-            query: Search query (compound name, CID, or formula)
-            search_type: Type of search ('name', 'cid', or 'formula')
-
-        Returns:
-            Dict containing SMILES and compound information:
-            {
-                'smiles': str,
-                'compound_info': {
-                    'cid': int,
-                    'iupac_name': str,
-                    'molecular_formula': str,
-                    'molecular_weight': float
-                }
-            }
-
-        Raises:
-            NotFoundError: If compound not found
-            ValidationError: If search type is invalid
-            ServiceError: For other errors
-        """
-        try:
-            # Validate search type
-            valid_types = ['name', 'cid', 'formula']
-            if search_type not in valid_types:
-                raise ValidationError(f"Invalid search type. Must be one of: {', '.join(valid_types)}")
-
-            logger.info(f"Retrieving SMILES from PubChem for '{query}' (type: {search_type})")
-
-            result = self.client.get_compound_smiles(query, search_type)
-
-            if not result or not result.get('smiles'):
-                raise NotFoundError(f'No SMILES found for query: {query}')
-
-            logger.info(f"Successfully retrieved SMILES for '{query}': {result['smiles']}")
-
-            return {
-                'smiles': result['smiles'],
-                'compound_info': {
-                    'cid': result['cid'],
-                    'iupac_name': result['iupac_name'],
-                    'molecular_formula': result['molecular_formula'],
-                    'molecular_weight': result['molecular_weight']
-                }
-            }
-
-        except ValidationError:
-            raise  # Re-raise ValidationError to propagate to caller
-        except NotFoundError:
-            raise  # Re-raise NotFoundError to propagate to caller
-        except PubChemNotFoundError as e:
-            logger.warning(f"PubChem SMILES search failed (Not Found): {e}")
-            raise NotFoundError(str(e))
-        except PubChemError as e:
-            logger.error(f"A PubChem API error occurred: {e}", exc_info=True)
-            # Map PubChem error status codes to service exceptions
-            if hasattr(e, 'status_code'):
-                if e.status_code == 404:
-                    raise NotFoundError(str(e))
-                elif e.status_code == 400:
-                    raise ValidationError(str(e))
-            raise ServiceError(str(e))
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}", exc_info=True)
             raise ServiceError('An internal server error occurred.')

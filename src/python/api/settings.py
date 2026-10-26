@@ -1,79 +1,54 @@
-"""
-Settings management API endpoints.
-Handles application settings retrieval and updates.
-"""
+"""Settings management API endpoints."""
 
-import logging
-from flask import Blueprint, jsonify
-from flask_pydantic import validate
+from typing import Any, Dict
 
-from services import get_settings_service, ServiceError
+from fastapi import APIRouter
+
 from generated_models import SettingsUpdateRequest
+from services import get_settings_service
 
-# Set up logging
-logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/settings")
 
-# Create settings blueprint
-settings_bp = Blueprint('settings', __name__)
-
-
-@settings_bp.route('/api/settings', methods=['GET'])
-def get_settings():
-    """Get current application settings."""
-    try:
-        settings_service = get_settings_service()
-        
-        # Call service layer
-        settings = settings_service.get_settings()
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'settings': settings
-            }
-        })
-    except ServiceError as e:
-        logger.error(f"Service error retrieving settings: {e}")
-        return jsonify({
-            'success': False,
-            'error': e.message
-        }), e.status_code
-    except Exception as e:
-        logger.error(f"Failed to retrieve settings: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred.'
-        }), 500
+# ---------------------------------------------------------------------------
+# Key used to indicate whether an API key is stored (without revealing it)
+# ---------------------------------------------------------------------------
+_API_KEY_FIELD = "gemini_api_key"
+_API_KEY_CONFIGURED_FIELD = "gemini_api_key_configured"
 
 
-@settings_bp.route('/api/settings', methods=['PUT'])
-@validate()
-def update_settings(body: SettingsUpdateRequest):
-    """Update application settings."""
-    try:
-        settings_service = get_settings_service()
-        
-        # Extract settings from root model
-        new_settings = body.root if hasattr(body, 'root') else body
-        
-        # Call service layer
-        updated_settings = settings_service.update_settings(new_settings.model_dump())
-        
-        return jsonify({
-            'success': True,
-            'data': {
-                'settings': updated_settings
-            }
-        })
-    except ServiceError as e:
-        logger.error(f"Service error updating settings: {e}")
-        return jsonify({
-            'success': False,
-            'error': e.message
-        }), e.status_code
-    except Exception as e:
-        logger.error(f"Failed to update settings: {e}", exc_info=True)
-        return jsonify({
-            'success': False,
-            'error': 'An internal server error occurred.'
-        }), 500
+def _mask_api_key_for_response(settings: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of *settings* with the real API key removed.
+
+    Adds a boolean ``gemini_api_key_configured`` flag so the UI can tell
+    whether a key has been stored, without ever exposing the secret over
+    the HTTP boundary.
+
+    Args:
+        settings: Raw settings dict (may contain the plaintext key).
+
+    Returns:
+        A new dict safe for HTTP responses.
+    """
+    masked = {**settings}
+    real_key = masked.get(_API_KEY_FIELD)
+    masked[_API_KEY_CONFIGURED_FIELD] = bool(real_key)
+    masked[_API_KEY_FIELD] = ""
+    return masked
+
+
+@router.get("")
+def get_settings() -> dict:
+    settings = get_settings_service().get_settings()
+    return {"success": True, "data": {"settings": _mask_api_key_for_response(settings)}}
+
+
+@router.put("")
+def update_settings(body: SettingsUpdateRequest) -> dict:
+    new_settings = body.root if hasattr(body, "root") else body
+    updated_settings = get_settings_service().update_settings(
+        new_settings.model_dump(mode="json")
+    )
+    return {
+        "success": True,
+        "data": {"settings": _mask_api_key_for_response(updated_settings)},
+    }

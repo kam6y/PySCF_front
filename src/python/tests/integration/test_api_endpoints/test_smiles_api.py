@@ -5,7 +5,6 @@ Tests the SMILES-to-XYZ conversion endpoint, ensuring proper
 handling of various SMILES strings and error conditions.
 """
 
-import pytest
 from services.exceptions import ValidationError, ServiceError
 
 
@@ -20,76 +19,49 @@ class TestSMILESConvertAPI:
         """
         # ARRANGE
         mock_result = {
-            'xyz': 'O 0.0000 0.0000 0.1173\nH 0.0000 0.7572 -0.4692\nH 0.0000 -0.7572 -0.4692',
-            'smiles': 'O'
+            "xyz": "O 0.0000 0.0000 0.1173\nH 0.0000 0.7572 -0.4692\nH 0.0000 -0.7572 -0.4692",
+            "smiles": "O",
         }
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
+        mock_service = mocker.patch("api.smiles.get_smiles_service")
         mock_service.return_value.convert_smiles.return_value = mock_result
 
         # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': 'O'
-        })
+        response = client.post("/api/smiles/convert", json={"smiles": "O"})
 
         # ASSERT
         assert response.status_code == 200
-        data = response.get_json()
-        assert data['success'] is True
-        assert 'data' in data
-        assert 'xyz' in data['data']
-        assert 'O' in data['data']['xyz']
-        assert 'H' in data['data']['xyz']
-        
+        data = response.json()
+        assert data["success"] is True
+        assert "data" in data
+        assert "xyz" in data["data"]
+        assert "O" in data["data"]["xyz"]
+        assert "H" in data["data"]["xyz"]
+
         # Verify service was called correctly
-        mock_service.return_value.convert_smiles.assert_called_once_with('O')
+        mock_service.return_value.convert_smiles.assert_called_once_with("O")
 
-    def test_convert_complex_smiles(self, client, mocker):
-        """
-        GIVEN SMILESService handles complex molecules
-        WHEN POST /api/smiles/convert is called with benzene SMILES
-        THEN conversion succeeds
-        """
-        # ARRANGE
-        benzene_smiles = 'c1ccccc1'
-        mock_result = {
-            'xyz': 'C 0 0 0\nC 1 0 0\nC 1.5 0.866 0\nC 1.5 1.732 0\nC 1 2.598 0\nC 0 2.598 0',
-            'smiles': benzene_smiles
-        }
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
-        mock_service.return_value.convert_smiles.return_value = mock_result
-
-        # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': benzene_smiles
-        })
-
-        # ASSERT
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['success'] is True
-        assert 'C' in data['data']['xyz']
-
-    def test_convert_with_whitespace_trimming(self, client, mocker):
+    def test_convert_passes_request_smiles_to_service(self, client, mocker):
         """
         GIVEN SMILES string has leading/trailing whitespace
         WHEN POST /api/smiles/convert is called
-        THEN whitespace is trimmed before conversion
+        THEN the API delegates validation and trimming to the service layer
         """
         # ARRANGE
-        smiles_with_whitespace = '  CCO  '
-        mock_result = {'xyz': 'C 0 0 0\nC 1 0 0\nO 2 0 0', 'smiles': 'CCO'}
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
+        smiles_with_whitespace = "  CCO  "
+        mock_result = {"xyz": "C 0 0 0\nC 1 0 0\nO 2 0 0", "smiles": "CCO"}
+        mock_service = mocker.patch("api.smiles.get_smiles_service")
         mock_service.return_value.convert_smiles.return_value = mock_result
 
         # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': smiles_with_whitespace
-        })
+        response = client.post(
+            "/api/smiles/convert", json={"smiles": smiles_with_whitespace}
+        )
 
         # ASSERT
         assert response.status_code == 200
-        # Service should receive trimmed version
-        mock_service.return_value.convert_smiles.assert_called_once_with(smiles_with_whitespace)
+        mock_service.return_value.convert_smiles.assert_called_once_with(
+            smiles_with_whitespace
+        )
 
     def test_convert_invalid_smiles(self, client, mocker):
         """
@@ -98,20 +70,20 @@ class TestSMILESConvertAPI:
         THEN 400 Bad Request is returned
         """
         # ARRANGE
-        invalid_smiles = 'INVALID_SMILES_XXX'
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
-        mock_service.return_value.convert_smiles.side_effect = ValidationError("Invalid SMILES string")
+        invalid_smiles = "INVALID_SMILES_XXX"
+        mock_service = mocker.patch("api.smiles.get_smiles_service")
+        mock_service.return_value.convert_smiles.side_effect = ValidationError(
+            "Invalid SMILES string"
+        )
 
         # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': invalid_smiles
-        })
+        response = client.post("/api/smiles/convert", json={"smiles": invalid_smiles})
 
         # ASSERT
         assert response.status_code == 400
-        data = response.get_json()
-        assert data['success'] is False
-        assert 'error' in data
+        data = response.json()
+        assert data["success"] is False
+        assert "error" in data
 
     def test_convert_empty_smiles(self, client):
         """
@@ -120,9 +92,7 @@ class TestSMILESConvertAPI:
         THEN 400 Bad Request is returned
         """
         # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': ''
-        })
+        response = client.post("/api/smiles/convert", json={"smiles": ""})
 
         # ASSERT
         assert response.status_code == 400
@@ -134,7 +104,7 @@ class TestSMILESConvertAPI:
         THEN 400 Bad Request is returned
         """
         # ACT
-        response = client.post('/api/smiles/convert', json={})
+        response = client.post("/api/smiles/convert", json={})
 
         # ASSERT
         assert response.status_code == 400
@@ -146,21 +116,19 @@ class TestSMILESConvertAPI:
         THEN appropriate error status is returned
         """
         # ARRANGE
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
+        mock_service = mocker.patch("api.smiles.get_smiles_service")
         mock_service.return_value.convert_smiles.side_effect = ServiceError(
-            "RDKit library error",
-            status_code=500
+            "RDKit library error", status_code=500
         )
 
         # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': 'CCO'
-        })
+        response = client.post("/api/smiles/convert", json={"smiles": "CCO"})
 
         # ASSERT
         assert response.status_code == 500
-        data = response.get_json()
-        assert data['success'] is False
+        data = response.json()
+        assert data["success"] is False
+        assert data["error"] == "An internal server error occurred."
 
     def test_convert_whitespace_only_smiles(self, client):
         """
@@ -169,35 +137,10 @@ class TestSMILESConvertAPI:
         THEN 400 Bad Request is returned
         """
         # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': '   '
-        })
+        response = client.post("/api/smiles/convert", json={"smiles": "   "})
 
         # ASSERT
         assert response.status_code == 400
-
-    def test_convert_very_long_smiles(self, client, mocker):
-        """
-        GIVEN very long SMILES string
-        WHEN POST /api/smiles/convert is called
-        THEN service handles it appropriately
-        """
-        # ARRANGE
-        # Create a long SMILES (polymer-like)
-        long_smiles = 'C' * 1000
-        mock_result = {'xyz': 'C 0 0 0', 'smiles': long_smiles}
-        mock_service = mocker.patch('api.smiles.get_smiles_service')
-        mock_service.return_value.convert_smiles.return_value = mock_result
-
-        # ACT
-        response = client.post('/api/smiles/convert', json={
-            'smiles': long_smiles
-        })
-
-        # ASSERT
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['success'] is True
 
     def test_convert_invalid_json(self, client):
         """
@@ -207,10 +150,82 @@ class TestSMILESConvertAPI:
         """
         # ACT
         response = client.post(
-            '/api/smiles/convert',
-            data='invalid json',
-            content_type='application/json'
+            "/api/smiles/convert",
+            content=b"invalid json",
+            headers={"Content-Type": "application/json"},
         )
 
         # ASSERT
         assert response.status_code == 400
+
+
+class TestSMILESExtraFieldRejection:
+    """Security tests: extra='forbid' rejects unknown fields at the Pydantic layer."""
+
+    def test_convert_rejects_unknown_fields(self, client):
+        """
+        GIVEN a valid SMILES convert payload with an extra unknown field
+        WHEN POST /api/smiles/convert is called
+        THEN 400 is returned because SMILESConvertRequest has extra='forbid'
+        """
+        payload = {"smiles": "O", "unknown_field": "x"}
+
+        response = client.post("/api/smiles/convert", json=payload)
+
+        assert response.status_code == 400
+        body = response.json()
+        assert body["success"] is False
+        assert "unknown_field" in body["error"]
+
+
+class TestSMILESInputLengthLimits:
+    """Security tests for input length validation on SMILES endpoints."""
+
+    def test_convert_smiles_over_max_length_returns_400(self, client):
+        """
+        GIVEN a SMILES string exceeding MAX_SMILES_LENGTH (10_000)
+        WHEN POST /api/smiles/convert is called
+        THEN 400 Bad Request is returned
+        """
+        # ARRANGE
+        overlength_smiles = "C" * 10_001
+
+        # ACT
+        response = client.post(
+            "/api/smiles/convert",
+            json={
+                "smiles": overlength_smiles,
+            },
+        )
+
+        # ASSERT
+        assert response.status_code == 400
+        data = response.json()
+        assert data["success"] is False
+
+    def test_convert_smiles_at_max_length_is_not_rejected_for_length(
+        self, client, mocker
+    ):
+        """
+        GIVEN a SMILES string exactly at MAX_SMILES_LENGTH (10_000)
+        WHEN POST /api/smiles/convert is called
+        THEN the request is not rejected for length (200 OK with mocked service)
+        """
+        # ARRANGE
+        boundary_smiles = "C" * 10_000
+        mock_result = {"xyz": "C 0 0 0", "smiles": boundary_smiles}
+        mock_service = mocker.patch("api.smiles.get_smiles_service")
+        mock_service.return_value.convert_smiles.return_value = mock_result
+
+        # ACT
+        response = client.post(
+            "/api/smiles/convert",
+            json={
+                "smiles": boundary_smiles,
+            },
+        )
+
+        # ASSERT
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True

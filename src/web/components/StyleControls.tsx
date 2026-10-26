@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSpec } from '../../types/3dmol';
-import { VAN_DER_WAALS_RADII } from '../data/atomicRadii';
 import styles from './StyleControls.module.css';
 
 export interface StyleControlsProps {
@@ -10,11 +9,13 @@ export interface StyleControlsProps {
   onShowAxesChange: (show: boolean) => void;
   showCoordinates: boolean;
   onShowCoordinatesChange: (show: boolean) => void;
+  showAtomNumbers: boolean;
+  onShowAtomNumbersChange: (show: boolean) => void;
   useAtomicRadii?: boolean;
   onUseAtomicRadiiChange?: (use: boolean) => void;
 }
 
-export type VisualizationStyle = 'stick' | 'sphere' | 'ball-and-stick' | 'line';
+export type VisualizationStyle = 'stick' | 'sphere';
 
 export interface StyleOption {
   id: VisualizationStyle;
@@ -33,16 +34,6 @@ const styleOptions: StyleOption[] = [
     label: 'Space-filling',
     description: 'Show atoms as spheres',
   },
-  {
-    id: 'ball-and-stick',
-    label: 'Ball & Stick',
-    description: 'Combination of spheres and sticks',
-  },
-  {
-    id: 'line',
-    label: 'Wireframe',
-    description: 'Show bonds as thin lines',
-  },
 ];
 
 export const StyleControls: React.FC<StyleControlsProps> = ({
@@ -52,61 +43,53 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
   onShowAxesChange,
   showCoordinates,
   onShowCoordinatesChange,
+  showAtomNumbers,
+  onShowAtomNumbersChange,
   useAtomicRadii = false,
   onUseAtomicRadiiChange,
 }) => {
-  const [selectedStyle, setSelectedStyle] =
-    useState<VisualizationStyle>('ball-and-stick');
+  const [selectedStyles, setSelectedStyles] = useState<Set<VisualizationStyle>>(
+    () => new Set<VisualizationStyle>(['stick', 'sphere'])
+  );
   const [atomRadius, setAtomRadius] = useState(0.3);
   const [bondRadius, setBondRadius] = useState(0.15);
 
-  const generateStyleSpec = (style: VisualizationStyle): StyleSpec => {
-    switch (style) {
-      case 'stick':
-        return {
-          stick: {
-            radius: bondRadius,
-            colorscheme: 'default',
-          },
-        };
+  const toggleStyle = useCallback((id: VisualizationStyle) => {
+    setSelectedStyles(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        // Prevent unchecking the last selected style
+        if (next.size === 1) return prev;
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
 
-      case 'sphere':
-        return {
-          sphere: {
-            radius: atomRadius,
-            colorscheme: 'default',
-          },
+  const generateStyleSpec = useCallback(
+    (selected: Set<VisualizationStyle>): StyleSpec => {
+      const spec: StyleSpec = {};
+      if (selected.has('stick')) {
+        spec.stick = {
+          radius: bondRadius,
+          colorscheme: 'default',
         };
-
-      case 'ball-and-stick':
-        return {
-          stick: {
-            radius: bondRadius,
-            colorscheme: 'default',
-          },
-          sphere: {
-            radius: atomRadius,
-            colorscheme: 'default',
-          },
+      }
+      if (selected.has('sphere')) {
+        spec.sphere = {
+          radius: atomRadius,
+          colorscheme: 'default',
         };
-
-      case 'line':
-        return {
-          line: {
-            linewidth: 2,
-          },
-        };
-
-      default:
-        return {
-          stick: { radius: 0.2 },
-          sphere: { radius: 0.3 },
-        };
-    }
-  };
+      }
+      return spec;
+    },
+    [atomRadius, bondRadius]
+  );
 
   useEffect(() => {
-    const styleSpec = generateStyleSpec(selectedStyle);
+    const styleSpec = generateStyleSpec(selectedStyles);
     // Add metadata to indicate if atomic radii should be used
     if (useAtomicRadii) {
       (styleSpec as any)._useAtomicRadii = true;
@@ -115,7 +98,13 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       (styleSpec as any)._useAtomicRadii = false;
     }
     onStyleChange(styleSpec);
-  }, [selectedStyle, atomRadius, bondRadius, onStyleChange, useAtomicRadii]);
+  }, [
+    selectedStyles,
+    generateStyleSpec,
+    onStyleChange,
+    useAtomicRadii,
+    atomRadius,
+  ]);
 
   return (
     <div className={`${styles.styleControls} ${className}`}>
@@ -124,27 +113,29 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
       </div>
 
       <div className={styles.styleOptions}>
-        {styleOptions.map(option => (
-          <label
-            key={option.id}
-            className={`${styles.styleOption} ${selectedStyle === option.id ? styles.selected : ''}`}
-          >
-            <input
-              type="radio"
-              name="visualization-style"
-              value={option.id}
-              checked={selectedStyle === option.id}
-              onChange={() => setSelectedStyle(option.id)}
-              className={styles.styleRadio}
-            />
-            <div className={styles.optionContent}>
-              <div className={styles.optionLabel}>{option.label}</div>
-            </div>
-          </label>
-        ))}
+        {styleOptions.map(option => {
+          const isSelected = selectedStyles.has(option.id);
+          return (
+            <label
+              key={option.id}
+              className={`${styles.styleOption} ${isSelected ? styles.selected : ''}`}
+            >
+              <input
+                type="checkbox"
+                value={option.id}
+                checked={isSelected}
+                onChange={() => toggleStyle(option.id)}
+                className={styles.styleRadio}
+              />
+              <div className={styles.optionContent}>
+                <div className={styles.optionLabel}>{option.label}</div>
+              </div>
+            </label>
+          );
+        })}
       </div>
 
-      {(selectedStyle === 'sphere' || selectedStyle === 'ball-and-stick') && (
+      {selectedStyles.has('sphere') && (
         <div className={styles.sizeControlSection}>
           <div
             className={`${styles.toggleSwitch} ${styles.toggleSwitchWithMargin}`}
@@ -177,7 +168,7 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
         </div>
       )}
 
-      {(selectedStyle === 'stick' || selectedStyle === 'ball-and-stick') && (
+      {selectedStyles.has('stick') && (
         <div className={styles.sizeControlSection}>
           <div className={styles.sliderControl}>
             <label className={styles.sliderLabel}>
@@ -215,6 +206,17 @@ export const StyleControls: React.FC<StyleControlsProps> = ({
               type="checkbox"
               checked={showCoordinates}
               onChange={e => onShowCoordinatesChange(e.target.checked)}
+            />
+            <span className="slider"></span>
+          </label>
+        </div>
+        <div className={styles.toggleSwitch} style={{ marginTop: '12px' }}>
+          <span className={styles.toggleLabel}>Show Atom Numbers</span>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={showAtomNumbers}
+              onChange={e => onShowAtomNumbersChange(e.target.checked)}
             />
             <span className="slider"></span>
           </label>

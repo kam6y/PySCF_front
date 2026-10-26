@@ -70,8 +70,13 @@ info:
     - ❌ Rejects: TDDFT request with `optimize_geometry: true` (disabled for TDDFT)
     
     See the `/api/quantum/supported-parameters` endpoint for runtime parameter constraints and method defaults.
+
+    ### Authentication
+
+    Runtime API routes are protected by the `X-Auth-Token` header when `PYSCF_AUTH_TOKEN` is configured.
+    Development-only API documentation routes (`/api-docs` and `/api-docs/spec.json`) are intentionally not part of this OpenAPI contract.
     
-  version: 0.1.7-beta
+  version: 0.1.8-beta
   license:
     name: Apache-2.0
     url: https://opensource.org/licenses/Apache-2.0
@@ -82,11 +87,17 @@ servers:
 
 paths:
   /health:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Health check endpoint
       description: Check if the API server is running
       operationId: healthCheck
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Server is healthy
           content:
@@ -95,7 +106,11 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
 
   /api/pubchem/search:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Search PubChem for compounds
       description: Search PubChem by name, CID, or formula and return 3D structure in XYZ format
       operationId: searchPubChem
@@ -106,6 +121,8 @@ paths:
             schema:
               $ref: '#/components/schemas/PubChemSearchRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Compound found and XYZ generated
           content:
@@ -132,7 +149,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/smiles/convert:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Convert SMILES to XYZ format
       description: Convert a SMILES string to 3D XYZ molecular structure
       operationId: convertSmiles
@@ -143,6 +164,8 @@ paths:
             schema:
               $ref: '#/components/schemas/SMILESConvertRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: SMILES converted successfully
           content:
@@ -163,7 +186,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/pubchem/validate:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Validate XYZ format
       description: Validate an XYZ format string
       operationId: validateXYZ
@@ -174,12 +201,20 @@ paths:
             schema:
               $ref: '#/components/schemas/XYZValidateRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: XYZ validation result
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/XYZValidateResponse'
+        '400':
+          description: Invalid request (e.g., XYZ string exceeds maximum length)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           description: Internal server error
           content:
@@ -188,7 +223,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculate:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Start quantum chemistry calculation
       description: Start a calculation in the background
       operationId: startCalculation
@@ -199,6 +238,8 @@ paths:
             schema:
               $ref: '#/components/schemas/QuantumCalculationRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '202':
           description: Calculation queued successfully
           content:
@@ -219,7 +260,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: List calculations with optional filtering
       description: Get a list of calculation directories with optional filtering by name, status, method, basis set, and date range. Filtering is performed at the file system level for optimal performance.
       operationId: listCalculations
@@ -241,8 +286,7 @@ paths:
           in: query
           required: false
           schema:
-            type: string
-            enum: [DFT, HF, MP2, CCSD, TDDFT, CASCI, CASSCF]
+            $ref: '#/components/schemas/CalculationMethod'
           description: Filter by calculation method
         - name: basis_function
           in: query
@@ -265,6 +309,8 @@ paths:
             format: date
           description: End date for date range filtering (ISO format YYYY-MM-DD)
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: List of calculations matching filter criteria
           content:
@@ -278,8 +324,97 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/quantum/calculations/{calculationId}:
+  /api/quantum/calculations/updates/stream:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
+      tags:
+        - Quantum Calculation
+      summary: Stream calculation updates
+      operationId: streamCalculationUpdates
+      description: |
+        Opens a Server-Sent Events stream for all calculation updates.
+        Each event line contains a JSON `CalculationUpdateStreamEvent`.
+      responses:
+        '200':
+          description: Successfully opened a calculation update SSE stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/quantum/calculations/{calculationId}/updates/stream:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
+    get:
+      security:
+        - AuthToken: []
+      tags:
+        - Quantum Calculation
+      summary: Stream updates for one calculation
+      operationId: streamCalculationUpdatesForCalculation
+      parameters:
+        - name: calculationId
+          in: path
+          required: true
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
+          schema:
+            type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
+      description: |
+        Opens a Server-Sent Events stream for one calculation and emits the
+        current calculation payload before future updates.
+      responses:
+        '200':
+          description: Successfully opened a calculation-specific SSE stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/quantum/status:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
+    get:
+      security:
+        - AuthToken: []
+      summary: Get calculation system status
+      description: Get current process pool and host system status for quantum calculations
+      operationId: getCalculationStatus
+      responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '200':
+          description: Calculation system status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalculationStatusResponse'
+        '503':
+          description: Process manager temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to get calculation system status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/quantum/calculations/{calculationId}:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
+    get:
+      security:
+        - AuthToken: []
       summary: Get calculation details
       description: Get detailed information about a specific calculation
       operationId: getCalculationDetails
@@ -287,10 +422,13 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Calculation details
           content:
@@ -310,17 +448,20 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    patch:
+    put:
+      security:
+        - AuthToken: []
       summary: Update calculation metadata
       description: Update calculation name and other metadata
-      operationId: patchCalculation
+      operationId: updateCalculation
       parameters:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       requestBody:
         required: true
         content:
@@ -328,6 +469,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CalculationUpdateRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Calculation updated successfully
           content:
@@ -354,6 +497,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     delete:
+      security:
+        - AuthToken: []
       summary: Delete calculation
       description: Delete a calculation and all its associated files
       operationId: deleteCalculation
@@ -361,16 +506,25 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Calculation deleted successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CalculationDeleteResponse'
+        '400':
+          description: Calculation cannot be deleted while it is non-terminal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: Calculation not found
           content:
@@ -385,7 +539,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/pause:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Pause a running calculation
       description: Safely pause a running calculation after the current SCF iteration completes. The calculation can be resumed later from the checkpoint.
       operationId: pauseCalculation
@@ -393,10 +551,13 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '202':
           description: Pause request accepted
           content:
@@ -423,7 +584,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/resume:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Resume a paused calculation
       description: Resume a paused calculation from its checkpoint file. The calculation will continue from where it was paused.
       operationId: resumeCalculation
@@ -431,10 +596,13 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '202':
           description: Resume request accepted
           content:
@@ -461,7 +629,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/orbitals:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get molecular orbital information
       description: Get list of all molecular orbitals with energies and indices
       operationId: getOrbitals
@@ -469,10 +641,13 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Molecular orbital information
           content:
@@ -493,7 +668,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/orbitals/{orbitalIndex}/cube:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Generate and get molecular orbital CUBE file
       description: Generate CUBE file for specific molecular orbital visualization
       operationId: getOrbitalCube
@@ -501,9 +680,10 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
         - name: orbitalIndex
           in: path
           required: true
@@ -539,6 +719,8 @@ paths:
             maximum: -0.001
             default: -0.02
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Orbital CUBE file data
           content:
@@ -559,7 +741,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/orbitals/cube-files:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: List CUBE files for a calculation
       description: List all saved CUBE files for molecular orbitals in a calculation
       operationId: listCubeFiles
@@ -567,10 +753,13 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: CUBE files list retrieved successfully
           content:
@@ -591,6 +780,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     delete:
+      security:
+        - AuthToken: []
       summary: Delete CUBE files for a calculation
       description: Delete CUBE files for specific orbital or all orbitals in a calculation
       operationId: deleteCubeFiles
@@ -598,16 +789,19 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
-        - name: orbitalIndex
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
+        - name: orbital_index
           in: query
           required: false
           description: Specific orbital index to delete (if not provided, deletes all)
           schema:
             type: integer
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: CUBE files deleted successfully
           content:
@@ -628,7 +822,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/calculations/{calculationId}/ir-spectrum:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Generate IR spectrum for a calculation
       description: Generate theoretical IR spectrum from vibrational frequency data with scale factor corrections and Lorentzian broadening
       operationId: getIRSpectrum
@@ -636,10 +834,11 @@ paths:
         - name: calculationId
           in: path
           required: true
-          description: Unique calculation ID
+          description: Unique calculation ID. Must be a single path segment; empty, `.`, `..`, slash, and backslash are not allowed.
           schema:
             type: string
-        - name: broadeningFwhm
+            pattern: '^(?!\.{1,2}$)[^/\\]+$'
+        - name: broadening_fwhm
           in: query
           required: false
           description: Full width at half maximum for Lorentzian broadening in cm⁻¹
@@ -649,7 +848,7 @@ paths:
             default: 100.0
             minimum: 0.1
             maximum: 1000.0
-        - name: xMin
+        - name: x_min
           in: query
           required: false
           description: Minimum wavenumber for spectrum range in cm⁻¹
@@ -659,7 +858,7 @@ paths:
             default: 400.0
             minimum: 0.0
             maximum: 4500.0
-        - name: xMax
+        - name: x_max
           in: query
           required: false
           description: Maximum wavenumber for spectrum range in cm⁻¹
@@ -668,7 +867,7 @@ paths:
             format: float
             default: 4000.0
             maximum: 4500.0
-        - name: showPeaks
+        - name: show_peaks
           in: query
           required: false
           description: Whether to mark individual peaks in the plot
@@ -676,6 +875,8 @@ paths:
             type: boolean
             default: true
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: IR spectrum generated successfully
           content:
@@ -702,11 +903,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/quantum/supported-parameters:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get supported quantum chemistry parameters
       description: Get lists of supported calculation methods, basis functions, exchange-correlation functionals, and solvents
       operationId: getSupportedParameters
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Supported parameters retrieved successfully
           content:
@@ -721,11 +928,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/settings:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get application settings
       description: Retrieve current application settings including parallel processing limits
       operationId: getSettings
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Settings retrieved successfully
           content:
@@ -740,6 +953,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     put:
+      security:
+        - AuthToken: []
       summary: Update application settings
       description: Update application settings including parallel processing limits
       operationId: updateSettings
@@ -750,6 +965,8 @@ paths:
             schema:
               $ref: '#/components/schemas/SettingsUpdateRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Settings updated successfully
           content:
@@ -770,11 +987,17 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/system/resource-status:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get system resource status
       description: Get current system resource information, constraints, and allocation status
       operationId: getSystemResourceStatus
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: System resource status retrieved successfully
           content:
@@ -788,12 +1011,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-  /api/chat-history/sessions:
+  /api/system/gpu4pyscf-status:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
+      summary: Get GPU4PySCF status
+      description: Detect CUDA version and GPU4PySCF installation status (Linux only)
+      operationId: getGpu4PyscfStatus
+      responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '200':
+          description: GPU4PySCF status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gpu4PyscfStatusResponse'
+        '500':
+          description: Failed to retrieve GPU4PySCF status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/system/gpu4pyscf-install:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
+    post:
+      security:
+        - AuthToken: []
+      summary: Install GPU4PySCF
+      description: Install GPU4PySCF and recommended cuTENSOR for detected CUDA version (Linux only)
+      operationId: installGpu4Pyscf
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Gpu4PyscfInstallRequest'
+      responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '200':
+          description: GPU4PySCF installed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gpu4PyscfInstallResponse'
+        '403':
+          description: GPU4PySCF installation is only available from the local machine
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Invalid installation request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Failed to install GPU4PySCF
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/chat-history/sessions:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
+    get:
+      security:
+        - AuthToken: []
       summary: Get all chat sessions
       description: Retrieve a list of all chat history sessions, ordered by most recent update
       operationId: getChatSessions
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat sessions retrieved successfully
           content:
@@ -808,6 +1105,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     post:
+      security:
+        - AuthToken: []
       summary: Create a new chat session
       description: Create a new chat history session with an optional name
       operationId: createChatSession
@@ -818,6 +1117,8 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateChatSessionRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '201':
           description: Chat session created successfully
           content:
@@ -838,7 +1139,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/chat-history/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     get:
+      security:
+        - AuthToken: []
       summary: Get chat session details
       description: Retrieve a specific chat session with all messages
       operationId: getChatSession
@@ -850,6 +1155,8 @@ paths:
           schema:
             type: string
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat session retrieved successfully
           content:
@@ -870,6 +1177,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     patch:
+      security:
+        - AuthToken: []
       summary: Update chat session
       description: Update chat session metadata (e.g., name)
       operationId: updateChatSession
@@ -887,6 +1196,8 @@ paths:
             schema:
               $ref: '#/components/schemas/UpdateChatSessionRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat session updated successfully
           content:
@@ -907,6 +1218,8 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
     delete:
+      security:
+        - AuthToken: []
       summary: Delete chat session
       description: Delete a chat session and all its messages
       operationId: deleteChatSession
@@ -918,6 +1231,8 @@ paths:
           schema:
             type: string
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: Chat session deleted successfully
           content:
@@ -938,7 +1253,11 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
   /api/agent/chat:
+    parameters:
+      - $ref: '#/components/parameters/AuthTokenHeader'
     post:
+      security:
+        - AuthToken: []
       summary: Chat with AI assistant
       description: >
         Send a message to the AI assistant and receive a streaming response using Server-Sent Events (SSE).
@@ -962,6 +1281,8 @@ paths:
             schema:
               $ref: '#/components/schemas/AgentChatRequest'
       responses:
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
         '200':
           description: >
             Successfully initiated a streaming connection.
@@ -998,6 +1319,27 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
 components:
+  securitySchemes:
+    AuthToken:
+      type: apiKey
+      in: header
+      name: X-Auth-Token
+      description: Authentication token passed from the Electron shell. Required when `PYSCF_AUTH_TOKEN` is configured.
+  responses:
+    UnauthorizedError:
+      description: Authentication token is missing or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  parameters:
+    AuthTokenHeader:
+      name: X-Auth-Token
+      in: header
+      required: false
+      description: Required when `PYSCF_AUTH_TOKEN` is configured.
+      schema:
+        type: string
   schemas:
     # Enums
     SearchType:
@@ -1025,10 +1367,12 @@ components:
     PubChemSearchRequest:
       type: object
       required: [query]
+      additionalProperties: false
       properties:
         query:
           type: string
           minLength: 1
+          maxLength: 500
           description: Search query for PubChem
         searchType:
           $ref: '#/components/schemas/SearchType'
@@ -1037,19 +1381,23 @@ components:
     SMILESConvertRequest:
       type: object
       required: [smiles]
+      additionalProperties: false
       properties:
         smiles:
           type: string
           minLength: 1
+          maxLength: 10000
           description: SMILES string to convert to XYZ format
 
     XYZValidateRequest:
       type: object
       required: [xyz]
+      additionalProperties: false
       properties:
         xyz:
           type: string
           minLength: 1
+          maxLength: 1000000
           description: XYZ string to validate
 
     # Base schema containing parameters common to all calculation methods
@@ -1060,11 +1408,13 @@ components:
         xyz:
           type: string
           minLength: 1
-          description: XYZ molecular structure data
+          maxLength: 1000000
+          description: XYZ molecular structure data (chemistry-aware cap ~1 MB)
         calculation_method:
           $ref: '#/components/schemas/CalculationMethod'
         basis_function:
           type: string
+          maxLength: 200
           description: Basis set for calculation (e.g., STO-3G, 6-31G(d), cc-pVDZ)
         charges:
           type: integer
@@ -1083,6 +1433,7 @@ components:
           default: none
         solvent:
           type: string
+          maxLength: 200
           default: "-"
           description: |
             Solvent type or custom parameters. Options include:
@@ -1108,6 +1459,7 @@ components:
           description: Memory in MB
         ketcher_data:
           type: string
+          maxLength: 1000000
           nullable: true
           description: Ketcher molecule format (JSON)
 
@@ -1123,6 +1475,7 @@ components:
               enum: [DFT]
             exchange_correlation:
               type: string
+              maxLength: 200
               default: "B3LYP"
               description: Exchange-correlation functional (e.g., B3LYP, PBE0, M06-2X)
             basis_function:
@@ -1132,6 +1485,28 @@ components:
               type: boolean
               default: true
               description: Whether to perform geometry optimization
+            geomopt_maxsteps:
+              type: integer
+              minimum: 1
+              maximum: 1000
+              default: 100
+              nullable: true
+              description: Maximum number of geometry optimization steps
+            geomopt_conv_energy:
+              type: number
+              format: float
+              default: 1.0e-6
+              nullable: true
+              description: Energy convergence threshold (Hartree)
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              maxLength: 200
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # Hartree-Fock calculation request
     HFCalculationRequest:
@@ -1149,6 +1524,28 @@ components:
             optimize_geometry:
               type: boolean
               default: true
+            geomopt_maxsteps:
+              type: integer
+              minimum: 1
+              maximum: 1000
+              default: 100
+              nullable: true
+              description: Maximum number of geometry optimization steps
+            geomopt_conv_energy:
+              type: number
+              format: float
+              default: 1.0e-6
+              nullable: true
+              description: Energy convergence threshold (Hartree)
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              maxLength: 200
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # MP2 calculation request
     MP2CalculationRequest:
@@ -1166,6 +1563,28 @@ components:
             optimize_geometry:
               type: boolean
               default: true
+            geomopt_maxsteps:
+              type: integer
+              minimum: 1
+              maximum: 1000
+              default: 100
+              nullable: true
+              description: Maximum number of geometry optimization steps
+            geomopt_conv_energy:
+              type: number
+              format: float
+              default: 1.0e-6
+              nullable: true
+              description: Energy convergence threshold (Hartree)
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              maxLength: 200
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # CCSD calculation request
     CCSDCalculationRequest:
@@ -1184,6 +1603,15 @@ components:
               type: boolean
               default: true
               description: Use frozen core approximation to reduce computational cost
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              maxLength: 200
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # CCSD(T) calculation request
     CCSD_TCalculationRequest:
@@ -1202,6 +1630,15 @@ components:
               type: boolean
               default: true
               description: Use frozen core approximation
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              maxLength: 200
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # TDDFT calculation request
     TDDFTCalculationRequest:
@@ -1215,6 +1652,7 @@ components:
               enum: [TDDFT]
             exchange_correlation:
               type: string
+              maxLength: 200
               default: "B3LYP"
               description: Exchange-correlation functional
             basis_function:
@@ -1235,6 +1673,15 @@ components:
               type: boolean
               default: false
               description: Perform Natural Transition Orbital analysis
+            density_fitting:
+              type: boolean
+              default: false
+              description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+            auxiliary_basis:
+              type: string
+              maxLength: 200
+              nullable: true
+              description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
 
     # CASCI calculation request
     CASCICalculationRequest:
@@ -1252,19 +1699,19 @@ components:
             ncas:
               type: integer
               minimum: 1
-              maximum: 50
+              maximum: 20
               default: 4
               description: Number of active space orbitals
             nelecas:
               type: integer
               minimum: 1
-              maximum: 100
+              maximum: 40
               default: 4
               description: Number of active space electrons
             max_cycle_micro:
               type: integer
               minimum: 1
-              maximum: 20
+              maximum: 100
               default: 3
               description: Maximum CI solver micro iterations
             natorb:
@@ -1288,13 +1735,13 @@ components:
             ncas:
               type: integer
               minimum: 1
-              maximum: 50
+              maximum: 20
               default: 4
               description: Number of active space orbitals
             nelecas:
               type: integer
               minimum: 1
-              maximum: 100
+              maximum: 40
               default: 4
               description: Number of active space electrons
             max_cycle_macro:
@@ -1306,7 +1753,7 @@ components:
             max_cycle_micro:
               type: integer
               minimum: 1
-              maximum: 20
+              maximum: 100
               default: 3
               description: Maximum CI solver micro iterations
             natorb:
@@ -1354,6 +1801,7 @@ components:
     CalculationUpdateRequest:
       type: object
       required: [name]
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -1513,6 +1961,10 @@ components:
         memory_mb:
           type: integer
           nullable: true
+        gpu_acceleration_enabled:
+          type: boolean
+          nullable: true
+          description: GPU acceleration setting snapshot captured when the calculation job was submitted
         created_at:
           type: string
           format: date-time
@@ -1559,6 +2011,25 @@ components:
           format: float
           nullable: true
           description: Gradient convergence tolerance used
+        geomopt_maxsteps:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          nullable: true
+          description: Maximum number of geometry optimization steps
+        geomopt_conv_energy:
+          type: number
+          format: float
+          nullable: true
+          description: Energy convergence threshold (Hartree)
+        density_fitting:
+          type: boolean
+          nullable: true
+          description: Enable density fitting (RI/DF) approximation for faster integral evaluation
+        auxiliary_basis:
+          type: string
+          nullable: true
+          description: Auxiliary basis set for density fitting. If null, PySCF auto-selects.
         ketcher_data:
           type: string
           nullable: true
@@ -1573,6 +2044,9 @@ components:
         converged:
           type: boolean
           description: Whether calculation converged
+        gpu_enabled:
+          type: boolean
+          description: Whether GPU acceleration was used for this calculation
         homo_index:
           type: integer
           description: HOMO orbital index
@@ -1695,6 +2169,10 @@ components:
           type: integer
           nullable: true
           description: Total number of electrons in the molecule
+        resolved_auxiliary_basis:
+          type: string
+          nullable: true
+          description: Actual auxiliary basis selected by PySCF for density fitting
         mp2_same_spin_correlation:
           type: number
           nullable: true
@@ -1775,9 +2253,6 @@ components:
               oscillator_strength:
                 type: number
                 description: Oscillator strength
-              dominant_transition:
-                type: string
-                description: Main orbital transition (e.g., HOMO -> LUMO)
           nullable: true
           description: Major orbital transitions (TDDFT only)
         nto_analysis:
@@ -1989,9 +2464,43 @@ components:
               enum: [geometry_optimization, scf_calculation, post_scf]
               description: Which phase the calculation was in when paused
 
+    CalculationUpdateStreamEvent:
+      type: object
+      required:
+        - type
+        - payload
+      properties:
+        type:
+          type: string
+          enum:
+            - calculation_update
+            - heartbeat
+            - error
+        payload:
+          type: object
+          additionalProperties: true
+
+    CalculationUpdateStreamPayload:
+      type: object
+      required:
+        - calculation
+      properties:
+        calculation:
+          $ref: '#/components/schemas/CalculationInstance'
+
+    CalculationUpdateStreamErrorPayload:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        calculation_id:
+          type: string
+
     CalculationSummary:
       type: object
-      required: [id, name, path, date, has_checkpoint, status]
+      required: [id, name, date, status]
       properties:
         id:
           type: string
@@ -1999,17 +2508,27 @@ components:
         name:
           type: string
           description: Display name
-        path:
-          type: string
-          description: Directory path
         date:
           type: string
           description: Date string
-        has_checkpoint:
-          type: boolean
-          description: Whether checkpoint file exists
         status:
           $ref: '#/components/schemas/CalculationStatus'
+        calculation_method:
+          type: string
+          nullable: true
+          description: Calculation method (DFT, HF, MP2, etc.)
+        basis_function:
+          type: string
+          nullable: true
+          description: Basis set used
+        exchange_correlation:
+          type: string
+          nullable: true
+          description: Exchange-correlation functional (DFT/TDDFT only)
+        created_at:
+          type: string
+          nullable: true
+          description: ISO format creation timestamp
 
     StartCalculationResponse:
       type: object
@@ -2034,11 +2553,8 @@ components:
           example: true
         data:
           type: object
-          required: [base_directory, calculations, count]
+          required: [calculations, count]
           properties:
-            base_directory:
-              type: string
-              description: Base directory for calculations
             calculations:
               type: array
               items:
@@ -2046,6 +2562,43 @@ components:
             count:
               type: integer
               description: Number of calculations
+
+    CalculationStatusResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          required: [process_pool, system]
+          properties:
+            process_pool:
+              type: object
+              required: [max_workers, active_calculations, active_count, is_shutdown]
+              properties:
+                max_workers:
+                  type: integer
+                  minimum: 1
+                active_calculations:
+                  type: array
+                  description: Currently active calculation IDs
+                  items:
+                    type: string
+                active_count:
+                  type: integer
+                  minimum: 0
+                is_shutdown:
+                  type: boolean
+            system:
+              type: object
+              required: [cpu_count]
+              properties:
+                cpu_count:
+                  type: integer
+                  nullable: true
+                  description: Number of CPU cores available on host machine
 
     CalculationDetailsResponse:
       type: object
@@ -2126,7 +2679,7 @@ components:
           description: Orbital occupancy (0.0 for virtual, 1.0 or 2.0 for occupied)
         orbital_type:
           type: string
-          enum: [core, homo, lumo, virtual]
+          enum: [core, homo, lumo, occupied, virtual]
           description: Type of orbital
         label:
           type: string
@@ -2195,10 +2748,6 @@ components:
                 file_size_kb:
                   type: number
                   description: Generated file size in KB
-            file_path:
-              type: string
-              nullable: true
-              description: Path to saved CUBE file (if saved to disk)
             cached:
               type: boolean
               description: Whether the CUBE file was loaded from cache
@@ -2222,14 +2771,11 @@ components:
               description: List of CUBE files
               items:
                 type: object
-                required: [filename, file_path, orbital_index, grid_size, file_size_kb, modified]
+                required: [filename, orbital_index, grid_size, file_size_kb, modified]
                 properties:
                   filename:
                     type: string
                     description: Name of the CUBE file
-                  file_path:
-                    type: string
-                    description: Full path to the CUBE file
                   orbital_index:
                     type: integer
                     description: Index of the molecular orbital
@@ -2291,7 +2837,7 @@ components:
 
     SupportedParametersData:
       type: object
-      required: [calculation_methods, basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods, method_defaults, parameter_constraints]
+      required: [calculation_methods, basis_functions, auxiliary_basis_functions, exchange_correlation, solvent_methods, solvents, tddft_methods, method_defaults, parameter_constraints]
       properties:
         calculation_methods:
           type: array
@@ -2305,6 +2851,13 @@ components:
             items:
               type: string
           description: Supported basis functions grouped by category (e.g., Minimal, Pople Style, etc.)
+        auxiliary_basis_functions:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Supported auxiliary basis sets for density fitting, grouped by category
         exchange_correlation:
           type: object
           additionalProperties:
@@ -2354,6 +2907,9 @@ components:
           frozen_core:
             type: boolean
             description: Default frozen core approximation setting (CCSD/CCSD_T)
+          density_fitting:
+            type: boolean
+            description: Default density fitting setting
           tddft_nstates:
             type: integer
             description: Default number of excited states (TDDFT)
@@ -2384,6 +2940,12 @@ components:
           conv_tol_grad:
             type: number
             description: Default gradient convergence tolerance (CASSCF)
+          geomopt_maxsteps:
+            type: integer
+            description: Default maximum geometry optimization steps (DFT/HF/MP2)
+          geomopt_conv_energy:
+            type: number
+            description: Default energy convergence threshold for geometry optimization (DFT/HF/MP2)
       description: Default values for each calculation method (e.g., DFT, CCSD, TDDFT)
 
     ParameterConstraint:
@@ -2430,6 +2992,7 @@ components:
     AppSettings:
       type: object
       required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb, calculations_directory, timezone]
+      additionalProperties: false
       properties:
         max_parallel_instances:
           type: integer
@@ -2449,6 +3012,11 @@ components:
           maximum: 100.0
           description: Maximum memory utilization percentage for the system
           example: 95.0
+        gpu_acceleration_enabled:
+          type: boolean
+          default: false
+          description: Whether GPU acceleration is enabled for calculations (Linux only)
+          example: false
         system_total_cores:
           type: integer
           minimum: 1
@@ -2486,8 +3054,85 @@ components:
         gemini_api_key:
           type: string
           nullable: true
-          description: Google Gemini API key for AI agent functionality. If not provided, agent will use fallback responses.
+          description: Google Gemini API key required for AI agent chat functionality.
           example: null
+        research_email:
+          type: string
+          nullable: true
+          description: Email address for academic research API access (PubMed, OpenAlex). Required by some APIs for polite pool access.
+          example: "pyscf-research-agent@example.com"
+
+    # View schema for GET /api/settings — never exposes the real API key.
+    AppSettingsResponse:
+      type: object
+      required: [max_parallel_instances, max_cpu_utilization_percent, max_memory_utilization_percent, system_total_cores, system_total_memory_mb, calculations_directory, timezone, gemini_api_key_configured]
+      properties:
+        max_parallel_instances:
+          type: integer
+          minimum: 1
+          maximum: 32
+          description: Maximum number of parallel calculation instances
+          example: 4
+        max_cpu_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum CPU utilization percentage for the system
+          example: 95.0
+        max_memory_utilization_percent:
+          type: number
+          minimum: 10.0
+          maximum: 100.0
+          description: Maximum memory utilization percentage for the system
+          example: 95.0
+        gpu_acceleration_enabled:
+          type: boolean
+          default: false
+          description: Whether GPU acceleration is enabled for calculations (Linux only)
+          example: false
+        system_total_cores:
+          type: integer
+          minimum: 1
+          description: Total number of CPU cores in the system (auto-detected)
+          example: 8
+        system_total_memory_mb:
+          type: integer
+          minimum: 1
+          description: Total system memory in MB (auto-detected)
+          example: 16384
+        calculations_directory:
+          type: string
+          description: Directory path where calculation data is stored
+          example: "/Users/username/PySCF_calculations"
+        timezone:
+          type: string
+          enum:
+            - UTC
+            - Asia/Tokyo
+            - Asia/Shanghai
+            - Asia/Seoul
+            - Asia/Singapore
+            - Asia/Kolkata
+            - Australia/Sydney
+            - Europe/London
+            - Europe/Paris
+            - Europe/Berlin
+            - America/New_York
+            - America/Chicago
+            - America/Denver
+            - America/Los_Angeles
+          default: "UTC"
+          description: Display timezone for timestamps in chat history and calculation history
+          example: "UTC"
+        gemini_api_key_configured:
+          type: boolean
+          description: Whether a non-empty Gemini API key is stored. The actual key value is never returned.
+          example: false
+        gemini_api_key:
+          type: string
+          nullable: true
+          description: Always returned as empty string. The real key is never exposed via GET.
+          example: ""
         research_email:
           type: string
           nullable: true
@@ -2506,7 +3151,7 @@ components:
           required: [settings]
           properties:
             settings:
-              $ref: '#/components/schemas/AppSettings'
+              $ref: '#/components/schemas/AppSettingsResponse'
 
     SettingsUpdateRequest:
       $ref: '#/components/schemas/AppSettings'
@@ -2636,6 +3281,124 @@ components:
           example: true
         data:
           $ref: '#/components/schemas/SystemResourceSummary'
+
+    Gpu4PyscfStatus:
+      type: object
+      required:
+        - is_linux
+        - cuda_detected
+        - cuda_supported
+        - gpu4pyscf_installed
+        - cutensor_installed
+      properties:
+        is_linux:
+          type: boolean
+          description: Whether the application is running on Linux
+        cuda_detected:
+          type: boolean
+          description: Whether CUDA Toolkit was detected via nvcc
+        cuda_version:
+          type: string
+          nullable: true
+          description: Detected CUDA Toolkit version (major.minor)
+          example: '12.4'
+        cuda_major:
+          type: integer
+          nullable: true
+          description: Detected CUDA major version
+          example: 12
+        cuda_minor:
+          type: integer
+          nullable: true
+          description: Detected CUDA minor version
+          example: 4
+        cuda_supported:
+          type: boolean
+          description: Whether detected CUDA version is supported by GPU4PySCF
+        cuda_detection_message:
+          type: string
+          nullable: true
+          description: Additional message for CUDA detection failures or warnings
+        recommended_gpu4pyscf_package:
+          type: string
+          nullable: true
+          description: Recommended GPU4PySCF package for the detected CUDA version
+          example: gpu4pyscf-cuda12x
+        recommended_cutensor_package:
+          type: string
+          nullable: true
+          description: Recommended cuTENSOR package for the detected CUDA version
+          example: cutensor-cu12
+        gpu4pyscf_installed:
+          type: boolean
+          description: Whether GPU4PySCF is installed
+        gpu4pyscf_version:
+          type: string
+          nullable: true
+          description: Installed GPU4PySCF version
+        cutensor_installed:
+          type: boolean
+          description: Whether cuTENSOR is installed
+        cutensor_version:
+          type: string
+          nullable: true
+          description: Installed cuTENSOR version
+
+    Gpu4PyscfInstallRequest:
+      type: object
+      properties:
+        include_cutensor:
+          type: boolean
+          description: Whether to install cuTENSOR alongside GPU4PySCF
+          default: true
+        force_reinstall:
+          type: boolean
+          description: Force reinstall of GPU4PySCF and cuTENSOR packages
+          default: false
+        confirm_install:
+          type: boolean
+          description: Must be true to confirm the installation and allow environment mutation. Prevents accidental installs.
+          default: false
+
+    Gpu4PyscfInstallResult:
+      type: object
+      required: [status, packages, used_user_site, pip_stdout, pip_stderr]
+      properties:
+        status:
+          $ref: '#/components/schemas/Gpu4PyscfStatus'
+        packages:
+          type: array
+          items:
+            type: string
+        used_user_site:
+          type: boolean
+          description: Whether pip installed into the user site-packages directory
+        pip_stdout:
+          type: string
+          description: Tail of pip stdout output
+        pip_stderr:
+          type: string
+          description: Tail of pip stderr output
+
+    Gpu4PyscfStatusResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Gpu4PyscfStatus'
+
+    Gpu4PyscfInstallResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Gpu4PyscfInstallResult'
 
     IRSpectrumResponse:
       type: object
@@ -3129,12 +3892,15 @@ components:
     AgentChatRequest:
       type: object
       required: [message, history]
+      additionalProperties: false
       properties:
         message:
           type: string
+          maxLength: 10000
           description: New message from the user
         history:
           type: array
+          maxItems: 200
           description: Previous conversation history
           items:
             type: object
@@ -3144,11 +3910,18 @@ components:
                 enum: [user, model]
               parts:
                 type: array
+                maxItems: 100
+                description: >-
+                  Content parts within a single history item. A normal message
+                  contains 1 part; the cap of 100 is intentionally generous for
+                  legitimate multi-part use while preventing DoS amplification
+                  through unbounded iteration.
                 items:
                   type: object
                   properties:
                     text:
                       type: string
+                      maxLength: 10000
         session_id:
           type: string
           nullable: true
@@ -3253,6 +4026,7 @@ components:
 
     CreateChatSessionRequest:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -3264,6 +4038,7 @@ components:
     UpdateChatSessionRequest:
       type: object
       required: [name]
+      additionalProperties: false
       properties:
         name:
           type: string

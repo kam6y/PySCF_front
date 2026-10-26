@@ -1,4 +1,4 @@
-import { RefObject } from 'react';
+import React from 'react';
 import { MoleculeViewer } from './MoleculeViewer';
 import { StyleControls } from './StyleControls';
 import { StyleSpec } from '../../types/3dmol';
@@ -13,57 +13,72 @@ interface MoleculeViewerSectionProps {
   onShowAxesChange: (show: boolean) => void;
   showCoordinates: boolean;
   onShowCoordinatesChange: (show: boolean) => void;
+  showAtomNumbers: boolean;
+  onShowAtomNumbersChange: (show: boolean) => void;
   useAtomicRadii: boolean;
   onUseAtomicRadiiChange: (use: boolean) => void;
+  selectedAtomIndices: number[];
+  onAtomClick: (atomIndex: number) => void;
 }
 
-export const MoleculeViewerSection = ({
-  hasValidMolecule,
-  xyzData,
-  currentStyle,
-  onStyleChange,
-  showAxes,
-  onShowAxesChange,
-  showCoordinates,
-  onShowCoordinatesChange,
-  useAtomicRadii,
-  onUseAtomicRadiiChange,
-}: MoleculeViewerSectionProps) => {
-  return (
-    <div className={styles.mainContent}>
-      <div className={styles.leftColumn}>
-        <MoleculeViewer
-          xyzData={xyzData}
-          currentStyle={currentStyle}
-          showAxes={showAxes}
-          showCoordinates={showCoordinates}
-          width={'100%'}
-          height={'100%'}
-          backgroundColor="white"
-        />
-        {!hasValidMolecule && (
-          <div className={styles.viewerPlaceholder}>
-            <div className={styles.placeholderContent}>
-              <h3>No Molecule Loaded</h3>
-              <p>
-                Enter a molecular structure in the right panel to see the 3D
-                visualization
-              </p>
+export const MoleculeViewerSection = React.memo<MoleculeViewerSectionProps>(
+  ({
+    hasValidMolecule,
+    xyzData,
+    currentStyle,
+    onStyleChange,
+    showAxes,
+    onShowAxesChange,
+    showCoordinates,
+    onShowCoordinatesChange,
+    showAtomNumbers,
+    onShowAtomNumbersChange,
+    useAtomicRadii,
+    onUseAtomicRadiiChange,
+    selectedAtomIndices,
+    onAtomClick,
+  }) => {
+    return (
+      <div className={styles.mainContent}>
+        <div className={styles.leftColumn}>
+          <MoleculeViewer
+            xyzData={xyzData}
+            currentStyle={currentStyle}
+            showAxes={showAxes}
+            showCoordinates={showCoordinates}
+            showAtomNumbers={showAtomNumbers}
+            selectedAtomIndices={selectedAtomIndices}
+            onAtomClick={onAtomClick}
+            width={'100%'}
+            height={'100%'}
+            backgroundColor="white"
+          />
+          {!hasValidMolecule && (
+            <div className={styles.viewerPlaceholder}>
+              <div className={styles.placeholderContent}>
+                <h3>No Molecule Loaded</h3>
+                <p>
+                  Enter a molecular structure in the right panel to see the 3D
+                  visualization
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        <section className={styles.rightColumn}>
+          <StyleControls
+            onStyleChange={onStyleChange}
+            showAxes={showAxes}
+            onShowAxesChange={onShowAxesChange}
+            showCoordinates={showCoordinates}
+            onShowCoordinatesChange={onShowCoordinatesChange}
+            showAtomNumbers={showAtomNumbers}
+            onShowAtomNumbersChange={onShowAtomNumbersChange}
+            useAtomicRadii={useAtomicRadii}
+            onUseAtomicRadiiChange={onUseAtomicRadiiChange}
+          />
+        </section>
       </div>
-      <section className={styles.rightColumn}>
-        <StyleControls
-          onStyleChange={onStyleChange}
-          showAxes={showAxes}
-          onShowAxesChange={onShowAxesChange}
-          showCoordinates={showCoordinates}
-          onShowCoordinatesChange={onShowCoordinatesChange}
-          useAtomicRadii={useAtomicRadii}
-          onUseAtomicRadiiChange={onUseAtomicRadiiChange}
-        />
-      </section>
-    </div>
-  );
-};
+    );
+  }
+);

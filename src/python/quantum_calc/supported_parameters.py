@@ -1,12 +1,7 @@
 """Module for detecting supported quantum chemistry parameters from PySCF and other sources."""
 
-import logging
 from typing import Dict, List, Any
-from pyscf import gto, dft
-from data.solvent_properties import SOLVENT_DIELECTRIC
 from quantum_calc.method_defaults import get_method_defaults, get_parameter_constraints
-
-logger = logging.getLogger(__name__)
 
 
 def get_supported_calculation_methods() -> List[str]:
@@ -19,49 +14,112 @@ def get_supported_basis_functions() -> Dict[str, List[str]]:
     return {
         'Minimal': [
             'STO-3G',
-            '3-21G'
+            'STO-6G',
+            'MINAO'
         ],
         'Pople Style': [
+            '3-21G',
+            '4-31G',
             '6-31G',
             '6-31G(d)',
+            '6-31G(d,p)',
+            '6-31+G(d)',
             '6-31+G(d,p)',
+            '6-31++G(d,p)',
+            '6-311G',
+            '6-311G(d)',
             '6-311G(d,p)',
+            '6-311+G(d)',
+            '6-311+G(d,p)',
             '6-311++G(d,p)'
         ],
         'Correlation Consistent': [
             'cc-pVDZ',
             'cc-pVTZ',
             'cc-pVQZ',
+            'cc-pV5Z',
             'aug-cc-pVDZ',
-            'aug-cc-pVTZ'
+            'aug-cc-pVTZ',
+            'aug-cc-pVQZ',
+            'aug-cc-pV5Z'
         ],
         'def2': [
             'def2-SVP',
-            'def2-TZVP'
+            'def2-SVPD',
+            'def2-TZVP',
+            'def2-TZVPP',
+            'def2-TZVPD',
+            'def2-QZVP',
+            'def2-QZVPP',
+            'def2-QZVPD'
         ]
+    }
+
+
+def get_supported_auxiliary_basis_functions() -> Dict[str, List[str]]:
+    """Get supported auxiliary basis functions for density fitting, grouped by category."""
+    return {
+        'def2 RI': [
+            'def2-svp-ri',
+            'def2-tzvp-ri',
+            'def2-tzvpp-ri',
+            'def2-qzvp-ri',
+            'def2-qzvpp-ri',
+        ],
+        'cc RI': [
+            'cc-pvdz-ri',
+            'cc-pvtz-ri',
+            'cc-pvqz-ri',
+            'aug-cc-pvdz-ri',
+            'aug-cc-pvtz-ri',
+            'aug-cc-pvqz-ri',
+        ],
+        'Weigend': [
+            'weigend',
+        ],
     }
 
 
 def get_supported_exchange_correlation() -> Dict[str, List[str]]:
     """Get supported exchange-correlation functionals grouped by category."""
     return {
-        'Hybrid': [
-            'B3LYP',
-            'PBE0',
-            'M06-2X',
-            'CAM-B3LYP',
-            'wB97XD'
+        'LDA': [
+            'SVWN'
         ],
         'GGA': [
             'PBE',
             'BLYP',
             'BP86',
-            'PW91'
+            'PW91',
+            'revPBE',
+            'PBEsol',
+            'RPBE',
+            'OLYP',
+            'BPBE'
         ],
         'Meta-GGA': [
-            'M06',
             'M06-L',
-            'TPSS'
+            'TPSS',
+            'revTPSS',
+            'SCAN',
+            'rSCAN',
+            'r2SCAN'
+        ],
+        'Hybrid (GGA)': [
+            'B3LYP',
+            'B3PW91',
+            'PBE0',
+            'B3P86',
+            'O3LYP'
+        ],
+        'Hybrid (Meta-GGA)': [
+            'M06',
+            'M06-2X',
+            'TPSSh'
+        ],
+        'Range-separated Hybrid': [
+            'CAM-B3LYP',
+            'wB97XD'
         ]
     }
 
@@ -109,42 +167,12 @@ def get_supported_tddft_methods() -> List[str]:
     return ['TDDFT', 'TDA']
 
 
-def validate_basis_function(basis: str) -> bool:
-    """Validate if a basis function is supported by PySCF."""
-    try:
-        # Create a simple test molecule
-        mol = gto.Mole()
-        mol.atom = 'H 0 0 0'
-        mol.basis = basis
-        mol.build(verbose=0)
-        return True
-    except Exception as e:
-        logger.debug(f"Basis function {basis} not supported: {e}")
-        return False
-
-
-def validate_exchange_correlation(xc: str) -> bool:
-    """Validate if an exchange-correlation functional is supported by PySCF."""
-    try:
-        # Create a simple test molecule and DFT object
-        mol = gto.Mole()
-        mol.atom = 'H 0 0 0'
-        mol.basis = 'sto-3g'
-        mol.build(verbose=0)
-        
-        mf = dft.RKS(mol)
-        mf.xc = xc
-        return True
-    except Exception as e:
-        logger.debug(f"Exchange-correlation functional {xc} not supported: {e}")
-        return False
-
-
 def get_all_supported_parameters() -> Dict[str, Any]:
     """Get all supported parameters in a structured format."""
     return {
         'calculation_methods': get_supported_calculation_methods(),
         'basis_functions': get_supported_basis_functions(),
+        'auxiliary_basis_functions': get_supported_auxiliary_basis_functions(),
         'exchange_correlation': get_supported_exchange_correlation(),
         'solvent_methods': get_supported_solvent_methods(),
         'solvents': get_supported_solvents(),

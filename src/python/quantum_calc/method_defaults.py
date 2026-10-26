@@ -15,27 +15,38 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'basis_function': '6-31G(d)',
         'exchange_correlation': 'B3LYP',
         'memory_mb': 2000,
-        'optimize_geometry': True
+        'optimize_geometry': True,
+        'geomopt_maxsteps': 100,
+        'geomopt_conv_energy': 1e-6,
+        'density_fitting': False
     },
     'HF': {
         'basis_function': '6-31G(d)',
         'memory_mb': 2000,
-        'optimize_geometry': True
+        'optimize_geometry': True,
+        'geomopt_maxsteps': 100,
+        'geomopt_conv_energy': 1e-6,
+        'density_fitting': False
     },
     'MP2': {
         'basis_function': '6-31G(d)',
         'memory_mb': 3000,
-        'optimize_geometry': True
+        'optimize_geometry': True,
+        'geomopt_maxsteps': 100,
+        'geomopt_conv_energy': 1e-6,
+        'density_fitting': False
     },
     'CCSD': {
         'basis_function': 'cc-pVDZ',  # Correlation-consistent basis recommended for CCSD
         'memory_mb': 4000,            # Higher memory requirements
-        'frozen_core': True           # Frozen core approximation to reduce cost
+        'frozen_core': True,          # Frozen core approximation to reduce cost
+        'density_fitting': False
     },
     'CCSD_T': {
         'basis_function': 'cc-pVDZ',  # Correlation-consistent basis recommended
         'memory_mb': 4000,            # Higher memory requirements
-        'frozen_core': True           # Frozen core approximation to reduce cost
+        'frozen_core': True,          # Frozen core approximation to reduce cost
+        'density_fitting': False
     },
     'TDDFT': {
         'basis_function': '6-31G(d)',
@@ -43,7 +54,8 @@ METHOD_DEFAULTS: Dict[str, Dict[str, Any]] = {
         'memory_mb': 2000,
         'tddft_nstates': 10,          # Default number of excited states
         'tddft_method': 'TDDFT',      # Full TDDFT (vs TDA approximation)
-        'tddft_analyze_nto': False    # NTO analysis off by default
+        'tddft_analyze_nto': False,   # NTO analysis off by default
+        'density_fitting': False
     },
     'CASCI': {
         'basis_function': '6-31G(d)',
@@ -107,6 +119,16 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
         'applicable_methods': ['DFT', 'HF', 'MP2'],
         'description': 'DFT, HF, and MP2 methods only'
     },
+    'geomopt_maxsteps': {
+        'min': 1,
+        'max': 1000,
+        'applicable_methods': ['DFT', 'HF', 'MP2'],
+        'description': 'Maximum geometry optimization steps (1-1000)'
+    },
+    'geomopt_conv_energy': {
+        'applicable_methods': ['DFT', 'HF', 'MP2'],
+        'description': 'Energy convergence threshold in Hartree'
+    },
     'frozen_core': {
         'applicable_methods': ['CCSD', 'CCSD_T'],
         'description': 'Freeze core orbitals to reduce computational cost (recommended for CCSD/CCSD(T))'
@@ -115,15 +137,40 @@ PARAMETER_CONSTRAINTS: Dict[str, Dict[str, Any]] = {
         'applicable_methods': ['TDDFT'],
         'description': 'Perform Natural Transition Orbital analysis for excited states'
     },
+    'density_fitting': {
+        'applicable_methods': ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT'],
+        'description': 'Enable density fitting (RI/DF) approximation for faster integral evaluation'
+    },
+    'auxiliary_basis': {
+        'applicable_methods': ['DFT', 'HF', 'MP2', 'CCSD', 'CCSD_T', 'TDDFT'],
+        'description': 'Auxiliary basis set for density fitting (auto-selected if not specified)'
+    },
     'cpu_cores': {
         'min': 1,
         'max': 32,
         'description': 'Number of CPU cores to use (1-32)'
     },
     'memory_mb': {
-        'min': 128,
-        'description': 'Memory allocation in megabytes (minimum 128 MB)'
+        'min': 512,
+        'max': 32768,
+        'description': 'Memory allocation in megabytes (512-32768 MB)'
+    },
+    'charges': {
+        'min': -10,
+        'max': 10,
+        'description': 'Molecular charge (-10 to 10)'
+    },
+    'spin': {
+        'min': 0,
+        'max': 10,
+        'description': 'Spin (2S), number of unpaired electrons (0-10)'
     }
+}
+
+UNIVERSAL_PARAMS = {
+    'xyz', 'calculation_method', 'basis_function', 'charges', 'spin',
+    'solvent_method', 'solvent', 'name', 'cpu_cores', 'memory_mb',
+    'ketcher_data', 'created_at'
 }
 
 
@@ -152,7 +199,6 @@ def get_parameter_constraints() -> Dict[str, Dict[str, Any]]:
     Example:
         {
             'ncas': {'min': 1, 'max': 20, 'applicable_methods': ['CASCI', 'CASSCF'], ...},
-            'optimize_geometry': {'disabled_for': ['TDDFT', 'CASCI', ...], ...},
             ...
         }
     """
@@ -203,32 +249,6 @@ def is_parameter_applicable(param_name: str, method: str) -> bool:
     return True
 
 
-def is_parameter_disabled(param_name: str, method: str) -> bool:
-    """Check if a parameter is disabled for a specific calculation method.
-
-    Args:
-        param_name: Name of the parameter (e.g., 'optimize_geometry')
-        method: Calculation method name (e.g., 'TDDFT', 'CCSD')
-
-    Returns:
-        True if the parameter is disabled for the method, False otherwise.
-
-    Example:
-        >>> is_parameter_disabled('optimize_geometry', 'TDDFT')
-        True
-        >>> is_parameter_disabled('optimize_geometry', 'DFT')
-        False
-    """
-    constraint = PARAMETER_CONSTRAINTS.get(param_name)
-    if not constraint:
-        return False
-
-    if 'disabled_for' in constraint:
-        return method in constraint['disabled_for']
-
-    return False
-
-
 def validate_parameter_value(param_name: str, value: Any) -> tuple[bool, str]:
     """Validate a parameter value against its constraints.
 
@@ -249,13 +269,18 @@ def validate_parameter_value(param_name: str, value: Any) -> tuple[bool, str]:
     if not constraint:
         return True, ''
 
-    # Check minimum value
-    if 'min' in constraint and value < constraint['min']:
-        return False, f"Value {value} is below minimum of {constraint['min']}"
+    try:
+        # Check minimum value
+        if 'min' in constraint and value < constraint['min']:
+            if constraint['min'] == 1:
+                return False, f"Value {value} is below minimum of 1 and must be greater than 0"
+            return False, f"Value {value} is below minimum of {constraint['min']}"
 
-    # Check maximum value
-    if 'max' in constraint and value > constraint['max']:
-        return False, f"Value {value} exceeds maximum of {constraint['max']}"
+        # Check maximum value
+        if 'max' in constraint and value > constraint['max']:
+            return False, f"Value {value} exceeds maximum of {constraint['max']}"
+    except TypeError:
+        return False, f"Value {value} cannot be compared with numeric constraints"
 
     return True, ''
 
@@ -288,19 +313,20 @@ def validate_parameters_for_method(
         >>> validate_parameters_for_method('TDDFT', {'xyz': '...', 'optimize_geometry': True})
         (False, "Parameter 'optimize_geometry' is disabled for method 'TDDFT'. Reason: Geometry optimization is not available for these calculation methods")
     """
-    # Universal parameters that are applicable to all calculation methods
-    UNIVERSAL_PARAMS = {
-        'xyz', 'calculation_method', 'basis_function', 'charges', 'spin',
-        'solvent_method', 'solvent', 'name', 'cpu_cores', 'memory_mb',
-        'ketcher_data', 'created_at'
-    }
-
     invalid_params = []
+    invalid_values = []
 
     for param_name, param_value in params.items():
         # Skip None values (parameter not explicitly provided)
         if param_value is None:
             continue
+
+        value_is_valid, value_error = validate_parameter_value(param_name, param_value)
+        if not value_is_valid:
+            invalid_values.append({
+                'param': param_name,
+                'error': value_error
+            })
 
         # Skip universal parameters that apply to all methods
         if param_name in UNIVERSAL_PARAMS:
@@ -316,9 +342,14 @@ def validate_parameters_for_method(
                 'applicable_to': applicable_to
             })
 
-    # Build comprehensive error message if any invalid parameters found
-    if invalid_params:
+    # Build comprehensive error message if any invalid parameters or values found
+    if invalid_params or invalid_values:
         error_lines = []
+        for invalid in invalid_values:
+            error_lines.append(
+                f"Parameter '{invalid['param']}' has invalid value: {invalid['error']}"
+            )
+
         for invalid in invalid_params:
             param = invalid['param']
             applicable = ', '.join(invalid['applicable_to']) if invalid['applicable_to'] else 'none'

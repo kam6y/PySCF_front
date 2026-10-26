@@ -1,65 +1,41 @@
-"""
-PubChem API endpoints.
-Handles molecular data retrieval from PubChem database and XYZ validation.
-"""
+"""PubChem API endpoints."""
 
-import logging
-from flask import Blueprint, jsonify
-from flask_pydantic import validate
+from fastapi import APIRouter, HTTPException
 
-from services import get_pubchem_service, ServiceError
 from generated_models import PubChemSearchRequest, XYZValidateRequest
+from services import get_pubchem_service
 
-# Set up logging
-logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/api/pubchem")
 
-# Create pubchem blueprint
-pubchem_bp = Blueprint('pubchem', __name__)
-
-
-@pubchem_bp.route('/api/pubchem/search', methods=['POST'])
-@validate()
-def search_pubchem(body: PubChemSearchRequest):
-    """Search PubChem for a compound and return its 3D structure in XYZ format."""
-    try:
-        pubchem_service = get_pubchem_service()
-        
-        query = body.query
-        search_type = body.searchType.value
-        
-        # Call service layer
-        result = pubchem_service.search_compound(query, search_type)
-        
-        return jsonify({
-            'success': True,
-            'data': result
-        })
-            
-    except ServiceError as e:
-        logger.error(f"Service error during PubChem search: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+# Endpoint-level length caps matching openapi.yaml maxLength constraints.
+# These act as defense-in-depth even when the Pydantic model enforces them.
+MAX_QUERY_LENGTH = 500
+MAX_XYZ_LENGTH = 1_000_000
 
 
-@pubchem_bp.route('/api/pubchem/validate', methods=['POST'])
-@validate()
-def validate_xyz_endpoint(body: XYZValidateRequest):
-    """Validate an XYZ format string."""
-    try:
-        pubchem_service = get_pubchem_service()
-        
-        xyz_string = body.xyz
-        
-        # Call service layer
-        validation_result = pubchem_service.validate_xyz(xyz_string)
-        
-        return jsonify({'success': True, 'data': validation_result})
-        
-    except ServiceError as e:
-        logger.error(f"Service error during XYZ validation: {e}")
-        return jsonify({'success': False, 'error': e.message}), e.status_code
-    except Exception as e:
-        logger.error(f"Unexpected error during XYZ validation: {e}", exc_info=True)
-        return jsonify({'success': False, 'error': 'An internal server error occurred.'}), 500
+@router.post("/search")
+def search_pubchem(body: PubChemSearchRequest) -> dict:
+    if len(body.query) > MAX_QUERY_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"query must be at most {MAX_QUERY_LENGTH} characters",
+        )
+    search_type_value = body.searchType or "name"
+    search_type = (
+        search_type_value.value
+        if hasattr(search_type_value, "value")
+        else str(search_type_value)
+    )
+    result = get_pubchem_service().search_compound(body.query, search_type)
+    return {"success": True, "data": result}
+
+
+@router.post("/validate")
+def validate_xyz_endpoint(body: XYZValidateRequest) -> dict:
+    if len(body.xyz) > MAX_XYZ_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"xyz must be at most {MAX_XYZ_LENGTH} characters",
+        )
+    validation_result = get_pubchem_service().validate_xyz(body.xyz)
+    return {"success": True, "data": validation_result}

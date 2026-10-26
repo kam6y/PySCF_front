@@ -224,39 +224,3 @@ def get_recommended_scale_factor(method: str, basis_set: str) -> Tuple[float, st
     message = f"No specific scale factor found. Using default value ({default_factor})"
     logger.warning(message)
     return default_factor, message
-
-
-def list_available_methods() -> Dict[str, list]:
-    """
-    List all available methods and their supported basis sets.
-    
-    Returns:
-        Dictionary mapping method names to lists of supported basis sets
-    """
-    return {method: list(basis_data.keys()) for method, basis_data in SCALE_FACTORS.items()}
-
-
-def validate_method_basis_combination(method: str, basis_set: str) -> Tuple[bool, str]:
-    """
-    Validate if a method/basis combination has a scale factor available.
-    
-    Args:
-        method: Computational method
-        basis_set: Basis set
-        
-    Returns:
-        Tuple of (is_available, message)
-    """
-    scale_factor = get_scale_factor(method, basis_set)
-    
-    if scale_factor is not None:
-        return True, f"Scale factor available: {scale_factor}"
-    else:
-        # Check if method exists with other basis sets
-        normalized_method = METHOD_ALIASES.get(method, method)
-        if normalized_method in SCALE_FACTORS:
-            available_basis = list(SCALE_FACTORS[normalized_method].keys())
-            return False, f"Method '{normalized_method}' is supported, but not with basis '{basis_set}'. Available basis sets: {available_basis}"
-        else:
-            available_methods = list(SCALE_FACTORS.keys())
-            return False, f"Method '{method}' not supported. Available methods: {available_methods}"

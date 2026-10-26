@@ -1,13 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { components } from '../types/generated-api';
-import { getSettings, updateSettings } from '../apiClient';
+import {
+  getSettings,
+  updateSettings,
+  type AppSettings,
+  type AppSettingsResponse,
+} from '../api/settings';
 import { useCalculationStore } from '../store/calculationStore';
-
-// Type definitions
-type AppSettings = components['schemas']['AppSettings'];
-type SettingsResponse = components['schemas']['SettingsResponse'];
-
-// API Client functions are now imported from ../apiClient
 
 // Query keys
 const settingsKeys = {
@@ -17,7 +15,7 @@ const settingsKeys = {
 
 // Custom hooks
 export const useGetSettings = () => {
-  return useQuery({
+  return useQuery<AppSettingsResponse>({
     queryKey: settingsKeys.settings(),
     queryFn: () => getSettings().then(response => response.settings),
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -31,9 +29,9 @@ export const useUpdateSettings = () => {
   return useMutation({
     mutationFn: (settings: AppSettings) =>
       updateSettings(settings).then(response => response.settings),
-    onSuccess: (updatedSettings, variables) => {
+    onSuccess: updatedSettings => {
       // Check if calculations_directory changed BEFORE updating cache
-      const oldSettings = queryClient.getQueryData<AppSettings>(
+      const oldSettings = queryClient.getQueryData<AppSettingsResponse>(
         settingsKeys.settings()
       );
       const directoryChanged =

@@ -23,39 +23,6 @@ export const useProcessedCalculationResults = (
     const results = activeCalculation.results;
     const parameters = activeCalculation.parameters;
 
-    // 計算手法に基づいて主要なエネルギー値を決定
-    let primaryEnergyLabel = '';
-    let primaryEnergyValue = '';
-
-    if (
-      parameters.calculation_method === 'CCSD_T' &&
-      (results as any).ccsd_t_total_energy
-    ) {
-      primaryEnergyLabel = 'CCSD(T) Total Energy';
-      primaryEnergyValue = `${(results as any).ccsd_t_total_energy.toFixed(8)} hartree`;
-    } else if (
-      parameters.calculation_method === 'CCSD' &&
-      (results as any).ccsd_total_energy
-    ) {
-      primaryEnergyLabel = 'CCSD Total Energy';
-      primaryEnergyValue = `${(results as any).ccsd_total_energy.toFixed(8)} hartree`;
-    } else if (
-      parameters.calculation_method === 'CASSCF' &&
-      (results as any).casscf_energy
-    ) {
-      primaryEnergyLabel = 'CASSCF Energy';
-      primaryEnergyValue = `${(results as any).casscf_energy.toFixed(8)} hartree`;
-    } else if (
-      parameters.calculation_method === 'CASCI' &&
-      (results as any).casci_energy
-    ) {
-      primaryEnergyLabel = 'CASCI Energy';
-      primaryEnergyValue = `${(results as any).casci_energy.toFixed(8)} hartree`;
-    } else {
-      primaryEnergyLabel = 'SCF Energy';
-      primaryEnergyValue = `${results.scf_energy?.toFixed(8) || 'N/A'} hartree`;
-    }
-
     // 各セクションの表示判定
     const shouldShowElectronicProperties =
       (results.mulliken_charges && results.mulliken_charges.length > 0) ||
@@ -75,21 +42,14 @@ export const useProcessedCalculationResults = (
 
     const shouldShowVibrationalSection = results.frequency_analysis_performed;
 
-    // Energetics section is always shown for completed calculations
-    // (all calculations have at least SCF energy)
-    const shouldShowEnergeticsSection = true;
-
     return {
       results,
       parameters,
-      primaryEnergyLabel,
-      primaryEnergyValue,
       shouldShowElectronicProperties,
       shouldShowCASSection,
       shouldShowTDDFTSection,
       shouldShowCCSDSection,
       shouldShowVibrationalSection,
-      shouldShowEnergeticsSection,
     };
   }, [activeCalculation]);
 };

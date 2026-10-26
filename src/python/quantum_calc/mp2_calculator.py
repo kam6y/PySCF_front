@@ -1,15 +1,13 @@
 """MP2 calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pyscf import gto, scf, mp
-# geometric_solver is now imported in BaseCalculator
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
-from .file_manager import CalculationFileManager
+from .exceptions import CalculationError
+from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
 
@@ -19,12 +17,19 @@ logger = logging.getLogger(__name__)
 class MP2Calculator(BaseCalculator):
     """MP2 calculator using PySCF for structure optimization and MP2 energy calculations."""
     
-    def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = True):
+    def __init__(
+        self,
+        working_dir: Optional[str] = None,
+        keep_files: bool = False,
+        molecule_name: Optional[str] = None,
+        optimize_geometry: bool = True,
+        **kwargs
+    ):
         # Use file manager for better organization
-        self.file_manager = CalculationFileManager()
+        self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
-        super().__init__(working_dir, optimize_geometry)
+        super().__init__(working_dir, optimize_geometry, **kwargs)
         self.mol: Optional[gto.Mole] = None
         self.mf: Optional[scf.hf.SCF] = None
         self.mp2: Optional[mp.MP2] = None
@@ -32,11 +37,6 @@ class MP2Calculator(BaseCalculator):
         self.keep_files = keep_files
         self.molecule_name = molecule_name
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup MP2 calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate MP2-specific parameters."""
         # MP2-specific parameters (MP2 has no method-specific parameters beyond common ones)
@@ -184,10 +184,16 @@ class MP2Calculator(BaseCalculator):
         # Create MP2 object for geometry optimization
         logger.info("Creating MP2 object for geometry optimization...")
         mp2_obj = mp.MP2(self.mf)
+
+        optimize_kwargs = {}
+        if getattr(self, 'geomopt_maxsteps', None) is not None:
+            optimize_kwargs['maxsteps'] = self.geomopt_maxsteps
+        if getattr(self, 'geomopt_conv_energy', None) is not None:
+            optimize_kwargs['convergence_energy'] = self.geomopt_conv_energy
         
         # Perform MP2 geometry optimization
         logger.info("Performing geometry optimization at MP2 level...")
-        optimized_mol = geometric_solver.optimize(mp2_obj)
+        optimized_mol = geometric_solver.optimize(mp2_obj, **optimize_kwargs)
         self.optimized_geometry = optimized_mol.atom_coords(unit="ANG")
         logger.info("MP2 geometry optimization completed")
         

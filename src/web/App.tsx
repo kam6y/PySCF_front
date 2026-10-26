@@ -1,6 +1,6 @@
 // src/web/App.tsx
 
-import React, { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import './App.css';
 import styles from './App.module.css';
 import { Header } from './components/Header';
@@ -15,13 +15,9 @@ import { DrawMoleculePage } from './pages/DrawMoleculePage';
 import { useAppState } from './hooks/useAppState';
 import { useCalculationData } from './hooks/useCalculationData';
 import { useCalculationActions } from './hooks/useCalculationActions';
-import { useUnifiedWebSocket } from './hooks/useUnifiedWebSocket';
+import { useCalculationUpdates } from './hooks/useCalculationUpdates';
 import { useChatHistoryStore } from './store/chatHistoryStore';
-import { useAgentStore } from './store/agentStore';
-import {
-  useGetChatSessionDetail,
-  useGetChatSessions,
-} from './hooks/useChatHistoryQueries';
+import { useGetChatSessions } from './hooks/useChatHistoryQueries';
 import { useAppSettings } from './hooks/useAppSettings';
 
 export const App = () => {
@@ -29,13 +25,16 @@ export const App = () => {
   const appState = useAppState();
   const calculationData = useCalculationData();
   const calculationActions = useCalculationActions();
+  const createNewCalculation = appState.actions.handleCreateNew;
+  const stagedCalculation = appState.calculation.stagedCalculation;
 
   // アプリ設定の取得
-  const { settings, updateSettings } = useAppSettings();
+  const { settings, updateSettingsAsync } = useAppSettings();
 
   // 初回セットアップダイアログの表示状態
   const [showInitialSetup, setShowInitialSetup] = useState(false);
   const [defaultDirectory, setDefaultDirectory] = useState('');
+  const hasAutoCreatedInitialCalculationRef = useRef(false);
 
   // プラットフォーム情報の取得
   const [platform, setPlatform] = useState<string>('');
@@ -95,11 +94,26 @@ export const App = () => {
 
   // 初回セットアップ完了時の処理
   const handleSetupComplete = async (calculationsDirectory: string) => {
-    if (settings) {
-      await updateSettings({
-        ...settings,
+    if (!settings) {
+      console.error('Failed to save initial setup settings: settings missing');
+      return;
+    }
+
+    try {
+      await updateSettingsAsync({
+        max_parallel_instances: settings.max_parallel_instances,
+        max_cpu_utilization_percent: settings.max_cpu_utilization_percent,
+        max_memory_utilization_percent: settings.max_memory_utilization_percent,
+        gpu_acceleration_enabled: settings.gpu_acceleration_enabled,
+        system_total_cores: settings.system_total_cores,
+        system_total_memory_mb: settings.system_total_memory_mb,
         calculations_directory: calculationsDirectory,
+        timezone: settings.timezone,
+        research_email: settings.research_email,
       });
+    } catch (error) {
+      console.error('Failed to save initial setup settings:', error);
+      return;
     }
 
     // セットアップ完了フラグをLocalStorageに保存
@@ -110,7 +124,8 @@ export const App = () => {
 
     // 初回セットアップ完了後、自動的に新規計算を作成
     console.log('[App] Auto-creating new calculation after setup completion');
-    appState.calculation.createNewCalculation();
+    createNewCalculation();
+    hasAutoCreatedInitialCalculationRef.current = true;
   };
 
   // チャットセッションのデータ取得
@@ -118,18 +133,18 @@ export const App = () => {
 
   // アプリ起動時に自動的に新規計算を作成
   useEffect(() => {
+    if (hasAutoCreatedInitialCalculationRef.current) {
+      return;
+    }
+
     // 初回セットアップダイアログが閉じており、settingsがロードされ、
     // まだ新規計算が作成されていない場合のみ実行
-    if (
-      !showInitialSetup &&
-      settings &&
-      !appState.calculation.stagedCalculation
-    ) {
+    if (!showInitialSetup && settings && !stagedCalculation) {
       console.log('[App] Auto-creating new calculation on app startup');
-      appState.calculation.createNewCalculation();
+      createNewCalculation();
+      hasAutoCreatedInitialCalculationRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showInitialSetup, settings]);
+  }, [showInitialSetup, settings, stagedCalculation, createNewCalculation]);
 
   // AIチャット画面を開いた時にサイドバーのタブを"chats"に自動切り替え
   // AI Agent ページがOFFの場合は"calculations"に戻す
@@ -141,8 +156,8 @@ export const App = () => {
     }
   }, [appState.ui.isAIAgentEnabled, appState.ui.setSidebarView]);
 
-  // 統合WebSocketによるリアルタイム更新（グローバル + アクティブ計算監視）
-  useUnifiedWebSocket({
+  // SSEによるリアルタイム更新（グローバル + アクティブ計算監視）
+  useCalculationUpdates({
     activeCalculationId: calculationData.activeCalculation?.id || null,
   });
 
@@ -177,19 +192,42 @@ export const App = () => {
   }, [chatSessionsData?.sessions, appState.ui.searchQuery]);
 
   // イベントハンドラー（統合されたアクションを使用）
-  const handleSearchChange = (query: string) => {
-    appState.ui.setSearchQuery(query);
-  };
+  const handleSearchChange = useCallback(
+    (query: string) => {
+      appState.ui.setSearchQuery(query);
+    },
+    [appState.ui]
+  );
 
-  const handleCalculationSelect = (calculationId: string) => {
-    appState.actions.handleCalculationSelect(calculationId);
-  };
+  const handleCalculationSelect = useCallback(
+    (calculationId: string) => {
+      appState.actions.handleCalculationSelect(calculationId);
+    },
+    [appState.actions]
+  );
+
+  const handleCalculationDelete = useCallback(
+    async (calculationId: string) => {
+      await calculationActions.handleCalculationDelete(calculationId);
+      // 削除された計算がアクティブだった場合はクリア
+      if (calculationData.activeCalculationId === calculationId) {
+        appState.calculation.selectCalculation(null);
+        appState.calculation.clearStagedCalculation();
+        appState.ui.setCurrentPage('calculation-settings');
+      }
+    },
+    [
+      calculationActions,
+      calculationData.activeCalculationId,
+      appState.calculation,
+      appState.ui,
+    ]
+  );
 
   // チャット履歴のハンドラー
   const setActiveSessionId = useChatHistoryStore(
     state => state.setActiveSessionId
   );
-  const setHistory = useAgentStore(state => state.setHistory);
 
   const handleChatSessionSelect = async (sessionId: string) => {
     try {
@@ -236,8 +274,7 @@ export const App = () => {
           <CalculationResultsPage
             activeCalculation={calculationData.activeCalculation || undefined}
             isLoadingDetails={calculationData.detailsLoading}
-            detailsError={null}
-            onCalculationUpdate={calculationActions.handleCalculationUpdate}
+            detailsError={calculationData.detailsError?.message ?? null}
           />
         );
       case 'draw-molecule':
@@ -314,6 +351,8 @@ export const App = () => {
         onDropdownClose={appState.ui.closeDropdown}
         isAIAgentEnabled={appState.ui.isAIAgentEnabled}
         onAIAgentToggle={appState.ui.setAIAgentEnabled}
+        platform={platform}
+        isFullScreen={isFullScreen}
       />
 
       <Sidebar
@@ -328,15 +367,7 @@ export const App = () => {
             : null
         }
         onCalculationSelect={handleCalculationSelect}
-        onCalculationDelete={async (calculationId: string) => {
-          await calculationActions.handleCalculationDelete(calculationId);
-          // 削除された計算がアクティブだった場合はクリア
-          if (calculationData.activeCalculationId === calculationId) {
-            appState.calculation.selectCalculation(null);
-            appState.calculation.clearStaged();
-            appState.ui.setCurrentPage('calculation-settings');
-          }
-        }}
+        onCalculationDelete={handleCalculationDelete}
         onCreateNew={appState.actions.handleCreateNew}
         searchQuery={appState.ui.searchQuery}
         onSearchChange={handleSearchChange}

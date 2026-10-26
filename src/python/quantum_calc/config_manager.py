@@ -1,8 +1,9 @@
 """Configuration manager for quantum calculation settings."""
 
 import logging
-from typing import Dict, Any, Optional, Tuple
-from flask import current_app
+from typing import Dict, Any
+
+from config import get_server_config
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +13,7 @@ class QuantumCalculationConfigManager:
     Manager for quantum calculation configuration settings.
 
     This class provides convenient access to quantum calculation settings
-    stored in Flask's app.config, which serves as the single source of truth
+    stored in ServerConfig, which serves as the single source of truth
     for all application configuration.
     """
 
@@ -20,30 +21,24 @@ class QuantumCalculationConfigManager:
         """
         Initialize configuration manager.
 
-        Configuration is retrieved from Flask's app.config at runtime,
+        Configuration is retrieved from ServerConfig at runtime,
         eliminating the need for duplicate file loading and caching.
         """
         pass
 
     def _get_config(self) -> Dict[str, Any]:
         """
-        Get quantum calculation configuration from Flask app.config.
+        Get quantum calculation configuration from ServerConfig.
 
         Returns:
             Dictionary containing quantum calculation defaults, or fallback values.
         """
-        try:
-            # Get configuration from Flask app.config (single source of truth)
-            config = current_app.config.get('QUANTUM_CALCULATION_DEFAULTS', {})
-            if config:
-                return {'quantum_calculation_defaults': config}
-            else:
-                logger.warning("Quantum calculation defaults not found in app.config, using fallback")
-                return self._get_fallback_config()
-        except RuntimeError:
-            # Outside Flask application context - use fallback
-            logger.warning("Outside Flask context, using fallback quantum calculation configuration")
-            return self._get_fallback_config()
+        server_config = get_server_config()
+        config = server_config.get('quantum_calculation_defaults', {})
+        if config:
+            return {'quantum_calculation_defaults': config}
+        logger.warning("Quantum calculation defaults not found in ServerConfig, using fallback")
+        return self._get_fallback_config()
 
     def _get_fallback_config(self) -> Dict[str, Any]:
         """Get fallback configuration when app.config is not available."""
@@ -73,16 +68,6 @@ class QuantumCalculationConfigManager:
             }
         }
 
-    def reload_config(self) -> None:
-        """
-        Reload configuration from Flask app.config.
-
-        Note: Since configuration is now read directly from app.config at runtime,
-        this method is kept for backwards compatibility but has no effect.
-        Configuration changes should be made directly to Flask's app.config.
-        """
-        logger.info("Configuration reload requested (configuration is now read from app.config at runtime)")
-    
     def get_memory_setting(self, calculation_method: str) -> int:
         """
         Get memory setting for a specific calculation method.
@@ -164,53 +149,6 @@ class QuantumCalculationConfigManager:
         logger.debug(f"No spectrum setting found for {setting_name}, using default: {default_value}")
         return default_value
     
-    def get_ir_frequency_range(self) -> Tuple[float, float]:
-        """Get IR frequency range as a tuple."""
-        range_list = self.get_spectrum_setting("ir_frequency_range")
-        if isinstance(range_list, list) and len(range_list) >= 2:
-            return (float(range_list[0]), float(range_list[1]))
-        return (400.0, 4000.0)
-    
-    def get_frequency_threshold(self) -> float:
-        """Get frequency threshold for vibrational analysis."""
-        return float(self.get_spectrum_setting("frequency_threshold"))
-    
-    def get_all_memory_settings(self) -> Dict[str, int]:
-        """Get all memory settings as a dictionary."""
-        config = self._get_config()
-        return config["quantum_calculation_defaults"]["memory_settings"].copy()
-
-    def get_all_cycle_settings(self) -> Dict[str, int]:
-        """Get all cycle settings as a dictionary."""
-        config = self._get_config()
-        return config["quantum_calculation_defaults"]["cycle_settings"].copy()
-
-    def get_all_spectrum_settings(self) -> Dict[str, Any]:
-        """Get all spectrum settings as a dictionary."""
-        config = self._get_config()
-        return config["quantum_calculation_defaults"]["spectrum_settings"].copy()
-
-    def get_config_info(self) -> Dict[str, Any]:
-        """
-        Get information about the configuration source and status.
-
-        Returns:
-            Dictionary with configuration source information.
-        """
-        try:
-            has_config = current_app.config.get('QUANTUM_CALCULATION_DEFAULTS') is not None
-            return {
-                "config_source": "Flask app.config",
-                "config_available": has_config,
-                "using_fallback": not has_config
-            }
-        except RuntimeError:
-            return {
-                "config_source": "fallback (outside Flask context)",
-                "config_available": False,
-                "using_fallback": True
-            }
-
 
 # Global instance for easy access
 _config_manager = None
@@ -221,12 +159,6 @@ def get_config_manager() -> QuantumCalculationConfigManager:
     if _config_manager is None:
         _config_manager = QuantumCalculationConfigManager()
     return _config_manager
-
-def reload_global_config() -> None:
-    """Reload the global configuration."""
-    global _config_manager
-    if _config_manager is not None:
-        _config_manager.reload_config()
 
 # Convenience functions for common operations
 def get_memory_for_method(calculation_method: str) -> int:
@@ -249,14 +181,6 @@ def get_ah_max_cycle() -> int:
     """Convenience function to get ah_max_cycle setting."""
     return get_config_manager().get_cycle_setting("ah_max_cycle")
 
-def get_ir_range() -> Tuple[float, float]:
-    """Convenience function to get IR frequency range."""
-    return get_config_manager().get_ir_frequency_range()
-
 def get_spectrum_setting(setting_name: str) -> Any:
     """Convenience function to get spectrum setting."""
     return get_config_manager().get_spectrum_setting(setting_name)
-
-def get_frequency_threshold() -> float:
-    """Convenience function to get frequency threshold."""
-    return get_config_manager().get_frequency_threshold()

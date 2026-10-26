@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useAppSettings } from '../hooks';
-import {
-  TIMEZONE_LABELS,
-  TIMEZONE_GROUPS,
-  getTimezoneLabel,
-} from '../utils/dateFormatter';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useGetCalculations } from '../hooks/useCalculationQueries';
+import { useAppSettings } from '../hooks/useAppSettings';
+import { useGpu4Pyscf } from '../hooks/useGpu4Pyscf';
+import { TIMEZONE_GROUPS, getTimezoneLabel } from '../utils/dateFormatter';
 import type { components } from '../types/generated-api';
 import styles from './SettingsPage.module.css';
 
@@ -15,37 +13,64 @@ type Timezone = components['schemas']['AppSettings']['timezone'];
 const DEFAULT_MAX_PARALLEL_INSTANCES = 4;
 const DEFAULT_MAX_CPU_UTILIZATION = 95.0;
 const DEFAULT_MAX_MEMORY_UTILIZATION = 95.0;
+const DIRECTORY_CHANGE_BLOCKING_STATUSES = [
+  'pending',
+  'running',
+  'waiting',
+  'pausing',
+] as const;
 
 interface SettingsPageProps {
   // Props will be added when integrating with the main app
 }
 
-export const SettingsPage: React.FC<SettingsPageProps> = () => {
-  const [maxParallelInstances, setMaxParallelInstances] = useState<
-    number | undefined
-  >(undefined);
-  const [maxCpuUtilization, setMaxCpuUtilization] = useState<
-    number | undefined
-  >(undefined);
-  const [maxMemoryUtilization, setMaxMemoryUtilization] = useState<
-    number | undefined
-  >(undefined);
-  const [geminiApiKey, setGeminiApiKey] = useState<string>('');
-  const [calculationsDirectory, setCalculationsDirectory] =
-    useState<string>('');
-  const [timezone, setTimezone] = useState<Timezone>('UTC');
-  const [isSelectingFolder, setIsSelectingFolder] = useState(false);
-  const [originalValues, setOriginalValues] = useState<{
-    maxParallelInstances?: number;
-    maxCpuUtilization?: number;
-    maxMemoryUtilization?: number;
-    geminiApiKey?: string;
-    calculationsDirectory?: string;
-    timezone?: Timezone;
-  }>({});
+interface SettingsFormValues {
+  maxParallelInstances?: number;
+  maxCpuUtilization?: number;
+  maxMemoryUtilization?: number;
+  geminiApiKey: string;
+  calculationsDirectory: string;
+  timezone: Timezone;
+  gpuAccelerationEnabled: boolean;
+}
 
-  const { settings, isLoading, isUpdating, error, updateSettings } =
+export const SettingsPage: React.FC<SettingsPageProps> = () => {
+  const [formValues, setFormValues] = useState<SettingsFormValues>({
+    geminiApiKey: '',
+    calculationsDirectory: '',
+    timezone: 'UTC',
+    gpuAccelerationEnabled: false,
+  });
+  const [isSelectingFolder, setIsSelectingFolder] = useState(false);
+  const [originalValues, setOriginalValues] = useState<SettingsFormValues>({
+    geminiApiKey: '',
+    calculationsDirectory: '',
+    timezone: 'UTC',
+    gpuAccelerationEnabled: false,
+  });
+
+  const { settings, isLoading, isUpdating, error, updateSettingsAsync } =
     useAppSettings();
+  const { data: calculationsData } = useGetCalculations();
+  const {
+    status: gpuStatus,
+    isLoading: isGpuStatusLoading,
+    isFetching: isGpuStatusFetching,
+    isInstalling: isGpuInstalling,
+    error: gpuError,
+    installGpu4Pyscf,
+    refetch: refetchGpuStatus,
+  } = useGpu4Pyscf();
+
+  const updateFormValue = <K extends keyof SettingsFormValues>(
+    key: K,
+    value: SettingsFormValues[K]
+  ) => {
+    setFormValues(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Whether the backend reports a Gemini API key is already stored.
+  const geminiApiKeyConfigured = Boolean(settings?.gemini_api_key_configured);
 
   // Update local state when settings are loaded
   useEffect(() => {
@@ -59,7 +84,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         settings.max_memory_utilization_percent
       );
 
-      const newValues = {
+      const newValues: SettingsFormValues = {
         maxParallelInstances: !isNaN(maxParallelInstancesValue)
           ? maxParallelInstancesValue
           : DEFAULT_MAX_PARALLEL_INSTANCES,
@@ -69,85 +94,83 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         maxMemoryUtilization: !isNaN(maxMemoryUtilizationValue)
           ? maxMemoryUtilizationValue
           : DEFAULT_MAX_MEMORY_UTILIZATION,
-        geminiApiKey: settings.gemini_api_key || '',
+        // Never populate from GET response -- the real key is not returned.
+        geminiApiKey: '',
         calculationsDirectory: settings.calculations_directory || '',
         timezone: settings.timezone || 'UTC',
+        gpuAccelerationEnabled: settings.gpu_acceleration_enabled ?? false,
       };
 
-      if (process.env.NODE_ENV === 'development') {
-        console.log('SettingsPage: Loading settings', { settings, newValues });
-      }
-
-      setMaxParallelInstances(newValues.maxParallelInstances);
-      setMaxCpuUtilization(newValues.maxCpuUtilization);
-      setMaxMemoryUtilization(newValues.maxMemoryUtilization);
-      setGeminiApiKey(newValues.geminiApiKey);
-      setCalculationsDirectory(newValues.calculationsDirectory);
-      setTimezone(newValues.timezone);
+      setFormValues(newValues);
       setOriginalValues(newValues);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('SettingsPage: State updated', {
-          originalValues: newValues,
-        });
-      }
     }
   }, [settings]);
 
+  const hasBlockingCalculations = useMemo(
+    () =>
+      calculationsData?.calculations?.some(calculation =>
+        DIRECTORY_CHANGE_BLOCKING_STATUSES.includes(
+          calculation.status as (typeof DIRECTORY_CHANGE_BLOCKING_STATUSES)[number]
+        )
+      ) ?? false,
+    [calculationsData]
+  );
+
+  const calculationsDirectoryChanged =
+    formValues.calculationsDirectory !==
+    (originalValues.calculationsDirectory || '');
+  const blockSaveForDirectoryChange =
+    hasBlockingCalculations && calculationsDirectoryChanged;
+
   const handleSave = async () => {
+    if (blockSaveForDirectoryChange) {
+      return;
+    }
+
     try {
-      updateSettings({
+      await updateSettingsAsync({
         max_parallel_instances:
-          maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
+          formValues.maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES,
         max_cpu_utilization_percent:
-          maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION,
+          formValues.maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION,
         max_memory_utilization_percent:
-          maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
+          formValues.maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION,
+        gpu_acceleration_enabled: formValues.gpuAccelerationEnabled,
         system_total_cores: settings?.system_total_cores || 0,
         system_total_memory_mb: settings?.system_total_memory_mb || 0,
-        calculations_directory: calculationsDirectory,
-        timezone: timezone,
-        gemini_api_key: geminiApiKey || null,
+        calculations_directory: formValues.calculationsDirectory,
+        timezone: formValues.timezone,
+        // Only send gemini_api_key when the user typed a new value;
+        // empty/untouched keeps the existing key on the backend.
+        ...(formValues.geminiApiKey
+          ? { gemini_api_key: formValues.geminiApiKey }
+          : {}),
       });
 
-      const newValues = {
-        maxParallelInstances,
-        maxCpuUtilization,
-        maxMemoryUtilization,
-        geminiApiKey,
-        calculationsDirectory,
-        timezone,
-      };
+      const newValues = { ...formValues };
       setOriginalValues(newValues);
     } catch (error) {
       console.error('Failed to save settings:', error);
-      // Reset to original values on error
-      setMaxParallelInstances(originalValues.maxParallelInstances);
-      setMaxCpuUtilization(originalValues.maxCpuUtilization);
-      setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
-      setGeminiApiKey(originalValues.geminiApiKey || '');
-      setCalculationsDirectory(originalValues.calculationsDirectory || '');
-      setTimezone(originalValues.timezone || 'UTC');
+      setFormValues({ ...originalValues });
     }
   };
 
   const handleCancel = () => {
-    setMaxParallelInstances(originalValues.maxParallelInstances);
-    setMaxCpuUtilization(originalValues.maxCpuUtilization);
-    setMaxMemoryUtilization(originalValues.maxMemoryUtilization);
-    setGeminiApiKey(originalValues.geminiApiKey || '');
-    setCalculationsDirectory(originalValues.calculationsDirectory || '');
-    setTimezone(originalValues.timezone || 'UTC');
+    setFormValues({ ...originalValues });
   };
 
   const handleSelectFolder = async () => {
+    if (hasBlockingCalculations) {
+      return;
+    }
+
     setIsSelectingFolder(true);
     try {
       const result = await window.electronAPI.selectFolder();
       if (!result.canceled && result.filePath) {
         // Append /PySCF_calculations to the selected path
         const fullPath = `${result.filePath}/PySCF_calculations`;
-        setCalculationsDirectory(fullPath);
+        updateFormValue('calculationsDirectory', fullPath);
       }
     } catch (error) {
       console.error('Failed to select folder:', error);
@@ -157,88 +180,94 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
   };
 
   const hasUnsavedChanges = useMemo(() => {
-    // Return false if settings haven't been loaded yet
-    if (!originalValues || Object.keys(originalValues).length === 0) {
-      return false;
+    // settings 未ロード時は変更なしとみなす
+    if (!settings) return false;
+
+    const floatClose = (
+      a: number | undefined,
+      b: number | undefined,
+      defaultValue: number
+    ) => Math.abs((a ?? defaultValue) - (b ?? defaultValue)) <= 0.001;
+
+    if (
+      (formValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES) !==
+      (originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES)
+    )
+      return true;
+    if (
+      !floatClose(
+        formValues.maxCpuUtilization,
+        originalValues.maxCpuUtilization,
+        DEFAULT_MAX_CPU_UTILIZATION
+      )
+    )
+      return true;
+    if (
+      !floatClose(
+        formValues.maxMemoryUtilization,
+        originalValues.maxMemoryUtilization,
+        DEFAULT_MAX_MEMORY_UTILIZATION
+      )
+    )
+      return true;
+    if (formValues.geminiApiKey !== (originalValues.geminiApiKey || ''))
+      return true;
+    if (
+      formValues.calculationsDirectory !==
+      (originalValues.calculationsDirectory || '')
+    )
+      return true;
+    if (formValues.timezone !== (originalValues.timezone || 'UTC')) return true;
+    if (
+      (formValues.gpuAccelerationEnabled ?? false) !==
+      (originalValues.gpuAccelerationEnabled ?? false)
+    )
+      return true;
+
+    return false;
+  }, [formValues, originalValues, settings]);
+
+  const gpuInstallLabel = useMemo(() => {
+    if (!gpuStatus) {
+      return 'Install GPU4PySCF';
+    }
+    return gpuStatus.gpu4pyscf_installed
+      ? 'Reinstall GPU4PySCF'
+      : 'Install GPU4PySCF';
+  }, [gpuStatus]);
+
+  const canEnableGpuAcceleration = Boolean(
+    gpuStatus?.gpu4pyscf_installed &&
+      gpuStatus?.is_linux &&
+      gpuStatus?.cuda_detected &&
+      gpuStatus?.cuda_supported
+  );
+
+  const gpuStatusMessage = useMemo(() => {
+    if (!gpuStatus) {
+      return null;
     }
 
-    // Use default values for comparison if values are undefined
-    const currentParallel =
-      maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
-    const currentCpu = maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
-    const currentMemory =
-      maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
-    const currentGeminiApiKey = geminiApiKey;
-    const currentCalculationsDirectory = calculationsDirectory;
-    const currentTimezone = timezone;
-
-    const originalParallel =
-      originalValues.maxParallelInstances ?? DEFAULT_MAX_PARALLEL_INSTANCES;
-    const originalCpu =
-      originalValues.maxCpuUtilization ?? DEFAULT_MAX_CPU_UTILIZATION;
-    const originalMemory =
-      originalValues.maxMemoryUtilization ?? DEFAULT_MAX_MEMORY_UTILIZATION;
-    const originalGeminiApiKey = originalValues.geminiApiKey || '';
-    const originalCalculationsDirectory =
-      originalValues.calculationsDirectory || '';
-    const originalTimezone = originalValues.timezone || 'UTC';
-
-    const parallelChanged = currentParallel !== originalParallel;
-    const cpuChanged = Math.abs(currentCpu - originalCpu) > 0.001;
-    const memoryChanged = Math.abs(currentMemory - originalMemory) > 0.001;
-    const geminiApiKeyChanged = currentGeminiApiKey !== originalGeminiApiKey;
-    const calculationsDirectoryChanged =
-      currentCalculationsDirectory !== originalCalculationsDirectory;
-    const timezoneChanged = currentTimezone !== originalTimezone;
-
-    const hasChanges =
-      parallelChanged ||
-      cpuChanged ||
-      memoryChanged ||
-      geminiApiKeyChanged ||
-      calculationsDirectoryChanged ||
-      timezoneChanged;
-
-    // Debug logging in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('SettingsPage: hasUnsavedChanges check', {
-        current: {
-          currentParallel,
-          currentCpu,
-          currentMemory,
-          currentGeminiApiKey,
-        },
-        original: {
-          originalParallel,
-          originalCpu,
-          originalMemory,
-          originalGeminiApiKey,
-        },
-        changes: {
-          parallelChanged,
-          cpuChanged,
-          memoryChanged,
-          geminiApiKeyChanged,
-        },
-        hasChanges,
-      });
+    if (!gpuStatus.cuda_detected) {
+      const detail = gpuStatus.cuda_detection_message
+        ? ` (${gpuStatus.cuda_detection_message})`
+        : '';
+      return `CUDA Toolkit not detected. Install CUDA 11/12/13 and ensure nvcc is in PATH.${detail}`;
     }
 
-    return hasChanges;
-  }, [
-    maxParallelInstances,
-    maxCpuUtilization,
-    maxMemoryUtilization,
-    geminiApiKey,
-    calculationsDirectory,
-    timezone,
-    originalValues?.maxParallelInstances,
-    originalValues?.maxCpuUtilization,
-    originalValues?.maxMemoryUtilization,
-    originalValues?.geminiApiKey,
-    originalValues?.calculationsDirectory,
-    originalValues?.timezone,
-  ]);
+    if (!gpuStatus.cuda_supported) {
+      const detail = gpuStatus.cuda_detection_message
+        ? ` (${gpuStatus.cuda_detection_message})`
+        : '';
+      return `Detected CUDA ${gpuStatus.cuda_version || 'unknown'} is not supported. Supported versions: 11.x, 12.x, 13.x.${detail}`;
+    }
+
+    if (gpuStatus.gpu4pyscf_installed) {
+      return 'GPU4PySCF is installed. You can reinstall if needed.';
+    }
+
+    return 'CUDA detected. Install GPU4PySCF to enable GPU acceleration.';
+  }, [gpuStatus]);
 
   if (isLoading) {
     return (
@@ -275,7 +304,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
             <button
               onClick={handleSave}
               className={styles.saveButton}
-              disabled={isUpdating}
+              disabled={isUpdating || blockSaveForDirectoryChange}
             >
               {isUpdating ? (
                 <>
@@ -328,16 +357,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   min="1"
                   max="16"
                   step="1"
-                  value={maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES}
+                  value={
+                    formValues.maxParallelInstances ||
+                    DEFAULT_MAX_PARALLEL_INSTANCES
+                  }
                   onChange={e => {
                     const newValue = Number(e.target.value);
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: maxParallelInstances changed',
-                        newValue
-                      );
-                    }
-                    setMaxParallelInstances(newValue);
+                    updateFormValue('maxParallelInstances', newValue);
                   }}
                   className={styles.slider}
                   disabled={isUpdating}
@@ -353,7 +379,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
-                  {maxParallelInstances || DEFAULT_MAX_PARALLEL_INSTANCES}
+                  {formValues.maxParallelInstances ||
+                    DEFAULT_MAX_PARALLEL_INSTANCES}
                 </span>
                 <span className={styles.valueUnit}>calculations</span>
               </div>
@@ -378,16 +405,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   min="10"
                   max="100"
                   step="5"
-                  value={maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION}
+                  value={
+                    formValues.maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION
+                  }
                   onChange={e => {
                     const newValue = Number(e.target.value);
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: maxCpuUtilization changed',
-                        newValue
-                      );
-                    }
-                    setMaxCpuUtilization(newValue);
+                    updateFormValue('maxCpuUtilization', newValue);
                   }}
                   className={styles.slider}
                   disabled={isUpdating}
@@ -401,9 +424,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
 
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
-                  {(maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION).toFixed(
-                    0
-                  )}
+                  {(
+                    formValues.maxCpuUtilization || DEFAULT_MAX_CPU_UTILIZATION
+                  ).toFixed(0)}
                   %
                 </span>
                 <span className={styles.valueUnit}>CPU</span>
@@ -431,16 +454,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   min="10"
                   max="100"
                   step="5"
-                  value={maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION}
+                  value={
+                    formValues.maxMemoryUtilization ||
+                    DEFAULT_MAX_MEMORY_UTILIZATION
+                  }
                   onChange={e => {
                     const newValue = Number(e.target.value);
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: maxMemoryUtilization changed',
-                        newValue
-                      );
-                    }
-                    setMaxMemoryUtilization(newValue);
+                    updateFormValue('maxMemoryUtilization', newValue);
                   }}
                   className={styles.slider}
                   disabled={isUpdating}
@@ -455,7 +475,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               <div className={styles.valueDisplay}>
                 <span className={styles.currentValue}>
                   {(
-                    maxMemoryUtilization || DEFAULT_MAX_MEMORY_UTILIZATION
+                    formValues.maxMemoryUtilization ||
+                    DEFAULT_MAX_MEMORY_UTILIZATION
                   ).toFixed(0)}
                   %
                 </span>
@@ -485,15 +506,198 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
         </div>
 
         <div className={styles.settingsSection}>
+          <div className={styles.sectionHeader}>
+            <h3>GPU Acceleration (Linux)</h3>
+            <label className={styles.gpuToggle}>
+              <input
+                type="checkbox"
+                checked={formValues.gpuAccelerationEnabled}
+                onChange={event =>
+                  updateFormValue(
+                    'gpuAccelerationEnabled',
+                    event.target.checked
+                  )
+                }
+                disabled={
+                  isUpdating ||
+                  isGpuStatusLoading ||
+                  (!canEnableGpuAcceleration &&
+                    !formValues.gpuAccelerationEnabled)
+                }
+              />
+              <span className={styles.gpuToggleTrack}></span>
+              <span className={styles.gpuToggleLabel}>Enabled</span>
+            </label>
+          </div>
+
+          <div className={styles.settingItem}>
+            <div className={styles.settingLabel}>
+              <label>GPU4PySCF Installation</label>
+              <p className={styles.settingHelp}>
+                Detects CUDA Toolkit via <code>nvcc --version</code> and
+                installs the matching GPU4PySCF package. cuTENSOR is strongly
+                recommended and will be installed together.
+              </p>
+            </div>
+
+            <div className={styles.settingControl}>
+              {isGpuStatusLoading ? (
+                <div className={styles.inlineStatus}>
+                  <div className={styles.inlineSpinner}></div>
+                  <span>Detecting CUDA environment...</span>
+                </div>
+              ) : (
+                <>
+                  <div className={styles.gpuStatusGrid}>
+                    <div className={styles.gpuStatusItem}>
+                      <span className={styles.infoLabel}>Platform</span>
+                      <span className={styles.infoValue}>
+                        {gpuStatus?.is_linux ? 'Linux' : 'Unsupported'}
+                      </span>
+                    </div>
+                    {gpuStatus?.is_linux && (
+                      <>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>CUDA Toolkit</span>
+                          <span className={styles.infoValue}>
+                            {gpuStatus?.cuda_version
+                              ? `CUDA ${gpuStatus.cuda_version}`
+                              : 'Not detected'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>CUDA Support</span>
+                          <span
+                            className={`${styles.gpuStatusBadge} ${
+                              gpuStatus?.cuda_supported
+                                ? styles.gpuStatusBadgeSuccess
+                                : styles.gpuStatusBadgeWarning
+                            }`}
+                          >
+                            {gpuStatus?.cuda_supported
+                              ? 'Supported'
+                              : 'Unsupported'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>GPU4PySCF</span>
+                          <span
+                            className={`${styles.gpuStatusBadge} ${
+                              gpuStatus?.gpu4pyscf_installed
+                                ? styles.gpuStatusBadgeSuccess
+                                : styles.gpuStatusBadgeWarning
+                            }`}
+                          >
+                            {gpuStatus?.gpu4pyscf_installed
+                              ? `Installed${gpuStatus.gpu4pyscf_version ? ` v${gpuStatus.gpu4pyscf_version}` : ''}`
+                              : 'Not installed'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>cuTENSOR</span>
+                          <span
+                            className={`${styles.gpuStatusBadge} ${
+                              gpuStatus?.cutensor_installed
+                                ? styles.gpuStatusBadgeSuccess
+                                : styles.gpuStatusBadgeWarning
+                            }`}
+                          >
+                            {gpuStatus?.cutensor_installed
+                              ? `Installed${gpuStatus.cutensor_version ? ` v${gpuStatus.cutensor_version}` : ''}`
+                              : 'Not installed'}
+                          </span>
+                        </div>
+                        <div className={styles.gpuStatusItem}>
+                          <span className={styles.infoLabel}>Recommended</span>
+                          <span className={styles.gpuPackageValue}>
+                            {gpuStatus?.recommended_gpu4pyscf_package ? (
+                              <>
+                                <code>
+                                  {gpuStatus.recommended_gpu4pyscf_package}
+                                </code>
+                                {gpuStatus.recommended_cutensor_package && (
+                                  <>
+                                    <span className={styles.gpuPackageDivider}>
+                                      +
+                                    </span>
+                                    <code>
+                                      {gpuStatus.recommended_cutensor_package}
+                                    </code>
+                                  </>
+                                )}
+                              </>
+                            ) : (
+                              'Not available'
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {gpuStatus?.is_linux && gpuStatusMessage && (
+                    <div className={styles.gpuNotice}>{gpuStatusMessage}</div>
+                  )}
+
+                  {gpuError && (
+                    <div className={styles.gpuErrorBox}>
+                      {gpuError instanceof Error
+                        ? gpuError.message
+                        : 'Failed to retrieve GPU status.'}
+                    </div>
+                  )}
+
+                  <div className={styles.gpuActionRow}>
+                    <button
+                      className={styles.gpuActionButton}
+                      onClick={() =>
+                        installGpu4Pyscf({
+                          include_cutensor: true,
+                          force_reinstall: Boolean(
+                            gpuStatus?.gpu4pyscf_installed
+                          ),
+                          confirm_install: true,
+                        })
+                      }
+                      disabled={
+                        isGpuInstalling ||
+                        isGpuStatusFetching ||
+                        !gpuStatus?.is_linux ||
+                        !gpuStatus?.cuda_supported
+                      }
+                    >
+                      {isGpuInstalling ? (
+                        <>
+                          <div className={styles.buttonSpinner}></div>
+                          Installing...
+                        </>
+                      ) : (
+                        gpuInstallLabel
+                      )}
+                    </button>
+                    <button
+                      className={styles.gpuSecondaryButton}
+                      onClick={() => refetchGpuStatus()}
+                      disabled={isGpuStatusFetching || isGpuInstalling}
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.settingsSection}>
           <h3>AI Agent</h3>
 
           <div className={styles.settingItem}>
             <div className={styles.settingLabel}>
               <label htmlFor="geminiApiKey">Google Gemini API Key</label>
               <p className={styles.settingHelp}>
-                API key for Google Gemini AI to enable intelligent molecular
-                analysis and assistance. Leave empty to use fallback responses
-                without AI features.
+                Required API key for the Gemini-based AI agent. Chat assistance
+                is unavailable until a valid key is configured.
               </p>
             </div>
 
@@ -502,25 +706,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 <input
                   id="geminiApiKey"
                   type="password"
-                  placeholder="Enter your Gemini API key..."
-                  value={geminiApiKey}
+                  placeholder={
+                    geminiApiKeyConfigured
+                      ? '••••••••'
+                      : 'Enter your Gemini API key...'
+                  }
+                  value={formValues.geminiApiKey}
                   onChange={e => {
                     const newValue = e.target.value;
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log(
-                        'SettingsPage: geminiApiKey changed (length)',
-                        newValue.length
-                      );
-                    }
-                    setGeminiApiKey(newValue);
+                    updateFormValue('geminiApiKey', newValue);
                   }}
                   className={styles.textInput}
                   disabled={isUpdating}
                 />
                 <div className={styles.inputStatus}>
-                  {geminiApiKey ? (
+                  {formValues.geminiApiKey || geminiApiKeyConfigured ? (
                     <span className={styles.statusConfigured}>
-                      ✓ API Key Configured
+                      {formValues.geminiApiKey
+                        ? '✓ New API Key Entered'
+                        : '✓ API Key Configured'}
                     </span>
                   ) : (
                     <span className={styles.statusNotConfigured}>
@@ -550,13 +754,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
               <div className={styles.selectContainer}>
                 <select
                   id="timezone"
-                  value={timezone}
+                  value={formValues.timezone}
                   onChange={e => {
                     const newValue = e.target.value as Timezone;
-                    if (process.env.NODE_ENV === 'development') {
-                      console.log('SettingsPage: timezone changed', newValue);
-                    }
-                    setTimezone(newValue);
+                    updateFormValue('timezone', newValue);
                   }}
                   className={styles.selectInput}
                   disabled={isUpdating}
@@ -593,7 +794,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 <div className={styles.selectedTimezone}>
                   <span className={styles.timezoneLabel}>Selected:</span>
                   <span className={styles.timezoneValue}>
-                    {getTimezoneLabel(timezone)}
+                    {getTimezoneLabel(formValues.timezone)}
                   </span>
                 </div>
               </div>
@@ -622,7 +823,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                   id="calculationsDirectory"
                   type="text"
                   placeholder="Calculations directory path..."
-                  value={calculationsDirectory}
+                  value={formValues.calculationsDirectory}
                   readOnly
                   className={styles.textInput}
                   style={{
@@ -632,12 +833,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = () => {
                 <button
                   onClick={handleSelectFolder}
                   className={styles.selectButton}
-                  disabled={isUpdating || isSelectingFolder}
+                  disabled={
+                    isUpdating || isSelectingFolder || hasBlockingCalculations
+                  }
                 >
                   {isSelectingFolder ? 'Selecting...' : 'Change Folder...'}
                 </button>
               </div>
-              {calculationsDirectory !==
+              {hasBlockingCalculations && (
+                <div className={styles.warningBox}>
+                  <span className={styles.warningIcon}>⚠</span>
+                  <span className={styles.warningText}>
+                    Calculation data folder cannot be changed while calculations
+                    are running or queued.
+                  </span>
+                </div>
+              )}
+              {formValues.calculationsDirectory !==
                 originalValues.calculationsDirectory && (
                 <div className={styles.warningBox}>
                   <span className={styles.warningIcon}>⚠</span>

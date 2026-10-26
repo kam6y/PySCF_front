@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { classifyResourceError } from '../utils/errorClassifier';
 
 export interface Notification {
   id: string;
@@ -16,7 +17,6 @@ interface NotificationState {
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id'>) => string;
   removeNotification: (id: string) => void;
-  clearNotifications: () => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set, get) => ({
@@ -47,10 +47,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
     set(state => ({
       notifications: state.notifications.filter(n => n.id !== id),
     }));
-  },
-
-  clearNotifications: () => {
-    set({ notifications: [] });
   },
 }));
 
@@ -104,7 +100,7 @@ export const showInfoNotification = (
 };
 
 // エラーコード付きエラー通知の汎用関数
-export const showErrorWithCodeNotification = (
+const showErrorWithCodeNotification = (
   errorCode: string,
   rawErrorMessage: string,
   title?: string,
@@ -122,23 +118,11 @@ export const showErrorWithCodeNotification = (
   });
 };
 
-// 後方互換性のためのリソース不足エラー通知関数
 export const showResourceInsufficientErrorNotification = (
   errorMessage: string,
   calculationId?: string
 ) => {
-  // エラーメッセージの内容からエラーコードを判定
-  let errorCode = 'RESOURCE_INSUFFICIENT';
-
-  if (errorMessage.toLowerCase().includes('cpu')) {
-    errorCode = errorMessage.includes('no active calculations')
-      ? 'CPU_INSUFFICIENT_SYSTEM'
-      : 'CPU_INSUFFICIENT_LIMIT';
-  } else if (errorMessage.toLowerCase().includes('memory')) {
-    errorCode = errorMessage.includes('no active calculations')
-      ? 'MEMORY_INSUFFICIENT_SYSTEM'
-      : 'MEMORY_INSUFFICIENT_LIMIT';
-  }
+  const errorCode = classifyResourceError(errorMessage);
 
   return showErrorWithCodeNotification(
     errorCode,

@@ -1,0 +1,442 @@
+"""Calculation data repository (parameters/results/status/pause state/etc)."""
+
+import json
+import logging
+import os
+from pathlib import Path
+from typing import Optional, Dict, Any, Callable
+from datetime import datetime
+from uuid import uuid4
+
+logger = logging.getLogger(__name__)
+
+
+class CalculationRepository:
+    """Manages files generated during quantum chemistry calculations (excluding cube artifacts and directory migration)."""
+
+    VALID_STATUSES = frozenset({'pending', 'running', 'completed', 'error', 'waiting', 'pausing', 'paused'})
+
+    def __init__(self, base_dir: Optional[str] = None):
+        if base_dir is None:
+            # Default to ~/PySCF_calculations if no base_dir is provided
+            home = Path.home()
+            self.base_dir = home / "PySCF_calculations"
+        else:
+            # Use the provided path as-is (should already include PySCF_calculations)
+            self.base_dir = Path(base_dir)
+
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    def set_base_directory(self, new_path: str) -> None:
+        self.base_dir = Path(new_path)
+        self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    def resolve_calculation_path(self, calculation_id: str) -> Path:
+        """Resolve a calculation ID to a path that stays inside base_dir."""
+        if not calculation_id or calculation_id in {".", ".."}:
+            raise ValueError("Invalid calculation ID")
+
+        separators = {"/", "\\", os.sep}
+        if os.altsep:
+            separators.add(os.altsep)
+        if any(separator in calculation_id for separator in separators if separator):
+            raise ValueError("Invalid calculation ID")
+
+        base_path = self.base_dir.resolve(strict=False)
+        calc_path = (base_path / calculation_id).resolve(strict=False)
+
+        try:
+            calc_path.relative_to(base_path)
+        except ValueError as e:
+            raise ValueError("Invalid calculation ID") from e
+
+        return calc_path
+
+    def create_calculation_dir(self, molecule_name: Optional[str] = None) -> str:
+        clean_name = (
+            "".join(c for c in molecule_name if c.isalnum() or c in "._-").strip()
+            if molecule_name
+            else "calculation"
+        ) or "unnamed"
+
+        for _ in range(5):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            suffix = uuid4().hex[:8]
+            calc_dir = self.base_dir / f"{clean_name}_{timestamp}_{suffix}"
+            try:
+                calc_dir.mkdir(exist_ok=False)
+                return str(calc_dir)
+            except FileExistsError:
+                logger.warning("Calculation directory collision detected: %s", calc_dir)
+
+        raise FileExistsError("Failed to create a unique calculation directory")
+
+    def rename_calculation(self, calculation_id: str, new_name: str) -> Optional[str]:
+        """Updates the display name of a calculation without changing the directory name."""
+        calc_path = self.resolve_calculation_path(calculation_id)
+        if not calc_path.is_dir():
+            return None
+
+        # Read existing parameters
+        params = self.read_calculation_parameters(str(calc_path))
+        if params is None:
+            params = {}
+
+        # Update the display name
+        params['name'] = new_name
+
+        # Save updated parameters
+        self.save_calculation_parameters(str(calc_path), params)
+
+        # Return the same ID
+        return calculation_id
+
+    def get_display_name(self, parameters: Optional[Dict[str, Any]]) -> str:
+        """Get display name from parameters."""
+        if parameters and parameters.get('name'):
+            return parameters['name'].strip()
+
+        return "Unnamed Calculation"
+
+    def list_calculations(
+        self,
+        name_query: Optional[str] = None,
+        status: Optional[str] = None,
+        calculation_method: Optional[str] = None,
+        basis_function: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None
+    ) -> list:
+        """
+        List calculation directories with optional filtering.
+
+        Args:
+            name_query: Partial match search in calculation name (case-insensitive)
+            status: Filter by status ("completed", "running", "error", etc.)
+            calculation_method: Filter by calculation method ("DFT", "HF", "MP2", etc.)
+            basis_function: Filter by basis set (case-insensitive)
+            date_from: Start date for date range filtering (ISO format: YYYY-MM-DD)
+            date_to: End date for date range filtering (ISO format: YYYY-MM-DD)
+
+        Returns:
+            List of calculation dictionaries matching the filter criteria, sorted by date (newest first)
+        """
+        if not self.base_dir.exists():
+            return []
+
+        # Helper function to parse ISO date strings
+        def parse_date(date_str: str) -> Optional[datetime]:
+            """Parse ISO date string to datetime object."""
+            try:
+                return datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            except (ValueError, AttributeError):
+                return None
+
+        # Parse date filters once
+        date_from_dt = parse_date(date_from) if date_from else None
+        date_to_dt = parse_date(date_to) if date_to else None
+
+        calculations = []
+        for item in self.base_dir.iterdir():
+            if not item.is_dir():
+                continue
+
+            params = self.read_calculation_parameters(str(item))
+            display_name = self.get_display_name(params)
+            calc_status = self.read_calculation_status(str(item))
+
+            # Apply filters - skip this calculation if it doesn't match
+
+            # Filter by name (case-insensitive partial match)
+            if name_query and name_query.lower() not in display_name.lower():
+                continue
+
+            # Filter by status (exact match, case-insensitive)
+            if status and calc_status.lower() != status.lower():
+                continue
+
+            # Filter by calculation_method (requires params)
+            if calculation_method and params:
+                calc_method = params.get('calculation_method', '')
+                if calc_method.lower() != calculation_method.lower():
+                    continue
+            elif calculation_method:
+                # No params available, can't match
+                continue
+
+            # Filter by basis_function (requires params)
+            if basis_function and params:
+                calc_basis = params.get('basis_function', '')
+                if calc_basis.lower() != basis_function.lower():
+                    continue
+            elif basis_function:
+                # No params available, can't match
+                continue
+
+            # Filter by date range (requires params with created_at)
+            if (date_from_dt or date_to_dt) and params:
+                created_at = params.get('created_at')
+                if not created_at:
+                    continue
+
+                calc_date = parse_date(created_at)
+                if not calc_date:
+                    continue
+
+                # Check date range
+                if date_from_dt and calc_date < date_from_dt:
+                    continue
+                if date_to_dt and calc_date > date_to_dt:
+                    continue
+            elif (date_from_dt or date_to_dt):
+                # No params or created_at available, can't match
+                continue
+
+            # All filters passed - add to results
+            calculations.append({
+                'id': item.name,  # Use directory name as the unique ID
+                'name': display_name,  # Use this for display purposes
+                'date': datetime.fromtimestamp(item.stat().st_mtime).isoformat(),
+                'status': calc_status,
+                # Include additional fields for better search results
+                'calculation_method': params.get('calculation_method') if params else None,
+                'basis_function': params.get('basis_function') if params else None,
+                'exchange_correlation': params.get('exchange_correlation') if params else None,
+                'created_at': params.get('created_at') if params else None
+            })
+
+        return sorted(calculations, key=lambda x: x['date'], reverse=True)
+
+    def save_geometry(self, calc_dir: str, xyz_string: str, filename: str = "optimized_geometry.xyz"):
+        """Save geometry to an XYZ file."""
+        if not xyz_string:
+            return
+        geom_file = Path(calc_dir) / filename
+        with open(geom_file, 'w') as f:
+            f.write(xyz_string)
+
+    def get_base_directory(self) -> str:
+        """Get the base directory path."""
+        return str(self.base_dir)
+
+    def file_exists(self, calc_dir: str, filename: str) -> bool:
+        """Check if a specific file exists in the calculation directory."""
+        return (Path(calc_dir) / filename).exists()
+
+    def _atomic_write_json(
+        self,
+        target_file: Path,
+        data: Dict[str, Any],
+        default: Optional[Callable[[Any], Any]] = None,
+    ) -> None:
+        """Write JSON through a same-directory temp file before replacing."""
+        temp_file = target_file.with_name(f".{target_file.name}.{uuid4().hex}.tmp")
+        try:
+            with open(temp_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, default=default)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_file, target_file)
+        except Exception:
+            try:
+                temp_file.unlink()
+            except OSError:
+                pass
+            raise
+
+    def save_calculation_parameters(self, calc_dir: str, parameters: Dict[str, Any]) -> None:
+        """Save calculation parameters to JSON file."""
+        params_file = Path(calc_dir) / "parameters.json"
+        self._atomic_write_json(params_file, parameters, default=str)
+
+    def read_calculation_parameters(self, calc_dir: str) -> Optional[Dict[str, Any]]:
+        """Read calculation parameters from JSON file."""
+        params_file = Path(calc_dir) / "parameters.json"
+        if not params_file.exists():
+            return None
+        try:
+            with open(params_file, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def save_calculation_results(self, calc_dir: str, results: Dict[str, Any]) -> None:
+        """Save calculation results to JSON file."""
+        results_file = Path(calc_dir) / "results.json"
+        self._atomic_write_json(results_file, results, default=str)
+
+    def read_calculation_results(self, calc_dir: str) -> Optional[Dict[str, Any]]:
+        """Read calculation results from JSON file."""
+        results_file = Path(calc_dir) / "results.json"
+        if not results_file.exists():
+            return None
+        try:
+            with open(results_file, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            return None
+
+    def save_calculation_status(self, calc_dir: str, status: str, waiting_reason: Optional[str] = None) -> None:
+        """Save calculation status to JSON file."""
+        status_file = Path(calc_dir) / "status.json"
+        status_data = {
+            'status': status,
+            'updated_at': datetime.now().isoformat()
+        }
+        if waiting_reason is not None:
+            status_data['waiting_reason'] = waiting_reason
+
+        self._atomic_write_json(status_file, status_data)
+
+    def read_calculation_status(self, calc_dir: str) -> str:
+        """Read calculation status from JSON file."""
+        status_file = Path(calc_dir) / "status.json"
+        if not status_file.exists():
+            if self.file_exists(calc_dir, 'results.json'):
+                return 'completed'
+            if self.file_exists(calc_dir, 'parameters.json'):
+                return 'pending'
+            return 'error'
+        try:
+            with open(status_file, 'r') as f:
+                status = json.load(f).get('status', 'pending')
+                if status not in self.VALID_STATUSES:
+                    status = 'error'
+                return status
+        except (json.JSONDecodeError, OSError):
+            return 'error'
+
+    def read_calculation_status_details(self, calc_dir: str) -> tuple[str, Optional[str]]:
+        """Read calculation status and waiting reason from JSON file."""
+        status_file = Path(calc_dir) / "status.json"
+        if not status_file.exists():
+            if self.file_exists(calc_dir, 'results.json'):
+                return 'completed', None
+            if self.file_exists(calc_dir, 'parameters.json'):
+                return 'pending', None
+            return 'error', None
+
+        try:
+            with open(status_file, 'r') as f:
+                status_data = json.load(f)
+                status = status_data.get('status', 'pending')
+                if status not in self.VALID_STATUSES:
+                    status = 'error'
+                waiting_reason = status_data.get('waiting_reason')
+                return status, waiting_reason
+        except (json.JSONDecodeError, OSError):
+            return 'error', None
+
+    def save_pause_state(self, calc_dir: str, pause_info: Dict[str, Any]) -> None:
+        """
+        Save pause state to JSON file.
+
+        Args:
+            calc_dir: Calculation directory path
+            pause_info: Dictionary containing pause state information
+        """
+        pause_file = Path(calc_dir) / "pause_state.json"
+        pause_data = {
+            'paused_at': datetime.now().isoformat(),
+            **pause_info
+        }
+
+        try:
+            with open(pause_file, 'w') as f:
+                json.dump(pause_data, f, indent=2)
+            logger.debug(f"Saved pause state to {pause_file}")
+        except Exception as e:
+            logger.error(f"Failed to save pause state: {e}")
+
+    def load_pause_state(self, calc_dir: str) -> Optional[Dict[str, Any]]:
+        """
+        Load pause state from JSON file.
+
+        Args:
+            calc_dir: Calculation directory path
+
+        Returns:
+            Dictionary containing pause state, or None if not found
+        """
+        pause_file = Path(calc_dir) / "pause_state.json"
+        if not pause_file.exists():
+            return None
+
+        try:
+            with open(pause_file, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            logger.error(f"Failed to load pause state: {e}")
+            return None
+
+    def delete_pause_state(self, calc_dir: str) -> None:
+        """
+        Delete pause state file after successful resume.
+
+        Args:
+            calc_dir: Calculation directory path
+        """
+        pause_file = Path(calc_dir) / "pause_state.json"
+        try:
+            if pause_file.exists():
+                pause_file.unlink()
+                logger.debug(f"Deleted pause state file: {pause_file}")
+        except Exception as e:
+            logger.error(f"Failed to delete pause state: {e}")
+
+    def save_geometry_trajectory_step(self, calc_dir: str, step: int, geometry: str) -> None:
+        """
+        Append geometry to optimization trajectory file.
+
+        Args:
+            calc_dir: Calculation directory path
+            step: Optimization step number
+            geometry: XYZ format geometry string
+        """
+        trajectory_file = Path(calc_dir) / "geom_opt_trajectory.xyz"
+
+        try:
+            # Append to trajectory file with step number comment
+            with open(trajectory_file, 'a') as f:
+                f.write(f"# Step {step}\n")
+                f.write(geometry)
+                if not geometry.endswith('\n'):
+                    f.write('\n')
+            logger.debug(f"Saved geometry step {step} to trajectory")
+        except Exception as e:
+            logger.error(f"Failed to save geometry trajectory step: {e}")
+
+    def load_last_geometry(self, calc_dir: str) -> Optional[str]:
+        """
+        Load the last geometry from trajectory file.
+
+        Args:
+            calc_dir: Calculation directory path
+
+        Returns:
+            XYZ format geometry string, or None if not found
+        """
+        trajectory_file = Path(calc_dir) / "geom_opt_trajectory.xyz"
+        if not trajectory_file.exists():
+            return None
+
+        try:
+            with open(trajectory_file, 'r') as f:
+                content = f.read()
+
+            # Split by step comments and get the last one
+            steps = content.split('# Step ')
+            if len(steps) < 2:
+                return None
+
+            # Get the last step's geometry
+            last_step = steps[-1]
+            # Remove the step number line
+            lines = last_step.split('\n', 1)
+            if len(lines) < 2:
+                return None
+
+            return lines[1].strip()
+        except Exception as e:
+            logger.error(f"Failed to load last geometry: {e}")
+            return None

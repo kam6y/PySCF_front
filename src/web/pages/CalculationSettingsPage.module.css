@@ -220,16 +220,6 @@
   box-shadow: 0 4px 12px rgba(72, 199, 142, 0.3);
 }
 
-.running {
-  background: #45c1e8;
-}
-
-.running:hover {
-  background: #22b9e7;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(80, 212, 245, 0.3);
-}
-
 .error {
   background: #dc3545;
 }
@@ -368,7 +358,7 @@
   margin: 8px 0;
 }
 
-.settingRow label {
+.settingRow > label {
   font-size: 12px;
   font-weight: 500;
   color: #444;
@@ -376,7 +366,30 @@
   margin: auto 0 auto 0;
 }
 
-.settingRow select,
+.settingRow select {
+  width: auto;
+  max-width: 100%;
+  align-self: flex-start;
+  padding: 6px 32px 6px 10px;
+  border: 1px solid #c7d3dc;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: start;
+  line-height: 1.4;
+  background-color: white;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%237a8894' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round' d='M1 1.5l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 8px;
+  color: #333;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease,
+    background-color 0.2s ease;
+}
+
 .settingRow .numberInput {
   width: 100px;
   padding: 6px 8px;
@@ -386,6 +399,10 @@
   text-align: start;
   background: white;
   color: #333;
+}
+
+.settingRow select:hover:not(:disabled) {
+  border-color: #50D4F5;
 }
 
 .settingRow select:focus,
@@ -398,6 +415,91 @@
 .settingRow select:disabled {
   background-color: #f5f5f5;
   color: #999;
+  border-color: #d4dce2;
+  cursor: not-allowed;
+}
+
+.toggleSwitch {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.toggleLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #444;
+  cursor: pointer;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.switch input:checked + .slider {
+  background-color: #50D4F5;
+}
+
+.switch input:checked + .slider:before {
+  transform: translateX(20px);
+}
+
+.switch input:focus-visible + .slider {
+  box-shadow: 0 0 0 2px rgba(80, 212, 245, 0.2);
+}
+
+.switch input:disabled + .slider {
+  cursor: not-allowed;
+}
+
+.toggleDisabled {
+  opacity: 0.5;
+}
+
+.toggleDisabled .toggleLabel {
+  cursor: not-allowed;
+}
+
+.toggleDisabled .slider,
+.toggleDisabled .slider:before {
+  cursor: not-allowed;
 }
 
 .numberInput {
@@ -426,6 +528,9 @@
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   border: 1px solid #e0e0e0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .molecularInputSection h3 {
@@ -529,10 +634,6 @@
   gap: 6px;
 }
 
-.validationMessage.valid {
-  color: #28a745;
-}
-
 .validationMessage.invalid {
   color: #dc3545;
 }
@@ -543,6 +644,10 @@
 
 .xyzDirectInput {
   border-top: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 /* Error Messages */
@@ -555,22 +660,6 @@
   gap: 6px;
 }
 
-/* Loading state */
-.loadingContainer {
-  text-align: center;
-  padding: 40px;
-  color: #666;
-  width: 100%;
-}
-
-/* Frozen core help text */
-.frozenCoreHelp {
-  font-size: 12px;
-  color: #666;
-  margin-left: 20px;
-  margin-top: 4px;
-}
-
 /* Converting and validation messages */
 .convertingMessage {
   margin-top: 8px;
@@ -578,13 +667,4 @@
 
 .errorMessage {
   margin-top: 8px;
-}
-
-.nestedSettings {
-  margin-left: 20px;
-  padding-left: 12px;
-  border-left: 2px solid #eee;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }

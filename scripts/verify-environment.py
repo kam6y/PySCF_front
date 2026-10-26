@@ -8,6 +8,7 @@ PySCF_front - 環境検証スクリプト
 
 import sys
 import importlib
+import importlib.metadata
 import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
@@ -51,34 +52,72 @@ def check_python_version() -> bool:
         log_error(f"Python {version_str} - Python 3.10+ が必要です")
         return False
 
+def _get_package_version(package_name: str) -> str:
+    """パッケージのバージョンを取得する（importlib.metadata を優先）"""
+    # import名とdistribution名の対応表
+    dist_name_map = {
+        'pyscf': 'pyscf',
+        'rdkit': 'rdkit',
+        'geometric': 'geometric',
+        'fastapi': 'fastapi',
+        'uvicorn': 'uvicorn',
+        'pydantic': 'pydantic',
+        'gunicorn': 'gunicorn',
+        'requests': 'requests',
+    }
+    dist_name = dist_name_map.get(package_name, package_name.replace('_', '-'))
+    try:
+        return importlib.metadata.version(dist_name)
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    # フォールバック: モジュール属性から取得
+    try:
+        module = importlib.import_module(package_name)
+        return getattr(module, '__version__', 'バージョン不明')
+    except ImportError:
+        return 'バージョン不明'
+
+
 def check_required_packages() -> bool:
     """必須パッケージの存在確認"""
     required_packages = [
         ('pyscf', 'PySCF - 量子化学計算'),
         ('rdkit', 'RDKit - 化学情報学'),
         ('geometric', 'geometric - 分子幾何最適化'),
-        ('flask', 'Flask - ウェブフレームワーク'),
-        ('flask_cors', 'Flask-CORS - CORS対応'),
-        ('flask_sock', 'Flask-Sock - WebSocket対応'),
+        ('fastapi', 'FastAPI - ASGI Web フレームワーク'),
+        ('uvicorn', 'Uvicorn - ASGI サーバー'),
         ('pydantic', 'Pydantic - データバリデーション'),
-        ('gevent', 'Gevent - 非同期処理'),
+        ('gunicorn', 'Gunicorn - 本番プロセスマネージャ'),
         ('requests', 'Requests - HTTP クライアント'),
+    ]
+
+    # 開発専用パッケージ（CI必須ではない）
+    optional_packages = [
         ('conda_pack', 'conda-pack - 環境パッケージ化'),
         ('datamodel_code_generator', 'datamodel-code-generator - コード生成'),
     ]
-    
+
     log_info("必須パッケージをチェック中...")
     all_available = True
-    
+
     for package_name, description in required_packages:
         try:
-            module = importlib.import_module(package_name)
-            version = getattr(module, '__version__', 'バージョン不明')
+            importlib.import_module(package_name)
+            version = _get_package_version(package_name)
             log_success(f"{description}: {version} ✓")
         except ImportError:
             log_error(f"{description}: インストールされていません ✗")
             all_available = False
-    
+
+    log_info("オプショナルパッケージをチェック中...")
+    for package_name, description in optional_packages:
+        try:
+            importlib.import_module(package_name)
+            version = _get_package_version(package_name)
+            log_success(f"{description}: {version} ✓")
+        except ImportError:
+            log_warning(f"{description}: インストールされていません（オプショナル）")
+
     return all_available
 
 def check_pyscf_functionality() -> bool:
@@ -138,35 +177,31 @@ def check_rdkit_functionality() -> bool:
         log_error(f"RDKit テストに失敗: {e}")
         return False
 
-def check_flask_functionality() -> bool:
-    """Flask の基本機能をテスト"""
-    log_info("Flask の基本機能をテスト中...")
-    
+def check_fastapi_functionality() -> bool:
+    """FastAPI の基本機能をテスト"""
+    log_info("FastAPI の基本機能をテスト中...")
     try:
-        from flask import Flask
-        from flask_cors import CORS
-        import flask_sock
-        
-        # 簡単なFlaskアプリケーション作成テスト
-        app = Flask(__name__)
-        CORS(app)
-        
-        @app.route('/test')
-        def test():
-            return {'message': 'Flask test successful'}
-        
-        # テストクライアントで簡単なテスト
-        with app.test_client() as client:
-            response = client.get('/test')
-            if response.status_code == 200:
-                log_success("Flask 機能テスト成功 ✓")
-                return True
-            else:
-                log_error(f"Flask テスト失敗: ステータスコード {response.status_code}")
-                return False
-                
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+        from uvicorn.workers import UvicornWorker
+
+        app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+
+        @app.get('/test')
+        def test_endpoint():
+            return {'message': 'FastAPI test successful'}
+
+        client = TestClient(app)
+        response = client.get('/test')
+
+        if response.status_code == 200 and UvicornWorker is not None:
+            log_success("FastAPI ASGI 機能テスト成功 ✓")
+            return True
+
+        log_error(f"FastAPI テスト失敗: ステータスコード {response.status_code}")
+        return False
     except Exception as e:
-        log_error(f"Flask テストに失敗: {e}")
+        log_error(f"FastAPI テストに失敗: {e}")
         return False
 
 def check_conda_environment() -> bool:
@@ -196,7 +231,7 @@ def check_project_structure() -> bool:
     required_files = [
         'package.json',
         'tsconfig.json',
-        'webpack.config.ts',
+        'electron.vite.config.ts',
         '.github/environment.yml',
         'src/main.ts',
         'src/python/app.py',
@@ -224,7 +259,7 @@ def main() -> None:
         ("必須パッケージ", check_required_packages),
         ("PySCF 機能", check_pyscf_functionality),
         ("RDKit 機能", check_rdkit_functionality),
-        ("Flask 機能", check_flask_functionality),
+        ("FastAPI ASGI 機能", check_fastapi_functionality),
         ("conda 環境", check_conda_environment),
         ("プロジェクト構造", check_project_structure),
     ]

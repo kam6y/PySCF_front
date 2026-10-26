@@ -285,74 +285,6 @@
   font-weight: 500;
 }
 
-.calculationStatus {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Status Badge */
-.statusBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.statusIcon {
-  font-size: 10px;
-}
-
-.statusLabel {
-  font-size: 10px;
-}
-
-/* Status Colors */
-.statusPending {
-  background: #fef3c7;
-  color: #92400e;
-}
-
-.statusRunning {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.statusCompleted {
-  background: #d1fae5;
-  color: #065f46;
-}
-
-.statusError {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.statusWaiting {
-  background: #fff3e0;
-  color: #e65100;
-}
-
-.statusPausing {
-  background: #f3e5f5;
-  color: #6a1b9a;
-}
-
-.statusPaused {
-  background: #ede7f6;
-  color: #512da8;
-}
-
-.statusUnknown {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
 /* Status Section */
 .statusSection {
   margin-bottom: 20px;
@@ -449,6 +381,17 @@
   background: #fee2e2;
   border-color: #fca5a5;
   color: #dc2626;
+}
+
+.deleteBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.deleteBtn:disabled:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  color: #6b7280;
 }
 
 /* Bottom Section - User Info */
@@ -560,41 +503,6 @@
   color: #9a3412;
 }
 
-/* Loading State */
-.calculationTagsLoading {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.tagSkeleton {
-  height: 20px;
-  width: 50px;
-  background: #f3f4f6;
-  border-radius: 4px;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-
-.tagSkeleton:nth-child(2) {
-  width: 40px;
-}
-
-.tagSkeleton:nth-child(3) {
-  width: 60px;
-}
-
-@keyframes shimmer {
-  0% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-  100% {
-    opacity: 1;
-  }
-}
 
 /* Spinner animation for running status */
 .animateSpin {

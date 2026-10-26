@@ -1,8 +1,9 @@
-import { ApiError } from '../apiClient';
+import { ApiError } from '../api/core';
 import {
   showErrorNotification,
   showResourceInsufficientErrorNotification,
 } from '../store/notificationStore';
+import { isResourceInsufficientError } from './errorClassifier';
 
 /**
  * Global error handler for the application.
@@ -21,7 +22,14 @@ export const handleError = (error: unknown, context?: string) => {
 
   // Handle ApiError
   if (error instanceof ApiError) {
-    calculationId = error.response?.id; // Try to extract calculation ID if available in response
+    const resp = error.response;
+    calculationId =
+      resp !== null &&
+      typeof resp === 'object' &&
+      'id' in resp &&
+      typeof (resp as { id?: unknown }).id === 'string'
+        ? (resp as { id: string }).id
+        : undefined; // Try to extract calculation ID if available in response
 
     if (error.isNetworkError) {
       title = 'Network Error';
@@ -54,12 +62,7 @@ export const handleError = (error: unknown, context?: string) => {
     // Standard Error object
     message = error.message;
 
-    // Check for specific error patterns (like resource insufficiency)
-    if (
-      message.toLowerCase().includes('cpu usage') ||
-      message.toLowerCase().includes('memory usage') ||
-      message.toLowerCase().includes('no active calculations')
-    ) {
+    if (isResourceInsufficientError(message)) {
       showResourceInsufficientErrorNotification(message, calculationId);
       return;
     }

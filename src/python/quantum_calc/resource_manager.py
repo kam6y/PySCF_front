@@ -1,6 +1,5 @@
 """System resource manager for monitoring CPU and memory usage."""
 
-import os
 import logging
 import multiprocessing
 from typing import Dict, List, Optional, Tuple
@@ -22,6 +21,14 @@ class AllocationStatus(Enum):
     
     
 logger = logging.getLogger(__name__)
+
+
+def _fallback_cpu_count(default: int = 4) -> int:
+    """Return a positive CPU count using multiprocessing as a fallback."""
+    try:
+        return max(1, int(multiprocessing.cpu_count() or default))
+    except (NotImplementedError, ValueError, TypeError):
+        return default
 
 
 @dataclass
@@ -69,7 +76,9 @@ class SystemResourceManager:
         try:
             if psutil is not None:
                 # Get system information using psutil
-                self._resource_constraints.system_total_cores = psutil.cpu_count(logical=True)
+                self._resource_constraints.system_total_cores = (
+                    psutil.cpu_count(logical=True) or _fallback_cpu_count()
+                )
                 self._resource_constraints.system_total_memory_mb = int(psutil.virtual_memory().total / (1024 * 1024))
                 logger.info("SystemResourceManager initialized with psutil")
             else:
@@ -80,12 +89,7 @@ class SystemResourceManager:
             self._psutil_available = False
             
             # Fallback to basic multiprocessing info
-            try:
-                self._resource_constraints.system_total_cores = multiprocessing.cpu_count()
-            except Exception:
-                # Ultimate fallback
-                self._resource_constraints.system_total_cores = 4
-                logger.warning("Failed to detect CPU count, using fallback value of 4 cores")
+            self._resource_constraints.system_total_cores = _fallback_cpu_count()
             
             # Conservative memory estimate
             self._resource_constraints.system_total_memory_mb = 4096
@@ -534,11 +538,3 @@ def get_resource_manager() -> SystemResourceManager:
     if _resource_manager is None:
         _resource_manager = SystemResourceManager()
     return _resource_manager
-
-
-def shutdown_resource_manager():
-    """Shutdown the global resource manager."""
-    global _resource_manager
-    if _resource_manager is not None:
-        logger.info("Shutting down resource manager")
-        _resource_manager = None

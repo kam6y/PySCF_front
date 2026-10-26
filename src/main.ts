@@ -12,14 +12,23 @@ import {
   closeSplashWindow,
   closeSplashWindowWhenReady,
 } from './main/splash-window-manager';
+import {
+  registerAppScheme,
+  installAppProtocolHandler,
+} from './main/app-protocol';
 
-let flaskPort: number | null = null;
+let backendPort: number | null = null;
 let authToken: string = '';
 let isCreatingWindow = false;
-let isQuitting = false;
 
 // グローバル設定を読み込み
 let serverConfig: any = null;
+
+// SEC-M002: register the app:// scheme as privileged. MUST be called before
+// app.ready — Electron requires synchronous registration at module load (J17c).
+if (app.isPackaged) {
+  registerAppScheme();
+}
 
 // Increase memory limits for rendering large SVG and 3D graphics
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
@@ -59,9 +68,9 @@ const initializeApp = async () => {
     // Python環境検出開始を通知
     updateSplashStatus('detecting-env', 'Detecting Python environment...');
 
-    flaskPort = await startPythonServer(serverConfig, authToken);
-    if (!flaskPort) {
-      throw new Error('Could not determine Flask server port.');
+    backendPort = await startPythonServer(serverConfig, authToken);
+    if (!backendPort) {
+      throw new Error('Could not determine backend server port.');
     }
     console.log('Python server started successfully.');
 
@@ -80,7 +89,7 @@ const initializeApp = async () => {
     isCreatingWindow = false;
   }
 
-  const mainWindow = createWindow(flaskPort, authToken);
+  const mainWindow = createWindow(backendPort, authToken);
 
   // メインウィンドウの準備完了を待ってスプラッシュをクローズ
   closeSplashWindowWhenReady(mainWindow);
@@ -95,7 +104,7 @@ if (!gotTheLock) {
   app.quit();
 } else {
   // 2つ目のインスタンスが起動しようとした時の処理
-  app.on('second-instance', (event, commandLine, workingDirectory) => {
+  app.on('second-instance', () => {
     console.log('Second instance detected. Focusing existing window...');
     // 既存のウィンドウをフォーカス
     const mainWindow = getMainWindow();
@@ -113,6 +122,16 @@ if (!gotTheLock) {
 
   // アプリが準備できたら通常の起動処理
   app.whenReady().then(() => {
+    // SEC-M002: must run after app.ready; the getter defers backendPort to module state.
+    if (app.isPackaged) {
+      // J17(d): null means "not yet resolved" — bridge to the getter's number | undefined contract.
+      installAppProtocolHandler(
+        __dirname,
+        app.isPackaged,
+        () => backendPort ?? undefined
+      );
+    }
+
     createApplicationMenu();
     registerIpcHandlers(getMainWindow);
     initializeApp();
@@ -133,6 +152,5 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
-  isQuitting = true;
   stopPythonServer();
 });

@@ -17,7 +17,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import styles from './IRSpectrumChart.module.css';
-import { getIRSpectrum } from '../apiClient';
+import { getIRSpectrum } from '../api/quantum';
 import type { components } from '../types/generated-api';
 import {
   IR_SPECTRUM_DEFAULTS,
@@ -34,7 +34,6 @@ interface IRSpectrumChartProps {
   calculationId: string | null;
   onError?: (error: string) => void;
   onSpectrumDataLoaded?: (data: IRSpectrumData) => void;
-  selectedPeakIndex?: number | null;
   settings: IRSettings;
   onSettingsChange: React.Dispatch<React.SetStateAction<IRSettings>>;
 }
@@ -100,7 +99,6 @@ export const IRSpectrumChart: React.FC<IRSpectrumChartProps> = React.memo(
     calculationId,
     onError,
     onSpectrumDataLoaded,
-    selectedPeakIndex,
     settings,
     onSettingsChange,
   }) => {

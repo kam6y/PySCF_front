@@ -69,36 +69,34 @@ export const ChatMessage: React.FC<ChatMessageProps> = React.memo(
 
     return (
       <div className={`${styles.chatMessage} ${styles[role]}`}>
-        <div className={styles.messageContent}>
-          {role === 'model' ? (
-            <>
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath]}
-                rehypePlugins={[
-                  rehypeHighlight,
-                  [
-                    rehypeKatex,
-                    {
-                      throwOnError: false,
-                      trust: false,
-                      strict: 'warn',
-                    },
-                  ],
-                ]}
-                disallowedElements={['script', 'iframe', 'object', 'embed']}
-                unwrapDisallowed={true}
-                className={styles.markdown}
-                components={markdownComponents}
-              >
-                {entry.parts[0].text}
-              </ReactMarkdown>
-              {entry.isStreaming && <span className={styles.cursor}>|</span>}
-            </>
-          ) : (
-            // ユーザーメッセージはプレーンテキストのまま
-            entry.parts[0].text
-          )}
-        </div>
+        {role === 'model' ? (
+          <>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm, remarkMath]}
+              rehypePlugins={[
+                rehypeHighlight,
+                [
+                  rehypeKatex,
+                  {
+                    throwOnError: false,
+                    trust: false,
+                    strict: 'warn',
+                  },
+                ],
+              ]}
+              disallowedElements={['script', 'iframe', 'object', 'embed']}
+              unwrapDisallowed={true}
+              className={styles.markdown}
+              components={markdownComponents}
+            >
+              {entry.parts[0].text}
+            </ReactMarkdown>
+            {entry.isStreaming && <span className={styles.cursor}>|</span>}
+          </>
+        ) : (
+          // ユーザーメッセージはプレーンテキストのまま
+          entry.parts[0].text
+        )}
       </div>
     );
   },

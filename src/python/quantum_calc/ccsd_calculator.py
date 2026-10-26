@@ -1,15 +1,13 @@
 """CCSD calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from pyscf import gto, scf, cc
-# geometric_solver is now imported in BaseCalculator
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
-from .file_manager import CalculationFileManager
+from .exceptions import CalculationError, ConvergenceError
+from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method
 
@@ -21,7 +19,7 @@ class CCSDCalculator(BaseCalculator):
     
     def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
-        self.file_manager = CalculationFileManager()
+        self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
         super().__init__(working_dir, optimize_geometry)
@@ -33,11 +31,6 @@ class CCSDCalculator(BaseCalculator):
         self.molecule_name = molecule_name
         self.calculate_ccsd_t = False  # Flag to indicate if CCSD(T) should be calculated
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup CCSD calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate CCSD-specific parameters."""
         # CCSD-specific parameters

@@ -9,308 +9,466 @@ import os
 # the libraries initialize with a single thread by default.
 # The actual thread count is set per-calculation in the worker process.
 _THREAD_CONTROL_VARS = [
-    'OMP_NUM_THREADS',
-    'MKL_NUM_THREADS',
-    'OPENBLAS_NUM_THREADS',
-    'BLIS_NUM_THREADS',
-    'VECLIB_MAXIMUM_THREADS',
-    'NUMEXPR_NUM_THREADS',
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "BLIS_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
 ]
 
 for _var in _THREAD_CONTROL_VARS:
     if _var not in os.environ:
-        os.environ[_var] = '1'
+        os.environ[_var] = "1"
 # =============================================================================
 
+import asyncio
+import json
 import logging
-import sys
-import signal
-import atexit
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-from flask_socketio import SocketIO
+from collections.abc import Awaitable, Callable
+from contextlib import asynccontextmanager
+from typing import Any
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.responses import Response
 
-# Import unified configuration module
+# Maximum allowed request body size in bytes (5 MB).
+# This must be larger than the largest legitimate field (e.g. xyz data for big
+# molecules can be ~1 MB, ketcher JSON similarly large).  5 MB provides ample
+# headroom while still preventing abuse.
+MAX_REQUEST_BODY_BYTES: int = 5 * 1024 * 1024
+
+# ServiceError status codes whose messages are curated, developer-authored,
+# and safe to return to the client (e.g. for user-facing toast notifications).
+# True 500 / unknown 5xx may contain interpolated exception text and are
+# redacted to a generic message.
+CURATED_5XX_CODES: frozenset[int] = frozenset({503, 507})
+
+# Loopback addresses recognised as safe for TrustedHostMiddleware.
+# IPv6 loopback (::1) is intentionally excluded: Starlette's
+# TrustedHostMiddleware splits the Host header on the first colon
+# (``host.split(":")[0]``), so a bracketed IPv6 Host like ``[::1]:5000``
+# becomes ``"["`` and bare ``::1`` becomes ``""`` — neither can match the
+# literal string ``"::1"``.  This app binds to 127.0.0.1; IPv6 loopback
+# is not used.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "localhost"})
+
+# HTTP methods that may carry a request body.  For these methods the
+# middleware requires a valid Content-Length header so that body-size
+# enforcement cannot be bypassed via chunked Transfer-Encoding (which
+# omits Content-Length).
+_BODY_METHODS: frozenset[str] = frozenset({"POST", "PUT", "PATCH"})
+
+from api import register_routers
 from config import (
-    ServerConfig,
-    get_server_config,
+    ConfigurationError,
+    configure_fastapi_app,
     determine_server_port,
-    configure_flask_app,
-    ConfigurationError
+    get_server_config,
 )
+from quantum_calc import shutdown_process_manager
+from services.exceptions import ServiceError
+from websocket.event_loop_bridge import bind_event_loop, clear_event_loop
 
-# Import blueprint registration and WebSocket handlers
-from api import register_blueprints
-from websocket import register_websocket_handlers
-
-# Import cleanup functions from quantum_calc
-from quantum_calc import shutdown_process_manager, shutdown_websocket_watcher
-from quantum_calc.exceptions import ProcessManagerError
-
-# Initialize configuration and logging
 try:
     _server_config = get_server_config()
     log_level = getattr(logging, _server_config.get_logging_level().upper())
     log_format = _server_config.get_logging_format()
-except ConfigurationError as e:
-    print(f"WARNING: Configuration error: {e}. Using default logging settings.")
+except ConfigurationError as exc:
+    print(f"WARNING: Configuration error: {exc}. Using default logging settings.")
     log_level = logging.INFO
-    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 
-logging.basicConfig(
-    level=log_level,
-    format=log_format
-)
+logging.basicConfig(level=log_level, format=log_format)
 logger = logging.getLogger(__name__)
 
-# Initialize SocketIO extension globally (without binding to app)
-# This will be initialized with init_app() in create_app()
-socketio = SocketIO()
+
+def _is_development_api_docs_path(path: str) -> bool:
+    return path == "/api-docs" or path.startswith("/api-docs/")
 
 
-def create_app(server_port: int = None, test_config: dict = None):
+def register_request_size_middleware(fastapi_app: FastAPI) -> None:
+    """Reject requests whose body size is not properly declared or exceeds the limit.
+
+    For body-bearing methods (POST/PUT/PATCH):
+      - Missing Content-Length header -> HTTP 411 (Length Required).
+        This closes the chunked Transfer-Encoding bypass where a client
+        omits Content-Length to evade the size check.
+      - Invalid (non-integer) Content-Length -> HTTP 400.
+      - Content-Length exceeds MAX_REQUEST_BODY_BYTES -> HTTP 413.
+
+    Other methods (GET/HEAD/DELETE/OPTIONS) pass through unconditionally
+    because they typically carry no body.
+
+    The check is header-only so it never buffers or consumes the request
+    body, which keeps SSE/streaming response endpoints and WebSocket
+    upgrades working.  (WebSocket upgrades use scope type "websocket" and
+    are not intercepted by Starlette's HTTP middleware at all.)
     """
-    Application factory for Gunicorn compatibility and testing.
 
-    Args:
-        server_port: The port number on which the server will run.
-                    If None, it will be determined from configuration.
-        test_config: Dictionary of configuration values for testing.
-                    If provided, these settings override the default configuration.
-    """
-    # Initialize Flask app
-    app = Flask(__name__)
-    CORS(app)  # Enable CORS for cross-origin requests
+    @fastapi_app.middleware("http")
+    async def enforce_request_body_size(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        content_length_header = request.headers.get("content-length")
+        if content_length_header is not None:
+            try:
+                content_length = int(content_length_header)
+            except (ValueError, TypeError):
+                content_length = -1  # force the invalid-header path below
+            if content_length < 0:
+                return JSONResponse(
+                    {"success": False, "error": "Invalid Content-Length header"},
+                    status_code=400,
+                )
+            if content_length > MAX_REQUEST_BODY_BYTES:
+                logger.warning(
+                    "Request body too large on %s: %d bytes (limit %d)",
+                    request.url.path,
+                    content_length,
+                    MAX_REQUEST_BODY_BYTES,
+                )
+                return JSONResponse(
+                    {
+                        "success": False,
+                        "error": (
+                            f"Request body too large. "
+                            f"Maximum size is {MAX_REQUEST_BODY_BYTES} bytes."
+                        ),
+                    },
+                    status_code=413,
+                )
+        elif request.method in _BODY_METHODS:
+            # Body-bearing method without Content-Length header.  Reject to
+            # prevent chunked-transfer bypass of the size limit.
+            logger.warning(
+                "Missing Content-Length on %s %s",
+                request.method,
+                request.url.path,
+            )
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": (
+                        "Content-Length header is required for "
+                        f"{request.method} requests."
+                    ),
+                },
+                status_code=411,
+            )
+        return await call_next(request)
 
-    # Load server configuration
-    server_config = get_server_config()
 
-    # Determine server port if not provided
-    if server_port is None:
-        port_env = os.getenv('PYSCF_SERVER_PORT')
-        server_port = determine_server_port(server_config, port_env=port_env)
+def register_auth_middleware(fastapi_app: FastAPI) -> None:
+    @fastapi_app.middleware("http")
+    async def verify_auth_token(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        env = os.getenv("PYSCF_ENV", "").lower()
+        if _is_development_api_docs_path(request.url.path) and env == "development":
+            return await call_next(request)
 
-    # Configure Flask app with all settings from ServerConfig
-    # This establishes app.config as the single source of truth for configuration
-    configure_flask_app(app, server_config, server_port)
+        if request.method == "OPTIONS":
+            return await call_next(request)
 
-    # Security: Authentication Middleware
-    # Verify X-Auth-Token header against the token provided by Electron
-    auth_token = os.getenv('PYSCF_AUTH_TOKEN')
-    
-    @app.before_request
-    def verify_auth_token():
-        """
-        Verify authentication token for all requests.
-        Skips verification for OPTIONS requests (CORS preflight) and TESTING mode.
-        """
-        # Skip auth for OPTIONS requests to allow CORS preflight
-        if request.method == 'OPTIONS':
-            return None
-
-        # If no auth token is configured (e.g. during dev without Electron),
-        # we might want to skip auth or warn.
-        # For security, we enforce it if the env var is present.
+        auth_token = os.getenv("PYSCF_AUTH_TOKEN")
         if auth_token:
-            client_token = request.headers.get('X-Auth-Token')
-            if not client_token or client_token != auth_token:
-                logger.warning(f"Unauthorized access attempt from {request.remote_addr}")
-                return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+            client_token = request.headers.get("X-Auth-Token")
+            if client_token != auth_token:
+                client_host = request.client.host if request.client else "unknown"
+                logger.warning("Unauthorized access attempt from %s", client_host)
+                return JSONResponse(
+                    {"success": False, "error": "Unauthorized"}, status_code=401
+                )
         else:
-            # Skip auth for test environment (only if not simulating production)
-            if app.config.get('TESTING') and os.getenv('PYSCF_ENV') != 'production':
-                return None
+            # Narrowly-scoped TESTING bypass: allow requests only when the
+            # application has been explicitly constructed with TESTING=True
+            # (pytest fixtures) and we are NOT in production.
+            is_testing = bool(getattr(request.app.state, "TESTING", False))
+            if is_testing and env != "production":
+                return await call_next(request)
+            logger.warning("Unauthorized access attempt: Missing authentication token")
+            return JSONResponse(
+                {
+                    "success": False,
+                    "error": "Unauthorized: Missing authentication token",
+                },
+                status_code=401,
+            )
 
-            # In production, this should be an error.
-            # In standalone dev, we might allow it but log a warning.
-            if not app.debug and not os.getenv('PYSCF_ENV') == 'development':
-                 logger.warning("Unauthorized access attempt: Missing authentication token in production mode")
-                 return jsonify({'success': False, 'error': 'Unauthorized: Missing authentication token'}), 401
+        return await call_next(request)
 
-            logger.warning("Running without authentication token in debug/development mode!")
 
-    # Apply test configuration if provided
-    if test_config is not None:
-        app.config.update(test_config)
+def register_cors_middleware(fastapi_app: FastAPI) -> None:
+    env = os.getenv("PYSCF_ENV", "").lower()
 
-    # Initialize SocketIO with configuration-based settings
-    # Use init_app() pattern for better testability
-    socketio_config = app.config.get('SOCKETIO', {})
-    socketio.init_app(
-        app,
-        cors_allowed_origins=socketio_config.get('cors_allowed_origins', ["http://127.0.0.1:*", "ws://127.0.0.1:*", "file://"]),
-        async_mode=socketio_config.get('async_mode', 'threading'),
-        ping_timeout=socketio_config.get('ping_timeout', 60),
-        ping_interval=socketio_config.get('ping_interval', 25),
-        allow_unsafe_werkzeug=socketio_config.get('allow_unsafe_werkzeug', True),
-        logger=socketio_config.get('logger', True),
-        engineio_logger=socketio_config.get('engineio_logger', False)
+    if env in {"development", "test"}:
+        # Development / test: only loopback HTTP origins with an explicit
+        # port are accepted, matching the Electron-side
+        # ``isAllowedDevRendererUrl`` policy which requires a non-default
+        # port (portless / :80 URLs are rejected because dev servers
+        # always bind to a non-default port).  Bare ``http://localhost``
+        # and ``http://127.0.0.1`` (portless) are intentionally omitted.
+        origins: list[str] = []
+        # Port group limited to valid TCP range 1-65535.
+        _VALID_PORT = (
+            r"[1-9]|[1-9]\d|[1-9]\d{2}|[1-9]\d{3}"
+            r"|[1-5]\d{4}|6[0-4]\d{3}|65[0-4]\d{2}|655[0-2]\d|6553[0-5]"
+        )
+        origin_regex: str | None = rf"^http://(127\.0\.0\.1|localhost):({_VALID_PORT})$"
+    else:
+        # Production / unknown: Packaged Electron builds use the custom
+        # ``app://renderer`` protocol (M-002), which sends
+        # ``Origin: app://renderer``.  Legacy ``file://`` / ``null`` origins
+        # are retained during the transition period for safety; they will be
+        # removed once the app:// migration is fully validated.
+        #
+        # REMOVAL CONDITION for 'file://' and 'null':
+        #   Remove both once all of the following are confirmed:
+        #     1. The app:// custom protocol is GUI-smoke-tested on all
+        #        target platforms (macOS, Windows, Linux).
+        #     2. Electron's registerSchemesAsPrivileged serializes the
+        #        origin as 'app://renderer' (not 'null') in every IPC
+        #        and fetch path (verified via DevTools Network tab).
+        #     3. No production crash/error reports reference a CORS
+        #        rejection for 'null' or 'file://' origins.
+        #   Until then, keeping them is the safer choice because a false
+        #   CORS block would silently break the packaged app with no
+        #   static test able to catch it.
+        #
+        # CORS is NOT the authentication boundary — the mandatory
+        # ``X-Auth-Token`` custom header is.  A cross-origin attacker cannot
+        # read or forge this header (browsers block cross-origin custom
+        # headers unless the preflight succeeds).  ``allow_credentials`` is
+        # False so no cookies are ever reflected.
+        origins = ["app://renderer", "file://", "null"]
+        origin_regex = None
+
+    fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_origin_regex=origin_regex,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Cache-Control", "Content-Type", "X-Auth-Token"],
     )
 
-    # Register all API blueprints
-    register_blueprints(app)
-    logger.info("Registered all API blueprints")
 
-    # Register WebSocket handlers
-    register_websocket_handlers(socketio)
-    logger.info("Registered all WebSocket handlers")
+def _format_validation_errors(errors: list[dict[str, Any]]) -> str:
+    messages: list[str] = []
+    for err in errors:
+        loc = ".".join(str(part) for part in err.get("loc", []))
+        msg = err.get("msg", "Invalid value")
+        messages.append(f"{loc}: {msg}" if loc else msg)
+    return "Validation failed: " + "; ".join(messages)
 
-    # Bind SocketIO to NotificationService
-    from services.notification_service import (
-        bind_notification_service,
-        get_notification_service
-    )
-    bind_notification_service(socketio)
 
-    # Initialize process manager with NotificationService callback
+def register_exception_handlers(fastapi_app: FastAPI) -> None:
+    @fastapi_app.exception_handler(json.JSONDecodeError)
+    async def json_decode_error_handler(
+        request: Request, error: json.JSONDecodeError
+    ) -> JSONResponse:
+        message = f"Validation failed: malformed JSON body: {error.msg}"
+        logger.warning("Malformed JSON on %s: %s", request.url.path, message)
+        return JSONResponse({"success": False, "error": message}, status_code=400)
+
+    @fastapi_app.exception_handler(RequestValidationError)
+    async def request_validation_error_handler(
+        request: Request, error: RequestValidationError
+    ) -> JSONResponse:
+        message = _format_validation_errors(error.errors())
+        logger.warning("Validation error on %s: %s", request.url.path, message)
+        return JSONResponse({"success": False, "error": message}, status_code=400)
+
+    @fastapi_app.exception_handler(ValidationError)
+    async def pydantic_validation_error_handler(
+        request: Request, error: ValidationError
+    ) -> JSONResponse:
+        message = _format_validation_errors(error.errors())
+        logger.warning("Pydantic validation error on %s: %s", request.url.path, message)
+        return JSONResponse({"success": False, "error": message}, status_code=400)
+
+    @fastapi_app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(
+        request: Request, error: StarletteHTTPException
+    ) -> JSONResponse:
+        if error.status_code == 404:
+            return JSONResponse(
+                {"success": False, "error": "Not Found"}, status_code=404
+            )
+        if error.status_code == 400:
+            return JSONResponse(
+                {"success": False, "error": f"Validation failed: {error.detail}"},
+                status_code=400,
+            )
+        if error.status_code >= 500:
+            # Application code uses ServiceError / ResourceUnavailableError for
+            # curated 5xx responses; StarletteHTTPException 5xx are
+            # framework-internal and always redacted to prevent leaking
+            # raw detail strings.
+            logger.error(
+                "HTTP %d on %s: %s",
+                error.status_code,
+                request.url.path,
+                error.detail,
+                exc_info=error,
+            )
+            return JSONResponse(
+                {"success": False, "error": "An internal server error occurred."},
+                status_code=error.status_code,
+            )
+        return JSONResponse(
+            {"success": False, "error": str(error.detail)},
+            status_code=error.status_code,
+        )
+
+    @fastapi_app.exception_handler(ServiceError)
+    async def service_error_handler(
+        request: Request, error: ServiceError
+    ) -> JSONResponse:
+        if error.status_code >= 500:
+            logger.error(
+                "Service error on %s: %s",
+                request.url.path,
+                error.message,
+                exc_info=error,
+            )
+            # Curated operational messages (503/507) are safe to surface;
+            # all other 5xx are redacted to prevent leaking raw exception
+            # text or internal paths.
+            client_message = (
+                error.message
+                if error.status_code in CURATED_5XX_CODES
+                else "An internal server error occurred."
+            )
+            return JSONResponse(
+                {"success": False, "error": client_message},
+                status_code=error.status_code,
+            )
+        return JSONResponse(
+            {"success": False, "error": error.message},
+            status_code=error.status_code,
+        )
+
+    @fastapi_app.exception_handler(Exception)
+    async def unhandled_exception_handler(
+        request: Request, error: Exception
+    ) -> JSONResponse:
+        logger.error(
+            "Unhandled exception on %s: %s", request.url.path, error, exc_info=error
+        )
+        return JSONResponse(
+            {"success": False, "error": "An internal server error occurred."},
+            status_code=500,
+        )
+
+
+@asynccontextmanager
+async def lifespan(fastapi_app: FastAPI):
+    bind_event_loop(asyncio.get_running_loop())
+    initialize_process_manager_notifications()
+    try:
+        yield
+    finally:
+        clear_event_loop()
+        shutdown_process_manager(wait=False, force=True)
+
+
+def initialize_process_manager_notifications() -> None:
     from quantum_calc import initialize_process_manager_with_callback
+    from services.notification_service import get_notification_service
+
     try:
         notification_service = get_notification_service()
         initialize_process_manager_with_callback(
             notification_callback=notification_service.send_calculation_update
         )
-        logger.info("Process manager initialized with NotificationService callback")
-    except Exception as e:
-        logger.error(f"Failed to initialize process manager with callback: {e}")
-        # Continue anyway - process manager will work without notifications
-
-    # Error handlers
-    @app.errorhandler(ValidationError)
-    def validation_error_handler(error):
-        """Handle Pydantic validation errors with consistent error format."""
-        errors = error.errors()
-        error_messages = []
-        for err in errors:
-            field = '.'.join(str(x) for x in err['loc'])
-            message = err['msg']
-            error_messages.append(f"{field}: {message}")
-        
-        combined_message = "Validation failed: " + "; ".join(error_messages)
-        logger.warning(f"Validation error: {combined_message}")
-        return jsonify({'success': False, 'error': combined_message}), 400
-
-    @app.errorhandler(400)
-    def bad_request_handler(error):
-        """
-        Handle bad requests, filtering out WebSocket close frame errors.
-        
-        KNOWN ISSUE & WORKAROUND:
-        When WebSocket connections close, the close frame (binary data) is sometimes
-        misinterpreted as an HTTP request by Werkzeug/Flask-SocketIO, resulting in
-        400 Bad Request errors.
-        
-        This is a known issue in the Flask-SocketIO/Werkzeug stack when using
-        threading async_mode.
-        
-        CURRENT WORKAROUND:
-        We detect if the error occurred on the Socket.IO endpoint path ('/socket.io/').
-        If so, we treat it as a known WebSocket teardown issue and log it at DEBUG level.
-        """
-        # Robust detection: Check if the request is for the Socket.IO endpoint
-        # WebSocket traffic always goes to /socket.io/ (unless configured otherwise)
-        if request.path.startswith('/socket.io/'):
-            # WebSocket protocol frame misinterpreted as HTTP - expected behavior
-            # Log at debug level to avoid polluting logs with normal connection teardown
-            logger.debug(f"WebSocket close frame detected on {request.path} (expected): {error}")
-            return '', 400  # Return minimal response
-        
-        # Genuine HTTP 400 error - log and return proper error response
-        logger.warning(f"Genuine bad HTTP request on {request.path}: {error}")
-        return jsonify({'success': False, 'error': 'Bad request.'}), 400
-
-    @app.errorhandler(404)
-    def not_found(error):
-        return jsonify({'success': False, 'error': 'Endpoint not found.'}), 404
-
-    @app.errorhandler(405)
-    def method_not_allowed(error):
-        return jsonify({'success': False, 'error': 'Method not allowed for this endpoint.'}), 405
-
-    # Store socketio instance for access by other modules
-    app.socketio = socketio
-
-    return app
+    except Exception as exc:
+        logger.error("Failed to initialize process manager with callback: %s", exc)
 
 
-def cleanup_resources():
-    """Clean up resources including the process pool and file watcher."""
-    logger.info("Cleaning up resources...")
-    try:
-        shutdown_process_manager()
-        logger.info("Process manager shut down successfully")
-    except ProcessManagerError as e:
-        logger.warning(f"Process manager already shut down or unavailable: {e}")
-    except Exception as e:
-        logger.error(f"Unexpected error shutting down process manager: {e}", exc_info=True)
-    
-    try:
-        shutdown_websocket_watcher()
-        logger.info("WebSocket file watcher shut down successfully")
-    except Exception as e:
-        logger.error(f"Unexpected error shutting down WebSocket file watcher: {e}", exc_info=True)
-
-
-def signal_handler(signum, frame):
-    """Handle shutdown signals."""
-    logger.info(f"Received signal {signum}, shutting down gracefully...")
-    cleanup_resources()
-    sys.exit(0)
-
-
-def start_development_server():
-    """Start the server in development mode using Flask-SocketIO."""
-    # Load server configuration
+def create_fastapi_app(
+    server_port: int | None = None, test_config: dict[str, Any] | None = None
+) -> FastAPI:
     server_config = get_server_config()
+    if server_port is None:
+        port_env = os.getenv("PYSCF_SERVER_PORT")
+        server_port = determine_server_port(server_config, port_env=port_env)
 
-    host = server_config.get_server_host()
-    debug = server_config.get('development.debug', False)
+    fastapi_app = FastAPI(
+        docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
+    )
+    configure_fastapi_app(fastapi_app, server_config, server_port)
+    # Middleware registration order matters: Starlette executes the *last*
+    # registered middleware first (outermost).  Desired execution order:
+    #   0. Host validation  (outermost - reject invalid Host headers first)
+    #   1. CORS  (must wrap 413/401 responses with CORS headers)
+    #   2. Body-size check  (reject oversized bodies before auth/routing)
+    #   3. Auth  (innermost - only reached if body size is OK)
+    # So register in reverse: auth -> body-size -> CORS -> host validation.
+    register_auth_middleware(fastapi_app)
+    register_request_size_middleware(fastapi_app)
+    register_cors_middleware(fastapi_app)
+    register_exception_handlers(fastapi_app)
 
-    # Command line port argument takes precedence
-    port_arg = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else None
-
-    # Determine server port using unified logic
-    actual_port = determine_server_port(server_config, port_arg=port_arg)
-
-    # Notify Electron process of the port
-    print(f"FLASK_SERVER_PORT:{actual_port}", file=sys.stdout, flush=True)
-
-    socketio_config = server_config.get('socketio', {})
-    logger.info(f"Starting API server with Flask-SocketIO on http://{host}:{actual_port}")
-    logger.info(f"Configuration: Debug={debug}, Async_mode={socketio_config.get('async_mode', 'threading')}")
-
-    # Create app instance with the determined port
-    # Global socketio instance is used automatically
-    app = create_app(server_port=actual_port)
-    
-    # Register cleanup functions
-    atexit.register(cleanup_resources)
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-    
-    # Start Flask-SocketIO server with configuration-based settings
-    try:
-        socketio.run(
-            app, 
-            host=host, 
-            port=actual_port, 
-            debug=debug, 
-            use_reloader=False, 
-            allow_unsafe_werkzeug=socketio_config.get('allow_unsafe_werkzeug', True)
+    # Host validation: restrict to loopback addresses appropriate for this
+    # local desktop app.  ``testserver`` is included only in development/test
+    # because Starlette's TestClient sends ``Host: testserver`` by default;
+    # all other environments (production, unset, typos) must NOT trust that
+    # synthetic hostname (fail-closed allowlist).
+    configured_host = server_config.get("server.host", "127.0.0.1")
+    if not isinstance(configured_host, str) or not configured_host:
+        logger.warning(
+            "Invalid server.host configuration value %r; falling back to 127.0.0.1",
+            configured_host,
         )
-    except KeyboardInterrupt:
-        logger.info("Server stopped by user.")
-    finally:
-        logger.info("Shutting down server...")
-        cleanup_resources()
+        configured_host = "127.0.0.1"
+    elif configured_host not in _LOOPBACK_HOSTS:
+        logger.warning(
+            "server.host %r is not a recognised loopback address; "
+            "falling back to 127.0.0.1",
+            configured_host,
+        )
+        configured_host = "127.0.0.1"
+
+    env = os.getenv("PYSCF_ENV", "").lower()
+    allowed_hosts: list[str] = list({"127.0.0.1", "localhost", configured_host})
+    if env in {"development", "test"}:
+        allowed_hosts.append("testserver")
+    fastapi_app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts)
+
+    if test_config:
+        for key, value in test_config.items():
+            setattr(fastapi_app.state, key, value)
+
+    register_routers(fastapi_app)
+    return fastapi_app
 
 
-# Create global app instance for import by other modules
-# Global socketio instance is already defined above
-# These are created at module import time for Gunicorn compatibility
-# Port is determined from environment variable or configuration
+def create_app(
+    server_port: int | None = None,
+    test_config: dict[str, Any] | None = None,
+) -> FastAPI:
+    return create_fastapi_app(server_port=server_port, test_config=test_config)
+
+
 app = create_app()
+fastapi_app = app
 
 
-if __name__ == '__main__':
-    start_development_server()
+if __name__ == "__main__":
+    import uvicorn
+
+    server_config = get_server_config()
+    port_env = os.getenv("PYSCF_SERVER_PORT")
+    actual_port = determine_server_port(server_config, port_env=port_env)
+    host = server_config.get("server.host", "127.0.0.1")
+    uvicorn.run("app:app", host=host, port=actual_port, reload=False, log_level="info")

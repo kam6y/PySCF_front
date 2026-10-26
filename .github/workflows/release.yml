@@ -8,64 +8,173 @@ on:
 jobs:
   release:
     strategy:
+      # Keep the other platform running so a Linux-only failure does not hide
+      # the result of the macOS signing/notarization job (and vice versa).
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             platform: linux
+            conda-platform: linux-64
+            conda-lock-file: .github/conda-locks/pyscf-env-linux-64.lock
           - os: macos-latest
             platform: darwin
+            conda-platform: osx-arm64
+            conda-lock-file: .github/conda-locks/pyscf-env-osx-arm64.lock
 
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
-        cache: 'npm'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
 
-    - name: Setup Miniconda
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        miniforge-version: latest
-        activate-environment: pyscf-env
-        environment-file: .github/environment.yml
-        python-version: 3.12
-        auto-activate-base: false
+      - name: Cache conda environment
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-${{ matrix.conda-platform }}-conda-v2-${{ hashFiles('.github/pyscf-env.conda-lock.yml', matrix.conda-lock-file) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.conda-platform }}-conda-v2-
 
-    - name: Install Node.js dependencies
-      run: npm ci
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: ""
+          auto-activate-base: true
+          use-only-tar-bz2: true
+          pkgs-dirs: ~/conda_pkgs_dir
+          conda-remove-defaults: true
 
-    - name: Verify conda environment
-      shell: bash -l {0}
-      run: |
-        conda activate pyscf-env
-        npm run verify-env
+      - name: Install locked conda environment
+        shell: bash -l {0}
+        run: |
+          conda install -n base -c conda-forge conda-lock=4.0.3 -y
+          conda-lock install --name pyscf-env .github/pyscf-env.conda-lock.yml
 
-    - name: Build application
-      shell: bash -l {0}
-      run: |
-        conda activate pyscf-env
-        npm run build
+      - name: Install Node.js dependencies
+        run: |
+          npm config set fetch-retries 5
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set fetch-timeout 300000
 
-    - name: Package application
-      shell: bash -l {0}
-      run: |
-        conda activate pyscf-env
-        npx electron-builder
+          for i in 1 2 3; do
+            npm ci --legacy-peer-deps && break || {
+              if [ $i -eq 3 ]; then
+                echo "npm ci failed after 3 attempts"
+                exit 1
+              fi
+              echo "npm ci failed, retrying (attempt $i/3)..."
+              sleep 10
+            }
+          done
 
-    - name: Upload release artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: release-${{ matrix.platform }}
-        path: |
-          dist/*.AppImage
-          dist/*.dmg
-          dist/*.zip
-        retention-days: 30
+      - name: Verify conda environment
+        shell: bash -l {0}
+        run: |
+          conda activate pyscf-env
+          npm run verify-env
+
+      - name: Build application
+        shell: bash -l {0}
+        run: |
+          conda activate pyscf-env
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            npm run build:linux
+          else
+            npm run build
+          fi
+
+      # ---------------------------------------------------------------------
+      # macOS: sign with a Developer ID Application certificate, notarize with
+      # Apple, staple the ticket and verify the result. Required secrets are
+      # documented in docs/release-signing.md.
+      # ---------------------------------------------------------------------
+      - name: Check macOS code-signing secrets
+        if: matrix.platform == 'darwin'
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          missing=()
+          [ -n "$CSC_LINK" ] || missing+=(CSC_LINK)
+          [ -n "$CSC_KEY_PASSWORD" ] || missing+=(CSC_KEY_PASSWORD)
+          if [ -n "$APPLE_API_KEY_CONTENT$APPLE_API_KEY_ID$APPLE_API_ISSUER" ]; then
+            # App Store Connect API key flow
+            [ -n "$APPLE_API_KEY_CONTENT" ] || missing+=(APPLE_API_KEY_CONTENT)
+            [ -n "$APPLE_API_KEY_ID" ] || missing+=(APPLE_API_KEY_ID)
+            [ -n "$APPLE_API_ISSUER" ] || missing+=(APPLE_API_ISSUER)
+          else
+            # Apple ID + app-specific password flow
+            [ -n "$APPLE_ID" ] || missing+=(APPLE_ID)
+            [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] || missing+=(APPLE_APP_SPECIFIC_PASSWORD)
+            [ -n "$APPLE_TEAM_ID" ] || missing+=(APPLE_TEAM_ID)
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing GitHub secrets for macOS signing/notarization: ${missing[*]} (see docs/release-signing.md)"
+            exit 1
+          fi
+          echo "All macOS signing secrets are present"
+
+      - name: Package application (macOS, signed and notarized)
+        if: matrix.platform == 'darwin'
+        shell: bash -l {0}
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          conda activate pyscf-env
+          if [ -n "$APPLE_API_KEY_CONTENT" ]; then
+            # electron-builder expects the .p8 key as a file path in APPLE_API_KEY.
+            export APPLE_API_KEY="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+            printf '%s\n' "$APPLE_API_KEY_CONTENT" > "$APPLE_API_KEY"
+            # electron-builder prefers Apple ID credentials when both are set.
+            unset APPLE_ID APPLE_APP_SPECIFIC_PASSWORD
+          fi
+          unset APPLE_API_KEY_CONTENT
+          npx electron-builder --mac
+          npm run verify:asar-artifacts
+
+      - name: Verify macOS signature and notarization
+        if: matrix.platform == 'darwin'
+        run: bash scripts/verify-mac-signing.sh
+
+      - name: Package application (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash -l {0}
+        run: |
+          conda activate pyscf-env
+          npx electron-builder --linux
+          npm run verify:asar-artifacts
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            release/*.AppImage
+            release/*.dmg
+            release/*.zip
+          retention-days: 30
 
   create-release:
     needs: release
@@ -75,21 +184,21 @@ jobs:
       contents: write
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: ./artifacts
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
 
-    - name: Create Release
-      uses: softprops/action-gh-release@v2
-      with:
-        draft: false
-        prerelease: ${{ contains(github.ref, '-') }}
-        files: |
-          ./artifacts/release-*/*
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          files: |
+            ./artifacts/release-*/*
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  calculationQueryKeys,
   useStartCalculation,
   useUpdateCalculationName,
   useDeleteCalculation,
@@ -9,14 +10,11 @@ import {
 import {
   CalculationInstance,
   QuantumCalculationRequest,
-  ApiError,
 } from '../types/api-types';
 import { useCalculationStore } from '../store/calculationStore';
-import {
-  showErrorNotification,
-  showInfoNotification,
-} from '../store/notificationStore';
+import { showInfoNotification } from '../store/notificationStore';
 import { handleError } from '../utils/errorHandler';
+import { isResourceInsufficientError } from '../utils/errorClassifier';
 
 export const useCalculationActions = () => {
   const queryClient = useQueryClient();
@@ -65,15 +63,9 @@ export const useCalculationActions = () => {
           runningCalculation.error || runningCalculation.results?.error;
 
         if (errorMessage) {
-          // リソース不足エラーの判定
-          const isResourceInsufficientError =
-            errorMessage.toLowerCase().includes('cpu usage') ||
-            errorMessage.toLowerCase().includes('memory usage') ||
-            errorMessage.toLowerCase().includes('system cpu usage') ||
-            errorMessage.toLowerCase().includes('system memory usage') ||
-            errorMessage.toLowerCase().includes('no active calculations');
+          const isResourceError = isResourceInsufficientError(errorMessage);
 
-          if (isResourceInsufficientError) {
+          if (isResourceError) {
             handleError(new Error(errorMessage), 'Calculation failed');
           } else {
             handleError(
@@ -149,10 +141,15 @@ export const useCalculationActions = () => {
 
   const handleCalculationUpdate = (updatedCalculation: CalculationInstance) => {
     // React Queryキャッシュを直接更新
-    queryClient.setQueryData(['calculation', updatedCalculation.id], {
-      calculation: updatedCalculation,
+    queryClient.setQueryData(
+      calculationQueryKeys.detail(updatedCalculation.id),
+      {
+        calculation: updatedCalculation,
+      }
+    );
+    queryClient.invalidateQueries({
+      queryKey: calculationQueryKeys.list(),
     });
-    queryClient.invalidateQueries({ queryKey: ['calculations'] });
   };
 
   return {

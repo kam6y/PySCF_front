@@ -1,14 +1,13 @@
 """CASSCF calculator implementation using PySCF."""
 
-import os
 import logging
 import numpy as np
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional
 from pyscf import gto, scf, mcscf
 
 from .base_calculator import BaseCalculator
-from .exceptions import CalculationError, ConvergenceError, InputError, GeometryError
-from .file_manager import CalculationFileManager
+from .exceptions import CalculationError, InputError
+from ._calculation_repository import CalculationRepository
 from .solvent_effects import setup_solvent_effects
 from .config_manager import get_memory_for_method, get_max_cycle_macro, get_max_cycle_micro, get_ah_max_cycle
 
@@ -20,7 +19,7 @@ class CASSCFCalculator(BaseCalculator):
     
     def __init__(self, working_dir: Optional[str] = None, keep_files: bool = False, molecule_name: Optional[str] = None, optimize_geometry: bool = False):
         # Use file manager for better organization
-        self.file_manager = CalculationFileManager()
+        self.file_manager = CalculationRepository()
         if working_dir is None:
             working_dir = self.file_manager.create_calculation_dir(molecule_name)
         super().__init__(working_dir, optimize_geometry)
@@ -32,11 +31,6 @@ class CASSCFCalculator(BaseCalculator):
         # Set calculation method for memory management
         self.calculation_method = 'CASSCF'
         
-    def setup_calculation(self, atoms: List[List], **kwargs) -> None:
-        """Setup CASSCF calculation using the base template method."""
-        # Call the base template method which handles common setup
-        super().setup_calculation(atoms, **kwargs)
-    
     def _validate_specific_parameters(self, **kwargs) -> Dict[str, Any]:
         """Validate CASSCF-specific parameters."""
         # CASSCF-specific parameters
@@ -347,10 +341,7 @@ class CASSCFCalculator(BaseCalculator):
                 mol = self.mf.mol if hasattr(self, 'mf') and self.mf is not None else self.mol
 
                 # Calculate orbital rotation matrix
-                if hasattr(mol, 'get_ovlp'):
-                    S = mol.get_ovlp()
-                else:
-                    S = self.mf.get_ovlp()
+                S = mol.get_ovlp() if hasattr(mol, 'get_ovlp') else self.mf.get_ovlp()
                 
                 # Rotation matrix: R = C_initial^T * S * C_final
                 rotation_matrix = np.dot(self.mf.mo_coeff.T, np.dot(S, self.mycas.mo_coeff))
