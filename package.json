@@ -87,7 +87,7 @@
     "ketcher-core": "^3.5.0",
     "ketcher-react": "^3.5.0",
     "ketcher-standalone": "^3.5.0",
-    "miew": "^0.11.1",
+    "miew": "^0.12.0",
     "process": "^0.11.10",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
