@@ -84,7 +84,7 @@
     "3dmol": "^2.5.2",
     "d3": "^7.9.0",
     "katex": "^0.16.27",
-    "ketcher-core": "^3.5.0",
+    "ketcher-core": "^3.18.0",
     "ketcher-react": "^3.5.0",
     "ketcher-standalone": "^3.5.0",
     "miew": "^0.11.1",
